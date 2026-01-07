@@ -77,7 +77,7 @@ func initSocket(k types.Knapsack, slogger *slog.Logger, socketPrefix string) (ne
 
 	// Now, create new pipe -- we use a random 4-digit number over ulid to avoid too-long paths.
 	socketPath := fmt.Sprintf("%s_%d", socketPrefixWithPath, rand.Intn(10000))
-	listener, err := net.Listen("unix", socketPath)
+	listener, err := net.Listen("unix", socketPath) //nolint:noctx // will fix in https://github.com/kolide/launcher/pull/2526
 	if err != nil {
 		return nil, socketPath, fmt.Errorf("listening at %s: %w", socketPath, err)
 	}

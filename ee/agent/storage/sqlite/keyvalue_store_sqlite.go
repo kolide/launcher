@@ -225,7 +225,7 @@ func (s *sqliteStore) Get(key []byte) (value []byte, err error) {
 	query := fmt.Sprintf(`SELECT value FROM %s WHERE name = ?;`, s.tableName)
 
 	var keyValue string
-	if err := s.conn.QueryRow(query, string(key)).Scan(&keyValue); err != nil {
+	if err := s.conn.QueryRow(query, string(key)).Scan(&keyValue); err != nil { //nolint:noctx
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -256,7 +256,7 @@ ON CONFLICT (name) DO UPDATE SET value=excluded.value;`,
 		s.tableName,
 	)
 
-	if _, err := s.conn.Exec(upsertSql, string(key), string(value)); err != nil {
+	if _, err := s.conn.Exec(upsertSql, string(key), string(value)); err != nil { //nolint:noctx
 		return fmt.Errorf("upserting into %s: %w", s.tableName, err)
 	}
 
@@ -279,7 +279,7 @@ func (s *sqliteStore) Update(kvPairs map[string]string) ([]string, error) {
 	// Wrap in a single transaction
 	var err error
 	var tx *sql.Tx
-	tx, err = s.conn.Begin()
+	tx, err = s.conn.Begin() //nolint:noctx
 	if err != nil {
 		return nil, fmt.Errorf("beginning transaction: %w", err)
 	}
@@ -312,7 +312,7 @@ ON CONFLICT (name) DO UPDATE SET value=excluded.value;`
 
 	// It's fine to interpolate the table name into the query because
 	// we require the table name to be in our allowlist `supportedTables`.
-	if _, err := tx.Exec(fmt.Sprintf(upsertSql, s.tableName, valueStr), valueArgs...); err != nil {
+	if _, err := tx.Exec(fmt.Sprintf(upsertSql, s.tableName, valueStr), valueArgs...); err != nil { //nolint:noctx
 		if rollbackErr := tx.Rollback(); rollbackErr != nil {
 			return nil, fmt.Errorf("upserting into %s: %w; rollback error %v", s.tableName, err, rollbackErr)
 		}
@@ -323,7 +323,7 @@ ON CONFLICT (name) DO UPDATE SET value=excluded.value;`
 	deleteSql := `DELETE FROM %s WHERE name NOT IN (%s) RETURNING name;`
 	inStr := strings.TrimRight(strings.Repeat("?,", len(keyNames)), ",")
 
-	rows, err := tx.Query(fmt.Sprintf(deleteSql, s.tableName, inStr), keyNames...)
+	rows, err := tx.Query(fmt.Sprintf(deleteSql, s.tableName, inStr), keyNames...) //nolint:noctx
 	if err != nil {
 		if rollbackErr := tx.Rollback(); rollbackErr != nil {
 			return nil, fmt.Errorf("deleting keys: %w; rollback error %v", err, rollbackErr)

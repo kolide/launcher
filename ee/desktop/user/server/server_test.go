@@ -91,7 +91,7 @@ func TestUserServer_shutdownHandler(t *testing.T) {
 				<-shutdownChan
 			}()
 
-			req, err := http.NewRequest("", "", nil) //nolint:noctx // We don't care about this in tests
+			req, err := http.NewRequestWithContext(t.Context(), "", "", nil) //nolint:noctx // We don't care about this in tests
 			require.NoError(t, err)
 
 			handler := http.HandlerFunc(server.shutdownHandler)
@@ -126,7 +126,7 @@ func testServer(t *testing.T, authHeader, socketPath string, logBytes *bytes.Buf
 }
 
 func testSocketPath(t *testing.T) string {
-	socketFileName := strings.Replace(t.Name(), "/", "_", -1)
+	socketFileName := strings.ReplaceAll(t.Name(), "/", "_")
 
 	// using t.TempDir() creates a file path too long for a unix socket
 	socketPath := filepath.Join(os.TempDir(), socketFileName)

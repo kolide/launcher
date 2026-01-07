@@ -30,7 +30,7 @@ func (s *sqliteStore) AppendValue(timestamp int64, value []byte) error {
 		colInfo.valueColumn,
 	)
 
-	if _, err := s.conn.Exec(insertSql, timestamp, value); err != nil {
+	if _, err := s.conn.Exec(insertSql, timestamp, value); err != nil { //nolint:noctx
 		return fmt.Errorf("appending row into %s: %w", s.tableName, err)
 	}
 
@@ -55,7 +55,7 @@ func (s *sqliteStore) DeleteRows(rowids ...any) error {
 	paramQs = paramQs[:len(paramQs)-1]
 	deleteSql := fmt.Sprintf(`DELETE FROM %s WHERE rowid IN (%s)`, s.tableName, paramQs)
 
-	if _, err := s.conn.Exec(deleteSql, rowids...); err != nil {
+	if _, err := s.conn.Exec(deleteSql, rowids...); err != nil { //nolint:noctx
 		return fmt.Errorf("deleting row from %s: %w", s.tableName, err)
 	}
 
@@ -79,7 +79,7 @@ func (s *sqliteStore) ForEach(fn func(rowid, timestamp int64, v []byte) error) e
 		s.tableName,
 	)
 
-	rows, err := s.conn.Query(query)
+	rows, err := s.conn.Query(query) //nolint:noctx
 	if err != nil {
 		return fmt.Errorf("issuing foreach query: %w", err)
 	}

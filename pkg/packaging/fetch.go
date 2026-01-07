@@ -67,7 +67,7 @@ func FetchBinary(ctx context.Context, localCacheDir, name, binaryName, channelOr
 	)
 
 	// Download the package
-	downloadReq, err := http.NewRequest("GET", url, nil)
+	downloadReq, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return "", fmt.Errorf("new request: %w", err)
 	}

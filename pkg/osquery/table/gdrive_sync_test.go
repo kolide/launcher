@@ -34,9 +34,9 @@ func TestGDriveSyncConfig(t *testing.T) { //nolint:paralleltest // We need to up
 	f.Close()
 	db, err := sql.Open("sqlite", tempSqliteFilepath)
 	require.NoError(t, err)
-	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS data (entry_key TEXT, data_value TEXT);`)
+	_, err = db.ExecContext(t.Context(), `CREATE TABLE IF NOT EXISTS data (entry_key TEXT, data_value TEXT);`)
 	require.NoError(t, err)
-	_, err = db.Exec(`INSERT INTO data (entry_key, data_value) VALUES ("user_email", "testusername@example.com"), ("local_sync_root_path", "test");`)
+	_, err = db.ExecContext(t.Context(), `INSERT INTO data (entry_key, data_value) VALUES ("user_email", "testusername@example.com"), ("local_sync_root_path", "test");`)
 	require.NoError(t, err)
 	require.NoError(t, db.Close())
 

@@ -64,7 +64,7 @@ func sqliteData(ctx context.Context, slogger *slog.Logger, sourcePaths []string,
 // accepted by filepath.Glob.
 func sourcePatternToGlobbablePattern(sourcePattern string) string {
 	// % matches zero or more characters, corresponds to * in glob syntax
-	return strings.Replace(sourcePattern, "%", `*`, -1)
+	return strings.ReplaceAll(sourcePattern, "%", `*`)
 }
 
 // querySqliteDb queries the database at the given path, returning rows of results

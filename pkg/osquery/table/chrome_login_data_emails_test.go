@@ -38,9 +38,9 @@ func TestChromeLoginDataEmails(t *testing.T) { //nolint:paralleltest // We need 
 	f.Close()
 	db, err := sql.Open("sqlite", tempSqliteFilepath)
 	require.NoError(t, err)
-	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS logins (username_value TEXT);`)
+	_, err = db.ExecContext(t.Context(), `CREATE TABLE IF NOT EXISTS logins (username_value TEXT);`)
 	require.NoError(t, err)
-	_, err = db.Exec(`INSERT INTO logins (username_value) VALUES ("testusername@example.com");`)
+	_, err = db.ExecContext(t.Context(), `INSERT INTO logins (username_value) VALUES ("testusername@example.com");`)
 	require.NoError(t, err)
 	require.NoError(t, db.Close())
 

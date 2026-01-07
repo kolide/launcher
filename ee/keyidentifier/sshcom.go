@@ -31,7 +31,7 @@ func ParseSshComPrivateKey(keyBytes []byte) (*KeyInfo, error) {
 	// then hand it to pem to decode
 	keyBytes = bytes.Replace(keyBytes, []byte("---- BEGIN"), []byte("-----BEGIN"), 1)
 	keyBytes = bytes.Replace(keyBytes, []byte("---- END"), []byte("-----END"), 1)
-	keyBytes = bytes.Replace(keyBytes, []byte("KEY ----"), []byte("KEY-----"), -1)
+	keyBytes = bytes.ReplaceAll(keyBytes, []byte("KEY ----"), []byte("KEY-----"))
 
 	block, _ := pem.Decode(keyBytes)
 	if block == nil {

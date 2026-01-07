@@ -39,7 +39,7 @@ func Test_sqliteData(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create table
-		_, err = conn.Exec(`
+		_, err = conn.ExecContext(t.Context(), `
 			CREATE TABLE IF NOT EXISTS test_data (
 				uuid TEXT NOT NULL PRIMARY KEY,
 				value TEXT,
@@ -49,7 +49,7 @@ func Test_sqliteData(t *testing.T) {
 		require.NoError(t, err)
 
 		// Add data to table
-		_, err = conn.Exec(`
+		_, err = conn.ExecContext(t.Context(), `
 			INSERT INTO test_data (uuid, value, ignored_column)
 			VALUES (?, ?, "ignored value");
 		`, uuids[i], values[i])

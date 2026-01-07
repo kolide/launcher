@@ -23,7 +23,7 @@ func (n *networkCheckup) Name() string {
 func (n *networkCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 	// Confirm that we can listen on the local network -- launcher has to be able to do this
 	// in order to communicate with desktop processes
-	listener, err := net.Listen("tcp", "localhost:0")
+	listener, err := net.Listen("tcp", "localhost:0") //nolint:noctx
 	if err != nil {
 		n.status = Failing
 		n.summary = fmt.Sprintf("launcher cannot listen on local network: %v", err)

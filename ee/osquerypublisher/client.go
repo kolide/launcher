@@ -15,9 +15,20 @@ import (
 	"github.com/kolide/kit/contexts/uuid"
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/pkg/service"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	osqlog "github.com/osquery/osquery-go/plugin/logger"
+)
+
+const (
+	// maxRequestSizeBytes is the maximum size in bytes for a single PublishOsqueryLogsRequest.
+	// Requests exceeding this size will be split into multiple smaller batches, to keep the requests
+	// performant for transfer via kafka later
+	maxRequestSizeBytes = 1024 * 1024 // 1MB
+
+	// publicationPathLogs is the path for publishing logs to the agent-ingester service
+	publicationPathLogs = "logs"
+	// publicationPathResults is the path for publishing results to the agent-ingester service
+	publicationPathResults = "results"
 )
 
 type (
@@ -68,6 +79,62 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 		return nil, nil
 	}
 
+	batches := lpc.batchLogsRequest(logs)
+	logger := lpc.slogger.With(
+		"log_type", logType.String(),
+		"log_count", len(logs),
+		"batch_count", len(batches),
+	)
+
+	pubResponse := types.OsqueryPublicationResponse{}
+
+	for idx, logBatch := range batches {
+		payload := types.PublishOsqueryLogsRequest{
+			LogType: logType,
+			Logs:    logBatch,
+		}
+
+		resp, err := lpc.publish(ctx, logger, payload, publicationPathLogs)
+		if err != nil {
+			logger.Log(ctx, slog.LevelError, "encountered error publishing log batch",
+				"err", err,
+				"batch_index", idx,
+			)
+
+			return nil, err
+		}
+
+		pubResponse.IngestedBytes += resp.IngestedBytes
+		pubResponse.LogCount += resp.LogCount
+		pubResponse.Status = resp.Status
+	}
+
+	return &pubResponse, nil
+}
+
+// PublishResults publishes results to the agent-ingester service.
+// It returns the response from the agent-ingester service and any error that occurred.
+// In the future we will likely want to pass a registration id in here to allow for selection of
+// the correct agent-ingester token to use. For now, we can use the default registration token.
+func (lpc *LogPublisherClient) PublishResults(ctx context.Context, results []distributed.Result) (*types.OsqueryPublicationResponse, error) {
+	if !lpc.shouldPublishLogs() {
+		return nil, nil
+	}
+
+	logger := lpc.slogger.With(
+		"result_count", len(results),
+	)
+
+	payload := types.PublishOsqueryResultsRequest{
+		Results: results,
+	}
+
+	return lpc.publish(ctx, logger, payload, publicationPathResults)
+}
+
+// publish handles the common logic for publishing logs and results to the agent-ingester service. This
+// includes marshalling the payload, fetching the auth token, issuing the request, and handling the response/logging.
+func (lpc *LogPublisherClient) publish(ctx context.Context, slogger *slog.Logger, payload any, publicationPath string) (*types.OsqueryPublicationResponse, error) {
 	// in the future we will want to plumb a registration ID through here, for now just use the default
 	registrationID := types.DefaultRegistrationID
 	authToken := lpc.getTokenForRegistration(registrationID)
@@ -79,44 +146,31 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 	ctx = uuid.NewContext(ctx, requestUUID)
 	logger := lpc.slogger.With(
 		"request_uuid", requestUUID,
-		"log_type", logType.String(),
-		"log_count", len(logs),
+		"publication_type", publicationPath,
 	)
 	var resp *http.Response
-	var publishLogsResponse types.OsqueryPublicationResponse
+	var publicationResponse types.OsqueryPublicationResponse
 	var err error
 
 	defer func(begin time.Time) {
-		pubStateVals, ok := ctx.Value(service.PublicationCtxKey).(map[string]int)
-		if !ok {
-			pubStateVals = make(map[string]int)
-		}
-
-		logger.Log(ctx, levelForError(err), "attempted log publication",
-			"method", "PublishLogs",
-			"response", publishLogsResponse,
+		logger.Log(ctx, levelForError(err), "attempted osquery publication",
+			"response", publicationResponse,
 			"status_code", resp.StatusCode,
 			"err", err,
 			"took", time.Since(begin),
-			"publication_state", pubStateVals,
 		)
 	}(time.Now())
-
-	payload := types.PublishOsqueryLogsRequest{
-		LogType: logType,
-		Logs:    logs,
-	}
 
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
 		logger.Log(ctx, slog.LevelError,
-			"failed to marshal log publish request",
+			"failed to marshal publication request",
 			"err", err,
 		)
 		return nil, fmt.Errorf("marshaling request: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/logs", lpc.knapsack.OsqueryPublisherURL())
+	url := fmt.Sprintf("%s/%s", lpc.knapsack.OsqueryPublisherURL(), publicationPath)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		logger.Log(ctx, slog.LevelError,
@@ -150,7 +204,7 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 		return nil, fmt.Errorf("reading response: %w", err)
 	}
 
-	err = json.Unmarshal(body, &publishLogsResponse)
+	err = json.Unmarshal(body, &publicationResponse)
 	if err != nil {
 		logger.Log(ctx, slog.LevelError,
 			"failed to unmarshal response body",
@@ -167,113 +221,7 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 		return nil, fmt.Errorf("agent-ingester returned status %d: %s", resp.StatusCode, string(body))
 	}
 
-	return &publishLogsResponse, nil
-}
-
-// PublishResults publishes results to the agent-ingester service.
-// It returns the response from the agent-ingester service and any error that occurred.
-// In the future we will likely want to pass a registration id in here to allow for selection of
-// the correct agent-ingester token to use. For now, we can use the default registration token.
-func (lpc *LogPublisherClient) PublishResults(ctx context.Context, results []distributed.Result) (*types.OsqueryPublicationResponse, error) {
-	if !lpc.shouldPublishLogs() {
-		return nil, nil
-	}
-
-	// in the future we will want to plumb a registration ID through here, for now just use the default
-	registrationID := types.DefaultRegistrationID
-	authToken := lpc.getTokenForRegistration(registrationID)
-	if authToken == "" {
-		return nil, fmt.Errorf("no auth token found for registration: %s", registrationID)
-	}
-
-	requestUUID := uuid.NewForRequest()
-	ctx = uuid.NewContext(ctx, requestUUID)
-	logger := lpc.slogger.With(
-		"request_uuid", requestUUID,
-		"result_count", len(results),
-	)
-	var resp *http.Response
-	var publishResultsResponse types.OsqueryPublicationResponse
-	var err error
-
-	defer func(begin time.Time) {
-		pubStateVals, ok := ctx.Value(service.PublicationCtxKey).(map[string]int)
-		if !ok {
-			pubStateVals = make(map[string]int)
-		}
-
-		logger.Log(ctx, levelForError(err), "attempted result publication",
-			"method", "PublishResults",
-			"response", publishResultsResponse,
-			"status_code", resp.StatusCode,
-			"err", err,
-			"took", time.Since(begin),
-			"publication_state", pubStateVals,
-		)
-	}(time.Now())
-
-	payload := types.PublishOsqueryResultsRequest{
-		Results: results,
-	}
-
-	jsonData, err := json.Marshal(payload)
-	if err != nil {
-		logger.Log(ctx, slog.LevelError,
-			"failed to marshal result publish request",
-			"err", err,
-		)
-		return nil, fmt.Errorf("marshaling request: %w", err)
-	}
-
-	url := fmt.Sprintf("%s/results", lpc.knapsack.OsqueryPublisherURL())
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(jsonData))
-	if err != nil {
-		logger.Log(ctx, slog.LevelError,
-			"failed to create HTTP request",
-			"err", err,
-		)
-		return nil, fmt.Errorf("creating request: %w", err)
-	}
-
-	// set required headers and issue the request
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
-	resp, err = lpc.client.Do(req)
-	if err != nil {
-		logger.Log(ctx, slog.LevelError,
-			"failed to issue HTTP request",
-			"err", err,
-		)
-		return nil, fmt.Errorf("sending request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// read in the response and unmarshal
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		logger.Log(ctx, slog.LevelError,
-			"failed to read response body",
-			"status_code", resp.StatusCode,
-			"err", err,
-		)
-		return nil, fmt.Errorf("reading response: %w", err)
-	}
-
-	err = json.Unmarshal(body, &publishResultsResponse)
-	if err != nil {
-		logger.Log(ctx, slog.LevelError,
-			"failed to unmarshal response body",
-			"status_code", resp.StatusCode,
-			"err", err,
-		)
-		return nil, fmt.Errorf("unable to unmarshal agent-ingester response: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("agent-ingester returned status %d: %s", resp.StatusCode, string(body))
-	}
-
-	return &publishResultsResponse, nil
+	return &publicationResponse, nil
 }
 
 func (lpc *LogPublisherClient) Ping() {
@@ -326,4 +274,43 @@ func (lpc *LogPublisherClient) shouldPublishLogs() bool {
 	// generate random number between 0 and 100 to determine if this batch should be published
 	// if the random number is less than the percentage enabled, publish the logs
 	return rand.Intn(101) <= dualPublicationPercentEnabled
+}
+
+// batchLogsRequest takes in a slice of logs and returns a slice of slices of logs, where each slice is a batch of logs
+// that will fit within maxRequestSizeBytes (set for kafka performance). If a single log exceeds the max request size, it is added as its own batch.
+func (lpc *LogPublisherClient) batchLogsRequest(logs []string) [][]string {
+	batches := make([][]string, 0)
+	currentLogBatchSize := 0
+	currentBatch := make([]string, 0)
+	for _, log := range logs {
+		logLength := len(log)
+		// if a single log ever exceeds the max request size, add as its own batch and log
+		// this loudly, this is not expected and may cause issues downstream
+		if logLength > maxRequestSizeBytes {
+			lpc.slogger.Log(context.TODO(), slog.LevelWarn,
+				"single osquery log exceeds max request size",
+				"log_length", logLength,
+				"max_request_size", maxRequestSizeBytes,
+			)
+			// add the log as its own batch but don't alter any of the current batch size state, that can continue
+			// in case there are other smaller logs that can still fit in the current batch
+			batches = append(batches, []string{log})
+			continue
+		}
+		// if the size of the next log would exceed the max request size, finalize the existing and start a new batch
+		if currentLogBatchSize+logLength > maxRequestSizeBytes {
+			batches = append(batches, currentBatch)
+			currentBatch = make([]string, 0)
+			currentLogBatchSize = 0
+		}
+
+		currentBatch = append(currentBatch, log)
+		currentLogBatchSize += logLength
+	}
+
+	if len(currentBatch) > 0 {
+		batches = append(batches, currentBatch)
+	}
+
+	return batches
 }

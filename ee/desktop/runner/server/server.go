@@ -49,7 +49,7 @@ type Messenger interface {
 func New(slogger *slog.Logger,
 	accelerator requestAcclerator,
 	messenger Messenger) (*RunnerServer, error) {
-	listener, err := net.Listen("tcp", "localhost:0")
+	listener, err := net.Listen("tcp", "localhost:0") //nolint:noctx
 	if err != nil {
 		return nil, fmt.Errorf("creating net listener: %w", err)
 	}

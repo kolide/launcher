@@ -93,11 +93,12 @@ func getDownloadDirs() []string {
 	var userDirs []string
 	var baseDir string
 
-	if runtime.GOOS == "windows" {
+	switch runtime.GOOS {
+	case "windows":
 		baseDir = "C:\\Users"
-	} else if runtime.GOOS == "darwin" {
+	case "darwin":
 		baseDir = "/Users"
-	} else {
+	default:
 		baseDir = "/home"
 	}
 

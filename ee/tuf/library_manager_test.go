@@ -47,9 +47,10 @@ func Test_pathToTargetVersionExecutable(t *testing.T) {
 	testVersion := "1.0.7-30-abcdabcd"
 	testTargetFilename := fmt.Sprintf("launcher-%s.tar.gz", testVersion)
 	expectedPath := filepath.Join(testBaseDir, "launcher", testVersion, "launcher")
-	if runtime.GOOS == "darwin" {
+	switch runtime.GOOS {
+	case "darwin":
 		expectedPath = filepath.Join(testBaseDir, "launcher", testVersion, "Kolide.app", "Contents", "MacOS", "launcher")
-	} else if runtime.GOOS == "windows" {
+	case "windows":
 		expectedPath = expectedPath + ".exe"
 	}
 

@@ -129,7 +129,7 @@ func TestOptionsFromFile(t *testing.T) { // nolint:paralleltest
 		require.NoError(t, err)
 
 		if val != "" {
-			_, err = flagFile.WriteString(fmt.Sprintf(" %s", val))
+			_, err = fmt.Fprintf(flagFile, " %s", val)
 			require.NoError(t, err)
 		}
 
@@ -164,7 +164,7 @@ func TestAutoupdateDownloadSPlayCanBeDisabledFromFlagsFile(t *testing.T) { //nol
 		require.NoError(t, err)
 
 		if val != "" {
-			_, err = flagFile.WriteString(fmt.Sprintf(" %s", val))
+			_, err = fmt.Fprintf(flagFile, " %s", val)
 			require.NoError(t, err)
 		}
 
@@ -201,7 +201,7 @@ func TestOsqueryLogPublishFlags(t *testing.T) { //nolint:paralleltest
 		require.NoError(t, err)
 
 		if val != "" {
-			_, err = flagFile.WriteString(fmt.Sprintf(" %s", val))
+			_, err = fmt.Fprintf(flagFile, " %s", val)
 			require.NoError(t, err)
 		}
 

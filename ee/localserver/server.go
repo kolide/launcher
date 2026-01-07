@@ -394,7 +394,7 @@ func (ls *localServer) startListener() (net.Listener, error) {
 			"port", p,
 		)
 
-		l, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", p))
+		l, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", p)) //nolint:noctx
 		if err != nil {
 			ls.slogger.Log(ctx, slog.LevelDebug,
 				"unable to bind to port, moving on",
