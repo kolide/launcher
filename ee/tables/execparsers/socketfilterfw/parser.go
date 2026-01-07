@@ -7,8 +7,8 @@ import (
 	"strings"
 )
 
-var appRegex = regexp.MustCompile("(.*)(?:\\s\\(state:\\s)([0-9]+)")
-var lineRegex = regexp.MustCompile("(state|block|built-in|downloaded|stealth|log mode|log option)(?:.*\\s)([0-9a-z]+)")
+var appRegex = regexp.MustCompile(`(.*)(?:\s\(state:\s)([0-9]+)`)
+var lineRegex = regexp.MustCompile(`(state|block|built-in|downloaded|stealth|log mode|log option)(?:.*\s)([0-9a-z]+)`)
 
 // socketfilterfw returns lines for each `get` argument supplied.
 // The output data is in the same order as the supplied arguments.

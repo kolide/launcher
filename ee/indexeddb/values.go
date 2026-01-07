@@ -417,7 +417,7 @@ func deserializeSparseArray(ctx context.Context, slogger *slog.Logger, srcReader
 			return nil, fmt.Errorf("unexpected array index type: 0x%02x / `%s`", idxByte, string(idxByte))
 		}
 
-		if reachedEndOfArray {
+		if reachedEndOfArray { //nolint:staticcheck
 			break
 		}
 
@@ -472,11 +472,7 @@ func deserializeDenseArray(ctx context.Context, slogger *slog.Logger, srcReader 
 	// At the end of the array we have some padding and additional data -- consume
 	// that data
 	reachedEndOfArray := false
-	for {
-		if reachedEndOfArray {
-			break
-		}
-
+	for !reachedEndOfArray {
 		nextByte, err := srcReader.ReadByte()
 		if err != nil {
 			return nil, fmt.Errorf("reading next byte at end of dense array: %w", err)

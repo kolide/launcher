@@ -779,7 +779,7 @@ func (e *kryptoEcMiddleware) checkOrigin(r *http.Request, allowedOrigins []strin
 		origin = strings.TrimSuffix(r.Header.Get("Referer"), "/")
 	}
 
-	if allowedOrigins == nil || len(allowedOrigins) == 0 {
+	if len(allowedOrigins) == 0 {
 		e.slogger.Log(r.Context(), slog.LevelDebug,
 			"origin is allowed by default, no allowlist",
 			"origin", origin,
@@ -862,7 +862,7 @@ func cmdReqToHttpReq(originalRequest *http.Request, cmdReq v2CmdRequestType) *ht
 	newReq = newReq.WithContext(originalRequest.Context())
 
 	// the body of the cmdReq become the body of the next http request
-	if cmdReq.Body != nil && len(cmdReq.Body) > 0 {
+	if len(cmdReq.Body) > 0 {
 		newReq.Body = io.NopCloser(bytes.NewBuffer(cmdReq.Body))
 	}
 

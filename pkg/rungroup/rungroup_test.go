@@ -75,11 +75,7 @@ func TestRun_MultipleActors(t *testing.T) {
 
 	receivedInterrupts := 0
 	gotRunCompleted := false
-	for {
-		if gotRunCompleted {
-			break
-		}
-
+	for !gotRunCompleted {
 		select {
 		case <-groupReceivedInterrupts:
 			receivedInterrupts += 1
@@ -153,11 +149,7 @@ func TestRun_MultipleActors_InterruptTimeout(t *testing.T) {
 
 	receivedInterrupts := 0
 	gotRunCompleted := false
-	for {
-		if gotRunCompleted {
-			break
-		}
-
+	for !gotRunCompleted {
 		select {
 		case <-groupReceivedInterrupts:
 			receivedInterrupts += 1
@@ -237,11 +229,7 @@ func TestRun_MultipleActors_ExecuteReturnTimeout(t *testing.T) {
 	receivedInterrupts := 0
 	receivedExecuteReturns := 0
 	gotRunCompleted := false
-	for {
-		if gotRunCompleted {
-			break
-		}
-
+	for !gotRunCompleted {
 		select {
 		case <-groupReceivedInterrupts:
 			receivedInterrupts += 1
@@ -291,11 +279,7 @@ func TestRun_RecoversAndLogsPanic(t *testing.T) {
 
 	// Confirm that the rungroup exited without panicking (i.e. we recovered appropriately)
 	gotRunCompleted := false
-	for {
-		if gotRunCompleted {
-			break
-		}
-
+	for !gotRunCompleted {
 		select {
 		case <-runCompleted:
 			gotRunCompleted = true

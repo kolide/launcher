@@ -72,21 +72,7 @@ linters:
       key-naming-case: snake
     staticcheck:
       checks:
-        # Convert untagged switch to tagged switch.
-        # https://staticcheck.dev/docs/checks/#QF1002
-        - QF1002
-        # Convert if/else-if chain to tagged switch.
-        # https://staticcheck.dev/docs/checks/#QF1003
-        - QF1003
-        # Use 'strings.ReplaceAll' instead of 'strings.Replace' with 'n == -1'.
-        # https://staticcheck.dev/docs/checks/#QF1004
-        - QF1004
-        # Omit embedded fields from selector expression.
-        # https://staticcheck.dev/docs/checks/#QF1008
-        - QF1008
-        # Use 'fmt.Fprintf(x, ...)' instead of 'x.Write(fmt.Sprintf(...))'.
-        # https://staticcheck.dev/docs/checks/#QF1012
-        - QF1012
+        - all
   exclusions:
     generated: lax
     presets:
@@ -119,6 +105,21 @@ linters:
       - linters:
           - perfsprint
         text: fmt.Sprint can be replaced with faster strconv.Itoa
+      # Poorly chosen identifier.
+      # https://staticcheck.dev/docs/checks/#ST1003
+      - linters:
+          - staticcheck
+        text: ST1003
+      # Incorrectly formatted error string.
+      # https://staticcheck.dev/docs/checks/#ST1005
+      - linters:
+          - staticcheck
+        text: ST1005
+      # Apply De Morgan's law.
+      # https://staticcheck.dev/docs/checks/#QF1001
+      - linters:
+          - staticcheck
+        text: QF1001
     paths:
       - test-cmds
       - third_party$
