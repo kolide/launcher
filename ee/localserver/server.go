@@ -290,12 +290,7 @@ func (ls *localServer) Start() error {
 		ticker := time.NewTicker(1 * time.Minute)
 		defer ticker.Stop()
 
-		for {
-			// Tenant munemo set successfully, nothing more to do here
-			if ls.kryptoMiddleware.tenantMunemo.Load() != "" {
-				break
-			}
-
+		for ls.kryptoMiddleware.tenantMunemo.Load() == "" {
 			select {
 			case <-ctx.Done():
 				ls.slogger.Log(ctx, slog.LevelDebug,

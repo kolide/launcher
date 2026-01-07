@@ -43,12 +43,7 @@ func TestGo_WithPanic(t *testing.T) {
 	goroutineExecuted := false
 	onPanicExecuted := false
 
-	for {
-		// Goroutine all done
-		if goroutineExecuted && onPanicExecuted {
-			break
-		}
-
+	for !(goroutineExecuted && onPanicExecuted) {
 		select {
 		case <-goroutineResults:
 			goroutineExecuted = true
@@ -92,12 +87,7 @@ func TestGo_WithoutPanic(t *testing.T) {
 	goroutineExecuted := false
 	onPanicExecuted := false
 
-	for {
-		// Wait until our timeout to make sure onPanic won't execute
-		if time.Now().After(goroutineEndTime) {
-			break
-		}
-
+	for !(time.Now().After(goroutineEndTime)) {
 		select {
 		case <-goroutineResults:
 			goroutineExecuted = true

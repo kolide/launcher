@@ -131,11 +131,7 @@ func Test_tpmRunner(t *testing.T) {
 		}
 
 		receivedInterrupts := 0
-		for {
-			if receivedInterrupts >= expectedInterrupts {
-				break
-			}
-
+		for receivedInterrupts < expectedInterrupts {
 			select {
 			case <-interruptComplete:
 				receivedInterrupts += 1
