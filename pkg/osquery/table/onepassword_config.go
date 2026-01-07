@@ -73,7 +73,7 @@ func (o *onePasswordAccountsTable) generateForPath(ctx context.Context, fileInfo
 	}
 	defer db.Close()
 
-	rows, err := db.Query("SELECT user_email, team_name, server, user_first_name, user_last_name, account_type FROM accounts")
+	rows, err := db.QueryContext(ctx, "SELECT user_email, team_name, server, user_first_name, user_last_name, account_type FROM accounts")
 	if err != nil {
 		return nil, fmt.Errorf("query rows from onepassword account configuration db: %w", err)
 	}

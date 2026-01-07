@@ -120,8 +120,8 @@ func (mw logmw) RequestQueries(ctx context.Context, nodeKey string) (res *distri
 		}
 		// Use exact time on error
 
-		mw.knapsack.Slogger().Log(ctx, levelForError(err), // nolint:sloglint // it's fine to not have a constant or literal here
-			message,
+		mw.knapsack.Slogger().Log(ctx, levelForError(err),
+			message, // nolint:sloglint // it's fine to not have a constant or literal here
 			"method", "RequestQueries",
 			"uuid", uuid,
 			"res", string(resJSON),

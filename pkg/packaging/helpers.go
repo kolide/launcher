@@ -15,7 +15,7 @@ import (
 // sanitizeHostname will replace any ":" characters in a given hostname with "-"
 // This is useful because ":" is not a valid character for file paths.
 func sanitizeHostname(hostname string) string {
-	return strings.Replace(hostname, ":", "-", -1)
+	return strings.ReplaceAll(hostname, ":", "-")
 }
 
 // setOsqueryVersionInCtx retrieves the osquery version (by running the binary) and

@@ -483,7 +483,7 @@ func sortedVersionsInLibrary(ctx context.Context, slogger *slog.Logger, binary a
 		// We have to swap the hyphen in the prerelease for a period (30-abcdabcd to 30.abcdabcd) so that the
 		// semver library can correctly compare prerelease values.
 		if v.Prerelease() != "" {
-			versionWithUpdatedPrerelease, err := v.SetPrerelease(strings.Replace(v.Prerelease(), "-", ".", -1))
+			versionWithUpdatedPrerelease, err := v.SetPrerelease(strings.ReplaceAll(v.Prerelease(), "-", "."))
 			if err == nil {
 				v = &versionWithUpdatedPrerelease
 			}
@@ -499,7 +499,7 @@ func sortedVersionsInLibrary(ctx context.Context, slogger *slog.Logger, binary a
 	versionsInLibraryStr := make([]string, len(versionsInLibrary))
 	for i, v := range versionsInLibrary {
 		if v.Prerelease() != "" {
-			versionWithUpdatedPrerelease, err := v.SetPrerelease(strings.Replace(v.Prerelease(), ".", "-", -1))
+			versionWithUpdatedPrerelease, err := v.SetPrerelease(strings.ReplaceAll(v.Prerelease(), ".", "-"))
 			if err == nil {
 				v = &versionWithUpdatedPrerelease
 			}

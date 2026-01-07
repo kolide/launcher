@@ -23,7 +23,7 @@ func NewLauncherClientConnection(rootDirectory string, socketPrefix string) (net
 	var clientConn net.Conn
 	var lastDialErr error
 	for _, match := range matches {
-		clientConn, lastDialErr = net.Dial("unix", match)
+		clientConn, lastDialErr = net.Dial("unix", match) //nolint:noctx // will fix in https://github.com/kolide/launcher/pull/2526
 		if lastDialErr != nil {
 			continue
 		}

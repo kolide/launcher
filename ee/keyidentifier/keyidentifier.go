@@ -130,7 +130,7 @@ func (kIdentifier *KeyIdentifier) attemptPem(keyBytes []byte) (*KeyInfo, error) 
 		ki.Format = "openssh"
 
 		if key, err := x509.ParsePKCS1PrivateKey(block.Bytes); err == nil {
-			ki.Bits = len(key.PublicKey.N.Bytes()) * 8
+			ki.Bits = len(key.N.Bytes()) * 8
 		}
 
 		return ki, nil
@@ -141,7 +141,7 @@ func (kIdentifier *KeyIdentifier) attemptPem(keyBytes []byte) (*KeyInfo, error) 
 		if key, err := x509.ParsePKCS8PrivateKey(block.Bytes); err == nil {
 			switch assertedKey := key.(type) {
 			case *rsa.PrivateKey:
-				ki.Bits = assertedKey.PublicKey.Size() * 8
+				ki.Bits = assertedKey.Size() * 8
 				ki.Type = "rsa"
 			case *ecdsa.PrivateKey:
 				ki.Bits = assertedKey.PublicKey.Curve.Params().BitSize
@@ -167,7 +167,7 @@ func (kIdentifier *KeyIdentifier) attemptPem(keyBytes []byte) (*KeyInfo, error) 
 
 	case "DSA PRIVATE KEY":
 		if key, err := ssh.ParseDSAPrivateKey(block.Bytes); err == nil {
-			ki.Bits = len(key.PublicKey.Y.Bytes()) * 8
+			ki.Bits = len(key.Y.Bytes()) * 8
 		}
 		ki.Type = ssh.KeyAlgoDSA //nolint:staticcheck
 		ki.Format = "openssh"

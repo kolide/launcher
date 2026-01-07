@@ -412,7 +412,7 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 				}
 			}()
 
-			if _, err = f.WriteString(fmt.Sprintf("binary=%s\n", output)); err != nil {
+			if _, err = fmt.Fprintf(f, "binary=%s\n", output); err != nil {
 				return fmt.Errorf("failed to write to $GITHUB_OUTPUT file: %w", err)
 			}
 		}

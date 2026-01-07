@@ -75,7 +75,8 @@ func TestParse(t *testing.T) {
 			resultMap, ok := result.(map[string]interface{})
 			require.True(t, ok, "Result should be a map[string]interface{}")
 
-			if tt.name == "lsblk data" {
+			switch tt.name {
+			case "lsblk data":
 				// Check blockdevices
 				blockdevices, ok := resultMap["blockdevices"]
 				require.True(t, ok, "Result should contain 'blockdevices' key")
@@ -152,7 +153,7 @@ func TestParse(t *testing.T) {
 				assert.Equal(t, "/dev/mapper/LvmEncrypt-lvmcryptroot", firstGrandchild["name"], "First grandchild should have correct name")
 				assert.Equal(t, "crypto_LUKS", firstGrandchild["fstype"], "First grandchild should have fstype 'crypto_LUKS'")
 
-			} else if tt.name == "nftables data" {
+			case "nftables data":
 				// Check nftables
 				nftables, ok := resultMap["nftables"]
 				require.True(t, ok, "Result should contain 'nftables' key")

@@ -36,7 +36,7 @@ func TestFlareConsumer(t *testing.T) {
 			t.Parallel()
 
 			mockSack := knapsackMock.NewKnapsack(t)
-			mockSack.On("Slogger").Return(slog.New(slog.NewJSONHandler(io.Discard, nil))).Maybe()
+			mockSack.On("Slogger").Return(slog.New(slog.DiscardHandler)).Maybe()
 			f := New(mockSack)
 			f.flarer = tt.flarer(t)
 			f.newFlareStream = func(note, uploadRequestURL string) (io.WriteCloser, error) {

@@ -816,7 +816,8 @@ func (i *OsqueryInstance) createOsquerydCommand(osquerydBinary string) (*exec.Cm
 		args = append(args, "--distributed_denylist_duration=0")
 	}
 
-	cmd := exec.Command( //nolint:forbidigo // We trust the autoupdate library to find the correct path
+	// We trust the autoupdate library to find the correct path, so this is an allowable use of exec.Command
+	cmd := exec.Command( //nolint:forbidigo,noctx
 		osquerydBinary,
 		args...,
 	)

@@ -154,9 +154,9 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 			var logBytes bytes.Buffer
 			server := testServer(t, k)
 
-			req, err := http.NewRequest("", "", nil)
+			req, err := http.NewRequestWithContext(t.Context(), "", "", nil)
 			if tt.body != nil {
-				req, err = http.NewRequest("", "", bytes.NewBuffer(mustMarshal(t, tt.body)))
+				req, err = http.NewRequestWithContext(t.Context(), "", "", bytes.NewBuffer(mustMarshal(t, tt.body)))
 			}
 			require.NoError(t, err)
 

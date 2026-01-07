@@ -62,7 +62,7 @@ func (c *ChromeLoginDataEmailsTable) generateForPath(ctx context.Context, file u
 	}
 	defer db.Close()
 
-	rows, err := db.Query("SELECT username_value, count(*) AS count FROM logins GROUP BY lower(username_value)")
+	rows, err := db.QueryContext(ctx, "SELECT username_value, count(*) AS count FROM logins GROUP BY lower(username_value)")
 	if err != nil {
 		return nil, fmt.Errorf("query rows from chrome login keychain db: %w", err)
 	}

@@ -199,9 +199,9 @@ func checkPathConstraints(path string, pathConstraints *table.ConstraintList) (b
 			// Transform the expression into a regex to test if we have a match.
 			likeRegexpStr := regexp.QuoteMeta(pathConstraint.Expression)
 			// % matches zero or more characters
-			likeRegexpStr = strings.Replace(likeRegexpStr, "%", `.*`, -1)
+			likeRegexpStr = strings.ReplaceAll(likeRegexpStr, "%", `.*`)
 			// _ matches a single character
-			likeRegexpStr = strings.Replace(likeRegexpStr, "_", `.`, -1)
+			likeRegexpStr = strings.ReplaceAll(likeRegexpStr, "_", `.`)
 			// LIKE is case-insensitive
 			likeRegexpStr = `(?i)` + likeRegexpStr
 			r, err := regexp.Compile(likeRegexpStr)
@@ -216,9 +216,9 @@ func checkPathConstraints(path string, pathConstraints *table.ConstraintList) (b
 			// Unlike LIKE, GLOB is case-sensitive.
 			globRegexpStr := regexp.QuoteMeta(pathConstraint.Expression)
 			// * matches zero or more characters
-			globRegexpStr = strings.Replace(globRegexpStr, `\*`, `.*`, -1)
+			globRegexpStr = strings.ReplaceAll(globRegexpStr, `\*`, `.*`)
 			// ? matches a single character
-			globRegexpStr = strings.Replace(globRegexpStr, `\?`, `.`, -1)
+			globRegexpStr = strings.ReplaceAll(globRegexpStr, `\?`, `.`)
 			r, err := regexp.Compile(globRegexpStr)
 			if err != nil {
 				return false, fmt.Errorf("invalid GLOB statement: %w", err)

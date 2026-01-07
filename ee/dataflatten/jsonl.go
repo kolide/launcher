@@ -29,10 +29,10 @@ func flattenJsonl(rawdata []byte, opts ...FlattenOpts) ([]Row, error) {
 		var object interface{}
 		err := decoder.Decode(&object)
 
-		switch {
-		case err == nil:
+		switch err {
+		case nil:
 			objects = append(objects, object)
-		case err == io.EOF:
+		case io.EOF:
 			return Flatten(objects, opts...)
 		default:
 			return nil, fmt.Errorf("unmarshalling jsonl: %w", err)

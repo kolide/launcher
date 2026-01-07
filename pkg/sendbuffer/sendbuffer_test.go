@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -206,10 +207,11 @@ func TestSendBufferConcurrent(t *testing.T) {
 			// check that size reported is correct
 			requireStoreSizeEqualsHttpBufferReportedSize(t, sb)
 
-			expectedAggregatedReceives := ""
+			var receives strings.Builder
 			for _, write := range tt.writes {
-				expectedAggregatedReceives += write
+				receives.WriteString(write) // Efficient
 			}
+			expectedAggregatedReceives := receives.String()
 
 			// make sure were done writing, done sending, and
 			// have sent all data
@@ -337,7 +339,7 @@ func TestUpdateData(t *testing.T) {
 					return err
 				}
 
-				_, err = out.Write([]byte(fmt.Sprint(num)))
+				_, err = fmt.Fprint(out, num)
 				require.NoError(t, err)
 				return err
 			},
@@ -397,7 +399,7 @@ func TestUpdateData(t *testing.T) {
 					return err
 				}
 
-				_, err = out.Write([]byte(fmt.Sprint(num)))
+				_, err = fmt.Fprint(out, num)
 				require.NoError(t, err)
 				return err
 			},
@@ -434,7 +436,7 @@ func TestUpdateData(t *testing.T) {
 					return errors.New("some error")
 				}
 
-				_, err = out.Write([]byte(fmt.Sprint(num)))
+				_, err = fmt.Fprint(out, num)
 				require.NoError(t, err)
 				return err
 			},

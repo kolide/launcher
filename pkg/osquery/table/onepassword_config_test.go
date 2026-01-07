@@ -33,9 +33,9 @@ func TestOnePasswordAccounts(t *testing.T) { //nolint:paralleltest // We need to
 	f.Close()
 	db, err := sql.Open("sqlite", tempSqliteFilepath)
 	require.NoError(t, err)
-	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS accounts (user_email TEXT, team_name TEXT, server TEXT, user_first_name TEXT, user_last_name TEXT, account_type TEXT);`)
+	_, err = db.ExecContext(t.Context(), `CREATE TABLE IF NOT EXISTS accounts (user_email TEXT, team_name TEXT, server TEXT, user_first_name TEXT, user_last_name TEXT, account_type TEXT);`)
 	require.NoError(t, err)
-	_, err = db.Exec(`INSERT INTO accounts (user_email, team_name, server, user_first_name, user_last_name, account_type) VALUES ("testusername@example.com", "Test Team", "myteam.example.com", "Jane", "Test", "");`)
+	_, err = db.ExecContext(t.Context(), `INSERT INTO accounts (user_email, team_name, server, user_first_name, user_last_name, account_type) VALUES ("testusername@example.com", "Test Team", "myteam.example.com", "Jane", "Test", "");`)
 	require.NoError(t, err)
 	require.NoError(t, db.Close())
 
