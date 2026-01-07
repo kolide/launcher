@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -206,10 +207,11 @@ func TestSendBufferConcurrent(t *testing.T) {
 			// check that size reported is correct
 			requireStoreSizeEqualsHttpBufferReportedSize(t, sb)
 
-			expectedAggregatedReceives := ""
+			var receives strings.Builder
 			for _, write := range tt.writes {
-				expectedAggregatedReceives += write
+				receives.WriteString(write) // Efficient
 			}
+			expectedAggregatedReceives := receives.String()
 
 			// make sure were done writing, done sending, and
 			// have sent all data
