@@ -422,29 +422,29 @@ func (p *PackageOptions) makePackage(ctx context.Context) error {
 	// packaging systems.
 	oldPackageNames := []string{"launcher"}
 
-	switch {
-	case p.target.Package == Deb:
+	switch p.target.Package {
+	case Deb:
 		if err := packagekit.PackageFPM(ctx, p.packageWriter, p.packagekitops, packagekit.AsDeb(), packagekit.WithReplaces(oldPackageNames), packagekit.WithArch(string(p.target.Arch))); err != nil {
 			return fmt.Errorf("packaging, target %s: %w", p.target.String(), err)
 		}
-	case p.target.Package == Rpm:
+	case Rpm:
 		if err := packagekit.PackageFPM(ctx, p.packageWriter, p.packagekitops, packagekit.AsRPM(), packagekit.WithReplaces(oldPackageNames), packagekit.WithArch(string(p.target.Arch))); err != nil {
 			return fmt.Errorf("packaging, target %s: %w", p.target.String(), err)
 		}
 
-	case p.target.Package == Tar:
+	case Tar:
 		if err := packagekit.PackageFPM(ctx, p.packageWriter, p.packagekitops, packagekit.AsTar(), packagekit.WithReplaces(oldPackageNames), packagekit.WithArch(string(p.target.Arch))); err != nil {
 			return fmt.Errorf("packaging, target %s: %w", p.target.String(), err)
 		}
-	case p.target.Package == Pacman:
+	case Pacman:
 		if err := packagekit.PackageFPM(ctx, p.packageWriter, p.packagekitops, packagekit.AsPacman(), packagekit.WithReplaces(oldPackageNames), packagekit.WithArch(string(p.target.Arch))); err != nil {
 			return fmt.Errorf("packaging, target %s: %w", p.target.String(), err)
 		}
-	case p.target.Package == Pkg:
+	case Pkg:
 		if err := packagekit.PackagePkg(ctx, p.packageWriter, p.packagekitops, string(p.target.Arch)); err != nil {
 			return fmt.Errorf("packaging, target %s: %w", p.target.String(), err)
 		}
-	case p.target.Package == Msi:
+	case Msi:
 		// pass whether to include a service as a bool argument to PackageWixMSI
 		includeService := p.target.Init == WindowsService
 		if err := packagekit.PackageWixMSI(ctx, p.packageWriter, p.packagekitops, includeService); err != nil {
