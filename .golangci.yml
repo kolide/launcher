@@ -357,6 +357,54 @@ linters:
         # Ineffectual Go compiler directive.
         # https://staticcheck.dev/docs/checks/#SA9009
         - SA9009
+        # Incorrect or missing package comment.
+        # https://staticcheck.dev/docs/checks/#ST1000
+        - ST1000
+        # Dot imports are discouraged.
+        # https://staticcheck.dev/docs/checks/#ST1001
+        - ST1001
+        # Poorly chosen receiver name.
+        # https://staticcheck.dev/docs/checks/#ST1006
+        - ST1006
+        # A function's error value should be its last return value.
+        # https://staticcheck.dev/docs/checks/#ST1008
+        - ST1008
+        # Poorly chosen name for variable of type 'time.Duration'.
+        # https://staticcheck.dev/docs/checks/#ST1011
+        - ST1011
+        # Poorly chosen name for error variable.
+        # https://staticcheck.dev/docs/checks/#ST1012
+        - ST1012
+        # Should use constants for HTTP error codes, not magic numbers.
+        # https://staticcheck.dev/docs/checks/#ST1013
+        - ST1013
+        # A switch's default case should be the first or last case.
+        # https://staticcheck.dev/docs/checks/#ST1015
+        - ST1015
+        # Use consistent method receiver names.
+        # https://staticcheck.dev/docs/checks/#ST1016
+        - ST1016
+        # Don't use Yoda conditions.
+        # https://staticcheck.dev/docs/checks/#ST1017
+        - ST1017
+        # Avoid zero-width and control characters in string literals.
+        # https://staticcheck.dev/docs/checks/#ST1018
+        - ST1018
+        # Importing the same package multiple times.
+        # https://staticcheck.dev/docs/checks/#ST1019
+        - ST1019
+        # The documentation of an exported function should start with the function's name.
+        # https://staticcheck.dev/docs/checks/#ST1020
+        - ST1020
+        # The documentation of an exported type should start with type's name.
+        # https://staticcheck.dev/docs/checks/#ST1021
+        - ST1021
+        # The documentation of an exported variable or constant should start with variable's name.
+        # https://staticcheck.dev/docs/checks/#ST1022
+        - ST1022
+        # Redundant type in variable declaration.
+        # https://staticcheck.dev/docs/checks/#ST1023
+        - ST1023
         # Convert untagged switch to tagged switch.
         # https://staticcheck.dev/docs/checks/#QF1002
         - QF1002
@@ -404,6 +452,16 @@ linters:
       - linters:
           - perfsprint
         text: fmt.Sprint can be replaced with faster strconv.Itoa
+      # Poorly chosen identifier.
+      # https://staticcheck.dev/docs/checks/#ST1003
+      - linters:
+          - staticcheck
+        text: ST1003
+      # Incorrectly formatted error string.
+      # https://staticcheck.dev/docs/checks/#ST1005
+      - linters:
+          - staticcheck
+        text: ST1005
     paths:
       - test-cmds
       - third_party$
