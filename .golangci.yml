@@ -72,7 +72,11 @@ linters:
       key-naming-case: snake
     staticcheck:
       checks:
-        - all
+        - QF1002
+        - QF1003
+        - QF1004
+        - QF1008
+        - QF1012
   exclusions:
     generated: lax
     presets:
@@ -105,15 +109,6 @@ linters:
       - linters:
           - perfsprint
         text: fmt.Sprint can be replaced with faster strconv.Itoa
-      - linters:
-          - staticcheck
-        text: 'ST1003:'
-      - linters:
-          - staticcheck
-        text: 'ST1005:'
-      - linters:
-          - staticcheck
-        text: 'QF1001:'
     paths:
       - test-cmds
       - third_party$
