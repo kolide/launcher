@@ -57,7 +57,7 @@ func (g *GDriveSyncHistory) generateForPath(ctx context.Context, path string) ([
 	}
 	defer db.Close()
 
-	db.Exec("PRAGMA journal_mode=WAL;")
+	db.ExecContext(ctx, "PRAGMA journal_mode=WAL;")
 
 	rows, err := db.QueryContext(ctx, "select distinct le.inode, le.filename, le.modified AS mtime, le.size from local_entry le, cloud_entry ce using (checksum) order by le.modified desc;")
 	if err != nil {

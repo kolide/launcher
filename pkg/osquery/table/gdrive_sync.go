@@ -54,7 +54,7 @@ func (g *gdrive) generateForPath(ctx context.Context, path string) ([]map[string
 	}
 	defer db.Close()
 
-	db.Exec("PRAGMA journal_mode=WAL;")
+	db.ExecContext(ctx, "PRAGMA journal_mode=WAL;")
 
 	rows, err := db.QueryContext(ctx,
 		`SELECT entry_key, data_value

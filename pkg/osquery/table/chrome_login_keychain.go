@@ -55,7 +55,7 @@ func (c *ChromeLoginKeychain) generateForPath(ctx context.Context, path string) 
 	}
 	defer db.Close()
 
-	db.Exec("PRAGMA journal_mode=WAL;")
+	db.ExecContext(ctx, "PRAGMA journal_mode=WAL;")
 
 	rows, err := db.QueryContext(ctx, "SELECT origin_url, action_url, username_value FROM logins")
 	if err != nil {
