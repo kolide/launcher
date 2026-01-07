@@ -50,7 +50,7 @@ func TestEnroll(t *testing.T) {
 	go testListener.Execute()
 
 	// Find socket
-	clientConn, err := NewLauncherClientConnection(rootDir, testPrefix)
+	clientConn, err := NewLauncherClientConnection(t.Context(), rootDir, testPrefix)
 	require.NoError(t, err)
 	t.Cleanup(func() { clientConn.Close() })
 
@@ -94,7 +94,7 @@ func TestEnroll_Invalid(t *testing.T) {
 	go testListener.Execute()
 
 	// Find socket
-	clientConn, err := NewLauncherClientConnection(rootDir, testPrefix)
+	clientConn, err := NewLauncherClientConnection(t.Context(), rootDir, testPrefix)
 	require.NoError(t, err)
 	t.Cleanup(func() { clientConn.Close() })
 
@@ -132,7 +132,7 @@ func TestEnroll_Unenrolled(t *testing.T) {
 	go testListener.Execute()
 
 	// Find socket
-	clientConn, err := NewLauncherClientConnection(rootDir, testPrefix)
+	clientConn, err := NewLauncherClientConnection(t.Context(), rootDir, testPrefix)
 	require.NoError(t, err)
 	t.Cleanup(func() { clientConn.Close() })
 

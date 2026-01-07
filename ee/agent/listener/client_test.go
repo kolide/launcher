@@ -21,7 +21,8 @@ func TestNewClientConn(t *testing.T) {
 	var mostRecentSocketPath string
 	for i := range 5 {
 		socketPath := fmt.Sprintf("%s_%d", socketPrefixWithPath, rand.Intn(10000))
-		listener, err := net.Listen("unix", socketPath)
+		var lc net.ListenConfig
+		listener, err := lc.Listen(t.Context(), "unix", socketPath)
 		require.NoError(t, err)
 		t.Cleanup(func() { listener.Close() })
 
@@ -31,7 +32,7 @@ func TestNewClientConn(t *testing.T) {
 		time.Sleep(500 * time.Millisecond)
 	}
 
-	conn, err := NewLauncherClientConnection(rootDir, prefix)
+	conn, err := NewLauncherClientConnection(t.Context(), rootDir, prefix)
 	require.NoError(t, err)
 	require.Equal(t, mostRecentSocketPath, conn.socketPath)
 }

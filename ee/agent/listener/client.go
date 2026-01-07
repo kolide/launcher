@@ -1,6 +1,7 @@
 package listener
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -32,11 +33,12 @@ type (
 
 const (
 	messageTypeEnroll = "enroll"
+	dialTimeout       = 10 * time.Second
 )
 
 // NewLauncherClientConnection opens up a connection to the launcher listener identified
 // by the given prefix.
-func NewLauncherClientConnection(rootDirectory string, socketPrefix string) (*clientConnection, error) {
+func NewLauncherClientConnection(ctx context.Context, rootDirectory string, socketPrefix string) (*clientConnection, error) {
 	socketPattern := filepath.Join(rootDirectory, socketPrefix) + "*"
 	matches, err := filepath.Glob(socketPattern)
 	if err != nil {
@@ -64,7 +66,10 @@ func NewLauncherClientConnection(rootDirectory string, socketPrefix string) (*cl
 		}
 	}
 
-	clientConn, err := net.Dial("unix", socketPath)
+	d := net.Dialer{
+		Timeout: dialTimeout,
+	}
+	clientConn, err := d.DialContext(ctx, "unix", socketPath)
 	if err != nil {
 		return nil, fmt.Errorf("dialing %s: %w", socketPath, err)
 	}

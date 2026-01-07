@@ -15,6 +15,8 @@ import (
 )
 
 func runEnroll(systemMultiSlogger *multislogger.MultiSlogger, args []string) error {
+	ctx := context.Background()
+
 	// Enroll assumes a launcher installation (at least partially) exists
 	// Overriding some of the default values allows options to be parsed making this assumption
 	launcher.DefaultAutoupdate = true
@@ -48,7 +50,7 @@ func runEnroll(systemMultiSlogger *multislogger.MultiSlogger, args []string) err
 	}))
 
 	// Set up connection to root launcher process
-	clientConn, err := listener.NewLauncherClientConnection(opts.RootDirectory, listener.RootLauncherListenerSocketPrefix)
+	clientConn, err := listener.NewLauncherClientConnection(ctx, opts.RootDirectory, listener.RootLauncherListenerSocketPrefix)
 	if err != nil {
 		return fmt.Errorf("opening listener: %w", err)
 	}
@@ -59,7 +61,7 @@ func runEnroll(systemMultiSlogger *multislogger.MultiSlogger, args []string) err
 		return fmt.Errorf("performing enrollment: %w", err)
 	}
 
-	systemMultiSlogger.Log(context.Background(), slog.LevelInfo,
+	systemMultiSlogger.Log(ctx, slog.LevelInfo,
 		"successfully completed enrollment",
 	)
 
