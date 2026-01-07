@@ -56,7 +56,7 @@ func (g *gdrive) generateForPath(ctx context.Context, path string) ([]map[string
 
 	db.Exec("PRAGMA journal_mode=WAL;")
 
-	rows, err := db.Query(
+	rows, err := db.QueryContext(ctx,
 		`SELECT entry_key, data_value
 		FROM data
 		WHERE entry_key = 'user_email' OR entry_key='local_sync_root_path'
