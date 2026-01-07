@@ -405,6 +405,111 @@ linters:
         # Redundant type in variable declaration.
         # https://staticcheck.dev/docs/checks/#ST1023
         - ST1023
+        # Use plain channel send or receive instead of single-case select.
+        # https://staticcheck.dev/docs/checks/#S1000
+        - S1000
+        # Replace for loop with call to copy.
+        # https://staticcheck.dev/docs/checks/#S1001
+        - S1001
+        # Omit comparison with boolean constant.
+        # https://staticcheck.dev/docs/checks/#S1002
+        - S1002
+        # Replace call to 'strings.Index' with 'strings.Contains'.
+        # https://staticcheck.dev/docs/checks/#S1003
+        - S1003
+        # Replace call to 'bytes.Compare' with 'bytes.Equal'.
+        # https://staticcheck.dev/docs/checks/#S1004
+        - S1004
+        # Drop unnecessary use of the blank identifier.
+        # https://staticcheck.dev/docs/checks/#S1005
+        - S1005
+        # Use "for { ... }" for infinite loops.
+        # https://staticcheck.dev/docs/checks/#S1006
+        - S1006
+        # Simplify regular expression by using raw string literal.
+        # https://staticcheck.dev/docs/checks/#S1007
+        - S1007
+        # Simplify returning boolean expression.
+        # https://staticcheck.dev/docs/checks/#S1008
+        - S1008
+        # Omit redundant nil check on slices, maps, and channels.
+        # https://staticcheck.dev/docs/checks/#S1009
+        - S1009
+        # Omit default slice index.
+        # https://staticcheck.dev/docs/checks/#S1010
+        - S1010
+        # Use a single 'append' to concatenate two slices.
+        # https://staticcheck.dev/docs/checks/#S1011
+        - S1011
+        # Replace 'time.Now().Sub(x)' with 'time.Since(x)'.
+        # https://staticcheck.dev/docs/checks/#S1012
+        - S1012
+        # Use a type conversion instead of manually copying struct fields.
+        # https://staticcheck.dev/docs/checks/#S1016
+        - S1016
+        # Replace manual trimming with 'strings.TrimPrefix'.
+        # https://staticcheck.dev/docs/checks/#S1017
+        - S1017
+        # Use "copy" for sliding elements.
+        # https://staticcheck.dev/docs/checks/#S1018
+        - S1018
+        # Simplify "make" call by omitting redundant arguments.
+        # https://staticcheck.dev/docs/checks/#S1019
+        - S1019
+        # Omit redundant nil check in type assertion.
+        # https://staticcheck.dev/docs/checks/#S1020
+        - S1020
+        # Merge variable declaration and assignment.
+        # https://staticcheck.dev/docs/checks/#S1021
+        - S1021
+        # Omit redundant control flow.
+        # https://staticcheck.dev/docs/checks/#S1023
+        - S1023
+        # Replace 'x.Sub(time.Now())' with 'time.Until(x)'.
+        # https://staticcheck.dev/docs/checks/#S1024
+        - S1024
+        # Don't use 'fmt.Sprintf("%s", x)' unnecessarily.
+        # https://staticcheck.dev/docs/checks/#S1025
+        - S1025
+        # Simplify error construction with 'fmt.Errorf'.
+        # https://staticcheck.dev/docs/checks/#S1028
+        - S1028
+        # Range over the string directly.
+        # https://staticcheck.dev/docs/checks/#S1029
+        - S1029
+        # Use 'bytes.Buffer.String' or 'bytes.Buffer.Bytes'.
+        # https://staticcheck.dev/docs/checks/#S1030
+        - S1030
+        # Omit redundant nil check around loop.
+        # https://staticcheck.dev/docs/checks/#S1031
+        - S1031
+        # Use 'sort.Ints(x)', 'sort.Float64s(x)', and 'sort.Strings(x)'.
+        # https://staticcheck.dev/docs/checks/#S1032
+        - S1032
+        # Unnecessary guard around call to "delete".
+        # https://staticcheck.dev/docs/checks/#S1033
+        - S1033
+        # Use result of type assertion to simplify cases.
+        # https://staticcheck.dev/docs/checks/#S1034
+        - S1034
+        # Redundant call to 'net/http.CanonicalHeaderKey' in method call on 'net/http.Header'.
+        # https://staticcheck.dev/docs/checks/#S1035
+        - S1035
+        # Unnecessary guard around map access.
+        # https://staticcheck.dev/docs/checks/#S1036
+        - S1036
+        # Elaborate way of sleeping.
+        # https://staticcheck.dev/docs/checks/#S1037
+        - S1037
+        # Unnecessarily complex way of printing formatted string.
+        # https://staticcheck.dev/docs/checks/#S1038
+        - S1038
+        # Unnecessary use of 'fmt.Sprint'.
+        # https://staticcheck.dev/docs/checks/#S1039
+        - S1039
+        # Type assertion to current type.
+        # https://staticcheck.dev/docs/checks/#S1040
+        - S1040
         # Convert untagged switch to tagged switch.
         # https://staticcheck.dev/docs/checks/#QF1002
         - QF1002
