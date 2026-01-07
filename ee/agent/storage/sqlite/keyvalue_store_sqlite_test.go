@@ -79,7 +79,7 @@ func TestOpenRW_DatabaseIsDirty(t *testing.T) {
 	require.NoError(t, err, "expected no error creating test store")
 
 	// Mark the migration as dirty
-	_, err = s.conn.Exec(fmt.Sprintf(`UPDATE %s SET dirty = 1;`, sqlite.DefaultMigrationsTable))
+	_, err = s.conn.ExecContext(t.Context(), fmt.Sprintf(`UPDATE %s SET dirty = 1;`, sqlite.DefaultMigrationsTable))
 	require.NoError(t, err, "marking migration as dirty")
 
 	// Close the connection
