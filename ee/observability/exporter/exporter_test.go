@@ -160,11 +160,7 @@ func TestInterrupt_Multiple(t *testing.T) { //nolint:paralleltest
 	}
 
 	receivedInterrupts := 0
-	for {
-		if receivedInterrupts >= expectedInterrupts {
-			break
-		}
-
+	for receivedInterrupts < expectedInterrupts {
 		select {
 		case <-interruptComplete:
 			receivedInterrupts += 1
