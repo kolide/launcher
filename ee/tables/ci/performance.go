@@ -16,7 +16,10 @@ func BaselineStats(b *testing.B) *performance.PerformanceStats {
 func ReportNonGolangMemoryUsage(b *testing.B, baselineStats *performance.PerformanceStats) {
 	statsAfter, err := performance.CurrentProcessStats(b.Context())
 	require.NoError(b, err)
-	nonGolangMemDifferenceInBytes := statsAfter.MemInfo.NonGoMemUsage - baselineStats.MemInfo.NonGoMemUsage
+	var nonGolangMemDifferenceInBytes uint64 = 0
+	if statsAfter.MemInfo.NonGoMemUsage > baselineStats.MemInfo.NonGoMemUsage {
+		nonGolangMemDifferenceInBytes = statsAfter.MemInfo.NonGoMemUsage - baselineStats.MemInfo.NonGoMemUsage
+	}
 
 	b.ReportMetric(float64(nonGolangMemDifferenceInBytes)/float64(b.N), "non-golang-B/op")
 }
