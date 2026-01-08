@@ -233,7 +233,7 @@ test: generate
 
 # -run=^$ will never match any of our regular non-benchmark tests, ensuring those don't run during benchmarking
 test-bench-tables: generate
-	go test ./ee/tables/... ./pkg/osquery/table/... -bench=. -count=10 -run=^$ -benchmem
+	go test ./ee/tables/... ./pkg/osquery/table/... -bench=. -count=20 -run=^$ -benchmem
 
 ##
 ## Lint
