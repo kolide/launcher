@@ -257,6 +257,8 @@ func runSubcommands(systemMultiSlogger *multislogger.MultiSlogger) error {
 		run = runQueryWindowsUpdates
 	case "rundisclaimed":
 		run = disclaim.RunDisclaimed
+	case "enroll":
+		run = runEnroll
 	default:
 		return fmt.Errorf("unknown subcommand %s", os.Args[1])
 	}
