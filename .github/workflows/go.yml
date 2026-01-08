@@ -348,9 +348,10 @@ jobs:
         # AppIcons-3         5.606m ± 10%   10012.759m ± 0%  +178505.57% (p=0.000 n=10)
         # Format is: <Function name> <benchmark measurement from main> ± <confidence interval> <benchmark measurement from PR> ± <confidence interval> +<percent change versus main>
         # We're capturing the percent change against main, whenever it is a performance regression (positive delta).
+        # We only care when it's at least a 1% change (so we ignore e.g. +0.02%).
         # When it's a negative change (e.g. -178505.57%), that's a performance improvement.
         # When there's no difference, benchstat outputs a ~ instead.
-        REGRESSIONS=$(grep -E '^.+-\d+\s+(?:\d+\.?\d*[a-zA-Z]*\s±\s\d+%\s+){2}(\+\d+\.?\d*%)' ./benchstat.txt || :)
+        REGRESSIONS=$(grep -E '^.+-\d+\s+(?:\d+\.?\d*[a-zA-Z]*\s±\s\d+%\s+){2}(\+[1-9]+\.?\d*%)' ./benchstat.txt || :)
         if [ -n "$REGRESSIONS" ]
         then
           echo "Performance regressions found:"
