@@ -2,8 +2,10 @@ package osquerypublisher
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/kolide/launcher/ee/agent/storage"
@@ -223,6 +225,14 @@ func TestLogPublisherClient_shouldPublishLogs(t *testing.T) {
 	}
 }
 
+// makeTestLogStringOfEncodedLength is a helper function to make a string that will be
+// a specific length after encoding. this is required because making e.g. a null byte array
+// will change in length dramatically as it is encoded
+func makeLogStringOfEncodedLength(length int) string {
+	// subtract 2 because the string will be encoded as a json string, which will add 2 quotes
+	return strings.Repeat("a", length-2)
+}
+
 func TestLogPublisherClient_batchLogsRequest(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -248,29 +258,29 @@ func TestLogPublisherClient_batchLogsRequest(t *testing.T) {
 		{
 			name: "logs that need to be split into two batches",
 			logs: []string{
-				string(make([]byte, maxRequestSizeBytes-1)), // log that's just under the limit
+				makeLogStringOfEncodedLength(maxRequestSizeBytes - 1), // log that's just under the limit
 				"small log", // this will start a new batch
 			},
 			expectedBatches: [][]string{
-				{string(make([]byte, maxRequestSizeBytes-1))},
+				{makeLogStringOfEncodedLength(maxRequestSizeBytes - 1)},
 				{"small log"},
 			},
 		},
 		{
 			name: "logs that need to be split into multiple batches",
 			logs: []string{
-				string(make([]byte, maxRequestSizeBytes/2)), // half the max size
-				string(make([]byte, maxRequestSizeBytes/2)), // half the max size (fits in same batch)
-				string(make([]byte, maxRequestSizeBytes/2)), // half the max size (starts new batch)
+				makeLogStringOfEncodedLength(maxRequestSizeBytes / 2), // half the max size
+				makeLogStringOfEncodedLength(maxRequestSizeBytes / 2), // half the max size (fits in same batch)
+				makeLogStringOfEncodedLength(maxRequestSizeBytes / 2), // half the max size (starts new batch)
 				"small log", // fits in second batch
 			},
 			expectedBatches: [][]string{
 				{
-					string(make([]byte, maxRequestSizeBytes/2)),
-					string(make([]byte, maxRequestSizeBytes/2)),
+					makeLogStringOfEncodedLength(maxRequestSizeBytes / 2),
+					makeLogStringOfEncodedLength(maxRequestSizeBytes / 2),
 				},
 				{
-					string(make([]byte, maxRequestSizeBytes/2)),
+					makeLogStringOfEncodedLength(maxRequestSizeBytes / 2),
 					"small log",
 				},
 			},
@@ -278,36 +288,36 @@ func TestLogPublisherClient_batchLogsRequest(t *testing.T) {
 		{
 			name: "single log exactly at max size",
 			logs: []string{
-				string(make([]byte, maxRequestSizeBytes)),
+				makeLogStringOfEncodedLength(maxRequestSizeBytes),
 			},
 			expectedBatches: [][]string{
-				{string(make([]byte, maxRequestSizeBytes))},
+				{makeLogStringOfEncodedLength(maxRequestSizeBytes)},
 			},
 		},
 		{
 			name: "single log exceeding max size",
 			logs: []string{
-				string(make([]byte, maxRequestSizeBytes+1)),
+				makeLogStringOfEncodedLength(maxRequestSizeBytes + 1),
 			},
 			expectedBatches: [][]string{
-				{string(make([]byte, maxRequestSizeBytes+1))},
+				{makeLogStringOfEncodedLength(maxRequestSizeBytes + 1)},
 			},
 		},
 		{
 			name: "multiple batches with single log exceeding max size",
 			logs: []string{
 				"small first log",
-				string(make([]byte, maxRequestSizeBytes-100)),
-				string(make([]byte, maxRequestSizeBytes+1)),
+				makeLogStringOfEncodedLength(maxRequestSizeBytes - 100),
+				makeLogStringOfEncodedLength(maxRequestSizeBytes + 1),
 				"small last log",
 			},
 			expectedBatches: [][]string{
 				{ // note that the single log will get put in its own batch before completing the remaining logs in the original batch
-					string(make([]byte, maxRequestSizeBytes+1)),
+					makeLogStringOfEncodedLength(maxRequestSizeBytes + 1),
 				},
 				{
 					"small first log",
-					string(make([]byte, maxRequestSizeBytes-100)),
+					makeLogStringOfEncodedLength(maxRequestSizeBytes - 100),
 					"small last log",
 				},
 			},
@@ -315,13 +325,13 @@ func TestLogPublisherClient_batchLogsRequest(t *testing.T) {
 		{
 			name: "logs that exactly fill a batch",
 			logs: []string{
-				string(make([]byte, maxRequestSizeBytes/2)),
-				string(make([]byte, maxRequestSizeBytes/2)),
+				makeLogStringOfEncodedLength(maxRequestSizeBytes / 2),
+				makeLogStringOfEncodedLength(maxRequestSizeBytes / 2),
 			},
 			expectedBatches: [][]string{
 				{
-					string(make([]byte, maxRequestSizeBytes/2)),
-					string(make([]byte, maxRequestSizeBytes/2)),
+					makeLogStringOfEncodedLength(maxRequestSizeBytes / 2),
+					makeLogStringOfEncodedLength(maxRequestSizeBytes / 2),
 				},
 			},
 		},
@@ -337,18 +347,18 @@ func TestLogPublisherClient_batchLogsRequest(t *testing.T) {
 		{
 			name: "logs with varying sizes",
 			logs: []string{
-				string(make([]byte, 50)),
-				string(make([]byte, 100)),
-				string(make([]byte, 150)),
-				string(make([]byte, maxRequestSizeBytes-301)),
+				makeLogStringOfEncodedLength(50),
+				makeLogStringOfEncodedLength(100),
+				makeLogStringOfEncodedLength(150),
+				makeLogStringOfEncodedLength(maxRequestSizeBytes - 301),
 				"another small one that should be batched separately",
 			},
 			expectedBatches: [][]string{
 				{
-					string(make([]byte, 50)),
-					string(make([]byte, 100)),
-					string(make([]byte, 150)),
-					string(make([]byte, maxRequestSizeBytes-301)),
+					makeLogStringOfEncodedLength(50),
+					makeLogStringOfEncodedLength(100),
+					makeLogStringOfEncodedLength(150),
+					makeLogStringOfEncodedLength(maxRequestSizeBytes - 301),
 				},
 				{"another small one that should be batched separately"},
 			},
@@ -358,10 +368,7 @@ func TestLogPublisherClient_batchLogsRequest(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			lpc := &LogPublisherClient{
-				slogger: multislogger.NewNopLogger(),
-			}
-			batches := lpc.batchLogsRequest(tt.logs)
+			batches := batchRequest(tt.logs, multislogger.NewNopLogger())
 
 			require.Equal(t, len(tt.expectedBatches), len(batches), "number of batches should match")
 
@@ -381,6 +388,233 @@ func TestLogPublisherClient_batchLogsRequest(t *testing.T) {
 						totalBatchSize += len(log)
 						// verify that the total size never exceeds limit
 						require.LessOrEqual(t, totalBatchSize, maxRequestSizeBytes)
+					}
+				}
+			}
+		})
+	}
+}
+
+// makeResultOfEncodedLength is a helper function to make a distributed.Result that will be
+// a specific length after JSON encoding. This accounts for the JSON structure overhead.
+// don't attempt to make a result smaller than the base overhead (76 bytes), the best we can
+// do there is give back a 76 byte empty result but that seems more confusing than just failing
+func makeResultOfEncodedLength(t *testing.T, length int) distributed.Result {
+	t.Helper()
+	// measure the overhead by creating a test result with empty data
+	testRow := map[string]string{"data": ""}
+	testResult := distributed.Result{
+		QueryName: "t",
+		Status:    0,
+		Rows:      []map[string]string{testRow},
+	}
+	testJSON, _ := json.Marshal(testResult)
+	baseOverhead := len(testJSON)
+
+	// calculate the actual data size needed
+	dataSize := length - baseOverhead
+	// don't want to constantly error check for a helper function but the results are
+	// confusing if you try to target a length that's smaller than the base overhead
+	// (e.g. if try to make a result of 50 bytes) so fail loudly
+	require.Greater(t, dataSize, 0, "base overhead is 76 bytes, update your test to use a bigger target length")
+
+	// Create the result with the calculated data size
+	row := map[string]string{
+		"data": strings.Repeat("a", dataSize),
+	}
+
+	testResult.Rows = []map[string]string{row}
+
+	return testResult
+}
+
+func TestLogPublisherClient_batchResultsRequest(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name            string
+		results         []distributed.Result
+		expectedBatches [][]distributed.Result
+	}{
+		{
+			name:            "empty results",
+			results:         []distributed.Result{},
+			expectedBatches: [][]distributed.Result{},
+		},
+		{
+			name: "single small result",
+			results: []distributed.Result{
+				{QueryName: "test_query", Status: 0, Rows: []map[string]string{{"key": "value"}}},
+			},
+			expectedBatches: [][]distributed.Result{
+				{{QueryName: "test_query", Status: 0, Rows: []map[string]string{{"key": "value"}}}},
+			},
+		},
+		{
+			name: "multiple small results in one batch",
+			results: []distributed.Result{
+				{QueryName: "query1", Status: 0, Rows: []map[string]string{{"key1": "value1"}}},
+				{QueryName: "query2", Status: 0, Rows: []map[string]string{{"key2": "value2"}}},
+				{QueryName: "query3", Status: 0, Rows: []map[string]string{{"key3": "value3"}}},
+			},
+			expectedBatches: [][]distributed.Result{
+				{
+					{QueryName: "query1", Status: 0, Rows: []map[string]string{{"key1": "value1"}}},
+					{QueryName: "query2", Status: 0, Rows: []map[string]string{{"key2": "value2"}}},
+					{QueryName: "query3", Status: 0, Rows: []map[string]string{{"key3": "value3"}}},
+				},
+			},
+		},
+		{
+			name: "results that need to be split into two batches",
+			results: []distributed.Result{
+				makeResultOfEncodedLength(t, maxRequestSizeBytes-1),                                // result that's just under the limit
+				{QueryName: "small_query", Status: 0, Rows: []map[string]string{{"key": "value"}}}, // this will start a new batch
+			},
+			expectedBatches: [][]distributed.Result{
+				{makeResultOfEncodedLength(t, maxRequestSizeBytes-1)},
+				{{QueryName: "small_query", Status: 0, Rows: []map[string]string{{"key": "value"}}}},
+			},
+		},
+		{
+			name: "results that need to be split into multiple batches",
+			results: []distributed.Result{
+				makeResultOfEncodedLength(t, maxRequestSizeBytes/2),                                // half the max size
+				makeResultOfEncodedLength(t, maxRequestSizeBytes/2),                                // half the max size (fits in same batch)
+				makeResultOfEncodedLength(t, maxRequestSizeBytes/2),                                // half the max size (starts new batch)
+				{QueryName: "small_query", Status: 0, Rows: []map[string]string{{"key": "value"}}}, // fits in second batch
+			},
+			expectedBatches: [][]distributed.Result{
+				{
+					makeResultOfEncodedLength(t, maxRequestSizeBytes/2),
+					makeResultOfEncodedLength(t, maxRequestSizeBytes/2),
+				},
+				{
+					makeResultOfEncodedLength(t, maxRequestSizeBytes/2),
+					{QueryName: "small_query", Status: 0, Rows: []map[string]string{{"key": "value"}}},
+				},
+			},
+		},
+		{
+			name: "single result exactly at max size",
+			results: []distributed.Result{
+				makeResultOfEncodedLength(t, maxRequestSizeBytes),
+			},
+			expectedBatches: [][]distributed.Result{
+				{makeResultOfEncodedLength(t, maxRequestSizeBytes)},
+			},
+		},
+		{
+			name: "single result exceeding max size",
+			results: []distributed.Result{
+				makeResultOfEncodedLength(t, maxRequestSizeBytes+1),
+			},
+			expectedBatches: [][]distributed.Result{
+				{makeResultOfEncodedLength(t, maxRequestSizeBytes+1)},
+			},
+		},
+		{
+			name: "multiple batches with single result exceeding max size",
+			results: []distributed.Result{
+				{QueryName: "small_first", Status: 0, Rows: []map[string]string{{"key": "value"}}},
+				makeResultOfEncodedLength(t, maxRequestSizeBytes-300),
+				makeResultOfEncodedLength(t, maxRequestSizeBytes+1),
+				{QueryName: "small_last", Status: 0, Rows: []map[string]string{{"key": "value"}}},
+			},
+			expectedBatches: [][]distributed.Result{
+				{
+					makeResultOfEncodedLength(t, maxRequestSizeBytes+1),
+				},
+				{
+					{QueryName: "small_first", Status: 0, Rows: []map[string]string{{"key": "value"}}},
+					makeResultOfEncodedLength(t, maxRequestSizeBytes-300),
+					{QueryName: "small_last", Status: 0, Rows: []map[string]string{{"key": "value"}}},
+				},
+			},
+		},
+		{
+			name: "results that almost fill a batch",
+			results: []distributed.Result{
+				makeResultOfEncodedLength(t, maxRequestSizeBytes/2),
+				makeResultOfEncodedLength(t, maxRequestSizeBytes/2),
+			},
+			expectedBatches: [][]distributed.Result{
+				{
+					makeResultOfEncodedLength(t, maxRequestSizeBytes/2),
+					makeResultOfEncodedLength(t, maxRequestSizeBytes/2),
+				},
+			},
+		},
+		{
+			name: "many small results that all fit in one batch",
+			results: []distributed.Result{
+				{QueryName: "query1", Status: 0, Rows: []map[string]string{{"key1": "value1"}}},
+				{QueryName: "query2", Status: 0, Rows: []map[string]string{{"key2": "value2"}}},
+				{QueryName: "query3", Status: 0, Rows: []map[string]string{{"key3": "value3"}}},
+				{QueryName: "query4", Status: 0, Rows: []map[string]string{{"key4": "value4"}}},
+				{QueryName: "query5", Status: 0, Rows: []map[string]string{{"key5": "value5"}}},
+			},
+			expectedBatches: [][]distributed.Result{
+				{
+					{QueryName: "query1", Status: 0, Rows: []map[string]string{{"key1": "value1"}}},
+					{QueryName: "query2", Status: 0, Rows: []map[string]string{{"key2": "value2"}}},
+					{QueryName: "query3", Status: 0, Rows: []map[string]string{{"key3": "value3"}}},
+					{QueryName: "query4", Status: 0, Rows: []map[string]string{{"key4": "value4"}}},
+					{QueryName: "query5", Status: 0, Rows: []map[string]string{{"key5": "value5"}}},
+				},
+			},
+		},
+		{
+			name: "results with varying sizes",
+			results: []distributed.Result{
+				makeResultOfEncodedLength(t, 100),
+				makeResultOfEncodedLength(t, 100),
+				makeResultOfEncodedLength(t, 100),
+				makeResultOfEncodedLength(t, maxRequestSizeBytes-301),
+				{QueryName: "small_query", Status: 0, Rows: []map[string]string{{"key": "value"}}},
+			},
+			expectedBatches: [][]distributed.Result{
+				{
+					makeResultOfEncodedLength(t, 100),
+					makeResultOfEncodedLength(t, 100),
+					makeResultOfEncodedLength(t, 100),
+					makeResultOfEncodedLength(t, maxRequestSizeBytes-301),
+				},
+				{
+					{QueryName: "small_query", Status: 0, Rows: []map[string]string{{"key": "value"}}},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			batches := batchRequest(tt.results, multislogger.NewNopLogger())
+
+			require.Equal(t, len(tt.expectedBatches), len(batches), "number of batches should match")
+
+			for i, expectedBatch := range tt.expectedBatches {
+				require.Equal(t, len(expectedBatch), len(batches[i]), "batch %d should have correct number of results", i)
+				expectedBatchRaw, err := json.Marshal(expectedBatch)
+				require.NoError(t, err)
+				batchRaw, err := json.Marshal(batches[i])
+				require.NoError(t, err)
+				require.Equal(t, expectedBatchRaw, batchRaw, "batch %d should match expected results", i)
+			}
+
+			// now check each batch- if any exceeds the maxRequestSize, verify that it is a solo entry (batch of size 1).
+			// otherwise, verify that the total result length does not exceed our limit
+			for _, results := range batches {
+				totalBatchSize := 0
+				for _, result := range results {
+					resultJSON, _ := json.Marshal(result)
+					resultLen := len(resultJSON)
+					if resultLen > maxRequestSizeBytes {
+						require.Equal(t, 1, len(results), "results exceeding max size should be in their own batch")
+					} else {
+						totalBatchSize += resultLen
+						// verify that the total size never exceeds limit
+						require.LessOrEqual(t, totalBatchSize, maxRequestSizeBytes, "batch total size should not exceed max")
 					}
 				}
 			}

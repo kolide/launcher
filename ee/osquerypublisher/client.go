@@ -79,7 +79,7 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 		return nil, nil
 	}
 
-	batches := lpc.batchLogsRequest(logs)
+	batches := batchRequest(logs, lpc.slogger)
 	logger := lpc.slogger.With(
 		"log_type", logType.String(),
 		"log_count", len(logs),
@@ -121,15 +121,35 @@ func (lpc *LogPublisherClient) PublishResults(ctx context.Context, results []dis
 		return nil, nil
 	}
 
+	batches := batchRequest(results, lpc.slogger)
 	logger := lpc.slogger.With(
 		"result_count", len(results),
+		"batch_count", len(batches),
 	)
 
-	payload := types.PublishOsqueryResultsRequest{
-		Results: results,
+	pubResponse := types.OsqueryPublicationResponse{}
+
+	for idx, resultBatch := range batches {
+		payload := types.PublishOsqueryResultsRequest{
+			Results: resultBatch,
+		}
+
+		resp, err := lpc.publish(ctx, logger, payload, publicationPathResults)
+		if err != nil {
+			logger.Log(ctx, slog.LevelError, "encountered error publishing results batch",
+				"err", err,
+				"batch_index", idx,
+			)
+
+			return nil, err
+		}
+
+		pubResponse.IngestedBytes += resp.IngestedBytes
+		pubResponse.LogCount += resp.LogCount
+		pubResponse.Status = resp.Status
 	}
 
-	return lpc.publish(ctx, logger, payload, publicationPathResults)
+	return &pubResponse, nil
 }
 
 // publish handles the common logic for publishing logs and results to the agent-ingester service. This
@@ -144,7 +164,7 @@ func (lpc *LogPublisherClient) publish(ctx context.Context, slogger *slog.Logger
 
 	requestUUID := uuid.NewForRequest()
 	ctx = uuid.NewContext(ctx, requestUUID)
-	logger := lpc.slogger.With(
+	logger := slogger.With(
 		"request_uuid", requestUUID,
 		"publication_type", publicationPath,
 	)
@@ -276,31 +296,43 @@ func (lpc *LogPublisherClient) shouldPublishLogs() bool {
 	return rand.Intn(101) <= dualPublicationPercentEnabled
 }
 
-// batchLogsRequest takes in a slice of logs and returns a slice of slices of logs, where each slice is a batch of logs
-// that will fit within maxRequestSizeBytes (set for kafka performance). If a single log exceeds the max request size, it is added as its own batch.
-func (lpc *LogPublisherClient) batchLogsRequest(logs []string) [][]string {
-	batches := make([][]string, 0)
+// batchRequest takes in a slice of logs or distributed results and returns a slice of slices of either
+// that will fit within maxRequestSizeBytes (set for kafka performance). If a single log/result exceeds the max request size,
+// it is added as its own batch.
+func batchRequest[Measureable string | distributed.Result](logs []Measureable, logger *slog.Logger) [][]Measureable {
+	logger = logger.With("batch_type", fmt.Sprintf("%T", logs))
+	batches := make([][]Measureable, 0)
 	currentLogBatchSize := 0
-	currentBatch := make([]string, 0)
+	currentBatch := make([]Measureable, 0)
+	logLength := 0
 	for _, log := range logs {
-		logLength := len(log)
-		// if a single log ever exceeds the max request size, add as its own batch and log
+		// marshal the result to get the length of the raw bytes
+		rawLog, err := json.Marshal(log)
+		if err != nil { // this should never happen, just log and continue if so
+			logger.Log(context.TODO(), slog.LevelError,
+				"failed to marshal osquery result",
+				"err", err,
+			)
+			continue
+		}
+		logLength = len(rawLog)
+		// if a single log/result ever exceeds the max request size, add as its own batch and log
 		// this loudly, this is not expected and may cause issues downstream
 		if logLength > maxRequestSizeBytes {
-			lpc.slogger.Log(context.TODO(), slog.LevelWarn,
-				"single osquery log exceeds max request size",
+			logger.Log(context.TODO(), slog.LevelWarn,
+				"single osquery log or result exceeds max request size",
 				"log_length", logLength,
 				"max_request_size", maxRequestSizeBytes,
 			)
 			// add the log as its own batch but don't alter any of the current batch size state, that can continue
 			// in case there are other smaller logs that can still fit in the current batch
-			batches = append(batches, []string{log})
+			batches = append(batches, []Measureable{log})
 			continue
 		}
 		// if the size of the next log would exceed the max request size, finalize the existing and start a new batch
 		if currentLogBatchSize+logLength > maxRequestSizeBytes {
 			batches = append(batches, currentBatch)
-			currentBatch = make([]string, 0)
+			currentBatch = make([]Measureable, 0)
 			currentLogBatchSize = 0
 		}
 
