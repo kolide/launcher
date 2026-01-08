@@ -6,6 +6,7 @@ var (
 	// Well-known keys
 	ObservabilityIngestAuthTokenKey = []byte("observability_ingest_auth_token")
 	AgentIngesterAuthTokenKey       = []byte("agent_ingester_auth_token")
+	EnrollmentSecretTokenKey        = []byte("enrollment_secret") // Enrollment secret set via `launcher enroll`
 
 	// Identifier types in complex keys
 	IdentifierTypeRegistration = []byte("registration")

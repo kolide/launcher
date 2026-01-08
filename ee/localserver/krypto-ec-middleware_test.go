@@ -248,7 +248,7 @@ func TestKryptoEcMiddleware(t *testing.T) {
 					require.Equal(t, http.StatusOK, rr.Code)
 					require.Equal(t, kolideKryptoEccHeader20230130Value, rr.Header().Get(kolideKryptoHeaderKey))
 
-					outerResponse := mustUnmarshallOuterResponse(t, string(rr.Body.Bytes()))
+					outerResponse := mustUnmarshallOuterResponse(t, rr.Body.String())
 					require.Equal(t, challengeId, outerResponse.ChallengeId)
 
 					opened, err := outerResponse.Open(challengePrivateKey)

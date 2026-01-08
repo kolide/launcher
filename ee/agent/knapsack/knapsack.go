@@ -459,6 +459,20 @@ func (k *knapsack) ReadEnrollSecret() (string, error) {
 		return string(bytes.TrimSpace(content)), nil
 	}
 
+	// Check if enroll secret was set via command-line and stored in token store
+	store := k.TokenStore()
+	if store == nil {
+		return "", errors.New("token store not available")
+	}
+	// For now, only checking for default enrollment
+	secret, err := store.Get(storage.KeyByIdentifier(storage.EnrollmentSecretTokenKey, storage.IdentifierTypeRegistration, []byte(types.DefaultRegistrationID)))
+	if err != nil {
+		return "", fmt.Errorf("getting enrollment secret from token store: %w", err)
+	}
+	if secret != nil {
+		return string(secret), nil
+	}
+
 	return "", errors.New("enroll secret not set")
 }
 
