@@ -300,7 +300,7 @@ func deserializeNext(ctx context.Context, slogger *slog.Logger, nextToken byte, 
 			if err != nil {
 				return nil, fmt.Errorf("reading id of object: %w", err)
 			}
-			return []byte(fmt.Sprintf("object id %d", objectId)), nil
+			return fmt.Appendf(nil, "object id %d", objectId), nil
 		case tokenArrayBufferView:
 			return deserializePresumablyEmptyArrayBufferView(srcReader)
 		case tokenArrayBufferTransfer:

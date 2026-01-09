@@ -475,6 +475,6 @@ func hashKeyValuePairs(keyvals ...interface{}) string {
 	})
 
 	// Create hash
-	h := sha256.Sum256([]byte(fmt.Sprintf("%v", filtered)))
+	h := sha256.Sum256(fmt.Appendf(nil, "%v", filtered))
 	return fmt.Sprintf("%x", h)
 }
