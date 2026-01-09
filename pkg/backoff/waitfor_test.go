@@ -23,7 +23,7 @@ func TestWaitFor(t *testing.T) {
 		name               string
 		innerFn            func() error
 		errorAssertion     require.ErrorAssertionFunc
-		testifyExpectation func(require.TestingT, func() bool, time.Duration, time.Duration, ...interface{})
+		testifyExpectation func(require.TestingT, func() bool, time.Duration, time.Duration, ...any)
 		errorRegexps       []*regexp.Regexp
 
 		interval time.Duration

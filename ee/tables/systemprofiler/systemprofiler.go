@@ -71,10 +71,10 @@ type Property struct {
 }
 
 type Result struct {
-	Items          []interface{} `plist:"_items"`
-	DataType       string        `plist:"_dataType"`
-	SPCommandLine  []string      `plist:"_SPCommandLineArguments"`
-	ParentDataType string        `plist:"_parentDataType"`
+	Items          []any    `plist:"_items"`
+	DataType       string   `plist:"_dataType"`
+	SPCommandLine  []string `plist:"_SPCommandLineArguments"`
+	ParentDataType string   `plist:"_parentDataType"`
 
 	// These would be nice to add, but they come back with inconsistent
 	// types, so doing a straight unmarshal is hard.

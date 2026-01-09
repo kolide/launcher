@@ -316,7 +316,7 @@ func (s *UserServer) memProfileHandler(w http.ResponseWriter, req *http.Request)
 	s.respondWithJSON(w, response)
 }
 
-func (s *UserServer) respondWithJSON(w http.ResponseWriter, data interface{}) {
+func (s *UserServer) respondWithJSON(w http.ResponseWriter, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(data); err != nil {
 		s.slogger.Log(context.TODO(), slog.LevelError, "failed to encode JSON response", "err", err)

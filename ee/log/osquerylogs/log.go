@@ -146,7 +146,7 @@ func (l *OsqueryLogAdapter) logInfoAboutUnrecognizedProcessLockingPidfile(p []by
 	}
 
 	// Gather as much info as we can about the process
-	processInfo := []interface{}{"pid", pid}
+	processInfo := []any{"pid", pid}
 	processInfo = append(processInfo, "name", getStringStat(unknownProcess.Name))
 	processInfo = append(processInfo, "cmdline", getStringStat(unknownProcess.Cmdline))
 	processInfo = append(processInfo, "status", getStringSliceStat(unknownProcess.Status))

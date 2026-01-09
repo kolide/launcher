@@ -23,7 +23,7 @@ func (p *parser) parsePlist(reader io.Reader) (any, error) {
 	}
 
 	// Create a variable to hold the parsed data
-	var result interface{}
+	var result any
 
 	// Unmarshal the plist data
 	if _, err := plist.Unmarshal(data, &result); err != nil {

@@ -19,7 +19,7 @@ var (
 func TestFilterResults(t *testing.T) {
 	t.Parallel()
 
-	data := []interface{}{
+	data := []any{
 		"one", "two",
 		"results", reallyLongString,
 	}
@@ -37,7 +37,7 @@ func TestFilterResults(t *testing.T) {
 func TestKitLogging(t *testing.T) {
 	t.Parallel()
 
-	data := []interface{}{
+	data := []any{
 		"one", "two",
 		"results", reallyLongString,
 	}

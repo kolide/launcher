@@ -154,7 +154,7 @@ func (ls *LogShipper) Stop(_ error) {
 	}
 }
 
-func (ls *LogShipper) Log(keyvals ...interface{}) error {
+func (ls *LogShipper) Log(keyvals ...any) error {
 	filterResults(keyvals...)
 	return ls.shippingLogger.Log(keyvals...)
 }
@@ -177,7 +177,7 @@ func (ls *LogShipper) SlogHandler() slog.Handler {
 // which just make a lot of noise in our debug logs.
 // It's a bit fragile, since it parses keyvals, but
 // hopefully that's good enough
-func filterResults(keyvals ...interface{}) {
+func filterResults(keyvals ...any) {
 	// Consider switching on `method` as well?
 	for i := 0; i < len(keyvals); i += 2 {
 		if keyvals[i] == "results" && len(keyvals) > i+1 {
@@ -245,7 +245,7 @@ func (ls *LogShipper) updateDevideIdentifyingAttributes() error {
 	// if this is the first time we've gotten device data, update the send buffer
 	// logs to include it
 	ls.sendBuffer.UpdateData(func(in io.Reader, out io.Writer) error {
-		var logMap map[string]interface{}
+		var logMap map[string]any
 
 		if err := json.NewDecoder(in).Decode(&logMap); err != nil {
 			ls.shippingLogger.Log(

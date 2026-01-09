@@ -24,7 +24,7 @@ var titleRegex = regexp.MustCompile(`^\s*\|\s*(.+?)\s*\|\s*$`)
 var lineRegex = regexp.MustCompile(`^\s*(.*?)\s*:\s*(.*?)\s*$`)
 
 func parseDsreg(reader io.Reader) (any, error) {
-	results := make(map[string]map[string]interface{})
+	results := make(map[string]map[string]any)
 
 	var currentSectionHeader string
 
@@ -44,7 +44,7 @@ func parseDsreg(reader io.Reader) (any, error) {
 				return nil, fmt.Errorf("failed to parse section header, no second line: %s", line)
 			}
 			currentSectionHeader = m[1]
-			results[currentSectionHeader] = make(map[string]interface{})
+			results[currentSectionHeader] = make(map[string]any)
 
 			// Consume the last line of the section header.
 			if ok := scanner.Scan(); !ok {

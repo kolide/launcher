@@ -195,7 +195,7 @@ func (c *HTTPClient) GetSubsystemData(ctx context.Context, hash string) (io.Read
 }
 
 // SendMessage sends a message to the server using JSON-RPC format
-func (c *HTTPClient) SendMessage(ctx context.Context, method string, params interface{}) error {
+func (c *HTTPClient) SendMessage(ctx context.Context, method string, params any) error {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -203,7 +203,7 @@ func (c *HTTPClient) SendMessage(ctx context.Context, method string, params inte
 		return errors.New("token is nil, cannot send message to server")
 	}
 
-	bodyMap := map[string]interface{}{
+	bodyMap := map[string]any{
 		"jsonrpc": "2.0",
 		"method":  method,
 		"params":  params,

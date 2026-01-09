@@ -110,13 +110,13 @@ func generateAirportData(ctx context.Context, queryContext table.QueryContext, a
 func processAirportOutput(airportOutput io.Reader, option string, queryContext table.QueryContext, slogger *slog.Logger) ([]map[string]string, error) {
 	var results []map[string]string
 
-	var unmarshalledOutput []map[string]interface{}
+	var unmarshalledOutput []map[string]any
 
 	rowData := map[string]string{"option": option}
 
 	switch option {
 	case "getinfo":
-		unmarshalledOutput = []map[string]interface{}{unmarshallGetInfoOutput(airportOutput)}
+		unmarshalledOutput = []map[string]any{unmarshallGetInfoOutput(airportOutput)}
 	case "scan":
 		unmarshalledOutput = unmarshallScanOuput(airportOutput)
 	default:
@@ -136,7 +136,7 @@ func processAirportOutput(airportOutput io.Reader, option string, queryContext t
 }
 
 // unmarshallGetInfoOutput parses the output of the airport getinfo command
-func unmarshallGetInfoOutput(reader io.Reader) map[string]interface{} {
+func unmarshallGetInfoOutput(reader io.Reader) map[string]any {
 	/* example output:
 
 	    agrCtlRSSI: -55
@@ -150,7 +150,7 @@ func unmarshallGetInfoOutput(reader io.Reader) map[string]interface{} {
 	scanner := bufio.NewScanner(reader)
 	scanner.Split(bufio.ScanLines)
 
-	results := make(map[string]interface{})
+	results := make(map[string]any)
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -170,7 +170,7 @@ func unmarshallGetInfoOutput(reader io.Reader) map[string]interface{} {
 }
 
 // unmarshallScanOuput parses the output of the airport scan command
-func unmarshallScanOuput(reader io.Reader) []map[string]interface{} {
+func unmarshallScanOuput(reader io.Reader) []map[string]any {
 	/* example output:
 
 	            SSID BSSID             RSSI CHANNEL HT CC SECURITY (auth/unicast/group)
@@ -183,7 +183,7 @@ func unmarshallScanOuput(reader io.Reader) []map[string]interface{} {
 
 	var headers []string
 	var headerSeparatorIndexes []int
-	var results []map[string]interface{}
+	var results []map[string]any
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -194,7 +194,7 @@ func unmarshallScanOuput(reader io.Reader) []map[string]interface{} {
 			continue
 		}
 
-		rowData := make(map[string]interface{}, len(headers))
+		rowData := make(map[string]any, len(headers))
 
 		for i, value := range splitAtIndexes(line, headerSeparatorIndexes) {
 			rowData[headers[i]] = value

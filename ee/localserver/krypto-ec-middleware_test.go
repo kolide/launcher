@@ -597,7 +597,7 @@ func mustMakePostRequest(t *testing.T, challengeKryptoBoxB64 string) *http.Reque
 	return req
 }
 
-func mustMarshal(t *testing.T, v interface{}) []byte {
+func mustMarshal(t *testing.T, v any) []byte {
 	b, err := json.Marshal(v)
 	require.NoError(t, err)
 	return b

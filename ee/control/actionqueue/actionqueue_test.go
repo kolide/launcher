@@ -367,7 +367,7 @@ func getValidUntil() int64 {
 	return time.Now().Add(1 * time.Hour).Unix()
 }
 
-func mustJsonMarshal(t *testing.T, v interface{}) []byte {
+func mustJsonMarshal(t *testing.T, v any) []byte {
 	b, err := json.Marshal(v)
 	require.NoError(t, err)
 	return b

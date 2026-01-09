@@ -89,7 +89,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 						t.slogger.Log(ctx, slog.LevelInfo, "error unmarshaling JWT signing keys", "err", err)
 					}
 
-					data := map[string]interface{}{}
+					data := map[string]any{}
 					token, err := jwt.ParseWithClaims(string(rawData), jwt.MapClaims{}, JWTKeyFunc(keyMap))
 					if err != nil {
 						t.slogger.Log(ctx, slog.LevelInfo, "error parsing token", "err", err)
@@ -107,7 +107,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 						continue
 					}
 
-					parsedClaims := map[string]interface{}{}
+					parsedClaims := map[string]any{}
 					maps.Copy(parsedClaims, claims)
 
 					data["header"] = token.Header
@@ -145,8 +145,8 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 // JWTKeyFunc handles taking in an array of public keys to validate against the JWT signature.
 // There may be improvements by using `VerificationKeySet` to pass an array of crypto keys however, `VerificationKeySet` would require decoding the PEM block for each possible key instead of finding the correct key first.
-func JWTKeyFunc(keys map[string]string) func(token *jwt.Token) (interface{}, error) {
-	return func(token *jwt.Token) (interface{}, error) {
+func JWTKeyFunc(keys map[string]string) func(token *jwt.Token) (any, error) {
+	return func(token *jwt.Token) (any, error) {
 		// We may want to validate algorithm here alongside the key id.
 		kid, ok := token.Header["kid"]
 		if !ok {

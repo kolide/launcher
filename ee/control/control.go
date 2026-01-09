@@ -55,7 +55,7 @@ type subscriber interface {
 type dataProvider interface {
 	GetConfig(ctx context.Context) (io.Reader, error)
 	GetSubsystemData(ctx context.Context, hash string) (io.Reader, error)
-	SendMessage(ctx context.Context, method string, params interface{}) error
+	SendMessage(ctx context.Context, method string, params any) error
 }
 
 func New(k types.Knapsack, fetcher dataProvider, opts ...Option) *ControlService {
@@ -399,7 +399,7 @@ func (cs *ControlService) RegisterSubscriber(subsystem string, subscriber subscr
 	cs.subscribers[subsystem] = append(cs.subscribers[subsystem], subscriber)
 }
 
-func (cs *ControlService) SendMessage(method string, params interface{}) error {
+func (cs *ControlService) SendMessage(method string, params any) error {
 	return cs.fetcher.SendMessage(context.TODO(), method, params)
 }
 

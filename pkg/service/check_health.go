@@ -19,11 +19,11 @@ type healthcheckResponse struct {
 	Err       error  `json:"err,omitempty"`
 }
 
-func decodeJSONRPCHealthCheckRequest(_ context.Context, msg json.RawMessage) (interface{}, error) {
+func decodeJSONRPCHealthCheckRequest(_ context.Context, msg json.RawMessage) (any, error) {
 	return healthcheckRequest{}, nil
 }
 
-func encodeJSONRPCHealthcheckResponse(_ context.Context, obj interface{}) (json.RawMessage, error) {
+func encodeJSONRPCHealthcheckResponse(_ context.Context, obj any) (json.RawMessage, error) {
 	res, ok := obj.(healthcheckResponse)
 	if !ok {
 		return encodeJSONResponse(nil, fmt.Errorf("asserting result to *healthcheckResponse failed. Got %T, %+v", obj, obj))
@@ -37,7 +37,7 @@ func encodeJSONRPCHealthcheckResponse(_ context.Context, obj interface{}) (json.
 	return encodeJSONResponse(b, nil)
 }
 
-func decodeJSONRPCHealthCheckResponse(_ context.Context, res jsonrpc.Response) (interface{}, error) {
+func decodeJSONRPCHealthCheckResponse(_ context.Context, res jsonrpc.Response) (any, error) {
 	if res.Error != nil {
 		return nil, *res.Error
 	}
@@ -51,7 +51,7 @@ func decodeJSONRPCHealthCheckResponse(_ context.Context, res jsonrpc.Response) (
 }
 
 func MakeCheckHealthEndpoint(svc KolideService) endpoint.Endpoint {
-	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+	return func(ctx context.Context, request any) (response any, err error) {
 		status, err := svc.CheckHealth(ctx)
 		return healthcheckResponse{
 			Status: status,

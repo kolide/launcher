@@ -107,7 +107,7 @@ func setNestedValue(results resultMap, lines []*repcliLine) resultMap {
 			results[key] = append(knownValue, value)
 		case string:
 			results[key] = []string{knownValue, value}
-		case resultMap, interface{}, nil:
+		case resultMap, any, nil:
 			results[key] = value
 		default:
 			// if additional nested types are required they should be added above

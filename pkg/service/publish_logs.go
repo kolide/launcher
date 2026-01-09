@@ -33,7 +33,7 @@ type publishLogsResponse struct {
 	Err         error  `json:"err,omitempty"`
 }
 
-func decodeJSONRPCLogCollection(_ context.Context, msg json.RawMessage) (interface{}, error) {
+func decodeJSONRPCLogCollection(_ context.Context, msg json.RawMessage) (any, error) {
 	var req logCollection
 
 	if err := json.Unmarshal(msg, &req); err != nil {
@@ -44,7 +44,7 @@ func decodeJSONRPCLogCollection(_ context.Context, msg json.RawMessage) (interfa
 	}
 	return req, nil
 }
-func encodeJSONRPCPublishLogsResponse(_ context.Context, obj interface{}) (json.RawMessage, error) {
+func encodeJSONRPCPublishLogsResponse(_ context.Context, obj any) (json.RawMessage, error) {
 	res, ok := obj.(publishLogsResponse)
 	if !ok {
 		return encodeJSONResponse(nil, fmt.Errorf("asserting result to *publishLogsResponse failed. Got %T, %+v", obj, obj))
@@ -54,7 +54,7 @@ func encodeJSONRPCPublishLogsResponse(_ context.Context, obj interface{}) (json.
 	return encodeJSONResponse(b, fmt.Errorf("marshal json response: %w", err))
 }
 
-func decodeJSONRPCPublishLogsResponse(_ context.Context, res jsonrpc.Response) (interface{}, error) {
+func decodeJSONRPCPublishLogsResponse(_ context.Context, res jsonrpc.Response) (any, error) {
 	if res.Error != nil {
 		return nil, *res.Error
 	}
@@ -68,7 +68,7 @@ func decodeJSONRPCPublishLogsResponse(_ context.Context, res jsonrpc.Response) (
 }
 
 func MakePublishLogsEndpoint(svc KolideService) endpoint.Endpoint {
-	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+	return func(ctx context.Context, request any) (response any, err error) {
 		req := request.(logCollection)
 		message, errcode, valid, err := svc.PublishLogs(ctx, req.NodeKey, req.LogType, req.Logs)
 		return publishLogsResponse{

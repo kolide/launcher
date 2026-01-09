@@ -48,6 +48,6 @@ func (c *TestClient) GetSubsystemData(_ context.Context, hash string) (data io.R
 	return bytes.NewReader(bodyBytes), nil
 }
 
-func (c *TestClient) SendMessage(_ context.Context, method string, params interface{}) error {
+func (c *TestClient) SendMessage(_ context.Context, method string, params any) error {
 	return nil
 }

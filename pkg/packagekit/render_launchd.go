@@ -14,14 +14,14 @@ import (
 // did not behave as expected. plist.Encode printed the fields without
 // hinting
 type launchdOptions struct {
-	Environment       map[string]string      `plist:"EnvironmentVariables"`
-	Args              []string               `plist:"ProgramArguments"`
-	Label             string                 `plist:"Label"`
-	ThrottleInterval  int                    `plist:"ThrottleInterval"`
-	StandardErrorPath string                 `plist:"StandardErrorPath"`
-	StandardOutPath   string                 `plist:"StandardOutPath"`
-	KeepAlive         map[string]interface{} `plist:"KeepAlive"`
-	RunAtLoad         bool                   `plist:"RunAtLoad"`
+	Environment       map[string]string `plist:"EnvironmentVariables"`
+	Args              []string          `plist:"ProgramArguments"`
+	Label             string            `plist:"Label"`
+	ThrottleInterval  int               `plist:"ThrottleInterval"`
+	StandardErrorPath string            `plist:"StandardErrorPath"`
+	StandardOutPath   string            `plist:"StandardOutPath"`
+	KeepAlive         map[string]any    `plist:"KeepAlive"`
+	RunAtLoad         bool              `plist:"RunAtLoad"`
 }
 
 func RenderLaunchd(ctx context.Context, w io.Writer, initOptions *InitOptions) error {
@@ -37,7 +37,7 @@ func RenderLaunchd(ctx context.Context, w io.Writer, initOptions *InitOptions) e
 		fmt.Sprintf("/etc/%s/secret", initOptions.Identifier): true,
 	}
 
-	keepAlive := map[string]interface{}{
+	keepAlive := map[string]any{
 		"PathState": pathState,
 	}
 

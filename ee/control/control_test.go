@@ -64,7 +64,7 @@ func (dp nopDataProvider) GetSubsystemData(_ context.Context, hash string) (io.R
 	return nil, nil
 }
 
-func (dp nopDataProvider) SendMessage(_ context.Context, method string, params interface{}) error {
+func (dp nopDataProvider) SendMessage(_ context.Context, method string, params any) error {
 	return nil
 }
 

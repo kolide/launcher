@@ -78,7 +78,7 @@ func TestParse(t *testing.T) {
 			require.NoError(t, err)
 
 			// Check the structure of the parsed data
-			resultMap, ok := result.(map[string]interface{})
+			resultMap, ok := result.(map[string]any)
 			require.True(t, ok, "Result should be a map[string]interface{}")
 
 			// Check if we have items
@@ -87,7 +87,7 @@ func TestParse(t *testing.T) {
 
 			// Check the item structure
 			if tt.expectedItemCount > 0 {
-				itemsMap, ok := items.(map[string]interface{})
+				itemsMap, ok := items.(map[string]any)
 				require.True(t, ok, "Items should be a map[string]interface{}")
 
 				itemList, ok := itemsMap["item"]
@@ -95,7 +95,7 @@ func TestParse(t *testing.T) {
 
 				// For single item, it will be a map, for multiple items it would be a slice
 				if tt.expectedItemCount == 1 {
-					item, ok := itemList.(map[string]interface{})
+					item, ok := itemList.(map[string]any)
 					require.True(t, ok, "Single item should be a map[string]interface{}")
 
 					// Verify all expected attributes
@@ -108,24 +108,24 @@ func TestParse(t *testing.T) {
 					// Check for output element
 					output, ok := item["output"]
 					assert.True(t, ok, "Item should have 'output' element")
-					outputMap, ok := output.(map[string]interface{})
+					outputMap, ok := output.(map[string]any)
 					assert.True(t, ok, "Output should be a map[string]interface{}")
 					assert.Equal(t, "out", outputMap["-name"], "Output name should be 'out'")
 				} else {
 					// Handle multiple items case
-					items, ok := itemList.([]interface{})
+					items, ok := itemList.([]any)
 					assert.True(t, ok, "Multiple items should be a []interface{}")
 					assert.Equal(t, tt.expectedItemCount, len(items), "Should have expected number of items")
 
 					// Verify first item in multiple items
 					if tt.name == "multiple installs data" {
-						firstItem, ok := items[0].(map[string]interface{})
+						firstItem, ok := items[0].(map[string]any)
 						assert.True(t, ok, "Item should be a map[string]interface{}")
 						assert.Equal(t, "0", firstItem["-attrPath"], "First item should have attrPath '0'")
 						assert.Equal(t, "git", firstItem["-pname"], "First item should have pname 'git'")
 
 						// Verify last item in multiple items
-						lastItem, ok := items[2].(map[string]interface{})
+						lastItem, ok := items[2].(map[string]any)
 						assert.True(t, ok, "Item should be a map[string]interface{}")
 						assert.Equal(t, "2", lastItem["-attrPath"], "Last item should have attrPath '2'")
 						assert.Equal(t, "go", lastItem["-pname"], "Last item should have pname 'go'")

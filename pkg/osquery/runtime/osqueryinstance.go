@@ -993,8 +993,8 @@ func (i *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, client
 // getOsqueryInfoForLog will log info about an osquery instance. It's
 // called when osquery unexpected fails to start. (returns as an
 // interface for go-kit's logger)
-func getOsqueryInfoForLog(path string) []interface{} {
-	msgPairs := []interface{}{
+func getOsqueryInfoForLog(path string) []any {
+	msgPairs := []any{
 		"path", path,
 	}
 

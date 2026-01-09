@@ -23,10 +23,10 @@ func Jsonl(rawdata []byte, opts ...FlattenOpts) ([]Row, error) {
 
 func flattenJsonl(rawdata []byte, opts ...FlattenOpts) ([]Row, error) {
 	decoder := json.NewDecoder(bytes.NewReader(rawdata))
-	var objects []interface{}
+	var objects []any
 
 	for {
-		var object interface{}
+		var object any
 		err := decoder.Decode(&object)
 
 		switch err {

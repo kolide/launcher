@@ -40,7 +40,7 @@ func Test_dnsCheckup_Run(t *testing.T) {
 				k:        typesMocks.NewKnapsack(t),
 				resolver: mocks.NewHostResolver(t),
 			},
-			knapsackReturns: map[string]interface{}{
+			knapsackReturns: map[string]any{
 				"KolideServerURL":      "https://kolide-server.example.com",
 				"ControlServerURL":     "https://control-server.example.com",
 				"TufServerURL":         "https://tuf-server.example.com",
@@ -63,7 +63,7 @@ func Test_dnsCheckup_Run(t *testing.T) {
 				k:        typesMocks.NewKnapsack(t),
 				resolver: mocks.NewHostResolver(t),
 			},
-			knapsackReturns: map[string]interface{}{
+			knapsackReturns: map[string]any{
 				"KolideServerURL":      "https://kolide-server.example.com",
 				"ControlServerURL":     "https://control-server.example.com",
 				"TufServerURL":         "https://tuf-server.example.com",
@@ -86,7 +86,7 @@ func Test_dnsCheckup_Run(t *testing.T) {
 				k:        typesMocks.NewKnapsack(t),
 				resolver: mocks.NewHostResolver(t),
 			},
-			knapsackReturns: map[string]interface{}{
+			knapsackReturns: map[string]any{
 				"KolideServerURL":      "https://kolide-server.example.com",
 				"ControlServerURL":     "https://control-server.example.com",
 				"TufServerURL":         "",
