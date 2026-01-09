@@ -51,7 +51,7 @@ func BenchmarkFindMyDevice(b *testing.B) {
 	baselineStats := ci.BaselineStats(b)
 	b.ReportAllocs()
 
-	for range b.N {
+	for b.Loop() {
 		// Confirm we can call the table successfully
 		response := findMyTable.Call(b.Context(), map[string]string{
 			"action":  "generate",
