@@ -191,7 +191,6 @@ func TestKryptoEcMiddleware(t *testing.T) {
 			callbackWaitGroup.Add(expectedCallbacks)
 
 			for _, req := range requests {
-				req := req
 				t.Run(req.Method, func(t *testing.T) {
 					t.Parallel()
 
@@ -344,7 +343,6 @@ func TestKryptoEcMiddlewareErrors(t *testing.T) {
 			getRequest := mustMakeGetRequest(t, tt.challenge())
 
 			for _, req := range []*http.Request{getRequest /* makePostRequest(t, encodedChallenge) */} {
-				req := req
 				t.Run(req.Method, func(t *testing.T) {
 					t.Parallel()
 

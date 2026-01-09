@@ -149,7 +149,6 @@ func TestLogRawLogRecord(t *testing.T) {
 			expectedLogAttributes: []slog.Attr{},
 		},
 	} {
-		tt := tt
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 

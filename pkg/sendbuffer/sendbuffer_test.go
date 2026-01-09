@@ -67,7 +67,6 @@ func TestSendBuffer(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -175,7 +174,6 @@ func TestSendBufferConcurrent(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -194,7 +192,6 @@ func TestSendBufferConcurrent(t *testing.T) {
 			var wg sync.WaitGroup
 			wg.Add(len(tt.writes))
 			for _, write := range tt.writes {
-				write := write
 				go func() {
 					_, err := sb.Write([]byte(write))
 					require.NoError(t, err)
@@ -454,7 +451,6 @@ func TestUpdateData(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 

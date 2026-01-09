@@ -142,7 +142,6 @@ func Test_shouldTriggerFlareUpload(t *testing.T) {
 			expectFlareUpload: false,
 		},
 	} {
-		tt := tt
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 

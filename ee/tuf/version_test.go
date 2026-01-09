@@ -59,7 +59,6 @@ func TestSanitizePinnedVersion(t *testing.T) {
 			expectedSanitizedVersion: pinnedLauncherVersionMinimum.Original(),
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			require.Equal(t, tt.expectedSanitizedVersion, SanitizePinnedVersion(tt.binary, tt.pinnedVersion))
@@ -101,7 +100,6 @@ func Test_launcherVersionSupportsTuf(t *testing.T) {
 			expectedSupportsTuf: false,
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			supportsTuf, err := launcherVersionSupportsTuf(tt.launcherVersion)

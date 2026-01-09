@@ -373,7 +373,6 @@ func TestFlagsChanged_ExportTraces(t *testing.T) { //nolint:paralleltest
 	}
 
 	for _, tt := range tests { //nolint:paralleltest
-		tt := tt
 		t.Run(tt.testName, func(t *testing.T) {
 			s := testServerProvidedDataStore(t)
 			mockKnapsack := typesmocks.NewKnapsack(t)
@@ -459,7 +458,6 @@ func TestFlagsChanged_TraceSamplingRate(t *testing.T) { //nolint:paralleltest
 	}
 
 	for _, tt := range tests { //nolint:paralleltest
-		tt := tt
 		t.Run(tt.testName, func(t *testing.T) {
 			mockKnapsack := typesmocks.NewKnapsack(t)
 			mockKnapsack.On("TraceSamplingRate").Return(tt.newTraceSamplingRate)
@@ -536,7 +534,6 @@ func TestFlagsChanged_TraceIngestServerURL(t *testing.T) { //nolint:paralleltest
 	}
 
 	for _, tt := range tests { //nolint:paralleltest
-		tt := tt
 		t.Run(tt.testName, func(t *testing.T) {
 			mockKnapsack := typesmocks.NewKnapsack(t)
 			mockKnapsack.On("TraceIngestServerURL").Return(tt.newObservabilityIngestServerURL)
@@ -608,7 +605,6 @@ func TestFlagsChanged_DisableTraceIngestTLS(t *testing.T) { //nolint:paralleltes
 	}
 
 	for _, tt := range tests { //nolint:paralleltest
-		tt := tt
 		t.Run(tt.testName, func(t *testing.T) {
 			mockKnapsack := typesmocks.NewKnapsack(t)
 			mockKnapsack.On("DisableTraceIngestTLS").Return(tt.newDisableTraceIngestTLS)
@@ -687,7 +683,6 @@ func TestFlagsChanged_TraceBatchTimeout(t *testing.T) { //nolint:paralleltest
 	}
 
 	for _, tt := range tests { //nolint:paralleltest
-		tt := tt
 		t.Run(tt.testName, func(t *testing.T) {
 			mockKnapsack := typesmocks.NewKnapsack(t)
 			mockKnapsack.On("TraceBatchTimeout").Return(tt.newBatchTimeout)
@@ -766,7 +761,6 @@ func TestFlagsChanged_LauncherGoMaxProcs(t *testing.T) { //nolint:paralleltest
 	}
 
 	for _, tt := range tests { //nolint:paralleltest
-		tt := tt
 		t.Run(tt.testName, func(t *testing.T) {
 			mockKnapsack := typesmocks.NewKnapsack(t)
 			mockKnapsack.On("LauncherGoMaxProcs").Return(int(tt.newGomaxprocs))

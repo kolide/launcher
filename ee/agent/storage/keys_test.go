@@ -38,7 +38,6 @@ func TestKeyByIdentifier(t *testing.T) {
 			expectedKey:    []byte("uuid:registration:some-test-registration-id"),
 		},
 	} {
-		tt := tt
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 
@@ -79,7 +78,6 @@ func TestSplitKey(t *testing.T) {
 			expectedIdentifier:     []byte("another-test-registration-id"),
 		},
 	} {
-		tt := tt
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 

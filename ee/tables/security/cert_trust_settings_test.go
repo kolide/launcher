@@ -53,7 +53,6 @@ func Test_parseTrustSettingsDump(t *testing.T) {
 			expectedError:                     false,
 		},
 	} {
-		tt := tt
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 

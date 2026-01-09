@@ -50,7 +50,6 @@ func TestUseBackupDbIfNeeded(t *testing.T) {
 			shouldPerformRename: false,
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -209,7 +208,6 @@ func TestBackupLauncherDbLocations(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(tt.testName, func(t *testing.T) {
 			t.Parallel()
 

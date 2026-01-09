@@ -94,7 +94,6 @@ func Test_commandExpectedToExit(t *testing.T) {
 			expectedExit: true,
 		},
 	} {
-		tt := tt
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 

@@ -47,7 +47,6 @@ func TestQueryFirefoxIndexedDB(t *testing.T) {
 			zipBytes:     basicFirefoxIndexeddb,
 		},
 	} {
-		tt := tt
 		t.Run(tt.fileName, func(t *testing.T) {
 			t.Parallel()
 
@@ -232,7 +231,6 @@ func TestQueryChromeIndexedDB(t *testing.T) {
 			zipBytes:     basicChromeIndexeddb,
 		},
 	} {
-		tt := tt
 		t.Run(tt.testName, func(t *testing.T) {
 			t.Parallel()
 
@@ -703,7 +701,6 @@ func Test_checkSourcePathConstraints(t *testing.T) {
 			errorExpected: false,
 		},
 	} {
-		tt := tt
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 

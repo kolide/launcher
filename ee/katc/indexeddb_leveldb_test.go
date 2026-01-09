@@ -44,7 +44,6 @@ func Test_extractQueryTargets(t *testing.T) {
 			expectErr:    true,
 		},
 	} {
-		tt := tt
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 

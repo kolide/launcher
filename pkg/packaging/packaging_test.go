@@ -59,7 +59,6 @@ func TestInitStuff(t *testing.T) {
 	}
 
 	for _, target := range testedTargets() {
-		target := target
 
 		t.Run(target.String(), func(t *testing.T) {
 			t.Parallel()
@@ -197,7 +196,6 @@ func Test_getBinary_AppBundle(t *testing.T) {
 	}
 
 	for _, a := range appBundles {
-		a := a
 		t.Run(a.appBundleName, func(t *testing.T) {
 			t.Parallel()
 
@@ -324,7 +322,6 @@ func Test_fullPathToBareBinary(t *testing.T) {
 			expectedPath: filepath.Join("test", "root", "Launcher-test-identifier", "bin", "amd64", "launcher.exe"),
 		},
 	} {
-		tt := tt
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 

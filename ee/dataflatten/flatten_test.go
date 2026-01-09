@@ -60,7 +60,6 @@ func TestFlatten_Complex2(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.comment, func(t *testing.T) {
 			t.Parallel()
 
@@ -105,7 +104,6 @@ func TestFlatten_NestingBug(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.comment, func(t *testing.T) {
 			t.Parallel()
 
@@ -226,7 +224,6 @@ func TestFlatten_Jsonl_Complex(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.comment, func(t *testing.T) {
 			t.Parallel()
 
@@ -345,7 +342,6 @@ func TestFlatten_Complex(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.comment, func(t *testing.T) {
 			t.Parallel()
 
@@ -391,7 +387,6 @@ func TestFlatten_ArrayMaps(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.comment, func(t *testing.T) {
 			t.Parallel()
 
@@ -461,7 +456,6 @@ func TestFlatten(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.comment, func(t *testing.T) {
 			t.Parallel()
 
@@ -502,7 +496,6 @@ func TestFlattenJsonlErrors(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.comment, func(t *testing.T) {
 			t.Parallel()
 
@@ -605,7 +598,6 @@ func TestFlattenSliceOfMaps(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 

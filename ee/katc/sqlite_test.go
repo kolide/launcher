@@ -127,7 +127,6 @@ func TestSourcePatternToGlobbablePattern(t *testing.T) {
 			expectedPattern: filepath.Join(rootDir, "path", "to", "*", "directory", "*.sqlite"),
 		},
 	} {
-		tt := tt
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 

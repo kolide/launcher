@@ -17,7 +17,6 @@ func Test_formatUptime(t *testing.T) {
 		{name: "you should reboot", uptime: 34559999, expected: "399 days, 23 hours, 59 minutes, 59 seconds"},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			if actual := formatUptime(tt.uptime); actual != tt.expected {

@@ -77,7 +77,6 @@ func Test_generateAirportData_HappyPath(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -209,7 +208,6 @@ func Test_generateAirportData_EdgeCases(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -263,7 +261,6 @@ func Test_unmarshallGetInfoOutput(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, tt.want, unmarshallGetInfoOutput(tt.args.reader))
@@ -320,7 +317,6 @@ func Test_unmarshallScanOuput(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, tt.want, unmarshallScanOuput(tt.args.reader))

@@ -87,7 +87,6 @@ func TestAddToLibrary(t *testing.T) {
 	t.Parallel()
 
 	for _, b := range []autoupdatableBinary{binaryLauncher, binaryOsqueryd} {
-		b := b
 		t.Run(string(b), func(t *testing.T) {
 			t.Parallel()
 
@@ -141,7 +140,6 @@ func TestAddToLibrary_alreadyRunning(t *testing.T) {
 	t.Parallel()
 
 	for _, binary := range binaries {
-		binary := binary
 		t.Run(string(binary), func(t *testing.T) {
 			t.Parallel()
 
@@ -180,7 +178,6 @@ func TestAddToLibrary_alreadyAdded(t *testing.T) {
 	t.Parallel()
 
 	for _, binary := range binaries {
-		binary := binary
 		t.Run(string(binary), func(t *testing.T) {
 			t.Parallel()
 
@@ -260,7 +257,6 @@ func TestAddToLibrary_verifyStagedUpdate_handlesInvalidFiles(t *testing.T) {
 	}
 
 	for _, tt := range testCases {
-		tt := tt
 		t.Run(string(tt.binary), func(t *testing.T) {
 			t.Parallel()
 
@@ -323,7 +319,6 @@ func Test_sanitizeExtractPath(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.filepath, func(t *testing.T) {
 			t.Parallel()
 
@@ -394,7 +389,6 @@ func Test_sanitizePermissions(t *testing.T) {
 	}
 
 	for _, tt := range testCases {
-		tt := tt
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 
@@ -579,9 +573,7 @@ func TestTidyLibrary(t *testing.T) {
 	}
 
 	for _, binary := range binaries {
-		binary := binary
 		for _, tt := range testCases {
-			tt := tt
 			t.Run(string(binary)+": "+tt.testCaseName, func(t *testing.T) {
 				t.Parallel()
 

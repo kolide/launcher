@@ -63,7 +63,6 @@ func TestConfigFilePath(t *testing.T) {
 	}
 
 	for _, tt := range testCases {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -287,7 +286,6 @@ func TestOptionsSetControlServerHost(t *testing.T) { // nolint:paralleltest
 	}
 
 	for _, tt := range testCases { // nolint:paralleltest
-		tt := tt
 		os.Clearenv()
 		t.Run(tt.testName, func(t *testing.T) {
 			opts, err := ParseOptions("", tt.testFlags)
@@ -375,7 +373,6 @@ func TestSanitizeUpdateChannel(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 

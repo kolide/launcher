@@ -38,7 +38,6 @@ func TestCheckOutLatest_withTufRepository(t *testing.T) {
 	t.Parallel()
 
 	for _, binary := range binaries {
-		binary := binary
 		t.Run(string(binary), func(t *testing.T) {
 			t.Parallel()
 
@@ -79,7 +78,6 @@ func TestCheckOutLatest_withTufRepository_withPinnedVersion(t *testing.T) {
 	t.Parallel()
 
 	for _, binary := range binaries {
-		binary := binary
 		t.Run(string(binary), func(t *testing.T) {
 			t.Parallel()
 
@@ -120,7 +118,6 @@ func TestCheckOutLatest_withTufRepository_withPinnedVersion(t *testing.T) {
 func TestCheckOutLatest_withoutTufRepository(t *testing.T) {
 	t.Parallel()
 	for _, binary := range binaries {
-		binary := binary
 		t.Run(string(binary), func(t *testing.T) {
 			t.Parallel()
 
@@ -148,7 +145,6 @@ func Test_mostRecentVersion(t *testing.T) {
 	t.Parallel()
 
 	for _, binary := range binaries {
-		binary := binary
 		t.Run(string(binary), func(t *testing.T) {
 			t.Parallel()
 
@@ -181,7 +177,6 @@ func Test_mostRecentVersion_DoesNotReturnInvalidExecutables(t *testing.T) {
 	t.Parallel()
 
 	for _, binary := range binaries {
-		binary := binary
 		t.Run(string(binary), func(t *testing.T) {
 			t.Parallel()
 
@@ -213,7 +208,6 @@ func Test_mostRecentVersion_ReturnsErrorOnNoUpdatesDownloaded(t *testing.T) {
 	t.Parallel()
 
 	for _, binary := range binaries {
-		binary := binary
 		t.Run(string(binary), func(t *testing.T) {
 			t.Parallel()
 

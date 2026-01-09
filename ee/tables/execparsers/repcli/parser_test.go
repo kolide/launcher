@@ -186,7 +186,6 @@ You Should Not See this erroneous L1n3
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
