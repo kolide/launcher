@@ -377,9 +377,7 @@ func TestSetDuplicateLogWindowConcurrentAccess(t *testing.T) {
 	done := make(chan struct{})
 
 	// Goroutine 1: Continuously update the window
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		windows := []time.Duration{0, 50 * time.Millisecond, 100 * time.Millisecond, 200 * time.Millisecond}
 		i := 0
 		for {
@@ -392,12 +390,10 @@ func TestSetDuplicateLogWindowConcurrentAccess(t *testing.T) {
 				time.Sleep(10 * time.Millisecond)
 			}
 		}
-	}()
+	})
 
 	// Goroutine 2: Continuously process logs
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for i := range 100 {
 			select {
 			case <-done:
@@ -410,12 +406,10 @@ func TestSetDuplicateLogWindowConcurrentAccess(t *testing.T) {
 				time.Sleep(5 * time.Millisecond)
 			}
 		}
-	}()
+	})
 
 	// Goroutine 3: Continuously read the window
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for range 100 {
 			select {
 			case <-done:
@@ -426,7 +420,7 @@ func TestSetDuplicateLogWindowConcurrentAccess(t *testing.T) {
 				time.Sleep(3 * time.Millisecond)
 			}
 		}
-	}()
+	})
 
 	// Let the test run for a short duration
 	time.Sleep(500 * time.Millisecond)
