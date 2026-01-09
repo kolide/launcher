@@ -189,8 +189,8 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 			// keyName == "name"
 			// keyValue == "alex" (need to test this againsty queryTerm
 			// pathKey == What we descend with
-			if strings.HasPrefix(queryTerm, fl.queryKeyDenoter) {
-				keyQuery := strings.SplitN(strings.TrimPrefix(queryTerm, fl.queryKeyDenoter), "=>", 2)
+			if after, ok := strings.CutPrefix(queryTerm, fl.queryKeyDenoter); ok {
+				keyQuery := strings.SplitN(after, "=>", 2)
 				keyName := keyQuery[0]
 
 				innerslogger := slogger.With("array_key_name", keyName)
