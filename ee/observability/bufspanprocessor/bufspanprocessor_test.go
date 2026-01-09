@@ -83,13 +83,11 @@ func TestBufSpanProcessor(t *testing.T) {
 func createSpans(count int) {
 	wg := &sync.WaitGroup{}
 	for range count {
-		wg.Add(1)
 
-		go func() {
+		wg.Go(func() {
 			_, span := otel.Tracer("test_tracer").Start(context.Background(), "test")
 			span.End()
-			wg.Done()
-		}()
+		})
 	}
 	wg.Wait()
 }

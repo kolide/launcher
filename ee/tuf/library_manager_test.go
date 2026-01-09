@@ -116,11 +116,9 @@ func TestAddToLibrary(t *testing.T) {
 			// Request download -- make a couple concurrent requests to confirm that the lock works.
 			var wg sync.WaitGroup
 			for i := 0; i < 5; i += 1 {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
+				wg.Go(func() {
 					require.NoError(t, testLibraryManager.AddToLibrary(b, "", targetFile, targetMeta), "expected no error adding to library")
-				}()
+				})
 			}
 
 			wg.Wait()

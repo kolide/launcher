@@ -120,9 +120,7 @@ func TestMultiSlogger_FlagsChanged_ConcurrentAccess(t *testing.T) {
 	done := make(chan struct{})
 
 	// Goroutine 1: Continuously trigger flag changes
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		ctx := t.Context()
 		for {
 			select {
@@ -133,12 +131,10 @@ func TestMultiSlogger_FlagsChanged_ConcurrentAccess(t *testing.T) {
 				time.Sleep(10 * time.Millisecond)
 			}
 		}
-	}()
+	})
 
 	// Goroutine 2: Continuously update duplicate log window directly
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		windows := []time.Duration{0, 50 * time.Millisecond, 100 * time.Millisecond, 200 * time.Millisecond}
 		i := 0
 		for {
@@ -151,12 +147,10 @@ func TestMultiSlogger_FlagsChanged_ConcurrentAccess(t *testing.T) {
 				time.Sleep(15 * time.Millisecond)
 			}
 		}
-	}()
+	})
 
 	// Goroutine 3: Continuously process logs to exercise the dedup engine
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for i := range 50 {
 			select {
 			case <-done:
@@ -167,7 +161,7 @@ func TestMultiSlogger_FlagsChanged_ConcurrentAccess(t *testing.T) {
 				time.Sleep(5 * time.Millisecond)
 			}
 		}
-	}()
+	})
 
 	// Let the test run for a short duration
 	time.Sleep(300 * time.Millisecond)

@@ -61,28 +61,24 @@ func Test_GetSet(t *testing.T) {
 				wg := sync.WaitGroup{}
 				for k, v := range tt.sets {
 					k, v := k, v
-					wg.Add(1)
-					go func() {
-						defer wg.Done()
+					wg.Go(func() {
 						err := s.Set([]byte(k), []byte(v))
 						if tt.expectedErr {
 							require.Error(t, err)
 							return
 						}
 						require.NoError(t, err)
-					}()
+					})
 				}
 				wg.Wait()
 				if !tt.expectedErr {
 					for k, v := range tt.gets {
 						k, v := k, v
-						wg.Add(1)
-						go func() {
-							defer wg.Done()
+						wg.Go(func() {
 							val, err := s.Get([]byte(k))
 							require.NoError(t, err)
 							assert.Equal(t, v, string(val))
-						}()
+						})
 					}
 					wg.Wait()
 				}
@@ -333,12 +329,10 @@ func Test_ForEach(t *testing.T) {
 				wg := sync.WaitGroup{}
 				for k, v := range tt.sets {
 					k, v := k, v
-					wg.Add(1)
-					go func() {
-						defer wg.Done()
+					wg.Go(func() {
 						err := s.Set([]byte(k), []byte(v))
 						require.NoError(t, err)
-					}()
+					})
 				}
 				wg.Wait()
 
@@ -351,9 +345,7 @@ func Test_ForEach(t *testing.T) {
 					return nil
 				}
 
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
+				wg.Go(func() {
 					err := s.ForEach(fn)
 					if tt.fnFailsOnCall > 0 && fnCalls == tt.fnFailsOnCall {
 						require.Error(t, err)
@@ -361,7 +353,7 @@ func Test_ForEach(t *testing.T) {
 						require.NoError(t, err)
 						assert.Equal(t, tt.expectedFnCalls, fnCalls)
 					}
-				}()
+				})
 				wg.Wait()
 			}
 		})
