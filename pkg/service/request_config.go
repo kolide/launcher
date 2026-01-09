@@ -25,7 +25,7 @@ type configResponse struct {
 	Err            error  `json:"err,omitempty"`
 }
 
-func decodeJSONRPCConfigRequest(_ context.Context, msg json.RawMessage) (interface{}, error) {
+func decodeJSONRPCConfigRequest(_ context.Context, msg json.RawMessage) (any, error) {
 	var req configRequest
 
 	if err := json.Unmarshal(msg, &req); err != nil {
@@ -37,7 +37,7 @@ func decodeJSONRPCConfigRequest(_ context.Context, msg json.RawMessage) (interfa
 	return req, nil
 }
 
-func encodeJSONRPCConfigResponse(_ context.Context, obj interface{}) (json.RawMessage, error) {
+func encodeJSONRPCConfigResponse(_ context.Context, obj any) (json.RawMessage, error) {
 	res, ok := obj.(configResponse)
 	if !ok {
 		return encodeJSONResponse(nil, fmt.Errorf("asserting result to *configResponse failed. Got %T, %+v", obj, obj))
@@ -51,7 +51,7 @@ func encodeJSONRPCConfigResponse(_ context.Context, obj interface{}) (json.RawMe
 	return encodeJSONResponse(b, nil)
 }
 
-func decodeJSONRPCConfigResponse(_ context.Context, res jsonrpc.Response) (interface{}, error) {
+func decodeJSONRPCConfigResponse(_ context.Context, res jsonrpc.Response) (any, error) {
 	if res.Error != nil {
 		return nil, *res.Error // I'm undecided if we should errors.Wrap this or not.
 	}
@@ -65,7 +65,7 @@ func decodeJSONRPCConfigResponse(_ context.Context, res jsonrpc.Response) (inter
 }
 
 func MakeRequestConfigEndpoint(svc KolideService) endpoint.Endpoint {
-	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+	return func(ctx context.Context, request any) (response any, err error) {
 		req := request.(configRequest)
 		config, valid, err := svc.RequestConfig(ctx, req.NodeKey)
 		return configResponse{

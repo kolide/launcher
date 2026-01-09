@@ -46,7 +46,7 @@ func (ll localLogger) Close() error {
 	return ll.lj.Close()
 }
 
-func (ll localLogger) Log(keyvals ...interface{}) error {
+func (ll localLogger) Log(keyvals ...any) error {
 	filterResults(keyvals...)
 	return ll.logger.Log(keyvals...)
 }
@@ -59,7 +59,7 @@ func (ll localLogger) Writer() io.Writer {
 // which just make a lot of noise in our debug logs.
 // It's a bit fragile, since it parses keyvals, but
 // hopefully that's good enough
-func filterResults(keyvals ...interface{}) {
+func filterResults(keyvals ...any) {
 	// Consider switching on `method` as well?
 	for i := 0; i < len(keyvals); i += 2 {
 		if keyvals[i] == "results" && len(keyvals) > i+1 {

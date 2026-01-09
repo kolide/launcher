@@ -67,10 +67,10 @@ var volumeGroupRegexp = regexp.MustCompile("^.* for volume group (.*):")
 // Signed System Volume Status: Enabled    (sip1): absent
 // Kernel CTRR Status:          Enabled    (sip2): absent
 // Boot Args Filtering Status:  Enabled    (sip3): absent
-func parseBootPoliciesOutput(reader io.Reader) map[string]interface{} {
+func parseBootPoliciesOutput(reader io.Reader) map[string]any {
 	var volumeGroup string
-	var volumeGroupData []map[string]interface{}
-	results := make(map[string]interface{})
+	var volumeGroupData []map[string]any
+	results := make(map[string]any)
 
 	// This function is called when either a new volume group has been found, or we
 	// have reached the end of the boot policy output. It's purpose is to add an
@@ -114,7 +114,7 @@ func parseBootPoliciesOutput(reader io.Reader) map[string]interface{} {
 }
 
 // Parses a single line of text of boot policy output
-func parsePolicyRow(line string) map[string]interface{} {
+func parsePolicyRow(line string) map[string]any {
 	// Some lines have one colon, some have two colons
 	kv := strings.SplitN(line, ": ", 3)
 
@@ -157,13 +157,13 @@ func parsePolicyRow(line string) map[string]interface{} {
 		return nil
 	}
 
-	objData := map[string]interface{}{
+	objData := map[string]any{
 		"value": strings.TrimSpace(value),
 		"mode":  strings.TrimSpace(mode),
 		"code":  code,
 	}
 
-	rowData := map[string]interface{}{
+	rowData := map[string]any{
 		strings.ReplaceAll(strings.TrimSpace(property), " ", "_"): objData,
 	}
 

@@ -78,12 +78,12 @@ func requireContainsAttribute(t *testing.T, r io.Reader, key, value string) {
 	t.Fatal("attribute not found")
 }
 
-func jsonl(t *testing.T, reader io.Reader) []map[string]interface{} {
-	var result []map[string]interface{}
+func jsonl(t *testing.T, reader io.Reader) []map[string]any {
+	var result []map[string]any
 
 	decoder := json.NewDecoder(reader)
 	for {
-		var data map[string]interface{}
+		var data map[string]any
 
 		err := decoder.Decode(&data)
 		if err == io.EOF {

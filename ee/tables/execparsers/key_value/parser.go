@@ -31,7 +31,7 @@ func (p *parser) parseKeyValue(reader io.Reader) (any, error) {
 	// Split into lines
 	lines := strings.Split(content, "\n")
 
-	result := make(map[string]interface{})
+	result := make(map[string]any)
 
 	for _, line := range lines {
 		// Skip empty lines and comments
@@ -70,16 +70,16 @@ func (p *parser) parseKeyValue(reader io.Reader) (any, error) {
 
 // setValueWithDuplicates handles duplicate keys by creating arrays
 // This mimics the behavior of dataflatten.DuplicateKeys
-func (p *parser) setValueWithDuplicates(result map[string]interface{}, key string, value string) {
+func (p *parser) setValueWithDuplicates(result map[string]any, key string, value string) {
 	if existing, exists := result[key]; exists {
 		// Key already exists, handle duplicates
 		switch v := existing.(type) {
-		case []interface{}:
+		case []any:
 			// Already an array, append to it
 			result[key] = append(v, value)
 		default:
 			// Convert to array with existing value and new value
-			result[key] = []interface{}{v, value}
+			result[key] = []any{v, value}
 		}
 	} else {
 		// First occurrence of this key
@@ -89,24 +89,24 @@ func (p *parser) setValueWithDuplicates(result map[string]interface{}, key strin
 
 // setNestedValueWithDuplicates sets a value in a nested map structure using dot notation
 // and handles duplicate keys by creating arrays
-func (p *parser) setNestedValueWithDuplicates(result map[string]interface{}, key string, value string) {
+func (p *parser) setNestedValueWithDuplicates(result map[string]any, key string, value string) {
 	parts := strings.Split(key, ".")
 	current := result
 
 	// Navigate/create the nested structure
 	for _, part := range parts[:len(parts)-1] {
 		if _, exists := current[part]; !exists {
-			current[part] = make(map[string]interface{})
+			current[part] = make(map[string]any)
 		}
 
-		if nested, ok := current[part].(map[string]interface{}); ok {
+		if nested, ok := current[part].(map[string]any); ok {
 			current = nested
 		} else {
 			// Handle conflict - convert to map if a non-map value exists at this path
 			// This ensures that if 'parent = "string"' was set and then 'parent.child = "value"' comes,
 			// 'parent' becomes a map.
-			current[part] = make(map[string]interface{})
-			current = current[part].(map[string]interface{})
+			current[part] = make(map[string]any)
+			current = current[part].(map[string]any)
 		}
 	}
 

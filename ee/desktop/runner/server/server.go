@@ -43,7 +43,7 @@ type requestAcclerator interface {
 }
 
 type Messenger interface {
-	SendMessage(method string, params interface{}) error
+	SendMessage(method string, params any) error
 }
 
 func New(slogger *slog.Logger,
@@ -182,8 +182,8 @@ func (ms *RunnerServer) sendMessage(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	message := struct {
-		Method string      `json:"method"`
-		Params interface{} `json:"params"`
+		Method string `json:"method"`
+		Params any    `json:"params"`
 	}{}
 
 	if err := json.NewDecoder(r.Body).Decode(&message); err != nil {

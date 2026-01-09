@@ -16,8 +16,8 @@ import (
 
 // Performs the Message action
 type actionMessage struct {
-	Method string      `json:"method"`
-	Params interface{} `json:"params"`
+	Method string `json:"method"`
+	Params any    `json:"params"`
 }
 
 func (a actionMessage) Perform(m *menu) {

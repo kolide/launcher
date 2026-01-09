@@ -233,14 +233,14 @@ func Test_unmarshallGetInfoOutput(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want map[string]interface{}
+		want map[string]any
 	}{
 		{
 			name: "happy_path",
 			args: args{
 				reader: strings.NewReader("\nagrCtlRSSI: -55\nagrExtRSSI: 0\n"),
 			},
-			want: map[string]interface{}{
+			want: map[string]any{
 				"agrCtlRSSI": "-55",
 				"agrExtRSSI": "0",
 			},
@@ -250,7 +250,7 @@ func Test_unmarshallGetInfoOutput(t *testing.T) {
 			args: args{
 				reader: strings.NewReader("agrCtlRSSI: -55\nagrExtRSSI"),
 			},
-			want: map[string]interface{}{
+			want: map[string]any{
 				"agrCtlRSSI": "-55",
 			},
 		},
@@ -259,7 +259,7 @@ func Test_unmarshallGetInfoOutput(t *testing.T) {
 			args: args{
 				reader: strings.NewReader(""),
 			},
-			want: map[string]interface{}{},
+			want: map[string]any{},
 		},
 	}
 	for _, tt := range tests {
@@ -280,7 +280,7 @@ func Test_unmarshallScanOuput(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want []map[string]interface{}
+		want []map[string]any
 	}{
 		{
 			name: "happy_path",
@@ -290,7 +290,7 @@ func Test_unmarshallScanOuput(t *testing.T) {
                 i got spaces! a0:a0:a0:a0:a0:a0 -92  108     Y  US WPA(PSK/AES,TKIP/TKIP) RSN(PSK/AES,TKIP/TKIP)
                     no-spaces b1:b1:b1:b1:b1:b1 -91  116     N  EU RSN(PSK/AES/AES)`),
 			},
-			want: []map[string]interface{}{
+			want: []map[string]any{
 				{
 					"SSID":                          "i got spaces!",
 					"BSSID":                         "a0:a0:a0:a0:a0:a0",
@@ -316,7 +316,7 @@ func Test_unmarshallScanOuput(t *testing.T) {
 			args: args{
 				reader: strings.NewReader(""),
 			},
-			want: []map[string]interface{}(nil),
+			want: []map[string]any(nil),
 		},
 	}
 	for _, tt := range tests {

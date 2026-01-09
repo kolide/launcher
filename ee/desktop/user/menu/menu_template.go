@@ -27,7 +27,7 @@ const (
 	MenuVersion        string = "MenuVersion"
 )
 
-type TemplateData map[string]interface{}
+type TemplateData map[string]any
 
 type templateParser struct {
 	td *TemplateData

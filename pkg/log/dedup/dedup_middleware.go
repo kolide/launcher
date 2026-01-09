@@ -425,7 +425,7 @@ func (d *Engine) performCleanup() {
 // hashRecord creates a hash of the log record content, excluding time and source information.
 func hashRecord(record slog.Record) string {
 	// Convert record to key-value pairs for hashing
-	var keyvals []interface{}
+	var keyvals []any
 
 	// Add level and message
 	keyvals = append(keyvals, "level", record.Level.String())
@@ -454,9 +454,9 @@ func collectAttrs(record slog.Record) []slog.Attr {
 }
 
 // hashKeyValuePairs creates a hash of key-value pairs for deduplication.
-func hashKeyValuePairs(keyvals ...interface{}) string {
+func hashKeyValuePairs(keyvals ...any) string {
 	// Filter out excluded fields (defensive; hashRecord already filters)
-	var filtered []interface{}
+	var filtered []any
 	for i := 0; i < len(keyvals); i += 2 {
 		if i+1 < len(keyvals) {
 			key := fmt.Sprintf("%v", keyvals[i])

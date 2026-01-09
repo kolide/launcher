@@ -29,7 +29,7 @@ import (
 //			Local Services:
 //				service4
 func (p *parser) parseDumpstate(reader io.Reader) (any, error) {
-	results := make(map[string]map[string]interface{})
+	results := make(map[string]map[string]any)
 
 	p.scanner = bufio.NewScanner(reader)
 	for p.scanner.Scan() {
@@ -62,8 +62,8 @@ func (p *parser) extractDeviceName() string {
 	return strings.TrimSpace(strings.TrimPrefix(p.lastReadLine, "Found"))
 }
 
-func (p *parser) parseDevice() (map[string]interface{}, error) {
-	deviceResults := make(map[string]interface{})
+func (p *parser) parseDevice() (map[string]any, error) {
+	deviceResults := make(map[string]any)
 
 	for p.scanner.Scan() {
 		p.lastReadLine = p.scanner.Text()
@@ -145,8 +145,8 @@ func (p *parser) isDeviceDelimiter() bool {
 	return strings.TrimSpace(p.lastReadLine) == ""
 }
 
-func (p *parser) parseDictionary() (map[string]interface{}, error) {
-	dictionaryResults := make(map[string]interface{})
+func (p *parser) parseDictionary() (map[string]any, error) {
+	dictionaryResults := make(map[string]any)
 
 	for p.scanner.Scan() {
 		p.lastReadLine = strings.TrimSpace(p.scanner.Text())
@@ -196,8 +196,8 @@ func (p *parser) parseDictionary() (map[string]interface{}, error) {
 //	Features => [<capacity = 1>
 //		0: com.apple.dt.profile
 //	]
-func (p *parser) parseFeatures() (map[string]interface{}, error) {
-	featuresResults := make(map[string]interface{})
+func (p *parser) parseFeatures() (map[string]any, error) {
+	featuresResults := make(map[string]any)
 
 	for p.scanner.Scan() {
 		p.lastReadLine = strings.TrimSpace(p.scanner.Text())
@@ -240,8 +240,8 @@ func (p *parser) parseStringArray() ([]string, error) {
 	return arrayResults, nil
 }
 
-func (p *parser) parseObjectArray() ([]map[string]interface{}, bool, error) {
-	arrayResults := make([]map[string]interface{}, 0)
+func (p *parser) parseObjectArray() ([]map[string]any, bool, error) {
+	arrayResults := make([]map[string]any, 0)
 	eof := false
 
 	startingIndentationLevel := p.getCurrentIndentationLevel()
@@ -260,7 +260,7 @@ func (p *parser) parseObjectArray() ([]map[string]interface{}, bool, error) {
 
 		// Process items
 		if currentIndentationLevel == arrayItemIndentationLevel {
-			item := make(map[string]interface{})
+			item := make(map[string]any)
 			// Create artificial key "Name" to hold the name of the item
 			item["Name"] = strings.TrimSpace(p.lastReadLine)
 			arrayResults = append(arrayResults, item)
@@ -293,8 +293,8 @@ func (p *parser) parseObjectArray() ([]map[string]interface{}, bool, error) {
 }
 
 // parseKeyValList parses a list of key val pairs separated by a colon.
-func (p *parser) parseKeyValList() (map[string]interface{}, error) {
-	listResults := make(map[string]interface{}, 0)
+func (p *parser) parseKeyValList() (map[string]any, error) {
+	listResults := make(map[string]any, 0)
 	startingIndentationLevel := p.getCurrentIndentationLevel()
 
 	for p.scanner.Scan() {

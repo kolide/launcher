@@ -97,7 +97,7 @@ func TestParse(t *testing.T) {
 
 			require.NoError(t, err)
 
-			resultMap := result.(map[string]map[string]interface{})
+			resultMap := result.(map[string]map[string]any)
 
 			// Count the number of devices and the total number of data in the result, to confirm we extracted all the information we meant to
 			actualDeviceCount := 0
@@ -112,7 +112,7 @@ func TestParse(t *testing.T) {
 
 				for topLevelKey, topLevelValue := range deviceValues {
 					if topLevelKey == "Properties" {
-						properties := topLevelValue.(map[string]interface{})
+						properties := topLevelValue.(map[string]any)
 						for propertyKey, propertyValue := range properties {
 							actualValueCount += 1
 							validateKeyValueInCommandOutput(t, propertyKey, propertyValue.(string), tt.input)
@@ -131,7 +131,7 @@ func TestParse(t *testing.T) {
 					}
 
 					if topLevelKey == "Services" || topLevelKey == "Local Services" {
-						for _, service := range topLevelValue.([]map[string]interface{}) {
+						for _, service := range topLevelValue.([]map[string]any) {
 							for serviceKey, serviceValue := range service {
 								if serviceKey == "Name" {
 									actualValueCount += 1
@@ -141,9 +141,9 @@ func TestParse(t *testing.T) {
 								}
 
 								if serviceKey == "Properties" {
-									for servicePropertyKey, servicePropertyValue := range serviceValue.(map[string]interface{}) {
+									for servicePropertyKey, servicePropertyValue := range serviceValue.(map[string]any) {
 										if servicePropertyKey == "Features" {
-											for servicePropertyFeatureKey, servicePropertyFeatureValue := range servicePropertyValue.(map[string]interface{}) {
+											for servicePropertyFeatureKey, servicePropertyFeatureValue := range servicePropertyValue.(map[string]any) {
 												actualValueCount += 1
 												validateKeyValueInCommandOutput(t, servicePropertyFeatureKey, servicePropertyFeatureValue.(string), tt.input)
 											}

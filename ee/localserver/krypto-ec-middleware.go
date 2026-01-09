@@ -719,7 +719,7 @@ func (e *kryptoEcMiddleware) presenceDetectionCallbackKryptoResponse(challengeBo
 func bufferedHttpResponseToResponseData(bhr *bufferedHttpResponse) ([]byte, error) {
 	// add headers to the response map
 	// this assumes that the response to `bhr` was a json encoded blob.
-	var responseMap map[string]interface{}
+	var responseMap map[string]any
 	bhrBytes := bhr.Bytes()
 	if err := json.Unmarshal(bhrBytes, &responseMap); err != nil {
 		responseMap = map[string]any{

@@ -31,7 +31,7 @@ type enrollmentResponse struct {
 	AgentIngesterToken string `json:"agent_ingester_auth_token,omitempty"`
 }
 
-func decodeJSONRPCEnrollmentRequest(_ context.Context, msg json.RawMessage) (interface{}, error) {
+func decodeJSONRPCEnrollmentRequest(_ context.Context, msg json.RawMessage) (any, error) {
 	var req enrollmentRequest
 
 	if err := json.Unmarshal(msg, &req); err != nil {
@@ -43,7 +43,7 @@ func decodeJSONRPCEnrollmentRequest(_ context.Context, msg json.RawMessage) (int
 	return req, nil
 }
 
-func decodeJSONRPCEnrollmentResponse(_ context.Context, res jsonrpc.Response) (interface{}, error) {
+func decodeJSONRPCEnrollmentResponse(_ context.Context, res jsonrpc.Response) (any, error) {
 	if res.Error != nil {
 		return nil, *res.Error
 	}
@@ -56,7 +56,7 @@ func decodeJSONRPCEnrollmentResponse(_ context.Context, res jsonrpc.Response) (i
 	return result, nil
 }
 
-func encodeJSONRPCEnrollmentResponse(_ context.Context, obj interface{}) (json.RawMessage, error) {
+func encodeJSONRPCEnrollmentResponse(_ context.Context, obj any) (json.RawMessage, error) {
 	res, ok := obj.(enrollmentResponse)
 	if !ok {
 		return encodeJSONResponse(nil, fmt.Errorf("asserting result to *enrollmentResponse failed. Got %T, %+v", obj, obj))
@@ -71,7 +71,7 @@ func encodeJSONRPCEnrollmentResponse(_ context.Context, obj interface{}) (json.R
 }
 
 func MakeRequestEnrollmentEndpoint(svc KolideService) endpoint.Endpoint {
-	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+	return func(ctx context.Context, request any) (response any, err error) {
 		req := request.(enrollmentRequest)
 		nodeKey, valid, token, err := svc.RequestEnrollment(ctx, req.EnrollSecret, req.HostIdentifier, req.EnrollmentDetails)
 		return enrollmentResponse{
@@ -125,7 +125,7 @@ func (mw logmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentif
 		}
 		// Use exact time on error
 
-		keyvals := []interface{}{
+		keyvals := []any{
 			"method", "RequestEnrollment",
 			"uuid", uuid,
 			"hostIdentifier", hostIdentifier,

@@ -239,7 +239,7 @@ func TestHelperProcess(t *testing.T) { //nolint:paralleltest
 	cmd, args := args[0], args[1:]
 	switch {
 	case cmd == "echo":
-		iargs := []interface{}{}
+		iargs := []any{}
 		for _, s := range args {
 			iargs = append(iargs, s)
 		}

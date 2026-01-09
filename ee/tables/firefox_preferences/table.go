@@ -99,14 +99,14 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	return results, nil
 }
 
-func parsePreferences(filePath string) (map[string]interface{}, error) {
+func parsePreferences(filePath string) (map[string]any, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("opening file at %s: %w", filePath, err)
 	}
 	defer file.Close()
 
-	rawKeyVals := make(map[string]interface{})
+	rawKeyVals := make(map[string]any)
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()

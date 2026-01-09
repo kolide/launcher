@@ -13,7 +13,7 @@ import (
 // line, comma separated. We parse multiple lines, but assume data does not space that. Eg: linebreaks and commas
 // treated as seperators.
 func parseOptions(reader io.Reader) (any, error) {
-	results := make(map[string]interface{})
+	results := make(map[string]any)
 	errors := make([]error, 0)
 
 	// rfm-reason, oddly, produces two KV pairs on a single line. We need to track the last key we saw, and

@@ -22,7 +22,7 @@ func TestParseKeyValue(t *testing.T) {
 		result, err := p.Parse(reader)
 		require.NoError(t, err)
 
-		expected := map[string]interface{}{
+		expected := map[string]any{
 			"key1": "value1",
 			"key2": "value2",
 		}
@@ -43,7 +43,7 @@ func TestParseKeyValue(t *testing.T) {
 		result, err := p.Parse(reader)
 		require.NoError(t, err)
 
-		expected := map[string]interface{}{
+		expected := map[string]any{
 			"key1": "value1",
 			"key2": "value2",
 		}
@@ -58,7 +58,7 @@ func TestParseKeyValue(t *testing.T) {
 		result, err := p.Parse(reader)
 		require.NoError(t, err)
 
-		expected := map[string]interface{}{
+		expected := map[string]any{
 			"key1": "value1",
 			"key2": "value2",
 		}
@@ -79,7 +79,7 @@ func TestParseKeyValue(t *testing.T) {
 		result, err := p.Parse(reader)
 		require.NoError(t, err)
 
-		expected := map[string]interface{}{
+		expected := map[string]any{
 			"key1": "value1",
 			"key2": "value2",
 			"key3": "value with spaces",
@@ -102,8 +102,8 @@ func TestParseKeyValue(t *testing.T) {
 		result, err := p.Parse(reader)
 		require.NoError(t, err)
 
-		expected := map[string]interface{}{
-			"key1": []interface{}{"value1", "value2", "value3"},
+		expected := map[string]any{
+			"key1": []any{"value1", "value2", "value3"},
 			"key2": "valueA",
 		}
 		assert.Equal(t, expected, result)
@@ -121,12 +121,12 @@ func TestParseKeyValue(t *testing.T) {
 		result, err := p.Parse(reader)
 		require.NoError(t, err)
 
-		expected := map[string]interface{}{
-			"section": map[string]interface{}{
+		expected := map[string]any{
+			"section": map[string]any{
 				"key1": "value1",
 				"key2": "value2",
 			},
-			"other": map[string]interface{}{
+			"other": map[string]any{
 				"keyA": "valueA",
 			},
 		}
@@ -145,9 +145,9 @@ func TestParseKeyValue(t *testing.T) {
 		result, err := p.Parse(reader)
 		require.NoError(t, err)
 
-		expected := map[string]interface{}{
-			"section": map[string]interface{}{
-				"key1": []interface{}{"value1", "value2"},
+		expected := map[string]any{
+			"section": map[string]any{
+				"key1": []any{"value1", "value2"},
 				"key2": "valueA",
 			},
 		}
@@ -168,7 +168,7 @@ func TestParseKeyValue(t *testing.T) {
 		result, err := p.Parse(reader)
 		require.NoError(t, err)
 
-		expected := map[string]interface{}{
+		expected := map[string]any{
 			"key1": "value1",
 			"key2": "value2",
 			"key3": "",       // Value is empty string
@@ -188,7 +188,7 @@ func TestParseKeyValue(t *testing.T) {
 		reader := strings.NewReader(input)
 		result, err := p.Parse(reader)
 		require.NoError(t, err)
-		assert.Equal(t, map[string]interface{}{}, result)
+		assert.Equal(t, map[string]any{}, result)
 	})
 
 	t.Run("nmcli data", func(t *testing.T) {
@@ -200,15 +200,15 @@ func TestParseKeyValue(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
-		parsedResult, ok := result.(map[string]interface{})
+		parsedResult, ok := result.(map[string]any)
 		require.True(t, ok, "Parsed result is not a map[string]interface{}")
 
 		const expectedEntries = 7 // AP[1] to AP[7]
 
 		// Helper function to get an array field and check its length
-		getArrayField := func(key string) []interface{} {
+		getArrayField := func(key string) []any {
 			assert.Contains(t, parsedResult, key)
-			field, ok := parsedResult[key].([]interface{})
+			field, ok := parsedResult[key].([]any)
 			require.True(t, ok, "%s field is not an array", key)
 			assert.Len(t, field, expectedEntries, "Length of %s array is not %d", key, expectedEntries)
 			return field
@@ -332,7 +332,7 @@ func TestParseKeyValue(t *testing.T) {
 		result, err := p.Parse(reader)
 		require.NoError(t, err)
 
-		expected := map[string]interface{}{
+		expected := map[string]any{
 			"key1": "value1",
 			"key2": "value2",
 		}
@@ -348,7 +348,7 @@ func TestParseKeyValue(t *testing.T) {
 		result, err := p.Parse(reader)
 		require.NoError(t, err)
 
-		expected := map[string]interface{}{
+		expected := map[string]any{
 			"key1": "value1",
 			"key2": "value2",
 		}
@@ -366,8 +366,8 @@ func TestParseKeyValue(t *testing.T) {
 		result, err := p.Parse(reader)
 		require.NoError(t, err)
 
-		expected := map[string]interface{}{
-			"parent": map[string]interface{}{
+		expected := map[string]any{
+			"parent": map[string]any{
 				"child": "value",
 			},
 		}
@@ -382,11 +382,11 @@ func TestParseKeyValue(t *testing.T) {
 		result, err := p.Parse(reader)
 		require.NoError(t, err)
 
-		expected := map[string]interface{}{
-			"a": map[string]interface{}{
-				"b": map[string]interface{}{
-					"c": map[string]interface{}{
-						"d": map[string]interface{}{
+		expected := map[string]any{
+			"a": map[string]any{
+				"b": map[string]any{
+					"c": map[string]any{
+						"d": map[string]any{
 							"e": "deep_value",
 						},
 					},
@@ -404,7 +404,7 @@ func TestParseKeyValue(t *testing.T) {
 		result, err := p.Parse(reader)
 		require.NoError(t, err)
 
-		expected := map[string]interface{}{
+		expected := map[string]any{
 			"key with spaces": "value with spaces",
 		}
 		assert.Equal(t, expected, result)
@@ -420,7 +420,7 @@ func TestParseKeyValue(t *testing.T) {
 		result, err := p.Parse(reader)
 		require.NoError(t, err)
 
-		expected := map[string]interface{}{
+		expected := map[string]any{
 			"key1": "value1=with=equals", // SplitN ensures this
 			"key2": "value2=with=equals", // Quotes are removed
 		}

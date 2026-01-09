@@ -134,7 +134,7 @@ func WithQuery(q []string) FlattenOpts {
 }
 
 // Flatten is the entry point to the Flattener functionality.
-func Flatten(data interface{}, opts ...FlattenOpts) ([]Row, error) {
+func Flatten(data any, opts ...FlattenOpts) ([]Row, error) {
 	fl := &Flattener{
 		rows:            []Row{},
 		logLevel:        levelFlattenDebug, // by default, log at a level below debug
@@ -159,7 +159,7 @@ func Flatten(data interface{}, opts ...FlattenOpts) ([]Row, error) {
 }
 
 // descend recurses through a given data structure flattening along the way.
-func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
+func (fl *Flattener) descend(path []string, data any, depth int) error {
 	queryTerm, isQueryMatched := fl.queryAtDepth(depth)
 
 	slogger := fl.slogger.With(
@@ -171,7 +171,7 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 	)
 
 	switch v := data.(type) {
-	case []interface{}:
+	case []any:
 		for i, e := range v {
 			pathKey := strconv.Itoa(i)
 			slogger.Log(context.TODO(), fl.logLevel,
@@ -198,7 +198,7 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 					"attempting to coerce array into map",
 				)
 
-				e, ok := e.(map[string]interface{})
+				e, ok := e.(map[string]any)
 				if !ok {
 					innerslogger.Log(context.TODO(), fl.logLevel,
 						"can't coerce into map",
@@ -238,7 +238,7 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 				return fmt.Errorf("flattening array: %w", err)
 			}
 		}
-	case map[string]interface{}:
+	case map[string]any:
 		slogger.Log(context.TODO(), fl.logLevel,
 			"checking a map",
 		)
@@ -253,7 +253,7 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 				return fmt.Errorf("flattening map: %w", err)
 			}
 		}
-	case []map[string]interface{}:
+	case []map[string]any:
 		slogger.Log(context.TODO(), fl.logLevel,
 			"checking an array of maps",
 		)
@@ -287,7 +287,7 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 // handleStringLike is called when we finally have an object we think
 // can be converted to a string. It uses the depth to compare against
 // the query, and returns a stringify'ed value
-func (fl *Flattener) handleStringLike(slogger *slog.Logger, path []string, v interface{}, depth int) error {
+func (fl *Flattener) handleStringLike(slogger *slog.Logger, path []string, v any, depth int) error {
 	queryTerm, isQueryMatched := fl.queryAtDepth(depth)
 
 	stringValue, err := stringify(v)
@@ -332,7 +332,7 @@ func (fl *Flattener) descendMaybePlist(path []string, data []byte, depth int) er
 		"parsing inner plist",
 	)
 
-	var innerData interface{}
+	var innerData any
 
 	if err := plist.Unmarshal(data, &innerData); err != nil {
 		slogger.Log(context.TODO(), slog.LevelInfo,
@@ -373,7 +373,7 @@ func (fl *Flattener) queryMatchNil(queryTerm string) bool {
 //
 // We use `=>` as something that is reasonably intuitive, and not very
 // likely to occur on it's own. Unfortunately, `==` shows up in base64
-func (fl *Flattener) queryMatchArrayElement(data interface{}, arrIndex int, queryTerm string) bool {
+func (fl *Flattener) queryMatchArrayElement(data any, arrIndex int, queryTerm string) bool {
 	slogger := fl.slogger.With(
 		"caller", "queryMatchArrayElement",
 		"rows_so_far", len(fl.rows),
@@ -401,10 +401,10 @@ func (fl *Flattener) queryMatchArrayElement(data interface{}, arrIndex int, quer
 	)
 
 	switch dataCasted := data.(type) {
-	case []interface{}:
+	case []any:
 		// fails. We can't match an array that has arrays as elements. Use a wildcard
 		return false
-	case map[string]interface{}:
+	case map[string]any:
 		kvQuery := strings.SplitN(queryTerm, "=>", 2)
 
 		// If this is one long, then we're testing for whether or not there's a key with this name,
@@ -429,7 +429,7 @@ func (fl *Flattener) queryMatchArrayElement(data interface{}, arrIndex int, quer
 	}
 }
 
-func (fl *Flattener) queryMatchStringify(data interface{}, queryTerm string) bool {
+func (fl *Flattener) queryMatchStringify(data any, queryTerm string) bool {
 	// strip off the key re-write denotation before trying to match
 	queryTerm = strings.TrimPrefix(queryTerm, fl.queryKeyDenoter)
 
@@ -500,7 +500,7 @@ func (fl *Flattener) queryAtDepth(depth int) (string, bool) {
 
 // stringify takes an arbitrary piece of data, and attempst to coerce
 // it into a string.
-func stringify(data interface{}) (string, error) {
+func stringify(data any) (string, error) {
 	switch v := data.(type) {
 	case nil:
 		return "", nil

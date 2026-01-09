@@ -28,7 +28,7 @@ func TestParse(t *testing.T) {
 		name               string
 		input              []byte
 		expectedItemCount  int
-		expectedAttributes map[string]interface{}
+		expectedAttributes map[string]any
 		expectedErr        bool
 	}{
 		{
@@ -41,9 +41,9 @@ func TestParse(t *testing.T) {
 			name:              "diskutil list data",
 			input:             []byte(diskutilListData),
 			expectedItemCount: 4, // Number of whole disks in the sample data
-			expectedAttributes: map[string]interface{}{
-				"AllDisks":   []interface{}{"disk0", "disk0s1", "disk0s2", "disk0s3", "disk1", "disk1s1", "disk1s2", "disk1s3", "disk1s4", "disk2", "disk2s1", "disk2s2", "disk3", "disk3s1", "disk3s1s1", "disk3s2", "disk3s3", "disk3s4", "disk3s5", "disk3s6", "disk3s7"},
-				"WholeDisks": []interface{}{"disk0", "disk1", "disk2", "disk3"},
+			expectedAttributes: map[string]any{
+				"AllDisks":   []any{"disk0", "disk0s1", "disk0s2", "disk0s3", "disk1", "disk1s1", "disk1s2", "disk1s3", "disk1s4", "disk2", "disk2s1", "disk2s2", "disk3", "disk3s1", "disk3s1s1", "disk3s2", "disk3s3", "disk3s4", "disk3s5", "disk3s6", "disk3s7"},
+				"WholeDisks": []any{"disk0", "disk1", "disk2", "disk3"},
 				"Size":       uint64(2001111162880), // Size of first disk in the sample data (as uint64)
 				"OSInternal": false,                 // OSInternal value of first disk
 				"Content":    "GUID_partition_scheme",
@@ -54,7 +54,7 @@ func TestParse(t *testing.T) {
 			name:              "powermetrics data",
 			input:             []byte(powermetricsData),
 			expectedItemCount: 237, // Number of tasks in the sample data
-			expectedAttributes: map[string]interface{}{
+			expectedAttributes: map[string]any{
 				"is_delta":       true,                                                  // Boolean value
 				"elapsed_ns":     uint64(5023936166),                                    // Integer value as uint64
 				"hw_model":       "Mac15,9",                                             // String value
@@ -68,7 +68,7 @@ func TestParse(t *testing.T) {
 			name:              "diskutil apfs data",
 			input:             []byte(diskutilApfsData),
 			expectedItemCount: 3, // Number of containers in the sample data
-			expectedAttributes: map[string]interface{}{
+			expectedAttributes: map[string]any{
 				"ContainerReference": "disk1",                                // String value
 				"APFSContainerUUID":  "E9CF7965-DC84-4CCD-95B1-8E7899A2F41D", // String value
 				"CapacityCeiling":    uint64(524288000),                      // Integer value as uint64
@@ -103,7 +103,7 @@ func TestParse(t *testing.T) {
 			require.NoError(t, err)
 
 			// Check the structure of the parsed data
-			resultMap, ok := result.(map[string]interface{})
+			resultMap, ok := result.(map[string]any)
 			require.True(t, ok, "Result should be a map[string]interface{}")
 
 			// Different handling based on the test case
@@ -113,14 +113,14 @@ func TestParse(t *testing.T) {
 				require.True(t, ok, "Result should contain 'AllDisksAndPartitions' key")
 
 				// Check the AllDisksAndPartitions structure
-				allDisksSlice, ok := allDisksAndPartitions.([]interface{})
+				allDisksSlice, ok := allDisksAndPartitions.([]any)
 				require.True(t, ok, "AllDisksAndPartitions should be a []interface{}")
 				assert.Equal(t, tt.expectedItemCount, len(allDisksSlice), "Should have expected number of disks")
 
 				// Check for WholeDisks
 				wholeDisks, ok := resultMap["WholeDisks"]
 				require.True(t, ok, "Result should contain 'WholeDisks' key")
-				wholeDisksSlice, ok := wholeDisks.([]interface{})
+				wholeDisksSlice, ok := wholeDisks.([]any)
 				require.True(t, ok, "WholeDisks should be a []interface{}")
 				assert.Equal(t, 4, len(wholeDisksSlice), "Should have 4 whole disks")
 
@@ -128,7 +128,7 @@ func TestParse(t *testing.T) {
 				allDisks, ok := resultMap["AllDisks"]
 				require.True(t, ok, "Result should contain 'AllDisks' key")
 				// Fix: Use different variable names to avoid redeclaration
-				allDisksArray, okAllDisks := allDisks.([]interface{})
+				allDisksArray, okAllDisks := allDisks.([]any)
 				require.True(t, okAllDisks, "AllDisks should be a []interface{}")
 				assert.Equal(t, 21, len(allDisksArray), "Should have 21 disks in AllDisks")
 
@@ -140,7 +140,7 @@ func TestParse(t *testing.T) {
 						continue
 					case "Size", "OSInternal", "Content":
 						// These are in the first disk in AllDisksAndPartitions
-						firstDisk, ok := allDisksSlice[0].(map[string]interface{})
+						firstDisk, ok := allDisksSlice[0].(map[string]any)
 						require.True(t, ok, "First disk should be a map[string]interface{}")
 						value, exists := firstDisk[key]
 						assert.True(t, exists, "First disk should have '%s'", key)
@@ -180,19 +180,19 @@ func TestParse(t *testing.T) {
 				}
 
 				// Check for specific disk details
-				firstDisk, ok := allDisksSlice[0].(map[string]interface{})
+				firstDisk, ok := allDisksSlice[0].(map[string]any)
 				require.True(t, ok, "First disk should be a map[string]interface{}")
 				assert.Equal(t, "disk0", firstDisk["DeviceIdentifier"], "First disk should have DeviceIdentifier 'disk0'")
 
 				// Check for partitions in the first disk
 				partitions, ok := firstDisk["Partitions"]
 				require.True(t, ok, "First disk should have 'Partitions' key")
-				partitionsSlice, ok := partitions.([]interface{})
+				partitionsSlice, ok := partitions.([]any)
 				require.True(t, ok, "Partitions should be a []interface{}")
 				assert.Equal(t, 3, len(partitionsSlice), "First disk should have 3 partitions")
 
 				// Check first partition details
-				firstPartition, ok := partitionsSlice[0].(map[string]interface{})
+				firstPartition, ok := partitionsSlice[0].(map[string]any)
 				require.True(t, ok, "First partition should be a map[string]interface{}")
 				assert.Equal(t, "disk0s1", firstPartition["DeviceIdentifier"], "First partition should have DeviceIdentifier 'disk0s1'")
 				assert.Equal(t, "Apple_APFS_ISC", firstPartition["Content"], "First partition should have Content 'Apple_APFS_ISC'")
@@ -200,12 +200,12 @@ func TestParse(t *testing.T) {
 				// Check for tasks array
 				tasks, ok := resultMap["tasks"]
 				require.True(t, ok, "Result should contain 'tasks' key")
-				tasksSlice, ok := tasks.([]interface{})
+				tasksSlice, ok := tasks.([]any)
 				require.True(t, ok, "Tasks should be a []interface{}")
 				assert.Equal(t, tt.expectedItemCount, len(tasksSlice), "Should have expected number of tasks")
 
 				// Check first task details
-				firstTask, ok := tasksSlice[0].(map[string]interface{})
+				firstTask, ok := tasksSlice[0].(map[string]any)
 				require.True(t, ok, "First task should be a map[string]interface{}")
 
 				// Use uint64 for pid
@@ -218,12 +218,12 @@ func TestParse(t *testing.T) {
 				// Check for timer_wakeups in first task (nested array)
 				timerWakeups, ok := firstTask["timer_wakeups"]
 				require.True(t, ok, "First task should have 'timer_wakeups' key")
-				timerWakeupsSlice, ok := timerWakeups.([]interface{})
+				timerWakeupsSlice, ok := timerWakeups.([]any)
 				require.True(t, ok, "timer_wakeups should be a []interface{}")
 				assert.Equal(t, 2, len(timerWakeupsSlice), "First task should have 2 timer_wakeups entries")
 
 				// Check first timer_wakeup details
-				firstTimerWakeup, ok := timerWakeupsSlice[0].(map[string]interface{})
+				firstTimerWakeup, ok := timerWakeupsSlice[0].(map[string]any)
 				require.True(t, ok, "First timer_wakeup should be a map[string]interface{}")
 
 				// Use uint64 for interval_ns
@@ -268,12 +268,12 @@ func TestParse(t *testing.T) {
 				// Check for Containers array
 				containers, ok := resultMap["Containers"]
 				require.True(t, ok, "Result should contain 'Containers' key")
-				containersSlice, ok := containers.([]interface{})
+				containersSlice, ok := containers.([]any)
 				require.True(t, ok, "Containers should be a []interface{}")
 				assert.Equal(t, tt.expectedItemCount, len(containersSlice), "Should have expected number of containers")
 
 				// Check first container details
-				firstContainer, ok := containersSlice[0].(map[string]interface{})
+				firstContainer, ok := containersSlice[0].(map[string]any)
 				require.True(t, ok, "First container should be a map[string]interface{}")
 
 				// Check container attributes
@@ -293,12 +293,12 @@ func TestParse(t *testing.T) {
 				// Check for PhysicalStores array
 				physicalStores, ok := firstContainer["PhysicalStores"]
 				require.True(t, ok, "First container should have 'PhysicalStores' key")
-				physicalStoresSlice, ok := physicalStores.([]interface{})
+				physicalStoresSlice, ok := physicalStores.([]any)
 				require.True(t, ok, "PhysicalStores should be a []interface{}")
 				assert.Equal(t, 1, len(physicalStoresSlice), "First container should have 1 physical store")
 
 				// Check first physical store details
-				firstStore, ok := physicalStoresSlice[0].(map[string]interface{})
+				firstStore, ok := physicalStoresSlice[0].(map[string]any)
 				require.True(t, ok, "First physical store should be a map[string]interface{}")
 				assert.Equal(t, "disk0s1", firstStore["DeviceIdentifier"], "First physical store should have DeviceIdentifier 'disk0s1'")
 				assert.Equal(t, "B02C7A05-B7E8-469E-A570-49F223D4935F", firstStore["DiskUUID"], "First physical store should have correct DiskUUID")
@@ -311,12 +311,12 @@ func TestParse(t *testing.T) {
 				// Check for Volumes array
 				volumes, ok := firstContainer["Volumes"]
 				require.True(t, ok, "First container should have 'Volumes' key")
-				volumesSlice, ok := volumes.([]interface{})
+				volumesSlice, ok := volumes.([]any)
 				require.True(t, ok, "Volumes should be a []interface{}")
 				assert.Equal(t, 4, len(volumesSlice), "First container should have 4 volumes")
 
 				// Check first volume details
-				firstVolume, ok := volumesSlice[0].(map[string]interface{})
+				firstVolume, ok := volumesSlice[0].(map[string]any)
 				require.True(t, ok, "First volume should be a map[string]interface{}")
 				assert.Equal(t, "6F9AA06F-1FA2-4F56-A0BD-61AE5572A016", firstVolume["APFSVolumeUUID"], "First volume should have correct APFSVolumeUUID")
 				assert.Equal(t, "disk1s1", firstVolume["DeviceIdentifier"], "First volume should have DeviceIdentifier 'disk1s1'")
@@ -335,14 +335,14 @@ func TestParse(t *testing.T) {
 				// Check for Roles array
 				roles, ok := firstVolume["Roles"]
 				require.True(t, ok, "First volume should have 'Roles' key")
-				rolesSlice, ok := roles.([]interface{})
+				rolesSlice, ok := roles.([]any)
 				require.True(t, ok, "Roles should be a []interface{}")
 				assert.Equal(t, 1, len(rolesSlice), "First volume should have 1 role")
 				assert.Equal(t, "Preboot", rolesSlice[0], "First volume should have role 'Preboot'")
 
 				// Verify specific expected attributes
 				for key, expectedValue := range tt.expectedAttributes {
-					var value interface{}
+					var value any
 					var exists bool
 
 					// Check in different places based on the key

@@ -25,7 +25,7 @@ type queryCollectionResponse struct {
 	Err         error  `json:"err,omitempty"`
 }
 
-func decodeJSONRPCQueryCollection(_ context.Context, res jsonrpc.Response) (interface{}, error) {
+func decodeJSONRPCQueryCollection(_ context.Context, res jsonrpc.Response) (any, error) {
 	if res.Error != nil {
 		return nil, *res.Error
 	}
@@ -38,7 +38,7 @@ func decodeJSONRPCQueryCollection(_ context.Context, res jsonrpc.Response) (inte
 	return result, nil
 }
 
-func decodeJSONRPCQueriesRequest(_ context.Context, msg json.RawMessage) (interface{}, error) {
+func decodeJSONRPCQueriesRequest(_ context.Context, msg json.RawMessage) (any, error) {
 	var req queriesRequest
 
 	if err := json.Unmarshal(msg, &req); err != nil {
@@ -50,7 +50,7 @@ func decodeJSONRPCQueriesRequest(_ context.Context, msg json.RawMessage) (interf
 	return req, nil
 }
 
-func encodeJSONRPCQueryCollection(_ context.Context, obj interface{}) (json.RawMessage, error) {
+func encodeJSONRPCQueryCollection(_ context.Context, obj any) (json.RawMessage, error) {
 	res, ok := obj.(queryCollectionResponse)
 	if !ok {
 		return encodeJSONResponse(nil, fmt.Errorf("asserting result to *queryCollectionResponse failed. Got %T, %+v", obj, obj))
@@ -65,7 +65,7 @@ func encodeJSONRPCQueryCollection(_ context.Context, obj interface{}) (json.RawM
 }
 
 func MakeRequestQueriesEndpoint(svc KolideService) endpoint.Endpoint {
-	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+	return func(ctx context.Context, request any) (response any, err error) {
 		req := request.(queriesRequest)
 		result, valid, err := svc.RequestQueries(ctx, req.NodeKey)
 		if err != nil {

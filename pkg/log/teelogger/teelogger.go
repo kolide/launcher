@@ -19,7 +19,7 @@ func New(loggers ...log.Logger) log.Logger {
 
 // Log will log to each logger. If any of them error, it will return a
 // random error.
-func (l *teeLogger) Log(keyvals ...interface{}) error {
+func (l *teeLogger) Log(keyvals ...any) error {
 	var randomErr error
 	for _, logger := range l.loggers {
 		if err := logger.Log(keyvals...); err != nil {
