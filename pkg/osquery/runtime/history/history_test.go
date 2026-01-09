@@ -60,7 +60,6 @@ func TestNewInstance(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -129,7 +128,6 @@ func TestGetHistory(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			currentHistory, err := InitHistory(setupStorage(t, tt.initialInstances...))

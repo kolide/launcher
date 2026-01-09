@@ -46,7 +46,6 @@ func TestWait(t *testing.T) {
 			expectedErr:  err1,
 		},
 	} {
-		tt := tt
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 
@@ -56,7 +55,6 @@ func TestWait(t *testing.T) {
 			eg := NewLoggedErrgroup(ctx, multislogger.NewNopLogger())
 
 			for i, err := range tt.errs {
-				err := err
 				eg.StartGoroutine(ctx, strconv.Itoa(i), func() error { return err })
 				time.Sleep(500 * time.Millisecond) // try to enforce ordering of goroutines
 			}

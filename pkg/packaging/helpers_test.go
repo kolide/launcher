@@ -54,7 +54,6 @@ osqueryd version 5.13.1
 			expectedVersion: "5.13.1",
 		},
 	} {
-		tt := tt
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 			require.Equal(t, tt.expectedVersion, osqueryVersionFromVersionOutput(tt.versionOutput))

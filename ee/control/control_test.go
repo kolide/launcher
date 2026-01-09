@@ -88,7 +88,6 @@ func TestControlServiceRegisterConsumer(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -121,7 +120,6 @@ func TestControlServiceRegisterConsumerMultiple(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -169,7 +167,6 @@ func TestControlServiceUpdate(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -314,7 +311,6 @@ func TestControlServiceFetch(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -463,7 +459,6 @@ func TestControlServicePersistLastFetched(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -537,7 +532,6 @@ func Test_knownSubsystem(t *testing.T) {
 			subsystemKnown: false,
 		},
 	} {
-		tt := tt
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 

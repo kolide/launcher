@@ -26,7 +26,6 @@ func Test_camelToSnake(t *testing.T) {
 			expectedOutput: "email_address",
 		},
 	} {
-		tt := tt
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 

@@ -163,7 +163,6 @@ func TestMergeEnrollmentDetails(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			result := mergeEnrollmentDetails(tc.old, tc.new)
@@ -481,7 +480,6 @@ func TestNodeKey(t *testing.T) {
 			expectedNodeKey: "test_node_key_2",
 		},
 	} {
-		tt := tt
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 
@@ -553,7 +551,6 @@ func TestDeleteRegistration(t *testing.T) {
 			expectedEnrollSecret:   "",
 		},
 	} {
-		tt := tt
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 
@@ -693,7 +690,6 @@ func TestCurrentEnrollmentStatus(t *testing.T) {
 			expectedStatus: types.Enrolled,
 		},
 	} {
-		tt := tt
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 
@@ -760,7 +756,6 @@ func TestReadEnrollSecret(t *testing.T) {
 			secretExpected: false,
 		},
 	} {
-		tt := tt
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 

@@ -53,14 +53,12 @@ func Test_GetSet(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
 			for _, s := range getStores(t) {
 				wg := sync.WaitGroup{}
 				for k, v := range tt.sets {
-					k, v := k, v
 					wg.Go(func() {
 						err := s.Set([]byte(k), []byte(v))
 						if tt.expectedErr {
@@ -73,7 +71,6 @@ func Test_GetSet(t *testing.T) {
 				wg.Wait()
 				if !tt.expectedErr {
 					for k, v := range tt.gets {
-						k, v := k, v
 						wg.Go(func() {
 							val, err := s.Get([]byte(k))
 							require.NoError(t, err)
@@ -121,7 +118,6 @@ func Test_Delete(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -167,7 +163,6 @@ func Test_DeleteAll(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -264,7 +259,6 @@ func Test_Updates(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -321,14 +315,12 @@ func Test_ForEach(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
 			for _, s := range getStores(t) {
 				wg := sync.WaitGroup{}
 				for k, v := range tt.sets {
-					k, v := k, v
 					wg.Go(func() {
 						err := s.Set([]byte(k), []byte(v))
 						require.NoError(t, err)
@@ -385,7 +377,6 @@ func Test_Count(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -425,7 +416,6 @@ func Test_AppendValues(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 

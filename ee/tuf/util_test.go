@@ -98,7 +98,6 @@ func TestCheckExecutable(t *testing.T) {
 	}
 
 	for _, tt := range tests { // nolint:paralleltest
-		tt := tt
 		t.Run(tt.testName, func(t *testing.T) {
 			err := CheckExecutable(t.Context(), multislogger.NewNopLogger(), targetExe, "-test.run=TestHelperProcess", "--", tt.testName)
 			if tt.expectedErr {

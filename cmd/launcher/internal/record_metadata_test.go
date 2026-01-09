@@ -76,7 +76,6 @@ func TestPing(t *testing.T) {
 			shouldLogMetadataChange: false,
 		},
 	} {
-		tt := tt
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 

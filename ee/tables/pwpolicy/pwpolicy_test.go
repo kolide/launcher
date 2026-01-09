@@ -42,7 +42,6 @@ func TestQueries(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		testTable := &Table{
 			slogger: multislogger.NewNopLogger(),
 			execCC:  execFaker(tt.file),

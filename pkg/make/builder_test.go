@@ -60,7 +60,6 @@ func TestNamingHelpers(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run("platform="+tt.platform, func(t *testing.T) {
 			t.Parallel()
 
@@ -188,7 +187,6 @@ func TestGetVersion(t *testing.T) { //nolint:paralleltest
 	b.execCC = helperCommandContext
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.in, func(t *testing.T) { //nolint:paralleltest
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()

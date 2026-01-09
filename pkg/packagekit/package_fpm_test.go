@@ -54,7 +54,6 @@ func Test_fpmArch(t *testing.T) {
 			expectedArch: "arm64",
 		},
 	} {
-		tt := tt
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 

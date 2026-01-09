@@ -191,7 +191,6 @@ func TestConstructKATCTables(t *testing.T) {
 			expectedPluginCount: 0,
 		},
 	} {
-		tt := tt
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 

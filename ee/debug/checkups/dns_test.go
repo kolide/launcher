@@ -105,7 +105,6 @@ func Test_dnsCheckup_Run(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		for mockfunc, mockval := range tt.knapsackReturns {
 			tt.fields.k.On(mockfunc).Return(mockval)
 		}

@@ -90,7 +90,6 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 		},
 	}
 	for _, tt := range tests { //nolint:paralleltest
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			testServer := httptest.NewServer(nil)
 
@@ -229,7 +228,6 @@ func TestShipToS3(t *testing.T) { //nolint:paralleltest
 	}
 
 	for _, tt := range tests { //nolint:paralleltest
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			testServer := httptest.NewServer(nil)
 

@@ -43,7 +43,6 @@ func TestTransformOutput(t *testing.T) {
 	table := Table{slogger: multislogger.NewNopLogger()}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.in, func(t *testing.T) {
 			t.Parallel()
 

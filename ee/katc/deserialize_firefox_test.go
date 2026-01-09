@@ -45,7 +45,6 @@ func Test_deserializeFirefox_malformedData(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 
@@ -98,7 +97,6 @@ func Test_deserializeString(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 

@@ -68,7 +68,6 @@ func (g *Group) Run() error {
 
 	actorErrors := make(chan actorError, len(g.actors))
 	for _, a := range g.actors {
-		a := a
 		// Launch goroutine with pprof labels for profiling purposes
 		labels := pprof.Labels("actor", a.name)
 		pprof.Do(context.TODO(), labels, func(ctx context.Context) {
