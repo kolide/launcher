@@ -157,7 +157,7 @@ func TestMultiSlogger_FlagsChanged_ConcurrentAccess(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for i := 0; i < 50; i++ {
+		for i := range 50 {
 			select {
 			case <-done:
 				return

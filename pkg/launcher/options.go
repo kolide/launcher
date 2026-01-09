@@ -531,7 +531,7 @@ func usageFooter() {
 func parseCertPins(pins string) ([][]byte, error) {
 	var certPins [][]byte
 	if pins != "" {
-		for _, hexPin := range strings.Split(pins, ",") {
+		for hexPin := range strings.SplitSeq(pins, ",") {
 			pin, err := hex.DecodeString(hexPin)
 			if err != nil {
 				return nil, fmt.Errorf("decoding cert pin: %w", err)

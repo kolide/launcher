@@ -452,7 +452,7 @@ func TestDesktopUsersProcessesRunner_setupSocketPath(t *testing.T) {
 	require.NoError(t, os.WriteFile(shouldNotBeDeletedFilePath, []byte{}, 0600))
 
 	// create some fake socket files to get cleaned up
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		socketPath := filepath.Join(socketDir, fmt.Sprintf("%s_%d", nonWindowsDesktopSocketPrefix, i))
 		require.NoError(t, os.WriteFile(socketPath, []byte{}, 0600))
 	}

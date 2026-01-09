@@ -82,7 +82,7 @@ func TestBufSpanProcessor(t *testing.T) {
 
 func createSpans(count int) {
 	wg := &sync.WaitGroup{}
-	for i := 0; i < count; i++ {
+	for range count {
 		wg.Add(1)
 
 		go func() {

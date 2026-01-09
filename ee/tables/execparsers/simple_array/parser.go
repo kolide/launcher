@@ -28,7 +28,7 @@ func parse(reader io.Reader) (any, error) {
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		for _, chunk := range strings.Split(line, ",") {
+		for chunk := range strings.SplitSeq(line, ",") {
 
 			// trim quotes and spaces
 			chunk = strings.TrimSpace(chunk)

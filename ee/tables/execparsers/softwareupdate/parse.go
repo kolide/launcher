@@ -57,8 +57,8 @@ func (p *parser) parseUpdate(label string) (map[string]string, error) {
 	updateDataStr := strings.TrimSuffix(strings.TrimSpace(p.scanner.Text()), ",")
 
 	// Add each update attribute to the result
-	updateData := strings.Split(updateDataStr, ",")
-	for _, attr := range updateData {
+	updateData := strings.SplitSeq(updateDataStr, ",")
+	for attr := range updateData {
 		keyValPair := strings.SplitN(attr, ":", 2)
 		if len(keyValPair) < 2 {
 			return result, fmt.Errorf("software update data has malformed attribute %s", attr)

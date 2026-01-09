@@ -547,7 +547,7 @@ func randomStringWithSqlCharacters(t *testing.T, n int) string {
 
 	sb := strings.Builder{}
 	sb.Grow(n)
-	for i := 0; i < n; i++ {
+	for range n {
 		char, err := rand.Int(rand.Reader, maxInt)
 		require.NoError(t, err)
 

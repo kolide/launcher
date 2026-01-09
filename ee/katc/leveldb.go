@@ -133,7 +133,7 @@ func queryLeveldb(ctx context.Context, slogger *slog.Logger, path string, allowe
 func extractLeveldbQueryTargets(query string) map[string]struct{} {
 	allowedKeyMap := make(map[string]struct{})
 
-	for _, allowedKey := range strings.Split(query, ",") {
+	for allowedKey := range strings.SplitSeq(query, ",") {
 		if len(allowedKey) == 0 {
 			continue
 		}

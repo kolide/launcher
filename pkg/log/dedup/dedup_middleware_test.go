@@ -398,7 +398,7 @@ func TestSetDuplicateLogWindowConcurrentAccess(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			select {
 			case <-done:
 				return
@@ -416,7 +416,7 @@ func TestSetDuplicateLogWindowConcurrentAccess(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			select {
 			case <-done:
 				return
@@ -549,7 +549,7 @@ func TestMultipleWindowCycles(t *testing.T) {
 	ctx := t.Context()
 
 	// Run through 3 complete window cycles
-	for cycle := 0; cycle < 3; cycle++ {
+	for cycle := range 3 {
 		expectedRecords := cycle + 1 // One emission per cycle
 
 		// First log of cycle (or first log ever): passes through
@@ -563,7 +563,7 @@ func TestMultipleWindowCycles(t *testing.T) {
 		}
 
 		// Add more duplicates within window
-		for i := 0; i < 2; i++ {
+		for range 2 {
 			if err := mw(ctx, makeRecord(slog.LevelInfo, "cycle-test"), next.next); err != nil {
 				t.Fatalf("cycle %d: middleware err: %v", cycle, err)
 			}

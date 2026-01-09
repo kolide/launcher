@@ -8,6 +8,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"log/slog"
+	"maps"
 	"os"
 	"strings"
 
@@ -107,9 +108,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 					}
 
 					parsedClaims := map[string]interface{}{}
-					for k, v := range claims {
-						parsedClaims[k] = v
-					}
+					maps.Copy(parsedClaims, claims)
 
 					data["header"] = token.Header
 					data["claims"] = parsedClaims

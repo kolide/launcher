@@ -1014,7 +1014,7 @@ func TestExtensionWriteBufferedLogsLimit(t *testing.T) {
 
 	expectedStatusLogs := []string{}
 	expectedResultLogs := []string{}
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		status := fmt.Sprintf("status_%3d", i)
 		expectedStatusLogs = append(expectedStatusLogs, status)
 		e.LogString(t.Context(), logger.LogTypeStatus, status)
@@ -1227,7 +1227,7 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 
 	expectedStatusLogs := []string{}
 	expectedResultLogs := []string{}
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		status := fmt.Sprintf("status_%013d", i)
 		expectedStatusLogs = append(expectedStatusLogs, status)
 		e.LogString(t.Context(), logger.LogTypeStatus, status)
@@ -1369,7 +1369,7 @@ func TestExtensionPurgeBufferedLogs(t *testing.T) {
 	require.Nil(t, err)
 
 	var expectedStatusLogs, expectedResultLogs []string
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		gotStatusLogs = nil
 		gotResultLogs = nil
 		statusLog := fmt.Sprintf("status %d", i)

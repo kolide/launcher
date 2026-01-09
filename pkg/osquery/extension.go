@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"maps"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -625,9 +626,7 @@ func (e *Extension) setOsqueryOptions(config string, optsToSet map[string]any) s
 		opts = make(map[string]any)
 	}
 
-	for k, v := range optsToSet {
-		opts[k] = v
-	}
+	maps.Copy(opts, optsToSet)
 
 	cfg["options"] = opts
 

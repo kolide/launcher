@@ -142,7 +142,7 @@ func TestSendAndPurgeHandlesLogBufferFullPurge(t *testing.T) {
 func testStringArray(size int) []string {
 	arr := make([]string, size)
 
-	for i := 0; i < size; i++ {
+	for i := range size {
 		arr[i] = fmt.Sprintf("%d", i)
 	}
 

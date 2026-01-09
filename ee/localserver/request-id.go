@@ -138,7 +138,7 @@ func (ls *localServer) requestIdHandlerFunc(w http.ResponseWriter, r *http.Reque
 			"err", err,
 		)
 
-		jsonBytes = []byte(fmt.Sprintf("unable to marshal json: %v", err))
+		jsonBytes = fmt.Appendf(nil, "unable to marshal json: %v", err)
 	}
 
 	w.Write(jsonBytes)
