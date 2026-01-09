@@ -296,11 +296,8 @@ func (r *DesktopUsersProcessesRunner) Interrupt(_ error) {
 
 	// The timeout for `Interrupt` is the desktop process interrupt timeout (r.interruptTimeout)
 	// plus a small buffer for killing processes that couldn't be shut down gracefully during r.interuptTimeout.
-	shutdownTimeout := r.interruptTimeout + 3*time.Second
 	// This timeout for `Interrupt` should not be larger than rungroup.interruptTimeout.
-	if shutdownTimeout > rungroup.InterruptTimeout {
-		shutdownTimeout = rungroup.InterruptTimeout
-	}
+	shutdownTimeout := min(r.interruptTimeout+3*time.Second, rungroup.InterruptTimeout)
 
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
