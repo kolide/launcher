@@ -1,6 +1,8 @@
 package dataflattentable
 
 import (
+	"maps"
+
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/osquery/osquery-go/plugin/table"
 )
@@ -12,9 +14,7 @@ func ToMap(rows []dataflatten.Row, query string, rowData map[string]string) []ma
 
 	for i, row := range rows {
 		res := make(map[string]string, len(rowData)+5)
-		for k, v := range rowData {
-			res[k] = v
-		}
+		maps.Copy(res, rowData)
 
 		p, k := row.ParentKey("/")
 
