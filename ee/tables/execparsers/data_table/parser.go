@@ -88,7 +88,7 @@ func (p parser) parseLines(reader io.Reader) ([]map[string]string, error) {
 
 		// For each header, add the corresponding line field to the result row.
 		// Duplicate headers overwrite the set value.
-		for i := 0; i < minimum; i++ {
+		for i := range minimum {
 			row[strings.TrimSpace(p.headers[i])] = strings.TrimSpace(fields[i])
 		}
 

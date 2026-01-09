@@ -378,7 +378,7 @@ func (d *Engine) performCleanup() {
 		}
 		sort.Slice(items, func(i, j int) bool { return items[i].lastSeen.Before(items[j].lastSeen) })
 		removeCount := len(d.cache) - d.cfg.MaxCacheSize
-		for i := 0; i < removeCount; i++ {
+		for i := range removeCount {
 			if entry, ok := d.cache[items[i].hash]; ok {
 				if entry.count > 1 {
 					toEmit = append(toEmit, expired{

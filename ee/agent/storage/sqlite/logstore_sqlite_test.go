@@ -19,7 +19,7 @@ func TestAppendAndIterateValues(t *testing.T) {
 
 	startTime := time.Now()
 	expectedLogCount := 5
-	for i := 0; i < expectedLogCount; i++ {
+	for i := range expectedLogCount {
 		currTime := startTime.Add(time.Duration(i) * time.Minute)
 		logEntry := fmt.Sprintf(`{"time":"%s", "msg":"testMessage%d"}`, currTime.Format(time.RFC3339), i)
 		require.NoError(t, s.AppendValue(currTime.Unix(), []byte(logEntry)), "expected no error appending value row")

@@ -231,7 +231,7 @@ select * from time;
 // The default t.TempDir is too long of a path, creating too long of an osquery
 // extension socket, on posix systems.
 func testRootDirectory(t *testing.T) string {
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		ulid := ulid.New()
 		rootDir := filepath.Join(os.TempDir(), ulid[len(ulid)-4:])
 

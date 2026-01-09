@@ -30,7 +30,7 @@ func TestExtensionLogPublicationHappyPath(t *testing.T) {
 	require.Nil(t, err)
 
 	// issue a few successful calls, expect that the batch limit is unchanged from the original opts
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		e.logPublicationState.BeginBatch(time.Now(), true)
 		err = e.writeLogsWithReenroll(t.Context(), logger.LogTypeSnapshot, []string{"foobar"}, true)
 		assert.Nil(t, err)
@@ -66,7 +66,7 @@ func TestExtensionLogPublicationRespondsToNetworkTimeouts(t *testing.T) {
 
 	// expect each subsequent failed call to reduce the batch size until the min threshold is reached
 	expectedMaxValue := e.Opts.MaxBytesPerBatch
-	for i := 0; i < numberOfPublicationRounds; i++ {
+	for range numberOfPublicationRounds {
 		// set the batch state to have started earlier than the 20 seconds threshold ago
 		e.logPublicationState.BeginBatch(time.Now().Add(-21*time.Second), true)
 		err = e.writeLogsWithReenroll(t.Context(), logger.LogTypeSnapshot, []string{"foobar"}, true)
@@ -85,7 +85,7 @@ func TestExtensionLogPublicationRespondsToNetworkTimeouts(t *testing.T) {
 	assert.Equal(t, expectedMaxValue, e.logPublicationState.currentMaxBytesPerBatch)
 
 	// this time mark the buffer as filled for subsequent successful calls and expect that we move back up towards the original batch limit
-	for i := 0; i < numberOfPublicationRounds; i++ {
+	for range numberOfPublicationRounds {
 		e.logPublicationState.BeginBatch(time.Now(), true)
 		err = e.writeLogsWithReenroll(t.Context(), logger.LogTypeSnapshot, []string{"foobar"}, true)
 		assert.Nil(t, err)
@@ -115,7 +115,7 @@ func TestExtensionLogPublicationIgnoresNonTimeoutErrors(t *testing.T) {
 	require.Nil(t, err)
 
 	// issue a few calls that error immediately, expect that the batch limit is unchanged from the original opts
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		e.logPublicationState.BeginBatch(time.Now(), true)
 		err = e.writeLogsWithReenroll(t.Context(), logger.LogTypeSnapshot, []string{"foobar"}, true)
 		// we still expect an error, but the batch limitation should not have changed

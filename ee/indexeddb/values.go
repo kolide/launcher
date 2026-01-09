@@ -626,7 +626,7 @@ func readUint8Array(typedArrayReader *bytes.Reader) ([]uint8, error) {
 	// rawArrayLength is the same as actual array length for uint8
 	arrayLen := typedArrayReader.Len()
 	result := make([]uint8, arrayLen)
-	for i := 0; i < arrayLen; i++ {
+	for i := range arrayLen {
 		if err := binary.Read(typedArrayReader, binary.NativeEndian, &result[i]); err != nil {
 			return nil, fmt.Errorf("reading uint8 at index %d in TypedArray: %w", i, err)
 		}
@@ -638,7 +638,7 @@ func readUint8Array(typedArrayReader *bytes.Reader) ([]uint8, error) {
 func readUint16Array(typedArrayReader *bytes.Reader) ([]uint16, error) {
 	arrayLen := typedArrayReader.Len() / 2
 	result := make([]uint16, arrayLen)
-	for i := 0; i < arrayLen; i++ {
+	for i := range arrayLen {
 		if err := binary.Read(typedArrayReader, binary.NativeEndian, &result[i]); err != nil {
 			return nil, fmt.Errorf("reading uint16 at index %d in TypedArray: %w", i, err)
 		}
@@ -650,7 +650,7 @@ func readUint16Array(typedArrayReader *bytes.Reader) ([]uint16, error) {
 func readUint32Array(typedArrayReader *bytes.Reader) ([]uint32, error) {
 	arrayLen := typedArrayReader.Len() / 4
 	result := make([]uint32, arrayLen)
-	for i := 0; i < arrayLen; i++ {
+	for i := range arrayLen {
 		if err := binary.Read(typedArrayReader, binary.NativeEndian, &result[i]); err != nil {
 			return nil, fmt.Errorf("reading uint32 at index %d in TypedArray: %w", i, err)
 		}
@@ -662,7 +662,7 @@ func readUint32Array(typedArrayReader *bytes.Reader) ([]uint32, error) {
 func readFloat32Array(typedArrayReader *bytes.Reader) ([]float32, error) {
 	arrayLen := typedArrayReader.Len() / 4
 	result := make([]float32, arrayLen)
-	for i := 0; i < arrayLen; i++ {
+	for i := range arrayLen {
 		if err := binary.Read(typedArrayReader, binary.NativeEndian, &result[i]); err != nil {
 			return nil, fmt.Errorf("reading float32 at index %d in TypedArray: %w", i, err)
 		}
@@ -674,7 +674,7 @@ func readFloat32Array(typedArrayReader *bytes.Reader) ([]float32, error) {
 func readUint64Array(typedArrayReader *bytes.Reader) ([]uint64, error) {
 	arrayLen := typedArrayReader.Len() / 8
 	result := make([]uint64, arrayLen)
-	for i := 0; i < arrayLen; i++ {
+	for i := range arrayLen {
 		if err := binary.Read(typedArrayReader, binary.NativeEndian, &result[i]); err != nil {
 			return nil, fmt.Errorf("reading uint64 at index %d in TypedArray: %w", i, err)
 		}
@@ -686,7 +686,7 @@ func readUint64Array(typedArrayReader *bytes.Reader) ([]uint64, error) {
 func readFloat64Array(typedArrayReader *bytes.Reader) ([]float64, error) {
 	arrayLen := typedArrayReader.Len() / 8
 	result := make([]float64, arrayLen)
-	for i := 0; i < arrayLen; i++ {
+	for i := range arrayLen {
 		if err := binary.Read(typedArrayReader, binary.NativeEndian, &result[i]); err != nil {
 			return nil, fmt.Errorf("reading float64 at index %d in TypedArray: %w", i, err)
 		}

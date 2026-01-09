@@ -30,7 +30,7 @@ func TestReinitializeMetrics(t *testing.T) { //nolint:paralleltest
 
 	// We should still be able to use our gauge and counter -- write data and wait
 	// for it to be written to our exporter.
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		time.Sleep(writeInterval)
 		GoMemoryUsageGauge.Record(t.Context(), int64(i))
 		RSSHistogram.Record(t.Context(), int64(i))
@@ -66,7 +66,7 @@ func TestReinitializeMetrics(t *testing.T) { //nolint:paralleltest
 
 	// We should still be able to use our gauge and counter -- write data and wait
 	// for it to be written to our new exporter.
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		time.Sleep(writeInterval)
 		GoMemoryUsageGauge.Record(t.Context(), int64(i))
 		RSSHistogram.Record(t.Context(), int64(i))
@@ -99,7 +99,7 @@ func Test_int64GaugeOrNoop(t *testing.T) { //nolint:paralleltest
 
 	// We should still be able to use our test gauge -- write data and wait
 	// for it to be written to our exporter.
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		time.Sleep(writeInterval)
 		testGauge.Record(t.Context(), int64(i))
 	}
@@ -155,7 +155,7 @@ func Test_int64HistogramOrNoop(t *testing.T) { //nolint:paralleltest
 
 	// We should still be able to use our test gauge -- write data and wait
 	// for it to be written to our exporter.
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		time.Sleep(writeInterval)
 		testHist.Record(t.Context(), int64(i))
 	}
@@ -183,7 +183,7 @@ func Test_float64HistogramOrNoop(t *testing.T) { //nolint:paralleltest
 
 	// We should still be able to use our test gauge -- write data and wait
 	// for it to be written to our exporter.
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		time.Sleep(writeInterval)
 		testHist.Record(t.Context(), float64(i))
 	}
@@ -211,7 +211,7 @@ func Test_int64CounterOrNoop(t *testing.T) { //nolint:paralleltest
 
 	// We should still be able to use our test gauge -- write data and wait
 	// for it to be written to our exporter.
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		time.Sleep(writeInterval)
 		testCounter.Add(t.Context(), int64(i))
 	}
