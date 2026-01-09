@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 
 	"github.com/kolide/launcher/ee/agent/types"
@@ -155,10 +156,5 @@ OUTER:
 }
 
 func optionAllowed(opt string) bool {
-	for _, b := range allowedOptions {
-		if b == opt {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(allowedOptions, opt)
 }

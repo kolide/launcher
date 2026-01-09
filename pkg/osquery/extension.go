@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -228,12 +229,8 @@ func (e *Extension) Shutdown(_ error) {
 // FlagsChanged satisfies the types.FlagsChangeObserver interface -- handles updates to flags
 // that we care about, which is DistributedForwardingInterval.
 func (e *Extension) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
-	for _, flagKey := range flagKeys {
-		if flagKey == keys.DistributedForwardingInterval {
-			e.distributedForwardingInterval.Store(int64(e.knapsack.DistributedForwardingInterval().Seconds()))
-			// That's the only flag we care about -- we can break here
-			break
-		}
+	if slices.Contains(flagKeys, keys.DistributedForwardingInterval) {
+		e.distributedForwardingInterval.Store(int64(e.knapsack.DistributedForwardingInterval().Seconds()))
 	}
 }
 

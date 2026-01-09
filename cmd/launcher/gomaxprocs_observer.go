@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"runtime"
+	"slices"
 	"sync"
 
 	"github.com/kolide/launcher/ee/agent/flags/keys"
@@ -33,17 +34,15 @@ func newGomaxprocsObserver(slogger *slog.Logger, k types.Knapsack) *gomaxprocsOb
 
 func (g *gomaxprocsObserver) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
 	// Check if LauncherGoMaxProcs changed
-	for _, key := range flagKeys {
-		if key == keys.LauncherGoMaxProcs {
-			newLimit := g.knapsack.LauncherGoMaxProcs()
-			g.slogger.Log(ctx, slog.LevelInfo,
-				"launcher go max procs changed by control server, applying new limit",
-				"new_value", newLimit,
-			)
+	if slices.Contains(flagKeys, keys.LauncherGoMaxProcs) {
+		newLimit := g.knapsack.LauncherGoMaxProcs()
+		g.slogger.Log(ctx, slog.LevelInfo,
+			"launcher go max procs changed by control server, applying new limit",
+			"new_value", newLimit,
+		)
 
-			gomaxprocsLimiter(ctx, g.slogger, newLimit)
-			return
-		}
+		gomaxprocsLimiter(ctx, g.slogger, newLimit)
+		return
 	}
 }
 
