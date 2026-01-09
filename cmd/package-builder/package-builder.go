@@ -227,7 +227,7 @@ func runMake(args []string) error {
 	}
 
 	// Validate that pinned certs are valid hex
-	for _, pin := range strings.Split(*flCertPins, ",") {
+	for pin := range strings.SplitSeq(*flCertPins, ",") {
 		if _, err := hex.DecodeString(pin); err != nil {
 			return fmt.Errorf("unable to parse cert pins: %w", err)
 		}
@@ -397,7 +397,7 @@ func getTargets(input string) ([]packaging.Target, error) {
 	}
 
 	targets := []packaging.Target{}
-	for _, targetString := range strings.Split(input, ",") {
+	for targetString := range strings.SplitSeq(input, ",") {
 		t := packaging.Target{}
 		if err := t.Parse(targetString); err != nil {
 			return nil, err

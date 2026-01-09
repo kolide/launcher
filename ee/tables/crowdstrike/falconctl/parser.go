@@ -30,8 +30,8 @@ func parseOptions(reader io.Reader) (any, error) {
 			continue
 		}
 
-		pairs := strings.Split(line, ", ")
-		for _, pair := range pairs {
+		pairs := strings.SplitSeq(line, ", ")
+		for pair := range pairs {
 			pair = strings.TrimSpace(pair)
 
 			// The format is quite inconsistent. The following sample shows 4 possible

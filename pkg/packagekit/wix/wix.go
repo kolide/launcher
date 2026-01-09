@@ -250,8 +250,8 @@ func (wo *wixTool) addServices(ctx context.Context) error {
 
 	baseSvcName := wo.services[0].serviceInstall.Id
 
-	lines := strings.Split(string(heatContent), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(string(heatContent), "\n")
+	for line := range lines {
 
 		if currentArchSpecificBinDir != none && strings.Contains(line, "</Directory>") {
 			// were in a arch specific bin dir that we want to remove, don't write closing tag
@@ -350,8 +350,8 @@ func (wo *wixTool) setSecretPermissions(ctx context.Context) error {
 	}
 	defer heatWrite.Close()
 
-	lines := strings.Split(string(heatContent), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(string(heatContent), "\n")
+	for line := range lines {
 		if strings.Contains(line, "<File") && strings.Contains(line, `\conf\secret`) {
 			// rewrite the line with an open end tag, we're going to inject some permissions before closing
 			line = strings.TrimRightFunc(line, unicode.IsSpace)           // trim trailing space to get at /> suffix

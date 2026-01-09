@@ -48,8 +48,8 @@ func generateMacho(ctx context.Context, queryContext table.QueryContext) ([]map[
 }
 
 func appFromPath(path string) string {
-	parts := strings.Split(path, "/")
-	for _, part := range parts {
+	parts := strings.SplitSeq(path, "/")
+	for part := range parts {
 		if strings.HasSuffix(part, ".app") {
 			return part
 		}
