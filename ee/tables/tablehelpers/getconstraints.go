@@ -3,6 +3,7 @@ package tablehelpers
 import (
 	"context"
 	"log/slog"
+	"slices"
 	"strings"
 
 	"github.com/kolide/launcher/pkg/log/multislogger"
@@ -78,13 +79,7 @@ func GetConstraints(queryContext table.QueryContext, columnName string, opts ...
 		}
 
 		if len(co.allowedValues) > 0 {
-			skip := true
-			for _, v := range co.allowedValues {
-				if v == c.Expression {
-					skip = false
-					break
-				}
-			}
+			skip := !slices.Contains(co.allowedValues, c.Expression)
 
 			if skip {
 				co.slogger.Log(context.TODO(), slog.LevelInfo,
