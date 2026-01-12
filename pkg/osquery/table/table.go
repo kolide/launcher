@@ -22,6 +22,7 @@ import (
 	"github.com/kolide/launcher/ee/tables/launcher_db"
 	"github.com/kolide/launcher/ee/tables/osquery_instance_history"
 	"github.com/kolide/launcher/ee/tables/release_tracker_data"
+	"github.com/kolide/launcher/ee/tables/secretscan"
 	"github.com/kolide/launcher/ee/tables/sleeper"
 	"github.com/kolide/launcher/ee/tables/tdebug"
 	"github.com/kolide/launcher/ee/tables/tufinfo"
@@ -61,6 +62,7 @@ func PlatformTables(k types.Knapsack, registrationId string, slogger *slog.Logge
 		firefox_preferences.TablePlugin(k, slogger),
 		sleeper.TablePlugin(k, slogger),
 		jwt.TablePlugin(k, slogger),
+		secretscan.TablePlugin(k, slogger),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_zerotier_info", json_parser.Parser, allowedcmd.ZerotierCli, []string{"info", "-j"}),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_zerotier_networks", json_parser.Parser, allowedcmd.ZerotierCli, []string{"listnetworks", "-j"}),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_zerotier_peers", json_parser.Parser, allowedcmd.ZerotierCli, []string{"listpeers", "-j"}),
