@@ -102,7 +102,7 @@ func getOsqEnrollDetails(ctx context.Context, osquerydPath string, details *serv
 		return fmt.Errorf("create osquery for enrollment details: %w", err)
 	}
 
-	osqCtx, osqCancel := context.WithTimeout(ctx, 5*time.Second)
+	osqCtx, osqCancel := context.WithTimeout(ctx, 12*time.Second)
 	defer osqCancel()
 
 	if sqlErr := osq.RunSql(osqCtx, []byte(query)); osqCtx.Err() != nil {
