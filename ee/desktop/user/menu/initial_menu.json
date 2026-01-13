@@ -3,7 +3,7 @@
     "tooltip": "Kolide",
     "items": [
         {
-            "label": "Kolide Agent Version: {{.LauncherVersion}}",
+            "label": "Kolide Agent: {{.LauncherVersion}}",
             "disabled": true
         }
     ]
