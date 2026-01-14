@@ -3,7 +3,6 @@ package multislogger
 import (
 	"context"
 	"log/slog"
-	"os"
 	"sync/atomic"
 	"time"
 
@@ -246,10 +245,4 @@ func reportedErrorMiddleware(ctx context.Context, record slog.Record, next func(
 	)
 
 	return next(ctx, record)
-}
-
-func defaultSystemSlogger() *MultiSlogger {
-	return New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	}))
 }

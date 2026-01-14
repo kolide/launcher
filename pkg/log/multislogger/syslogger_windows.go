@@ -6,6 +6,7 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"os"
 
 	"github.com/kolide/launcher/pkg/log/eventlog"
 	"golang.org/x/sys/windows"
@@ -41,4 +42,13 @@ func SystemSlogger() (*MultiSlogger, io.Closer, error) {
 	}))
 
 	return systemSlogger, eventLogWriter, nil
+}
+
+func defaultSystemSlogger() *MultiSlogger {
+	// On Windows, writing to stderr is not a no-op, it's an error:
+	// `write /dev/stderr: The handle is invalid`. We have to write to
+	// stdout instead.
+	return New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	}))
 }
