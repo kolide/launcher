@@ -394,6 +394,11 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		observability.SetError(span, err)
 		return "", true, err
 	}
+	if keyString == "" {
+		err = errors.New("valid node received empty response")
+		observability.SetError(span, err)
+		return "", false, err
+	}
 
 	// Save newly acquired node key if successful -- adding the registration
 	// will do this. SaveRegistration will extract the munemo from the enrollment
