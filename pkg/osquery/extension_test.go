@@ -278,6 +278,25 @@ func createTestEnrollSecret(t *testing.T, munemo string) string {
 	return signedTokenStr
 }
 
+func TestExtensionEnrollValidNodeEmptyResponse(t *testing.T) {
+	m := &mock.KolideService{
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, string, error) {
+			return "", false, "", nil
+		},
+	}
+	k := makeKnapsackUnenrolled(t)
+	lpc := makeTestOsqLogPublisher(k)
+
+	e, err := NewExtension(t.Context(), m, lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
+	require.Nil(t, err)
+
+	key, invalid, err := e.Enroll(t.Context())
+	assert.True(t, m.RequestEnrollmentFuncInvoked)
+	assert.Equal(t, "", key)
+	assert.False(t, invalid)
+	assert.NotNil(t, err)
+}
+
 func TestExtensionEnroll(t *testing.T) {
 	expectedMunemo := "test_fake_munemo"
 	expectedEnrollSecret := createTestEnrollSecret(t, expectedMunemo)
