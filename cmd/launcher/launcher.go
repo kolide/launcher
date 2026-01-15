@@ -404,7 +404,9 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 
 	// Now that the keys exist, collect and set enrollment details (which include the agent keys) in the background
 	gowrapper.Go(ctx, slogger, func() {
-		osquery.CollectAndSetEnrollmentDetails(ctx, slogger, k, 60*time.Second, 6*time.Second)
+		// getOsqEnrollDetails has a 12-second timeout for performing the query, so we set our retry interval
+		// to slightly longer than that.
+		osquery.CollectAndSetEnrollmentDetails(ctx, slogger, k, 120*time.Second, 15*time.Second)
 		logShipper.Ping() // Let the logshipper know about the updated serial number
 	})
 

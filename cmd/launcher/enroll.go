@@ -15,6 +15,9 @@ import (
 )
 
 func runEnroll(systemMultiSlogger *multislogger.MultiSlogger, args []string) error {
+	attachConsole()
+	defer detachConsole()
+
 	ctx := context.Background()
 
 	// Enroll assumes a launcher installation (at least partially) exists
