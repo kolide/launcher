@@ -16,7 +16,8 @@ import (
 )
 
 type runtimeCheckup struct {
-	k types.Knapsack
+	k    types.Knapsack
+	data map[string]any
 }
 
 func (c *runtimeCheckup) Name() string {
@@ -26,6 +27,12 @@ func (c *runtimeCheckup) Name() string {
 func (c *runtimeCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 	extraZip := zip.NewWriter(extraWriter)
 	defer extraZip.Close()
+
+	c.data = map[string]any{
+		"num_goroutine": runtime.NumGoroutine(),
+		"num_cgocall":   runtime.NumCgoCall(),
+		"gomaxprocs":    runtime.GOMAXPROCS(0),
+	}
 
 	if err := gatherMemStats(extraZip); err != nil {
 		return fmt.Errorf("gathering mem stats: %w", err)
@@ -64,7 +71,7 @@ func (c *runtimeCheckup) Summary() string {
 }
 
 func (c *runtimeCheckup) Data() any {
-	return nil
+	return c.data
 }
 
 func gatherMemStats(z *zip.Writer) error {
