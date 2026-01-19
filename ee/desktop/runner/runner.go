@@ -151,6 +151,8 @@ type DesktopUsersProcessesRunner struct {
 	osVersion string
 	// cachedMenuData is the cached label values of the currently displayed menu data, used for detecting changes
 	cachedMenuData *menuItemCache
+	// runDesktopProcessErrFilter is used to filter errors from running desktop processes
+	runDesktopProcessErrFilter errFilter
 }
 
 // processRecord is used to track spawned desktop processes.
@@ -188,6 +190,17 @@ func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUser
 		usersFilesRoot:      agent.TempPath("kolide-desktop"),
 		knapsack:            k,
 		cachedMenuData:      newMenuItemCache(),
+		// these are common errors that we have no control over, they will be logged as warnings
+		runDesktopProcessErrFilter: errFilter{
+			matchStrings: []string{
+				"no mapping between account names and security ids was done",
+				"signal: killed",
+				"insufficient system resources exist to complete the requested service",
+				"no explorer process found",
+				"a specified logon session does not exist",
+				"this program is blocked by group policy",
+			},
+		},
 	}
 
 	runner.slogger = k.Slogger().With("component", "desktop_runner")
@@ -251,18 +264,10 @@ func (r *DesktopUsersProcessesRunner) Execute() error {
 	for {
 		// Check immediately on each iteration, avoiding the initial ticker delay
 		if err := r.runConsoleUserDesktop(); err != nil {
-
-			if errors.Is(err, NoExplorerProcessError{}) {
-				r.slogger.Log(context.TODO(), slog.LevelDebug,
-					"no explorer proc, user may not have desktop session",
-					"err", err,
-				)
-			} else {
-				r.slogger.Log(context.TODO(), slog.LevelError,
-					"could not run console user desktop process",
-					"err", err,
-				)
-			}
+			r.slogger.Log(context.TODO(), r.runDesktopProcessErrFilter.filter(err),
+				"could not run console user desktop process",
+				"err", err,
+			)
 		}
 
 		select {
