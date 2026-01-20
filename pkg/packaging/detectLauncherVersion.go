@@ -27,7 +27,7 @@ func (p *PackageOptions) detectLauncherVersion(ctx context.Context) error {
 
 	// Sometimes there are logs before the actual version output, so we want to check all lines
 	var version string
-	versionOutputLines := strings.SplitSeq(strings.ReplaceAll(string(stdout), "\r\n", "\n"), "\n")
+	versionOutputLines := strings.SplitSeq(strings.ReplaceAll(stdout, "\r\n", "\n"), "\n")
 	for line := range versionOutputLines {
 		if after, ok := strings.CutPrefix(line, "launcher - version"); ok {
 			version = strings.TrimSpace(after)
@@ -36,7 +36,7 @@ func (p *PackageOptions) detectLauncherVersion(ctx context.Context) error {
 	}
 
 	if version == "" {
-		return fmt.Errorf("unable to parse launcher version from output `%s`", string(stdout))
+		return fmt.Errorf("unable to parse launcher version from output `%s`", stdout)
 	}
 
 	level.Debug(logger).Log("msg", "formatting version string for target platform", "origVersion", version, "platform", p.target.Platform)
