@@ -34,7 +34,6 @@ import (
 	"math"
 
 	"github.com/kolide/goleveldb/leveldb/comparer"
-	"github.com/kolide/launcher/ee/observability"
 )
 
 // const values are defined here: https://source.chromium.org/chromium/chromium/src/+/main:content/browser/indexed_db/indexed_db_leveldb_coding.cc
@@ -129,24 +128,21 @@ func (prefix *keyPrefix) Type() int {
 }
 
 func (c *idbCmp1Comparer) Compare(a, b []byte) int {
-	ctx, span := observability.StartSpan(context.TODO())
-	defer span.End()
-
 	slogger := c.slogger.With(
 		"key_a", fmt.Sprintf("%x", a),
 		"key_b", fmt.Sprintf("%x", b),
 	)
 
-	aWithoutPrefix, prefixA, err := decodeKeyPrefix(ctx, a)
+	aWithoutPrefix, prefixA, err := decodeKeyPrefix(a)
 	if err != nil {
-		slogger.Log(ctx, slog.LevelError,
+		slogger.Log(context.TODO(), slog.LevelError,
 			"error decoding key prefix a",
 			"err", err,
 		)
 		return 0
 	}
 
-	bWithoutPrefix, prefixB, err := decodeKeyPrefix(ctx, b)
+	bWithoutPrefix, prefixB, err := decodeKeyPrefix(b)
 	if err != nil {
 		slogger.Log(context.TODO(), slog.LevelError,
 			"error decoding key prefix b",
@@ -157,7 +153,7 @@ func (c *idbCmp1Comparer) Compare(a, b []byte) int {
 
 	// Compare the key prefixes. this should be the end of the comparison for any keys which belong to
 	// a separate database, object store, or index
-	if ret := compareKeyPrefix(ctx, prefixA, prefixB); ret != 0 {
+	if ret := compareKeyPrefix(prefixA, prefixB); ret != 0 {
 		return ret
 	}
 
@@ -190,11 +186,11 @@ func (c *idbCmp1Comparer) Compare(a, b []byte) int {
 			if len(aWithoutPrefix) == 0 || len(bWithoutPrefix) == 0 {
 				return cmp.Compare(len(aWithoutPrefix), len(bWithoutPrefix))
 			}
-			_, databaseIdA, err := c.decodeVarInt(ctx, aWithoutPrefix)
+			_, databaseIdA, err := c.decodeVarInt(aWithoutPrefix)
 			if err != nil {
 				return 0 // error already logged by decodeVarInt
 			}
-			_, databaseIdB, err := c.decodeVarInt(ctx, bWithoutPrefix)
+			_, databaseIdB, err := c.decodeVarInt(bWithoutPrefix)
 			if err != nil {
 				return 0 // error already logged by decodeVarInt
 			}
@@ -203,7 +199,7 @@ func (c *idbCmp1Comparer) Compare(a, b []byte) int {
 			if len(aWithoutPrefix) == 0 || len(bWithoutPrefix) == 0 {
 				return cmp.Compare(len(aWithoutPrefix), len(bWithoutPrefix))
 			}
-			aPostString, bPostString, ret, err := c.compareStringWithLength(ctx, aWithoutPrefix, bWithoutPrefix)
+			aPostString, bPostString, ret, err := c.compareStringWithLength(aWithoutPrefix, bWithoutPrefix)
 			if err != nil {
 				return 0 // error already logged by compareStringWithLength via decodeVarInt
 			}
@@ -218,7 +214,7 @@ func (c *idbCmp1Comparer) Compare(a, b []byte) int {
 			if len(aPostString) == 0 || len(bPostString) == 0 {
 				return cmp.Compare(len(aPostString), len(bPostString))
 			}
-			_, _, ret, err = c.compareStringWithLength(ctx, aPostString, bPostString)
+			_, _, ret, err = c.compareStringWithLength(aPostString, bPostString)
 			if err != nil {
 				return 0 // error already logged by compareStringWithLength via decodeVarInt
 			}
@@ -251,11 +247,11 @@ func (c *idbCmp1Comparer) Compare(a, b []byte) int {
 			if len(aWithoutPrefix) == 0 || len(bWithoutPrefix) == 0 {
 				return cmp.Compare(len(aWithoutPrefix), len(bWithoutPrefix))
 			}
-			aPostObjectStoreId, objectStoreIdA, err := c.decodeVarInt(ctx, aWithoutPrefix)
+			aPostObjectStoreId, objectStoreIdA, err := c.decodeVarInt(aWithoutPrefix)
 			if err != nil {
 				return 0 // error already logged by decodeVarInt
 			}
-			bPostObjectStoreId, objectStoreIdB, err := c.decodeVarInt(ctx, bWithoutPrefix)
+			bPostObjectStoreId, objectStoreIdB, err := c.decodeVarInt(bWithoutPrefix)
 			if err != nil {
 				return 0 // error already logged by decodeVarInt
 			}
@@ -274,11 +270,11 @@ func (c *idbCmp1Comparer) Compare(a, b []byte) int {
 			if len(aWithoutPrefix) == 0 || len(bWithoutPrefix) == 0 {
 				return cmp.Compare(len(aWithoutPrefix), len(bWithoutPrefix))
 			}
-			a, objectStoreIdA, err := c.decodeVarInt(ctx, aWithoutPrefix)
+			a, objectStoreIdA, err := c.decodeVarInt(aWithoutPrefix)
 			if err != nil {
 				return 0 // error already logged by decodeVarInt
 			}
-			b, objectStoreIdB, err := c.decodeVarInt(ctx, bWithoutPrefix)
+			b, objectStoreIdB, err := c.decodeVarInt(bWithoutPrefix)
 			if err != nil {
 				return 0 // error already logged by decodeVarInt
 			}
@@ -289,11 +285,11 @@ func (c *idbCmp1Comparer) Compare(a, b []byte) int {
 			if len(a) == 0 || len(b) == 0 {
 				return cmp.Compare(len(a), len(b))
 			}
-			a, indexIdA, err := c.decodeVarInt(ctx, a)
+			a, indexIdA, err := c.decodeVarInt(a)
 			if err != nil {
 				return 0 // error already logged by decodeVarInt
 			}
-			b, indexIdB, err := c.decodeVarInt(ctx, b)
+			b, indexIdB, err := c.decodeVarInt(b)
 			if err != nil {
 				return 0 // error already logged by decodeVarInt
 			}
@@ -309,11 +305,11 @@ func (c *idbCmp1Comparer) Compare(a, b []byte) int {
 			if len(aWithoutPrefix) == 0 || len(bWithoutPrefix) == 0 {
 				return cmp.Compare(len(aWithoutPrefix), len(bWithoutPrefix))
 			}
-			_, objectStoreIdA, err := c.decodeVarInt(ctx, aWithoutPrefix)
+			_, objectStoreIdA, err := c.decodeVarInt(aWithoutPrefix)
 			if err != nil {
 				return 0 // error already logged by decodeVarInt
 			}
-			_, objectStoreIdB, err := c.decodeVarInt(ctx, bWithoutPrefix)
+			_, objectStoreIdB, err := c.decodeVarInt(bWithoutPrefix)
 			if err != nil {
 				return 0 // error already logged by decodeVarInt
 			}
@@ -322,11 +318,11 @@ func (c *idbCmp1Comparer) Compare(a, b []byte) int {
 			if len(aWithoutPrefix) == 0 || len(bWithoutPrefix) == 0 {
 				return cmp.Compare(len(aWithoutPrefix), len(bWithoutPrefix))
 			}
-			a, objectStoreIdA, err := c.decodeVarInt(ctx, aWithoutPrefix)
+			a, objectStoreIdA, err := c.decodeVarInt(aWithoutPrefix)
 			if err != nil {
 				return 0 // error already logged by decodeVarInt
 			}
-			b, objectStoreIdB, err := c.decodeVarInt(ctx, bWithoutPrefix)
+			b, objectStoreIdB, err := c.decodeVarInt(bWithoutPrefix)
 			if err != nil {
 				return 0 // error already logged by decodeVarInt
 			}
@@ -337,11 +333,11 @@ func (c *idbCmp1Comparer) Compare(a, b []byte) int {
 			if len(a) == 0 || len(b) == 0 {
 				return cmp.Compare(len(a), len(b))
 			}
-			_, indexIdA, err := c.decodeVarInt(ctx, a)
+			_, indexIdA, err := c.decodeVarInt(a)
 			if err != nil {
 				return 0 // error already logged by decodeVarInt
 			}
-			_, indexIdB, err := c.decodeVarInt(ctx, b)
+			_, indexIdB, err := c.decodeVarInt(b)
 			if err != nil {
 				return 0 // error already logged by decodeVarInt
 			}
@@ -350,7 +346,7 @@ func (c *idbCmp1Comparer) Compare(a, b []byte) int {
 			if len(aWithoutPrefix) == 0 || len(bWithoutPrefix) == 0 {
 				return cmp.Compare(len(aWithoutPrefix), len(bWithoutPrefix))
 			}
-			_, _, ret, err := c.compareStringWithLength(ctx, aWithoutPrefix, bWithoutPrefix)
+			_, _, ret, err := c.compareStringWithLength(aWithoutPrefix, bWithoutPrefix)
 			if err != nil {
 				return 0 // error already logged by compareStringWithLength via decodeVarInt
 			}
@@ -359,11 +355,11 @@ func (c *idbCmp1Comparer) Compare(a, b []byte) int {
 			if len(aWithoutPrefix) == 0 || len(bWithoutPrefix) == 0 {
 				return cmp.Compare(len(aWithoutPrefix), len(bWithoutPrefix))
 			}
-			a, objectStoreIdA, err := c.decodeVarInt(ctx, aWithoutPrefix)
+			a, objectStoreIdA, err := c.decodeVarInt(aWithoutPrefix)
 			if err != nil {
 				return 0 // error already logged by decodeVarInt
 			}
-			b, objectStoreIdB, err := c.decodeVarInt(ctx, bWithoutPrefix)
+			b, objectStoreIdB, err := c.decodeVarInt(bWithoutPrefix)
 			if err != nil {
 				return 0 // error already logged by decodeVarInt
 			}
@@ -374,7 +370,7 @@ func (c *idbCmp1Comparer) Compare(a, b []byte) int {
 			if len(a) == 0 || len(b) == 0 {
 				return cmp.Compare(len(a), len(b))
 			}
-			_, _, ret, err := c.compareStringWithLength(ctx, a, b)
+			_, _, ret, err := c.compareStringWithLength(a, b)
 			if err != nil {
 				return 0 // error already logged by compareStringWithLength via decodeVarInt
 			}
@@ -387,7 +383,7 @@ func (c *idbCmp1Comparer) Compare(a, b []byte) int {
 			return 0
 		}
 	case objectStoreData:
-		_, _, ret, err := c.compareEncodedIDBKeys(ctx, aWithoutPrefix, bWithoutPrefix)
+		_, _, ret, err := c.compareEncodedIDBKeys(aWithoutPrefix, bWithoutPrefix)
 		if err != nil {
 			c.slogger.Log(context.TODO(), slog.LevelError,
 				"encountered error comparing encoded IDB keys",
@@ -397,7 +393,7 @@ func (c *idbCmp1Comparer) Compare(a, b []byte) int {
 		}
 		return ret
 	case existsEntry:
-		_, _, ret, err := c.compareEncodedIDBKeys(ctx, aWithoutPrefix, bWithoutPrefix)
+		_, _, ret, err := c.compareEncodedIDBKeys(aWithoutPrefix, bWithoutPrefix)
 		if err != nil {
 			c.slogger.Log(context.TODO(), slog.LevelError,
 				"encountered error comparing encoded IDB keys",
@@ -407,7 +403,7 @@ func (c *idbCmp1Comparer) Compare(a, b []byte) int {
 		}
 		return ret
 	case blobEntry:
-		_, _, ret, err := c.compareEncodedIDBKeys(ctx, aWithoutPrefix, bWithoutPrefix)
+		_, _, ret, err := c.compareEncodedIDBKeys(aWithoutPrefix, bWithoutPrefix)
 		if err != nil {
 			c.slogger.Log(context.TODO(), slog.LevelError,
 				"encountered error comparing encoded IDB keys",
@@ -417,7 +413,7 @@ func (c *idbCmp1Comparer) Compare(a, b []byte) int {
 		}
 		return ret
 	case indexData:
-		a, b, ret, err := c.compareEncodedIDBKeys(ctx, aWithoutPrefix, bWithoutPrefix)
+		a, b, ret, err := c.compareEncodedIDBKeys(aWithoutPrefix, bWithoutPrefix)
 		if err != nil {
 			c.slogger.Log(context.TODO(), slog.LevelError,
 				"encountered error comparing encoded IDB keys",
@@ -432,13 +428,13 @@ func (c *idbCmp1Comparer) Compare(a, b []byte) int {
 		sequenceNumberA := int64(-1)
 		sequenceNumberB := int64(-1)
 		if len(a) > 0 {
-			a, sequenceNumberA, err = c.decodeVarInt(ctx, a)
+			a, sequenceNumberA, err = c.decodeVarInt(a)
 			if err != nil {
 				return 0 // error already logged by decodeVarInt
 			}
 		}
 		if len(b) > 0 {
-			b, sequenceNumberB, err = c.decodeVarInt(ctx, b)
+			b, sequenceNumberB, err = c.decodeVarInt(b)
 			if err != nil {
 				return 0 // error already logged by decodeVarInt
 			}
@@ -447,7 +443,7 @@ func (c *idbCmp1Comparer) Compare(a, b []byte) int {
 		if len(a) == 0 || len(b) == 0 {
 			return cmp.Compare(len(a), len(b))
 		}
-		_, _, ret, err = c.compareEncodedIDBKeys(ctx, a, b)
+		_, _, ret, err = c.compareEncodedIDBKeys(a, b)
 		if err != nil {
 			c.slogger.Log(context.TODO(), slog.LevelError,
 				"encountered error comparing encoded IDB keys",
@@ -487,10 +483,7 @@ func (c *idbCmp1Comparer) Successor(dst, b []byte) []byte {
 // Returns the remaining bytes after the decoded integer, the decoded int64 value, and any error.
 // Returns an error if the input contains an invalid variable-length integer encoding.
 // see https://chromium.googlesource.com/chromium/src/+/main/content/browser/indexed_db/docs/leveldb_coding_scheme.md#primitive-types
-func (c *idbCmp1Comparer) decodeVarInt(ctx context.Context, a []byte) ([]byte, int64, error) {
-	ctx, span := observability.StartSpan(ctx)
-	defer span.End()
-
+func (c *idbCmp1Comparer) decodeVarInt(a []byte) ([]byte, int64, error) {
 	v := uint64(0)
 	for i := 0; i < len(a) && i < 9; i++ {
 		v |= uint64(a[i]&0x7f) << (7 * i)
@@ -499,7 +492,7 @@ func (c *idbCmp1Comparer) decodeVarInt(ctx context.Context, a []byte) ([]byte, i
 		}
 	}
 
-	c.slogger.Log(ctx, slog.LevelError,
+	c.slogger.Log(context.TODO(), slog.LevelError,
 		"invalid key provided for decodeVarInt",
 		"invalid_key", fmt.Sprintf("%x", a),
 	)
@@ -507,16 +500,13 @@ func (c *idbCmp1Comparer) decodeVarInt(ctx context.Context, a []byte) ([]byte, i
 	return nil, 0, fmt.Errorf("invalid key provided for decodeVarInt: %x", a)
 }
 
-func (c *idbCmp1Comparer) compareBinary(ctx context.Context, a, b []byte) ([]byte, []byte, int, error) {
-	ctx, span := observability.StartSpan(ctx)
-	defer span.End()
-
-	a, lenA, err := c.decodeVarInt(ctx, a)
+func (c *idbCmp1Comparer) compareBinary(a, b []byte) ([]byte, []byte, int, error) {
+	a, lenA, err := c.decodeVarInt(a)
 	if err != nil {
 		return nil, nil, 0, err
 	}
 
-	b, lenB, err := c.decodeVarInt(ctx, b)
+	b, lenB, err := c.decodeVarInt(b)
 	if err != nil {
 		return nil, nil, 0, err
 	}
@@ -537,12 +527,9 @@ func (c *idbCmp1Comparer) compareBinary(ctx context.Context, a, b []byte) ([]byt
 // converts them from their native endian representation to float64 values,
 // and returns the remaining bytes along with the comparison result.
 // Returns an error if either input slice is less than 8 bytes.
-func (c *idbCmp1Comparer) compareDouble(ctx context.Context, a, b []byte) ([]byte, []byte, int, error) {
-	ctx, span := observability.StartSpan(ctx)
-	defer span.End()
-
+func (c *idbCmp1Comparer) compareDouble(a, b []byte) ([]byte, []byte, int, error) {
 	if len(a) < 8 || len(b) < 8 {
-		c.slogger.Log(ctx, slog.LevelError,
+		c.slogger.Log(context.TODO(), slog.LevelError,
 			"invalid keys provided for compareDouble (must be at least 8 bytes)",
 			"key_len_a", len(a),
 			"key_len_b", len(b),
@@ -556,10 +543,7 @@ func (c *idbCmp1Comparer) compareDouble(ctx context.Context, a, b []byte) ([]byt
 	return a[8:], b[8:], cmp.Compare(f1, f2), nil
 }
 
-func (c *idbCmp1Comparer) compareEncodedIDBKeys(ctx context.Context, a, b []byte) ([]byte, []byte, int, error) {
-	ctx, span := observability.StartSpan(ctx)
-	defer span.End()
-
+func (c *idbCmp1Comparer) compareEncodedIDBKeys(a, b []byte) ([]byte, []byte, int, error) {
 	if len(a) == 0 || len(b) == 0 {
 		return a, b, cmp.Compare(len(a), len(b)), nil
 	}
@@ -579,11 +563,11 @@ func (c *idbCmp1Comparer) compareEncodedIDBKeys(ctx context.Context, a, b []byte
 		if len(a) == 0 || len(b) == 0 {
 			return a, b, cmp.Compare(len(a), len(b)), nil
 		}
-		a, lenA, err := c.decodeVarInt(ctx, a)
+		a, lenA, err := c.decodeVarInt(a)
 		if err != nil {
 			return nil, nil, 0, fmt.Errorf("decoding key a (%x) as varInt: %w", a, err)
 		}
-		b, lenB, err := c.decodeVarInt(ctx, b)
+		b, lenB, err := c.decodeVarInt(b)
 		if err != nil {
 			return nil, nil, 0, fmt.Errorf("decoding key b (%x) as varInt: %w", b, err)
 		}
@@ -591,7 +575,7 @@ func (c *idbCmp1Comparer) compareEncodedIDBKeys(ctx context.Context, a, b []byte
 			if len(a) == 0 || len(b) == 0 {
 				break
 			}
-			a, b, ret, err = c.compareEncodedIDBKeys(ctx, a, b)
+			a, b, ret, err = c.compareEncodedIDBKeys(a, b)
 			if err != nil {
 				return nil, nil, 0, fmt.Errorf("recursively comparing encodedIdbKeys: %w", err)
 			}
@@ -604,17 +588,17 @@ func (c *idbCmp1Comparer) compareEncodedIDBKeys(ctx context.Context, a, b []byte
 		if len(a) == 0 || len(b) == 0 {
 			return a, b, cmp.Compare(len(a), len(b)), nil
 		}
-		return c.compareBinary(ctx, a, b)
+		return c.compareBinary(a, b)
 	case indexedDBKeyStringTypeByte:
 		if len(a) == 0 || len(b) == 0 {
 			return a, b, cmp.Compare(len(a), len(b)), nil
 		}
-		return c.compareStringWithLength(ctx, a, b)
+		return c.compareStringWithLength(a, b)
 	case indexedDBKeyDateTypeByte, indexedDBKeyNumberTypeByte:
 		if len(a) == 0 || len(b) == 0 {
 			return a, b, cmp.Compare(len(a), len(b)), nil
 		}
-		return c.compareDouble(ctx, a, b)
+		return c.compareDouble(a, b)
 	default:
 		return nil, nil, 0, fmt.Errorf("invalid keyTypeByte provided for compareEncodedIDBKeys: %d", typeByte)
 	}
@@ -626,17 +610,14 @@ func (c *idbCmp1Comparer) compareEncodedIDBKeys(ctx context.Context, a, b []byte
 // Returns the remaining bytes after the strings, and the comparison result.
 // If either key has insufficient bytes for its declared length, compares available bytes
 // and falls back to comparing the length values themselves.
-func (c *idbCmp1Comparer) compareStringWithLength(ctx context.Context, a, b []byte) ([]byte, []byte, int, error) {
-	ctx, span := observability.StartSpan(ctx)
-	defer span.End()
-
-	a, v1, err := c.decodeVarInt(ctx, a)
+func (c *idbCmp1Comparer) compareStringWithLength(a, b []byte) ([]byte, []byte, int, error) {
+	a, v1, err := c.decodeVarInt(a)
 	if err != nil {
 		return nil, nil, 0, fmt.Errorf("decoding key a (%x) as varInt: %w", a, err)
 	}
 
 	lenA := 2 * uint64(v1)
-	b, v2, err := c.decodeVarInt(ctx, b)
+	b, v2, err := c.decodeVarInt(b)
 	if err != nil {
 		return nil, nil, 0, fmt.Errorf("decoding key b (%x) as varInt: %w", b, err)
 	}
@@ -653,10 +634,7 @@ func (c *idbCmp1Comparer) compareStringWithLength(ctx context.Context, a, b []by
 	return a[lenA:], b[lenB:], bytes.Compare(a[:lenA], b[:lenB]), nil
 }
 
-func compareKeyPrefix(ctx context.Context, a, b *keyPrefix) int {
-	_, span := observability.StartSpan(ctx)
-	defer span.End()
-
+func compareKeyPrefix(a, b *keyPrefix) int {
 	if ret := cmp.Compare(a.DatabaseId, b.DatabaseId); ret != 0 {
 		return ret
 	}
@@ -671,10 +649,7 @@ func compareKeyPrefix(ctx context.Context, a, b *keyPrefix) int {
 
 // decodeInt - see https://chromium.googlesource.com/chromium/src/+/main/content/browser/indexed_db/docs/leveldb_coding_scheme.md#primitive-types
 // int64_t >= 0; 8 bytes in little-endian order
-func decodeInt(ctx context.Context, a []byte) (int64, error) {
-	_, span := observability.StartSpan(ctx)
-	defer span.End()
-
+func decodeInt(a []byte) (int64, error) {
 	if len(a) == 0 || len(a) > 8 {
 		return 0, fmt.Errorf("invalid byte length for decodeInt: len=%d", len(a))
 	}
@@ -689,10 +664,7 @@ func decodeInt(ctx context.Context, a []byte) (int64, error) {
 // It parses the first byte to determine the lengths of database ID, object store ID, and index ID fields,
 // then decodes each field and returns the remaining bytes along with the decoded keyPrefix struct.
 // Returns an error if the input is empty or has insufficient length for the expected prefix structure.
-func decodeKeyPrefix(ctx context.Context, a []byte) ([]byte, *keyPrefix, error) {
-	ctx, span := observability.StartSpan(ctx)
-	defer span.End()
-
+func decodeKeyPrefix(a []byte) ([]byte, *keyPrefix, error) {
 	if len(a) == 0 {
 		return nil, nil, errors.New("invalid empty key provided to decodeKeyPrefix")
 	}
@@ -719,19 +691,19 @@ func decodeKeyPrefix(ctx context.Context, a []byte) ([]byte, *keyPrefix, error) 
 		)
 	}
 
-	databaseId, err := decodeInt(ctx, a[:databaseIdBytes])
+	databaseId, err := decodeInt(a[:databaseIdBytes])
 	if err != nil {
 		return nil, nil, fmt.Errorf("decoding database ID as int: %w", err)
 	}
 	a = a[databaseIdBytes:]
 
-	objectStoreId, err := decodeInt(ctx, a[:objectStoreIdBytes])
+	objectStoreId, err := decodeInt(a[:objectStoreIdBytes])
 	if err != nil {
 		return nil, nil, fmt.Errorf("decoding object store ID as int: %w", err)
 	}
 	a = a[objectStoreIdBytes:]
 
-	indexId, err := decodeInt(ctx, a[:indexIdBytes])
+	indexId, err := decodeInt(a[:indexIdBytes])
 	if err != nil {
 		return nil, nil, fmt.Errorf("decoding index ID as int: %w", err)
 	}
