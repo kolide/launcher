@@ -55,10 +55,7 @@ type chromeProfileInfo struct {
 	Email     string `json:"user_name"`
 }
 
-func (c *chromeUserProfilesTable) generateForPath(ctx context.Context, fileInfo userFileInfo) ([]map[string]string, error) {
-	_, span := observability.StartSpan(ctx, "path", fileInfo.path)
-	defer span.End()
-
+func (c *chromeUserProfilesTable) generateForPath(fileInfo userFileInfo) ([]map[string]string, error) {
 	var results []map[string]string
 	data, err := os.ReadFile(fileInfo.path)
 	if err != nil {
@@ -102,7 +99,7 @@ func (c *chromeUserProfilesTable) generate(ctx context.Context, queryContext tab
 			continue
 		}
 		for _, file := range userFiles {
-			res, err := c.generateForPath(ctx, file)
+			res, err := c.generateForPath(file)
 			if err != nil {
 				c.slogger.Log(ctx, slog.LevelInfo,
 					"generating user profile result",

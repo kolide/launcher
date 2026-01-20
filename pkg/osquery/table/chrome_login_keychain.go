@@ -35,9 +35,6 @@ type ChromeLoginKeychain struct {
 }
 
 func (c *ChromeLoginKeychain) generateForPath(ctx context.Context, path string) ([]map[string]string, error) {
-	_, span := observability.StartSpan(ctx, "path", path)
-	defer span.End()
-
 	dir, err := agent.MkdirTemp("kolide_chrome_login_keychain")
 	if err != nil {
 		return nil, fmt.Errorf("creating kolide_chrome_login_keychain tmp dir: %w", err)
