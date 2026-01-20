@@ -2,7 +2,6 @@ package packaging
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -26,12 +25,18 @@ func (p *PackageOptions) detectLauncherVersion(ctx context.Context) error {
 		return fmt.Errorf("failed to exec -- possibly can't autodetect while cross compiling: out `%s`: %w", stdout, err)
 	}
 
-	stdoutSplit := strings.Split(stdout, "\n")
-	versionLine := strings.Split(stdoutSplit[0], " ")
-	version := versionLine[len(versionLine)-1]
+	// Sometimes there are logs before the actual version output, so we want to check all lines
+	var version string
+	versionOutputLines := strings.SplitSeq(strings.ReplaceAll(string(stdout), "\r\n", "\n"), "\n")
+	for line := range versionOutputLines {
+		if after, ok := strings.CutPrefix(line, "launcher - version"); ok {
+			version = strings.TrimSpace(after)
+			break
+		}
+	}
 
 	if version == "" {
-		return errors.New("unable to parse launcher version")
+		return fmt.Errorf("unable to parse launcher version from output `%s`", string(stdout))
 	}
 
 	level.Debug(logger).Log("msg", "formatting version string for target platform", "origVersion", version, "platform", p.target.Platform)
