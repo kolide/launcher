@@ -28,6 +28,11 @@ type FlareConsumer struct {
 	slogger        *slog.Logger
 }
 
+//mockery:generate: true
+//mockery:dir: ee/control/consumers/flareconsumer/mocks
+//mockery:filename: flarer.go
+//mockery:pkgname: mocks
+//mockery:structname: Flarer
 type flarer interface {
 	RunFlare(ctx context.Context, k types.Knapsack, flareStream io.WriteCloser) error
 }

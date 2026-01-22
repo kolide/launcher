@@ -52,6 +52,12 @@ type subscriber interface {
 
 // dataProvider is an interface for something that can retrieve control data. Authentication, HTTP,
 // file system access, etc. lives below this abstraction layer.
+//
+//mockery:generate: true
+//mockery:dir: ee/control/mocks
+//mockery:filename: data_provider.go
+//mockery:pkgname: mocks
+//mockery:structname: DataProvider
 type dataProvider interface {
 	GetConfig(ctx context.Context) (io.Reader, error)
 	GetSubsystemData(ctx context.Context, hash string) (io.Reader, error)

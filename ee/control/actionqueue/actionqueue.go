@@ -22,6 +22,11 @@ const (
 	actionRetentionPeriod = time.Hour * 24 * 30 * 6
 )
 
+//mockery:generate: true
+//mockery:dir: ee/control/actionqueue/mocks
+//mockery:filename: actor.go
+//mockery:pkgname: mocks
+//mockery:structname: Actor
 type actor interface {
 	Do(data io.Reader) error
 }
