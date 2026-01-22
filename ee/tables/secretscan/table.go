@@ -30,9 +30,8 @@ const (
 )
 
 type Table struct {
-	slogger   *slog.Logger
-	config    config.Config
-	configErr error
+	slogger *slog.Logger
+	config  config.Config
 }
 
 func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
@@ -48,35 +47,24 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		table.TextColumn("redacted_context"),
 	}
 
-	var cfg config.Config
-	var configErr error
-
-	tempDetector, err := detect.NewDetectorDefaultConfig()
+	detector, err := detect.NewDetectorDefaultConfig()
 	if err != nil {
-		configErr = err
 		slogger.Log(context.TODO(), slog.LevelError,
-			"failed to create gitleaks config, table will return errors when queried",
+			"failed to create gitleaks default config, table will not be available",
 			"err", err,
 		)
-	} else {
-		cfg = tempDetector.Config
+		return nil
 	}
 
 	t := &Table{
-		slogger:   slogger.With("table", tableName),
-		config:    cfg,
-		configErr: configErr,
+		slogger: slogger.With("table", tableName),
+		config:  detector.Config,
 	}
 
 	return tablewrapper.New(flags, slogger, tableName, columns, t.generate)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-
-	if t.configErr != nil {
-		return nil, fmt.Errorf("gitleaks config not available: %w", t.configErr)
-	}
-
 	// Fresh detector per query - gitleaks accumulates findings internally
 	detector := detect.NewDetector(t.config)
 
