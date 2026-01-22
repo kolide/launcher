@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/fatih/semgroup"
 	"github.com/kolide/launcher/ee/agent/types"
@@ -29,6 +30,25 @@ const (
 	redactPrefixLength = 3
 )
 
+// Shared config to avoid concurrent viper initialization issues (gitleaks uses viper internally)
+var (
+	sharedConfig     config.Config
+	sharedConfigOnce sync.Once
+	sharedConfigErr  error
+)
+
+func getSharedConfig() (config.Config, error) {
+	sharedConfigOnce.Do(func() {
+		detector, err := detect.NewDetectorDefaultConfig()
+		if err != nil {
+			sharedConfigErr = err
+			return
+		}
+		sharedConfig = detector.Config
+	})
+	return sharedConfig, sharedConfigErr
+}
+
 type Table struct {
 	slogger *slog.Logger
 	config  config.Config
@@ -47,7 +67,7 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		table.TextColumn("redacted_context"),
 	}
 
-	detector, err := detect.NewDetectorDefaultConfig()
+	cfg, err := getSharedConfig()
 	if err != nil {
 		slogger.Log(context.TODO(), slog.LevelError,
 			"failed to create gitleaks default config, table will not be available",
@@ -58,7 +78,7 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 
 	t := &Table{
 		slogger: slogger.With("table", tableName),
-		config:  detector.Config,
+		config:  cfg,
 	}
 
 	return tablewrapper.New(flags, slogger, tableName, columns, t.generate)

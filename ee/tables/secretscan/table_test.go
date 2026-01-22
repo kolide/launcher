@@ -6,38 +6,16 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sync"
 	"testing"
 
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/zricethezav/gitleaks/v8/config"
-	"github.com/zricethezav/gitleaks/v8/detect"
 )
 
 //go:embed test_data/sample_project.zip
 var sampleProjectZip []byte
-
-// Shared config to avoid concurrent viper initialization issues
-var (
-	sharedConfig     config.Config
-	sharedConfigOnce sync.Once
-	sharedConfigErr  error
-)
-
-func getSharedConfig() (config.Config, error) {
-	sharedConfigOnce.Do(func() {
-		detector, err := detect.NewDetectorDefaultConfig()
-		if err != nil {
-			sharedConfigErr = err
-			return
-		}
-		sharedConfig = detector.Config
-	})
-	return sharedConfig, sharedConfigErr
-}
 
 func TestSecretScan(t *testing.T) {
 	t.Parallel()
