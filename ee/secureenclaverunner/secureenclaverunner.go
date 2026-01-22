@@ -50,6 +50,11 @@ type secureEnclaveRunner struct {
 	noConsoleUsersDelay time.Duration
 }
 
+//mockery:generate: true
+//mockery:dir: ee/secureenclaverunner/mocks
+//mockery:filename: secureEnclaveClient.go
+//mockery:pkgname: mocks
+//mockery:structname: SecureEnclaveClient
 type secureEnclaveClient interface {
 	CreateSecureEnclaveKey(ctx context.Context, uid string) (*ecdsa.PublicKey, error)
 	VerifySecureEnclaveKey(ctx context.Context, uid string, pubKey *ecdsa.PublicKey) (bool, error)
