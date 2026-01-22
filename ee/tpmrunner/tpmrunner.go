@@ -22,6 +22,19 @@ import (
 	"github.com/kolide/launcher/pkg/backoff"
 )
 
+// tpmSignerCreator is an interface for creating and loading TPM signers
+// useful for mocking in tests
+//
+//mockery:generate: true
+//mockery:dir: ee/tpmrunner/mocks
+//mockery:filename: tpmSignerCreator.go
+//mockery:pkgname: mocks
+//mockery:structname: TpmSignerCreator
+type tpmSignerCreator interface {
+	CreateKey(opts ...tpm.TpmSignerOption) (private []byte, public []byte, err error)
+	New(private, public []byte) (crypto.Signer, error)
+}
+
 type (
 	tpmRunner struct {
 		signer        crypto.Signer
@@ -32,13 +45,6 @@ type (
 		interrupt     chan struct{}
 		interrupted   atomic.Bool
 		machineHasTpm atomic.Bool
-	}
-
-	// tpmSignerCreator is an interface for creating and loading TPM signers
-	// useful for mocking in tests
-	tpmSignerCreator interface {
-		CreateKey(opts ...tpm.TpmSignerOption) (private []byte, public []byte, err error)
-		New(private, public []byte) (crypto.Signer, error)
 	}
 
 	// defaultTpmSignerCreator is the default implementation of tpmSignerCreator
