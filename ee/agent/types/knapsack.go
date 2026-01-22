@@ -4,6 +4,12 @@ import "context"
 
 // Knapsack is an inventory of data and useful services which are used throughout
 // launcher code and are typically valid for the lifetime of the launcher application instance.
+//
+//mockery:generate: true
+//mockery:dir: ee/agent/types/mocks
+//mockery:filename: knapsack.go
+//mockery:pkgname: mocks
+//mockery:structname: Knapsack
 type Knapsack interface {
 	Stores
 	BboltDB

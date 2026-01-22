@@ -8,7 +8,7 @@ type FlagKey string
 // 2. Add a getter and setter to the Flags interface (ee/agent/types/flags.go)
 // 3. Implement the getter and setter in the FlagController (ee/agent/flags/flag_controller.go), providing defaults, limits, and overrides
 // 4. Implement tests for any new APIs, sanitizers, limits, overrides.
-// 5. Update mocks -- in ee/agent/types, run `mockery --name Knapsack` and `mockery --name Flags`.
+// 5. Update mocks -- in the top-level launcher directory, run `mockery`.
 const (
 	KolideServerURL                  FlagKey = "hostname"
 	KolideHosted                     FlagKey = "kolide_hosted"
