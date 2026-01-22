@@ -4,7 +4,6 @@ package types
 //
 //mockery:generate: true
 //mockery:filename: logstore.go
-//mockery:structname: RowDeleter
 type RowDeleter interface {
 	DeleteRows(rowids ...any) error
 }
@@ -13,7 +12,6 @@ type RowDeleter interface {
 //
 //mockery:generate: true
 //mockery:filename: logstore.go
-//mockery:structname: TimestampedIterator
 type TimestampedIterator interface {
 	// ForEach executes a function for each timestamp/value pair in a store.
 	// If the provided function returns an error then the iteration is stopped and
@@ -26,7 +24,6 @@ type TimestampedIterator interface {
 //
 //mockery:generate: true
 //mockery:filename: logstore.go
-//mockery:structname: TimestampedAppender
 type TimestampedAppender interface {
 	// AppendValue takes the timestamp, and marshalled value for insertion as a new row
 	AppendValue(timestamp int64, value []byte) error
@@ -38,7 +35,6 @@ type TimestampedAppender interface {
 //
 //mockery:generate: true
 //mockery:filename: logstore.go
-//mockery:structname: TimestampedIteratorDeleterAppenderCloser
 type TimestampedIteratorDeleterAppenderCloser interface {
 	TimestampedIterator
 	TimestampedAppender
@@ -50,5 +46,4 @@ type TimestampedIteratorDeleterAppenderCloser interface {
 //
 //mockery:generate: true
 //mockery:filename: logstore.go
-//mockery:structname: LogStore
 type LogStore = TimestampedIteratorDeleterAppenderCloser

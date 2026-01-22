@@ -4,7 +4,6 @@ package types
 //
 //mockery:generate: true
 //mockery:filename: keyvalue_store.go
-//mockery:structname: Getter
 type Getter interface {
 	// Get retrieves the value for a key.
 	// Returns a nil value if the key does not exist.
@@ -15,7 +14,6 @@ type Getter interface {
 //
 //mockery:generate: true
 //mockery:filename: keyvalue_store.go
-//mockery:structname: Setter
 type Setter interface {
 	// Set sets the value for a key.
 	// If the key exist then its previous value will be overwritten.
@@ -27,7 +25,6 @@ type Setter interface {
 //
 //mockery:generate: true
 //mockery:filename: keyvalue_store.go
-//mockery:structname: Deleter
 type Deleter interface {
 	// Delete removes a key.
 	// If the key does not exist then nothing is done and a nil error is returned.
@@ -40,7 +37,6 @@ type Deleter interface {
 //
 //mockery:generate: true
 //mockery:filename: keyvalue_store.go
-//mockery:structname: Iterator
 type Iterator interface {
 	// ForEach executes a function for each key/value pair in a store.
 	// If the provided function returns an error then the iteration is stopped and
@@ -53,7 +49,6 @@ type Iterator interface {
 //
 //mockery:generate: true
 //mockery:filename: keyvalue_store.go
-//mockery:structname: Updater
 type Updater interface {
 	// Update takes a map of key-value pairs, and inserts
 	// these key-values into the store. Any preexisting keys in the store which
@@ -66,7 +61,6 @@ type Updater interface {
 //
 //mockery:generate: true
 //mockery:filename: keyvalue_store.go
-//mockery:structname: Counter
 type Counter interface {
 	// Count should return the total number of current key-value pairs
 	Count() (int, error)
@@ -77,7 +71,6 @@ type Counter interface {
 //
 //mockery:generate: true
 //mockery:filename: keyvalue_store.go
-//mockery:structname: Appender
 type Appender interface {
 	// AppendValues takes 1 or more ordered values
 	AppendValues(values ...[]byte) error
@@ -87,7 +80,6 @@ type Appender interface {
 //
 //mockery:generate: true
 //mockery:filename: keyvalue_store.go
-//mockery:structname: GetterSetter
 type GetterSetter interface {
 	Getter
 	Setter
@@ -95,7 +87,6 @@ type GetterSetter interface {
 
 //mockery:generate: true
 //mockery:filename: keyvalue_store.go
-//mockery:structname: Closer
 type Closer interface {
 	Close() error
 }
@@ -104,7 +95,6 @@ type Closer interface {
 //
 //mockery:generate: true
 //mockery:filename: keyvalue_store.go
-//mockery:structname: GetterCloser
 type GetterCloser interface {
 	Getter
 	Closer
@@ -114,7 +104,6 @@ type GetterCloser interface {
 //
 //mockery:generate: true
 //mockery:filename: keyvalue_store.go
-//mockery:structname: GetterUpdaterCloser
 type GetterUpdaterCloser interface {
 	Updater
 	GetterCloser
@@ -124,7 +113,6 @@ type GetterUpdaterCloser interface {
 //
 //mockery:generate: true
 //mockery:filename: keyvalue_store.go
-//mockery:structname: GetterSetterDeleter
 type GetterSetterDeleter interface {
 	Getter
 	Setter
@@ -135,7 +123,6 @@ type GetterSetterDeleter interface {
 //
 //mockery:generate: true
 //mockery:filename: keyvalue_store.go
-//mockery:structname: GetterSetterDeleterIterator
 type GetterSetterDeleterIterator interface {
 	Getter
 	Setter
@@ -147,7 +134,6 @@ type GetterSetterDeleterIterator interface {
 //
 //mockery:generate: true
 //mockery:filename: keyvalue_store.go
-//mockery:structname: GetterSetterDeleterIteratorUpdaterCounterAppender
 type GetterSetterDeleterIteratorUpdaterCounterAppender interface {
 	Getter
 	Setter
@@ -162,5 +148,4 @@ type GetterSetterDeleterIteratorUpdaterCounterAppender interface {
 //
 //mockery:generate: true
 //mockery:filename: keyvalue_store.go
-//mockery:structname: KVStore
 type KVStore = GetterSetterDeleterIteratorUpdaterCounterAppender

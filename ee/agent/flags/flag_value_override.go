@@ -11,7 +11,6 @@ import (
 //
 //mockery:generate: true
 //mockery:filename: flag_value_override.go
-//mockery:structname: FlagValueOverride
 type FlagValueOverride interface {
 	// Value gets the override value.
 	Value() any

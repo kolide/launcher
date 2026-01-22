@@ -44,7 +44,6 @@ type requestAcclerator interface {
 
 //mockery:generate: true
 //mockery:filename: messenger.go
-//mockery:structname: Messenger
 type Messenger interface {
 	SendMessage(method string, params any) error
 }

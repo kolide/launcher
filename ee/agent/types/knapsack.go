@@ -7,7 +7,6 @@ import "context"
 //
 //mockery:generate: true
 //mockery:filename: knapsack.go
-//mockery:structname: Knapsack
 type Knapsack interface {
 	Stores
 	BboltDB

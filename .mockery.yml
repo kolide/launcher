@@ -7,6 +7,7 @@ log-level: info
 pkgname: mocks
 recursive: true # Generate for all launcher packages
 require-template-schema-exists: true
+structname: "{{.InterfaceName}}"
 template-data:
   unroll-variadic: true # Required for consistent behavior with how previous version of mockery handled variadic args
 template: testify
