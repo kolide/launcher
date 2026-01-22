@@ -7,6 +7,12 @@ import (
 )
 
 // FlagsChangeObserver is an interface to be notified of changes to flags.
+//
+//mockery:generate: true
+//mockery:dir: ee/agent/types/mocks
+//mockery:filename: flags_change_observer.go
+//mockery:pkgname: mocks
+//mockery:structname: FlagsChangeObserver
 type FlagsChangeObserver interface {
 	// FlagsChanged tells the observer that flag changes have occurred.
 	FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey)

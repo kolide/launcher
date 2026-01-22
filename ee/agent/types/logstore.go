@@ -1,11 +1,23 @@
 package types
 
 // RowDeleter is an interface for deleting rows by rowid in a sql store
+//
+//mockery:generate: true
+//mockery:dir: ee/agent/types/mocks
+//mockery:filename: logstore.go
+//mockery:pkgname: mocks
+//mockery:structname: RowDeleter
 type RowDeleter interface {
 	DeleteRows(rowids ...any) error
 }
 
 // TimestampedIterator is a read-only interface for iterating timestamped data.
+//
+//mockery:generate: true
+//mockery:dir: ee/agent/types/mocks
+//mockery:filename: logstore.go
+//mockery:pkgname: mocks
+//mockery:structname: TimestampedIterator
 type TimestampedIterator interface {
 	// ForEach executes a function for each timestamp/value pair in a store.
 	// If the provided function returns an error then the iteration is stopped and
@@ -15,6 +27,12 @@ type TimestampedIterator interface {
 }
 
 // TimestampedAppender is an interface for supporting the addition of timestamped values to a store
+//
+//mockery:generate: true
+//mockery:dir: ee/agent/types/mocks
+//mockery:filename: logstore.go
+//mockery:pkgname: mocks
+//mockery:structname: TimestampedAppender
 type TimestampedAppender interface {
 	// AppendValue takes the timestamp, and marshalled value for insertion as a new row
 	AppendValue(timestamp int64, value []byte) error
@@ -23,6 +41,12 @@ type TimestampedAppender interface {
 // TimestampedIteratorDeleterAppenderCloser is an interface to support the storage and retrieval of
 // sets of timestamped values. This can be used where a strict key/value interface may not suffice,
 // e.g. for writing logs or historical records to sqlite
+//
+//mockery:generate: true
+//mockery:dir: ee/agent/types/mocks
+//mockery:filename: logstore.go
+//mockery:pkgname: mocks
+//mockery:structname: TimestampedIteratorDeleterAppenderCloser
 type TimestampedIteratorDeleterAppenderCloser interface {
 	TimestampedIterator
 	TimestampedAppender
@@ -31,4 +55,10 @@ type TimestampedIteratorDeleterAppenderCloser interface {
 }
 
 // LogStore is a convenient alias for a store that supports all methods required to manipulate sqlite logs
+//
+//mockery:generate: true
+//mockery:dir: ee/agent/types/mocks
+//mockery:filename: logstore.go
+//mockery:pkgname: mocks
+//mockery:structname: LogStore
 type LogStore = TimestampedIteratorDeleterAppenderCloser
