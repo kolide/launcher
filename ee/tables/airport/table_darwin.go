@@ -55,7 +55,6 @@ func (a *airportExecutor) Exec(option string) ([]byte, error) {
 }
 
 //mockery:generate: true
-//mockery:dir: ee/tables/airport/mocks
 //mockery:filename: executor.go
 //mockery:pkgname: mocks
 //mockery:structname: Executor

@@ -29,7 +29,6 @@ type FlareConsumer struct {
 }
 
 //mockery:generate: true
-//mockery:dir: ee/control/consumers/flareconsumer/mocks
 //mockery:filename: flarer.go
 //mockery:pkgname: mocks
 //mockery:structname: Flarer

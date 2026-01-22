@@ -22,7 +22,6 @@ type PresenceDetector struct {
 // just exists for testing purposes
 //
 //mockery:generate: true
-//mockery:dir: ee/presencedetection/mocks
 //mockery:filename: detectorIface.go
 //mockery:pkgname: mocks
 //mockery:structname: DetectorIface

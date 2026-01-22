@@ -20,7 +20,6 @@ type OsqueryHistorian interface {
 }
 
 //mockery:generate: true
-//mockery:dir: ee/agent/types/mocks
 //mockery:filename: querier.go
 //mockery:pkgname: mocks
 //mockery:structname: Querier

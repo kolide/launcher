@@ -1,4 +1,5 @@
 all: false # Only generate mocks when the `mockery:generate` directive is present
+dir: "{{.InterfaceDir}}/mocks"
 force-file-write: true # Overwrite files that already exist
 formatter: goimports
 generate: true # We use the generate directive

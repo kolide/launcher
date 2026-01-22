@@ -3,7 +3,6 @@ package types
 // Getter is an interface for getting data from a key/value store.
 //
 //mockery:generate: true
-//mockery:dir: ee/agent/types/mocks
 //mockery:filename: keyvalue_store.go
 //mockery:pkgname: mocks
 //mockery:structname: Getter
@@ -16,7 +15,6 @@ type Getter interface {
 // Setter is an interface for setting data in a key/value store.
 //
 //mockery:generate: true
-//mockery:dir: ee/agent/types/mocks
 //mockery:filename: keyvalue_store.go
 //mockery:pkgname: mocks
 //mockery:structname: Setter
@@ -30,7 +28,6 @@ type Setter interface {
 // Deleter is an interface for deleting data in a key/value store.
 //
 //mockery:generate: true
-//mockery:dir: ee/agent/types/mocks
 //mockery:filename: keyvalue_store.go
 //mockery:pkgname: mocks
 //mockery:structname: Deleter
@@ -45,7 +42,6 @@ type Deleter interface {
 // Iterator is an interface for iterating data in a key/value store.
 //
 //mockery:generate: true
-//mockery:dir: ee/agent/types/mocks
 //mockery:filename: keyvalue_store.go
 //mockery:pkgname: mocks
 //mockery:structname: Iterator
@@ -60,7 +56,6 @@ type Iterator interface {
 // Updater is an interface for bulk replacing data in a key/value store.
 //
 //mockery:generate: true
-//mockery:dir: ee/agent/types/mocks
 //mockery:filename: keyvalue_store.go
 //mockery:pkgname: mocks
 //mockery:structname: Updater
@@ -75,7 +70,6 @@ type Updater interface {
 // pairs held by the underlying storage methodology
 //
 //mockery:generate: true
-//mockery:dir: ee/agent/types/mocks
 //mockery:filename: keyvalue_store.go
 //mockery:pkgname: mocks
 //mockery:structname: Counter
@@ -88,7 +82,6 @@ type Counter interface {
 // implementations should generate keys to ensure an ordered iteration is possible
 //
 //mockery:generate: true
-//mockery:dir: ee/agent/types/mocks
 //mockery:filename: keyvalue_store.go
 //mockery:pkgname: mocks
 //mockery:structname: Appender
@@ -100,7 +93,6 @@ type Appender interface {
 // GetterSetter is an interface that groups the Get and Set methods.
 //
 //mockery:generate: true
-//mockery:dir: ee/agent/types/mocks
 //mockery:filename: keyvalue_store.go
 //mockery:pkgname: mocks
 //mockery:structname: GetterSetter
@@ -110,7 +102,6 @@ type GetterSetter interface {
 }
 
 //mockery:generate: true
-//mockery:dir: ee/agent/types/mocks
 //mockery:filename: keyvalue_store.go
 //mockery:pkgname: mocks
 //mockery:structname: Closer
@@ -121,7 +112,6 @@ type Closer interface {
 // GetterCloser extends the Getter interface with a Close method.
 //
 //mockery:generate: true
-//mockery:dir: ee/agent/types/mocks
 //mockery:filename: keyvalue_store.go
 //mockery:pkgname: mocks
 //mockery:structname: GetterCloser
@@ -133,7 +123,6 @@ type GetterCloser interface {
 // GetterUpdaterCloser groups the Get, Update, and Close methods.
 //
 //mockery:generate: true
-//mockery:dir: ee/agent/types/mocks
 //mockery:filename: keyvalue_store.go
 //mockery:pkgname: mocks
 //mockery:structname: GetterUpdaterCloser
@@ -145,7 +134,6 @@ type GetterUpdaterCloser interface {
 // GetterSetterDeleter is an interface that groups the Get, Set, and Delete methods.
 //
 //mockery:generate: true
-//mockery:dir: ee/agent/types/mocks
 //mockery:filename: keyvalue_store.go
 //mockery:pkgname: mocks
 //mockery:structname: GetterSetterDeleter
@@ -158,7 +146,6 @@ type GetterSetterDeleter interface {
 // GetterSetterDeleterIterator is an interface that groups the Get, Set, Delete, and ForEach methods.
 //
 //mockery:generate: true
-//mockery:dir: ee/agent/types/mocks
 //mockery:filename: keyvalue_store.go
 //mockery:pkgname: mocks
 //mockery:structname: GetterSetterDeleterIterator
@@ -172,7 +159,6 @@ type GetterSetterDeleterIterator interface {
 // GetterSetterDeleterIteratorUpdater is an interface that groups the Get, Set, Delete, ForEach, and Update methods.
 //
 //mockery:generate: true
-//mockery:dir: ee/agent/types/mocks
 //mockery:filename: keyvalue_store.go
 //mockery:pkgname: mocks
 //mockery:structname: GetterSetterDeleterIteratorUpdaterCounterAppender
@@ -189,7 +175,6 @@ type GetterSetterDeleterIteratorUpdaterCounterAppender interface {
 // Convenient alias for a key value store that supports all methods
 //
 //mockery:generate: true
-//mockery:dir: ee/agent/types/mocks
 //mockery:filename: keyvalue_store.go
 //mockery:pkgname: mocks
 //mockery:structname: KVStore

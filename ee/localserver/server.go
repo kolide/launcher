@@ -35,7 +35,6 @@ var PortList = []int{
 }
 
 //mockery:generate: true
-//mockery:dir: ee/localserver/mocks
 //mockery:filename: querier.go
 //mockery:pkgname: mocks
 //mockery:structname: Querier
@@ -67,7 +66,6 @@ const (
 )
 
 //mockery:generate: true
-//mockery:dir: ee/localserver/mocks
 //mockery:filename: presenceDetector.go
 //mockery:pkgname: mocks
 //mockery:structname: PresenceDetector

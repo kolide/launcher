@@ -78,7 +78,7 @@ type (
 )
 
 //mockery:generate: true
-//mockery:dir: ee/tuf
+//mockery:dir: "{{.InterfaceDir}}"
 //mockery:filename: mock_librarian_test.go
 //mockery:pkgname: tuf
 //mockery:structname: Mocklibrarian

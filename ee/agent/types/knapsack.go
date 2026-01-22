@@ -6,7 +6,6 @@ import "context"
 // launcher code and are typically valid for the lifetime of the launcher application instance.
 //
 //mockery:generate: true
-//mockery:dir: ee/agent/types/mocks
 //mockery:filename: knapsack.go
 //mockery:pkgname: mocks
 //mockery:structname: Knapsack

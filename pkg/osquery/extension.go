@@ -32,7 +32,6 @@ import (
 // settingsStoreWriter writes to our startup settings store
 //
 //mockery:generate: true
-//mockery:dir: pkg/osquery/mocks
 //mockery:filename: settings_store_writer.go
 //mockery:pkgname: mocks
 //mockery:structname: SettingsStoreWriter

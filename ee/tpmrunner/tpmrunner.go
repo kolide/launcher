@@ -26,7 +26,6 @@ import (
 // useful for mocking in tests
 //
 //mockery:generate: true
-//mockery:dir: ee/tpmrunner/mocks
 //mockery:filename: tpmSignerCreator.go
 //mockery:pkgname: mocks
 //mockery:structname: TpmSignerCreator

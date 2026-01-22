@@ -12,7 +12,6 @@ import (
 )
 
 //mockery:generate: true
-//mockery:dir: ee/debug/checkups/mocks
 //mockery:filename: HostResolver.go
 //mockery:pkgname: mocks
 //mockery:structname: HostResolver

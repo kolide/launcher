@@ -54,7 +54,6 @@ type subscriber interface {
 // file system access, etc. lives below this abstraction layer.
 //
 //mockery:generate: true
-//mockery:dir: ee/control/mocks
 //mockery:filename: data_provider.go
 //mockery:pkgname: mocks
 //mockery:structname: DataProvider

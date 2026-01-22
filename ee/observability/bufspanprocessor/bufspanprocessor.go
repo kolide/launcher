@@ -12,7 +12,6 @@ import (
 // childSpanProcessor is a wrapper around sdktrace.SpanProcessor for testing
 //
 //mockery:generate: true
-//mockery:dir: ee/observability/bufspanprocessor/mocks
 //mockery:filename: span_processor.go
 //mockery:pkgname: mocks
 //mockery:structname: SpanProcessor

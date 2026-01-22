@@ -43,7 +43,6 @@ type requestAcclerator interface {
 }
 
 //mockery:generate: true
-//mockery:dir: ee/desktop/runner/server/mocks
 //mockery:filename: messenger.go
 //mockery:pkgname: mocks
 //mockery:structname: Messenger

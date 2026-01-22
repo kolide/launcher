@@ -51,7 +51,6 @@ type secureEnclaveRunner struct {
 }
 
 //mockery:generate: true
-//mockery:dir: ee/secureenclaverunner/mocks
 //mockery:filename: secureEnclaveClient.go
 //mockery:pkgname: mocks
 //mockery:structname: SecureEnclaveClient

@@ -23,7 +23,6 @@ const (
 )
 
 //mockery:generate: true
-//mockery:dir: ee/control/actionqueue/mocks
 //mockery:filename: actor.go
 //mockery:pkgname: mocks
 //mockery:structname: Actor
