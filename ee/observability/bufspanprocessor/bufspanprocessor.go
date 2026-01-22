@@ -9,12 +9,23 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
+// childSpanProcessor is a wrapper around sdktrace.SpanProcessor for testing
+//
+//mockery:generate: true
+//mockery:dir: ee/observability/bufspanprocessor/mocks
+//mockery:filename: span_processor.go
+//mockery:pkgname: mocks
+//mockery:structname: SpanProcessor
+type childSpanProcessor interface {
+	sdktrace.SpanProcessor
+}
+
 type BufSpanProcessor struct {
 	slogger       *slog.Logger
 	bufferedSpans []sdktrace.ReadOnlySpan
 	bufMu         *sync.Mutex
 
-	childProcessor   sdktrace.SpanProcessor
+	childProcessor   childSpanProcessor
 	MaxBufferedSpans int
 }
 
@@ -45,7 +56,7 @@ func (b *BufSpanProcessor) SetSlogger(slogger *slog.Logger) {
 // or have attributes added, they will simply be passed straight to the
 // child processor.
 // If a processor was already set, it will be shutdown.
-func (b *BufSpanProcessor) SetChildProcessor(p sdktrace.SpanProcessor) {
+func (b *BufSpanProcessor) SetChildProcessor(p childSpanProcessor) {
 	if b.childProcessor != nil {
 		if err := b.childProcessor.Shutdown(context.Background()); err != nil {
 			b.slogger.Log(context.TODO(), slog.LevelWarn,
