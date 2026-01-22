@@ -8,93 +8,32 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/fatih/semgroup"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
+	"github.com/zricethezav/gitleaks/v8/config"
 	"github.com/zricethezav/gitleaks/v8/detect"
 	"github.com/zricethezav/gitleaks/v8/report"
+	"github.com/zricethezav/gitleaks/v8/sources"
 )
 
 const tableName = "kolide_secret_scan"
 
-// highSeverityRules contains rule IDs that are considered high severity
-var highSeverityRules = map[string]bool{
-	"aws-access-token":          true,
-	"aws-secret-access-key":     true,
-	"github-pat":                true,
-	"github-fine-grained-pat":   true,
-	"github-oauth":              true,
-	"gitlab-pat":                true,
-	"gcp-api-key":               true,
-	"google-api-key":            true,
-	"private-key":               true,
-	"generic-api-key":           true,
-	"slack-bot-token":           true,
-	"slack-user-token":          true,
-	"slack-webhook-url":         true,
-	"stripe-access-token":       true,
-	"twilio-api-key":            true,
-	"sendgrid-api-token":        true,
-	"mailchimp-api-key":         true,
-	"npm-access-token":          true,
-	"pypi-upload-token":         true,
-	"azure-storage-account-key": true,
-	"databricks-api-token":      true,
-	"hashicorp-vault-token":     true,
-	"jwt":                       true,
-	"okta-access-token":         true,
-	"shopify-access-token":      true,
-	"telegram-bot-api-token":    true,
-	"twitter-bearer-token":      true,
-	"discord-webhook":           true,
-	"discord-bot-token":         true,
-	"doppler-api-token":         true,
-	"dropbox-api-token":         true,
-	"facebook-access-token":     true,
-	"hubspot-api-key":           true,
-	"intercom-api-key":          true,
-	"linkedin-client-secret":    true,
-	"mailgun-private-api-token": true,
-	"planetscale-api-token":     true,
-	"pulumi-api-token":          true,
-	"sentry-access-token":       true,
-	"snyk-api-token":            true,
-	"square-access-token":       true,
-	"sumologic-access-token":    true,
-	"typeform-api-token":        true,
-	"vault-batch-token":         true,
-	"vault-service-token":       true,
-	"yandex-api-key":            true,
-	"zendesk-secret-key":        true,
-}
-
-// mediumSeverityRules contains rule IDs that are considered medium severity
-var mediumSeverityRules = map[string]bool{
-	"generic-password":   true,
-	"password-in-url":    true,
-	"base64-basic-auth":  true,
-	"credentials-in-url": true,
-}
-
-// Table represents the secret scan table
 type Table struct {
-	slogger     *slog.Logger
-	detector    *detect.Detector
-	detectorErr error // stores initialization error to return at query time
+	slogger   *slog.Logger
+	config    config.Config
+	configErr error
 }
 
-// TablePlugin creates and returns the kolide_secret_scan table plugin
 func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
-		// Input columns
 		table.TextColumn("path"),
 		table.TextColumn("raw_data"),
-		// Output columns
 		table.TextColumn("rule_id"),
 		table.TextColumn("description"),
-		table.TextColumn("severity"),
 		table.IntegerColumn("line_number"),
 		table.IntegerColumn("column_start"),
 		table.IntegerColumn("column_end"),
@@ -102,21 +41,24 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		table.TextColumn("redacted_context"),
 	}
 
-	// Initialize gitleaks detector with default config (~150 secret patterns)
-	// If initialization fails, we store the error and return it at query time
-	// rather than returning nil (which would cause a panic during plugin registration)
-	detector, detectorErr := detect.NewDetectorDefaultConfig()
-	if detectorErr != nil {
+	var cfg config.Config
+	var configErr error
+
+	tempDetector, err := detect.NewDetectorDefaultConfig()
+	if err != nil {
+		configErr = err
 		slogger.Log(context.TODO(), slog.LevelError,
-			"failed to create gitleaks detector, table will return errors when queried",
-			"err", detectorErr,
+			"failed to create gitleaks config, table will return errors when queried",
+			"err", err,
 		)
+	} else {
+		cfg = tempDetector.Config
 	}
 
 	t := &Table{
-		slogger:     slogger.With("table", tableName),
-		detector:    detector,
-		detectorErr: detectorErr,
+		slogger:   slogger.With("table", tableName),
+		config:    cfg,
+		configErr: configErr,
 	}
 
 	return tablewrapper.New(flags, slogger, tableName, columns, t.generate)
@@ -126,10 +68,12 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	ctx, span := observability.StartSpan(ctx, "table_name", tableName)
 	defer span.End()
 
-	// Return initialization error if detector failed to initialize
-	if t.detectorErr != nil {
-		return nil, fmt.Errorf("gitleaks detector not available: %w", t.detectorErr)
+	if t.configErr != nil {
+		return nil, fmt.Errorf("gitleaks config not available: %w", t.configErr)
 	}
+
+	// Fresh detector per query - gitleaks accumulates findings internally
+	detector := detect.NewDetector(t.config)
 
 	var results []map[string]string
 
@@ -140,10 +84,8 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		return results, fmt.Errorf("the %s table requires that you specify at least one of 'path' or 'raw_data'", tableName)
 	}
 
-	// Handle file paths
 	for _, requestedPath := range requestedPaths {
-		// Convert SQL % wildcards to glob * wildcards
-		filePaths, err := filepath.Glob(strings.ReplaceAll(requestedPath, `%`, `*`))
+		expandedPaths, err := filepath.Glob(strings.ReplaceAll(requestedPath, `%`, `*`))
 		if err != nil {
 			t.slogger.Log(ctx, slog.LevelInfo,
 				"bad file glob",
@@ -153,24 +95,22 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 			continue
 		}
 
-		for _, filePath := range filePaths {
-			fileResults, err := t.scanFile(ctx, filePath)
+		for _, targetPath := range expandedPaths {
+			pathResults, err := t.scanPath(ctx, detector, targetPath)
 			if err != nil {
 				t.slogger.Log(ctx, slog.LevelInfo,
-					"failed to scan file",
-					"path", filePath,
+					"failed to scan path",
+					"path", targetPath,
 					"err", err,
 				)
 				continue
 			}
-			results = append(results, fileResults...)
+			results = append(results, pathResults...)
 		}
 	}
 
-	// Handle raw data
 	for _, rawData := range requestedRawDatas {
-		rawResults := t.scanContent(ctx, []byte(rawData), "")
-		// Don't echo back the raw data for security
+		rawResults := t.scanContent(ctx, detector, []byte(rawData))
 		for i := range rawResults {
 			rawResults[i]["raw_data"] = "[scanned]"
 		}
@@ -180,43 +120,80 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	return results, nil
 }
 
-// scanFile reads a file and scans it for secrets
-func (t *Table) scanFile(ctx context.Context, filePath string) ([]map[string]string, error) {
-	_, span := observability.StartSpan(ctx, "path", filePath)
+func (t *Table) scanPath(ctx context.Context, detector *detect.Detector, targetPath string) ([]map[string]string, error) {
+	_, span := observability.StartSpan(ctx, "path", targetPath)
 	defer span.End()
 
-	content, err := os.ReadFile(filePath)
+	info, err := os.Stat(targetPath)
 	if err != nil {
-		return nil, fmt.Errorf("reading file: %w", err)
+		return nil, fmt.Errorf("stat path: %w", err)
 	}
 
-	return t.scanContent(ctx, content, filePath), nil
-}
+	var findings []report.Finding
 
-// scanContent scans byte content for secrets using gitleaks
-func (t *Table) scanContent(ctx context.Context, content []byte, filePath string) []map[string]string {
-	// Create a fragment for gitleaks to scan
-	fragment := detect.Fragment{
-		Raw:      string(content),
-		FilePath: filePath,
+	if info.IsDir() {
+		dirSource := &sources.Files{
+			Path:           targetPath,
+			Config:         &detector.Config,
+			FollowSymlinks: false,
+			Sema:           semgroup.NewGroup(ctx, 4),
+		}
+
+		findings, err = detector.DetectSource(ctx, dirSource)
+		if err != nil {
+			return nil, fmt.Errorf("scanning directory: %w", err)
+		}
+
+		return t.findingsToRows(findings), nil
 	}
 
-	findings := t.detector.Detect(fragment)
+	file, err := os.Open(targetPath)
+	if err != nil {
+		return nil, fmt.Errorf("opening file: %w", err)
+	}
+	defer file.Close()
 
-	return t.findingsToRows(findings, filePath)
+	fileSource := &sources.File{
+		Content: file,
+		Path:    targetPath,
+		Config:  &detector.Config,
+	}
+
+	findings, err = detector.DetectSource(ctx, fileSource)
+	if err != nil {
+		return nil, fmt.Errorf("scanning file: %w", err)
+	}
+
+	return t.findingsToRowsWithPath(findings, targetPath), nil
 }
 
-// findingsToRows converts gitleaks findings to table rows
-func (t *Table) findingsToRows(findings []report.Finding, path string) []map[string]string {
+func (t *Table) scanContent(ctx context.Context, detector *detect.Detector, content []byte) []map[string]string {
+	fileSource := &sources.File{
+		Content: strings.NewReader(string(content)),
+		Config:  &detector.Config,
+	}
+
+	findings, err := detector.DetectSource(ctx, fileSource)
+	if err != nil {
+		t.slogger.Log(ctx, slog.LevelInfo,
+			"failed to scan content",
+			"err", err,
+		)
+		return nil
+	}
+
+	return t.findingsToRows(findings)
+}
+
+func (t *Table) findingsToRows(findings []report.Finding) []map[string]string {
 	results := make([]map[string]string, 0, len(findings))
 
 	for _, f := range findings {
 		row := map[string]string{
-			"path":             path,
+			"path":             f.File,
 			"raw_data":         "",
 			"rule_id":          f.RuleID,
 			"description":      f.Description,
-			"severity":         determineSeverity(f.RuleID, f.Entropy),
 			"line_number":      fmt.Sprintf("%d", f.StartLine),
 			"column_start":     fmt.Sprintf("%d", f.StartColumn),
 			"column_end":       fmt.Sprintf("%d", f.EndColumn),
@@ -229,29 +206,30 @@ func (t *Table) findingsToRows(findings []report.Finding, path string) []map[str
 	return results
 }
 
-// redact returns a redacted version of a secret for safe logging/display
-// Shows first 4 characters followed by "..." to provide context without exposing the full secret
-func redact(secret string) string {
-	if len(secret) <= 4 {
-		return "****"
+func (t *Table) findingsToRowsWithPath(findings []report.Finding, path string) []map[string]string {
+	results := make([]map[string]string, 0, len(findings))
+
+	for _, f := range findings {
+		row := map[string]string{
+			"path":             path,
+			"raw_data":         "",
+			"rule_id":          f.RuleID,
+			"description":      f.Description,
+			"line_number":      fmt.Sprintf("%d", f.StartLine),
+			"column_start":     fmt.Sprintf("%d", f.StartColumn),
+			"column_end":       fmt.Sprintf("%d", f.EndColumn),
+			"entropy":          fmt.Sprintf("%.2f", f.Entropy),
+			"redacted_context": redact(f.Match),
+		}
+		results = append(results, row)
 	}
-	return secret[:4] + "..."
+
+	return results
 }
 
-// determineSeverity maps a rule ID and entropy to a severity level
-func determineSeverity(ruleID string, entropy float32) string {
-	if highSeverityRules[ruleID] {
-		return "high"
+func redact(secret string) string {
+	if len(secret) <= 3 {
+		return "***"
 	}
-
-	if mediumSeverityRules[ruleID] {
-		return "medium"
-	}
-
-	// High entropy with any rule suggests it's likely a real secret
-	if entropy > 4.5 {
-		return "medium"
-	}
-
-	return "low"
+	return secret[:3] + "..."
 }
