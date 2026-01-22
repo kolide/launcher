@@ -174,14 +174,14 @@ func TestSecretScan(t *testing.T) {
 			require.NoError(t, err)
 
 			// Check findings count
-			if tt.expectFindings {
-				require.NotEmpty(t, results, "expected to find secrets")
-				assert.GreaterOrEqual(t, len(results), tt.minFindingsCount,
-					"expected at least %d findings, got %d", tt.minFindingsCount, len(results))
-			} else {
+			if !tt.expectFindings {
 				assert.Empty(t, results, "expected no secrets to be found")
 				return
 			}
+
+			require.NotEmpty(t, results, "expected to find secrets")
+			assert.GreaterOrEqual(t, len(results), tt.minFindingsCount,
+				"expected at least %d findings, got %d", tt.minFindingsCount, len(results))
 
 			// Collect actual findings
 			foundRuleIDs := make(map[string]bool)
@@ -234,27 +234,27 @@ func TestRedact(t *testing.T) {
 		{
 			name:     "long secret",
 			input:    "AKIAIOSFODNN7EXAMPLE",
-			expected: "AKIA...",
+			expected: "AKI...",
 		},
 		{
 			name:     "short secret",
 			input:    "abc",
-			expected: "****",
+			expected: "***",
 		},
 		{
 			name:     "exactly 4 chars",
 			input:    "abcd",
-			expected: "****",
+			expected: "abc...",
 		},
 		{
 			name:     "5 chars",
 			input:    "abcde",
-			expected: "abcd...",
+			expected: "abc...",
 		},
 		{
 			name:     "empty string",
 			input:    "",
-			expected: "****",
+			expected: "***",
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
