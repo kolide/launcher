@@ -313,8 +313,7 @@ func createTestTable(t *testing.T) *Table {
 	require.NoError(t, err)
 
 	return &Table{
-		slogger:   multislogger.NewNopLogger(),
-		config:    cfg,
-		configErr: nil,
+		slogger: multislogger.NewNopLogger(),
+		config:  cfg,
 	}
 }
