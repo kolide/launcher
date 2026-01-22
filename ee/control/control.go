@@ -55,7 +55,6 @@ type subscriber interface {
 //
 //mockery:generate: true
 //mockery:filename: data_provider.go
-//mockery:pkgname: mocks
 //mockery:structname: DataProvider
 type dataProvider interface {
 	GetConfig(ctx context.Context) (io.Reader, error)

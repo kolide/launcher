@@ -13,7 +13,6 @@ import (
 //
 //mockery:generate: true
 //mockery:filename: span_processor.go
-//mockery:pkgname: mocks
 //mockery:structname: SpanProcessor
 type childSpanProcessor interface {
 	sdktrace.SpanProcessor

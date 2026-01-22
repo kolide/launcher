@@ -4,7 +4,6 @@ package types
 //
 //mockery:generate: true
 //mockery:filename: keyvalue_store.go
-//mockery:pkgname: mocks
 //mockery:structname: Getter
 type Getter interface {
 	// Get retrieves the value for a key.
@@ -16,7 +15,6 @@ type Getter interface {
 //
 //mockery:generate: true
 //mockery:filename: keyvalue_store.go
-//mockery:pkgname: mocks
 //mockery:structname: Setter
 type Setter interface {
 	// Set sets the value for a key.
@@ -29,7 +27,6 @@ type Setter interface {
 //
 //mockery:generate: true
 //mockery:filename: keyvalue_store.go
-//mockery:pkgname: mocks
 //mockery:structname: Deleter
 type Deleter interface {
 	// Delete removes a key.
@@ -43,7 +40,6 @@ type Deleter interface {
 //
 //mockery:generate: true
 //mockery:filename: keyvalue_store.go
-//mockery:pkgname: mocks
 //mockery:structname: Iterator
 type Iterator interface {
 	// ForEach executes a function for each key/value pair in a store.
@@ -57,7 +53,6 @@ type Iterator interface {
 //
 //mockery:generate: true
 //mockery:filename: keyvalue_store.go
-//mockery:pkgname: mocks
 //mockery:structname: Updater
 type Updater interface {
 	// Update takes a map of key-value pairs, and inserts
@@ -71,7 +66,6 @@ type Updater interface {
 //
 //mockery:generate: true
 //mockery:filename: keyvalue_store.go
-//mockery:pkgname: mocks
 //mockery:structname: Counter
 type Counter interface {
 	// Count should return the total number of current key-value pairs
@@ -83,7 +77,6 @@ type Counter interface {
 //
 //mockery:generate: true
 //mockery:filename: keyvalue_store.go
-//mockery:pkgname: mocks
 //mockery:structname: Appender
 type Appender interface {
 	// AppendValues takes 1 or more ordered values
@@ -94,7 +87,6 @@ type Appender interface {
 //
 //mockery:generate: true
 //mockery:filename: keyvalue_store.go
-//mockery:pkgname: mocks
 //mockery:structname: GetterSetter
 type GetterSetter interface {
 	Getter
@@ -103,7 +95,6 @@ type GetterSetter interface {
 
 //mockery:generate: true
 //mockery:filename: keyvalue_store.go
-//mockery:pkgname: mocks
 //mockery:structname: Closer
 type Closer interface {
 	Close() error
@@ -113,7 +104,6 @@ type Closer interface {
 //
 //mockery:generate: true
 //mockery:filename: keyvalue_store.go
-//mockery:pkgname: mocks
 //mockery:structname: GetterCloser
 type GetterCloser interface {
 	Getter
@@ -124,7 +114,6 @@ type GetterCloser interface {
 //
 //mockery:generate: true
 //mockery:filename: keyvalue_store.go
-//mockery:pkgname: mocks
 //mockery:structname: GetterUpdaterCloser
 type GetterUpdaterCloser interface {
 	Updater
@@ -135,7 +124,6 @@ type GetterUpdaterCloser interface {
 //
 //mockery:generate: true
 //mockery:filename: keyvalue_store.go
-//mockery:pkgname: mocks
 //mockery:structname: GetterSetterDeleter
 type GetterSetterDeleter interface {
 	Getter
@@ -147,7 +135,6 @@ type GetterSetterDeleter interface {
 //
 //mockery:generate: true
 //mockery:filename: keyvalue_store.go
-//mockery:pkgname: mocks
 //mockery:structname: GetterSetterDeleterIterator
 type GetterSetterDeleterIterator interface {
 	Getter
@@ -160,7 +147,6 @@ type GetterSetterDeleterIterator interface {
 //
 //mockery:generate: true
 //mockery:filename: keyvalue_store.go
-//mockery:pkgname: mocks
 //mockery:structname: GetterSetterDeleterIteratorUpdaterCounterAppender
 type GetterSetterDeleterIteratorUpdaterCounterAppender interface {
 	Getter
@@ -176,6 +162,5 @@ type GetterSetterDeleterIteratorUpdaterCounterAppender interface {
 //
 //mockery:generate: true
 //mockery:filename: keyvalue_store.go
-//mockery:pkgname: mocks
 //mockery:structname: KVStore
 type KVStore = GetterSetterDeleterIteratorUpdaterCounterAppender

@@ -4,6 +4,7 @@ force-file-write: true # Overwrite files that already exist
 formatter: goimports
 generate: true # We use the generate directive
 log-level: info
+pkgname: mocks
 recursive: true # Generate for all launcher packages
 require-template-schema-exists: true
 template-data:

@@ -52,7 +52,6 @@ type secureEnclaveRunner struct {
 
 //mockery:generate: true
 //mockery:filename: secureEnclaveClient.go
-//mockery:pkgname: mocks
 //mockery:structname: SecureEnclaveClient
 type secureEnclaveClient interface {
 	CreateSecureEnclaveKey(ctx context.Context, uid string) (*ecdsa.PublicKey, error)

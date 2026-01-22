@@ -36,7 +36,6 @@ var PortList = []int{
 
 //mockery:generate: true
 //mockery:filename: querier.go
-//mockery:pkgname: mocks
 //mockery:structname: Querier
 type Querier interface {
 	Query(query string) ([]map[string]string, error)
@@ -67,7 +66,6 @@ const (
 
 //mockery:generate: true
 //mockery:filename: presenceDetector.go
-//mockery:pkgname: mocks
 //mockery:structname: PresenceDetector
 type presenceDetector interface {
 	DetectPresence(reason string, interval time.Duration) (time.Duration, error)

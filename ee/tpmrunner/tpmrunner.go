@@ -27,7 +27,6 @@ import (
 //
 //mockery:generate: true
 //mockery:filename: tpmSignerCreator.go
-//mockery:pkgname: mocks
 //mockery:structname: TpmSignerCreator
 type tpmSignerCreator interface {
 	CreateKey(opts ...tpm.TpmSignerOption) (private []byte, public []byte, err error)

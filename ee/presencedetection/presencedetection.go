@@ -23,7 +23,6 @@ type PresenceDetector struct {
 //
 //mockery:generate: true
 //mockery:filename: detectorIface.go
-//mockery:pkgname: mocks
 //mockery:structname: DetectorIface
 type detectorIface interface {
 	Detect(reason string, timeout time.Duration) (bool, error)

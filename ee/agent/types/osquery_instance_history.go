@@ -21,7 +21,6 @@ type OsqueryHistorian interface {
 
 //mockery:generate: true
 //mockery:filename: querier.go
-//mockery:pkgname: mocks
 //mockery:structname: Querier
 type Querier interface {
 	Query(query string) ([]map[string]string, error)

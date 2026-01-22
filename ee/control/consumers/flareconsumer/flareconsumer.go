@@ -30,7 +30,6 @@ type FlareConsumer struct {
 
 //mockery:generate: true
 //mockery:filename: flarer.go
-//mockery:pkgname: mocks
 //mockery:structname: Flarer
 type flarer interface {
 	RunFlare(ctx context.Context, k types.Knapsack, flareStream io.WriteCloser) error

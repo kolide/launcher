@@ -10,7 +10,6 @@ import (
 //
 //mockery:generate: true
 //mockery:filename: flags.go
-//mockery:pkgname: mocks
 //mockery:structname: Flags
 type Flags interface {
 	// Registers an observer to receive messages when the specified keys change.

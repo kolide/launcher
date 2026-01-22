@@ -33,7 +33,6 @@ import (
 //
 //mockery:generate: true
 //mockery:filename: settings_store_writer.go
-//mockery:pkgname: mocks
 //mockery:structname: SettingsStoreWriter
 type settingsStoreWriter interface {
 	WriteSettings() error

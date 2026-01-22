@@ -24,7 +24,6 @@ const (
 
 //mockery:generate: true
 //mockery:filename: actor.go
-//mockery:pkgname: mocks
 //mockery:structname: Actor
 type actor interface {
 	Do(data io.Reader) error
