@@ -34,6 +34,11 @@ var PortList = []int{
 	22322,
 }
 
+//mockery:generate: true
+//mockery:dir: ee/localserver/mocks
+//mockery:filename: querier.go
+//mockery:pkgname: mocks
+//mockery:structname: Querier
 type Querier interface {
 	Query(query string) ([]map[string]string, error)
 }
@@ -61,6 +66,11 @@ const (
 	defaultRateBurst = 2000
 )
 
+//mockery:generate: true
+//mockery:dir: ee/localserver/mocks
+//mockery:filename: presenceDetector.go
+//mockery:pkgname: mocks
+//mockery:structname: PresenceDetector
 type presenceDetector interface {
 	DetectPresence(reason string, interval time.Duration) (time.Duration, error)
 }
