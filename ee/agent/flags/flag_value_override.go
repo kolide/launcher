@@ -8,6 +8,12 @@ import (
 
 // FlagValueOverride is an interface for an override which can be active for a duration of
 // time, with a special-case value, until it expires.
+//
+//mockery:generate: true
+//mockery:dir: ee/agent/flags/mocks
+//mockery:filename: flag_value_override.go
+//mockery:pkgname: mocks
+//mockery:structname: FlagValueOverride
 type FlagValueOverride interface {
 	// Value gets the override value.
 	Value() any
