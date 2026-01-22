@@ -196,9 +196,9 @@ func TestSecretScan(t *testing.T) {
 				assert.NotEmpty(t, row["redacted_context"], "redacted_context should be populated")
 				assert.NotEqual(t, "0", row["line_number"], "line_number should be > 0")
 
-				// For raw_data scans, verify the content is marked as scanned
+				// For raw_data scans, verify the original input is returned (for SQLite filtering to work)
 				if tt.scanType == "raw_data" {
-					assert.Equal(t, "[scanned]", row["raw_data"], "raw_data should be marked as scanned")
+					assert.Equal(t, tt.targetPath, row["raw_data"], "raw_data should contain the original input")
 				}
 			}
 

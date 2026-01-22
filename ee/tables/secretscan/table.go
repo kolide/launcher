@@ -105,7 +105,8 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	for _, rawData := range requestedRawDatas {
 		rawResults := t.scanContent(ctx, detector, []byte(rawData))
 		for i := range rawResults {
-			rawResults[i]["raw_data"] = "[scanned]"
+			// Return original value so SQLite WHERE clause filtering works correctly
+			rawResults[i]["raw_data"] = rawData
 		}
 		results = append(results, rawResults...)
 	}
@@ -160,6 +161,7 @@ func (t *Table) scanPath(ctx context.Context, detector *detect.Detector, targetP
 func (t *Table) scanContent(ctx context.Context, detector *detect.Detector, content []byte) []map[string]string {
 	fileSource := &sources.File{
 		Content: strings.NewReader(string(content)),
+		Path:    "raw_data_input", // Placeholder path required for gitleaks detection
 		Config:  &detector.Config,
 	}
 
