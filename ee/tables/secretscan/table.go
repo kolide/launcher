@@ -10,7 +10,6 @@ import (
 
 	"github.com/fatih/semgroup"
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -20,7 +19,15 @@ import (
 	"github.com/zricethezav/gitleaks/v8/sources"
 )
 
-const tableName = "kolide_secret_scan"
+const (
+	tableName = "kolide_secret_scan"
+
+	// directoryScanConcurrency is the number of concurrent file scans when scanning a directory
+	directoryScanConcurrency = 4
+
+	// redactPrefixLength is the number of characters to show before redacting a secret
+	redactPrefixLength = 3
+)
 
 type Table struct {
 	slogger   *slog.Logger
@@ -65,8 +72,6 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, span := observability.StartSpan(ctx, "table_name", tableName)
-	defer span.End()
 
 	if t.configErr != nil {
 		return nil, fmt.Errorf("gitleaks config not available: %w", t.configErr)
@@ -87,7 +92,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	for _, requestedPath := range requestedPaths {
 		expandedPaths, err := filepath.Glob(strings.ReplaceAll(requestedPath, `%`, `*`))
 		if err != nil {
-			t.slogger.Log(ctx, slog.LevelInfo,
+			t.slogger.Log(ctx, slog.LevelWarn,
 				"bad file glob",
 				"path", requestedPath,
 				"err", err,
@@ -98,7 +103,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		for _, targetPath := range expandedPaths {
 			pathResults, err := t.scanPath(ctx, detector, targetPath)
 			if err != nil {
-				t.slogger.Log(ctx, slog.LevelInfo,
+				t.slogger.Log(ctx, slog.LevelWarn,
 					"failed to scan path",
 					"path", targetPath,
 					"err", err,
@@ -121,9 +126,6 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 }
 
 func (t *Table) scanPath(ctx context.Context, detector *detect.Detector, targetPath string) ([]map[string]string, error) {
-	_, span := observability.StartSpan(ctx, "path", targetPath)
-	defer span.End()
-
 	info, err := os.Stat(targetPath)
 	if err != nil {
 		return nil, fmt.Errorf("stat path: %w", err)
@@ -136,7 +138,7 @@ func (t *Table) scanPath(ctx context.Context, detector *detect.Detector, targetP
 			Path:           targetPath,
 			Config:         &detector.Config,
 			FollowSymlinks: false,
-			Sema:           semgroup.NewGroup(ctx, 4),
+			Sema:           semgroup.NewGroup(ctx, directoryScanConcurrency),
 		}
 
 		findings, err = detector.DetectSource(ctx, dirSource)
@@ -175,7 +177,7 @@ func (t *Table) scanContent(ctx context.Context, detector *detect.Detector, cont
 
 	findings, err := detector.DetectSource(ctx, fileSource)
 	if err != nil {
-		t.slogger.Log(ctx, slog.LevelInfo,
+		t.slogger.Log(ctx, slog.LevelWarn,
 			"failed to scan content",
 			"err", err,
 		)
@@ -228,8 +230,8 @@ func (t *Table) findingsToRowsWithPath(findings []report.Finding, path string) [
 }
 
 func redact(secret string) string {
-	if len(secret) <= 3 {
+	if len(secret) <= redactPrefixLength {
 		return "***"
 	}
-	return secret[:3] + "..."
+	return secret[:redactPrefixLength] + "..."
 }
