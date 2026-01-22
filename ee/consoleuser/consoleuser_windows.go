@@ -13,7 +13,6 @@ import (
 	"time"
 
 	winlsa "github.com/kolide/go-winlsa"
-	"github.com/kolide/launcher/ee/observability"
 	"github.com/shirou/gopsutil/v4/process"
 	"golang.org/x/sys/windows"
 )
@@ -124,9 +123,6 @@ func usernameFromSessionData(sessionData *winlsa.LogonSessionData) string {
 }
 
 func ExplorerProcess(ctx context.Context, uid string) (*process.Process, error) {
-	ctx, span := observability.StartSpan(ctx, "uid", uid)
-	defer span.End()
-
 	procs, err := process.ProcessesWithContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting processes: %w", err)
@@ -204,9 +200,6 @@ func updateInvalidUsernameMaps(username string, windowSeconds int64) {
 }
 
 func processOwnerUid(ctx context.Context, proc *process.Process) (string, error) {
-	ctx, span := observability.StartSpan(ctx)
-	defer span.End()
-
 	username, err := proc.UsernameWithContext(ctx)
 	if err != nil {
 		return "", fmt.Errorf("getting process username (for pid %d): %w", proc.Pid, err)

@@ -61,10 +61,7 @@ type slackTeamsFile map[string]struct {
 	UserID     string `json:"user_id"`
 }
 
-func (t *SlackConfigTable) generateForPath(ctx context.Context, file userFileInfo) ([]map[string]string, error) {
-	_, span := observability.StartSpan(ctx, "path", file.path)
-	defer span.End()
-
+func (t *SlackConfigTable) generateForPath(file userFileInfo) ([]map[string]string, error) {
 	var results []map[string]string
 	data, err := os.ReadFile(file.path)
 	if err != nil {
@@ -120,7 +117,7 @@ func (t *SlackConfigTable) generate(ctx context.Context, queryContext table.Quer
 			continue
 		}
 		for _, file := range files {
-			res, err := t.generateForPath(ctx, file)
+			res, err := t.generateForPath(file)
 			if err != nil {
 				t.slogger.Log(ctx, slog.LevelInfo,
 					"generating slack team result",

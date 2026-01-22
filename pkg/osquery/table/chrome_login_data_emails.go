@@ -42,9 +42,6 @@ type ChromeLoginDataEmailsTable struct {
 }
 
 func (c *ChromeLoginDataEmailsTable) generateForPath(ctx context.Context, file userFileInfo) ([]map[string]string, error) {
-	_, span := observability.StartSpan(ctx, "path", file.path)
-	defer span.End()
-
 	dir, err := agent.MkdirTemp("kolide_chrome_login_data_emails")
 	if err != nil {
 		return nil, fmt.Errorf("creating kolide_chrome_login_data_emails tmp dir: %w", err)

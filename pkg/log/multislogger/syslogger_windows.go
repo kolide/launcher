@@ -19,7 +19,7 @@ func SystemSlogger() (*MultiSlogger, io.Closer, error) {
 		syslogger := defaultSystemSlogger()
 
 		syslogger.Log(context.TODO(), slog.LevelInfo,
-			"launcher running on windows without elevated permissions, using default stderr instead of eventlog",
+			"launcher running on windows without elevated permissions, using default stdout instead of eventlog",
 		)
 
 		return syslogger, io.NopCloser(nil), nil
@@ -30,7 +30,7 @@ func SystemSlogger() (*MultiSlogger, io.Closer, error) {
 		syslogger := defaultSystemSlogger()
 
 		syslogger.Log(context.TODO(), slog.LevelError,
-			"could not create eventlog writer, using default stderr instead of eventlog",
+			"could not create eventlog writer, using default stdout instead of eventlog",
 			"err", err,
 		)
 

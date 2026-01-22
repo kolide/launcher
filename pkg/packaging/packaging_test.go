@@ -125,7 +125,8 @@ func TestHelperProcess(t *testing.T) {
 		n, _ := strconv.Atoi(args[0])
 		os.Exit(n) //nolint:forbidigo // Fine to use os.Exit in tests
 	case strings.HasSuffix(cmd, "launcher") && args[0] == "-version":
-		fmt.Println(`launcher - version 0.5.6-19-g17c8589
+		fmt.Println(`{"msg": "test log line before version output"}
+launcher - version 0.5.6-19-g17c8589
   branch: 	master
   revision: 	17c8589f47858877bb8de3d8ab1bd095cf631a11
   build date: 	2018-11-09T15:31:10Z

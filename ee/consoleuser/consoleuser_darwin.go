@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/kolide/launcher/ee/allowedcmd"
-	"github.com/kolide/launcher/ee/observability"
 )
 
 // example scutil output
@@ -91,9 +90,6 @@ const (
 )
 
 func CurrentUids(ctx context.Context) ([]string, error) {
-	ctx, span := observability.StartSpan(ctx)
-	defer span.End()
-
 	cmd, err := allowedcmd.Scutil(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("creating scutil command: %w", err)
