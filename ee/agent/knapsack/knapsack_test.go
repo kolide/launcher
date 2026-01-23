@@ -289,7 +289,7 @@ func TestSaveRegistration(t *testing.T) {
 	}
 }
 
-func TestEnsureRegistrationStored(t *testing.T) {
+func TestEnsureEnrollmentStored(t *testing.T) {
 	t.Parallel()
 
 	type testCase struct {
@@ -391,9 +391,9 @@ func TestEnsureRegistrationStored(t *testing.T) {
 			mockFlags.On("EnrollSecret").Return(enrollSecret, nil).Maybe()
 			mockFlags.On("EnrollSecretPath").Return("", nil).Maybe() // We never expect to read the enrollment secret from here
 
-			// Set up registration with node key missing
+			// Set up enrollment with node key missing
 			if tt.enrollmentExists {
-				// Save the registration
+				// Save the enrollment
 				r := types.Enrollment{
 					EnrollmentID:     tt.enrollmentId,
 					Munemo:           testMunemo,
@@ -404,7 +404,7 @@ func TestEnsureRegistrationStored(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, enrollmentStore.Set([]byte(tt.enrollmentId), rawRegistration))
 
-				// Confirm registration was saved as expected
+				// Confirm enrollment was saved as expected
 				rawStoredRegistration, err := enrollmentStore.Get([]byte(tt.enrollmentId))
 				require.NoError(t, err)
 				var storedRegistration types.Enrollment
@@ -422,9 +422,9 @@ func TestEnsureRegistrationStored(t *testing.T) {
 				require.Equal(t, nodeKey, savedNodeKey)
 			}
 
-			// Now we're ready to test -- call the function, then check to make sure the registration
+			// Now we're ready to test -- call the function, then check to make sure the enrollment
 			// looks how we expect.
-			err = testKnapsack.EnsureRegistrationStored(tt.enrollmentId)
+			err = testKnapsack.EnsureEnrollmentStored(tt.enrollmentId)
 			if tt.successExpected {
 				require.NoError(t, err)
 			} else {
@@ -437,7 +437,7 @@ func TestEnsureRegistrationStored(t *testing.T) {
 				var updatedRegistration types.Enrollment
 				require.NoError(t, json.Unmarshal(rawUpdatedEnrollment, &updatedRegistration))
 
-				// All data on the registration should be correct
+				// All data on the enrollment should be correct
 				require.Equal(t, nodeKey, updatedRegistration.NodeKey)
 				require.Equal(t, enrollSecret, updatedRegistration.EnrollmentSecret)
 				require.Equal(t, tt.enrollmentId, updatedRegistration.EnrollmentID)

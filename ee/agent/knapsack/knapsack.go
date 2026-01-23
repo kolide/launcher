@@ -203,10 +203,10 @@ func (k *knapsack) SaveRegistration(registrationId, munemo, nodeKey, enrollmentS
 	return nil
 }
 
-// EnsureRegistrationStored creates a registration under the given registration ID,
-// if it does not already exist. Since registrations are a newer concept, older launcher
+// EnsureEnrollmentStored creates an enrollment under the given enrollment ID,
+// if it does not already exist. Since enrollments are a newer concept, older launcher
 // installations may not have them saved yet.
-func (k *knapsack) EnsureRegistrationStored(registrationId string) error {
+func (k *knapsack) EnsureEnrollmentStored(enrollmentId string) error {
 	// First, get the stores we'll need
 	nodeKeyStore := k.getKVStore(storage.ConfigStore)
 	if nodeKeyStore == nil {
@@ -218,10 +218,10 @@ func (k *knapsack) EnsureRegistrationStored(registrationId string) error {
 	}
 
 	// Get the existing node key from the config store. If we can't get this, then
-	// there's nothing more we can do here -- we won't save a registration without
+	// there's nothing more we can do here -- we won't save an enrollment without
 	// a node key.
-	nodeKeyKeyForRegistration := storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(registrationId))
-	keyRaw, err := nodeKeyStore.Get(nodeKeyKeyForRegistration)
+	nodeKeyKeyForEnrollment := storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(enrollmentId))
+	keyRaw, err := nodeKeyStore.Get(nodeKeyKeyForEnrollment)
 	if err != nil {
 		return fmt.Errorf("retrieving node key: %w", err)
 	}
@@ -231,7 +231,7 @@ func (k *knapsack) EnsureRegistrationStored(registrationId string) error {
 	}
 
 	// Check to see if we have an existing enrollment first
-	existingEnrollmentRaw, err := enrollmentStore.Get([]byte(registrationId))
+	existingEnrollmentRaw, err := enrollmentStore.Get([]byte(enrollmentId))
 	if err != nil {
 		return fmt.Errorf("getting existing registration: %w", err)
 	}
@@ -245,13 +245,13 @@ func (k *knapsack) EnsureRegistrationStored(registrationId string) error {
 			return fmt.Errorf("reading enrollment secret to create new enrollment: %w", err)
 		}
 		// SaveRegistration will extract the munemo from the enrollment secret for us.
-		if err := k.SaveRegistration(registrationId, "", nodeKey, enrollSecret); err != nil {
+		if err := k.SaveRegistration(enrollmentId, "", nodeKey, enrollSecret); err != nil {
 			return fmt.Errorf("saving new enrollment: %w", err)
 		}
 		return nil
 	}
 
-	// We have an existing registration, which may or may not have the node key set on it yet --
+	// We have an existing enrollment, which may or may not have the node key set on it yet --
 	// unmarshal it so we can update it appropriately with the node key.
 	var existingEnrollment types.Enrollment
 	if err := json.Unmarshal(existingEnrollmentRaw, &existingEnrollment); err != nil {
@@ -265,18 +265,18 @@ func (k *knapsack) EnsureRegistrationStored(registrationId string) error {
 
 	// Make update
 	existingEnrollment.NodeKey = nodeKey
-	updatedRegistrationRaw, err := json.Marshal(existingEnrollment)
+	updatedEnrollmentRaw, err := json.Marshal(existingEnrollment)
 	if err != nil {
 		return fmt.Errorf("marshalling updated enrollment: %w", err)
 	}
-	if err := enrollmentStore.Set([]byte(registrationId), updatedRegistrationRaw); err != nil {
+	if err := enrollmentStore.Set([]byte(enrollmentId), updatedEnrollmentRaw); err != nil {
 		return fmt.Errorf("updating enrollment in store: %w", err)
 	}
 
 	k.Slogger().Log(context.TODO(), slog.LevelInfo,
 		"successfully updated enrollment's node key",
 		"munemo", existingEnrollment.Munemo,
-		"registration_id", registrationId,
+		"registration_id", enrollmentId,
 	)
 	return nil
 }

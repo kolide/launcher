@@ -192,7 +192,7 @@ func (e *Extension) Execute() error {
 	// Ensuring the enrollment is stored is currently also handled by any call to `Enroll`,
 	// which is currently triggered by the osquery instance, immediately after creating the extension.
 	// We have the call here in case we ever remove it from the osquery instance.
-	if err := e.knapsack.EnsureRegistrationStored(e.enrollmentId); err != nil {
+	if err := e.knapsack.EnsureEnrollmentStored(e.enrollmentId); err != nil {
 		e.slogger.Log(context.TODO(), slog.LevelError,
 			"could not ensure enrollment is stored",
 			"err", err,
@@ -319,7 +319,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 			"node key exists, skipping enrollment",
 		)
 		span.AddEvent("node_key_already_exists")
-		if err := e.knapsack.EnsureRegistrationStored(e.enrollmentId); err != nil {
+		if err := e.knapsack.EnsureEnrollmentStored(e.enrollmentId); err != nil {
 			e.slogger.Log(ctx, slog.LevelError,
 				"could not ensure registration is stored for existing enrollment",
 				"err", err,

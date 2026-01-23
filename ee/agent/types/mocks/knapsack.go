@@ -1665,35 +1665,35 @@ func (_c *Knapsack_EnrollmentStore_Call) RunAndReturn(run func() types.KVStore) 
 	return _c
 }
 
-// EnsureRegistrationStored provides a mock function for the type Knapsack
-func (_mock *Knapsack) EnsureRegistrationStored(registrationId string) error {
-	ret := _mock.Called(registrationId)
+// EnsureEnrollmentStored provides a mock function for the type Knapsack
+func (_mock *Knapsack) EnsureEnrollmentStored(enrollmentId string) error {
+	ret := _mock.Called(enrollmentId)
 
 	if len(ret) == 0 {
-		panic("no return value specified for EnsureRegistrationStored")
+		panic("no return value specified for EnsureEnrollmentStored")
 	}
 
 	var r0 error
 	if returnFunc, ok := ret.Get(0).(func(string) error); ok {
-		r0 = returnFunc(registrationId)
+		r0 = returnFunc(enrollmentId)
 	} else {
 		r0 = ret.Error(0)
 	}
 	return r0
 }
 
-// Knapsack_EnsureRegistrationStored_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EnsureRegistrationStored'
-type Knapsack_EnsureRegistrationStored_Call struct {
+// Knapsack_EnsureEnrollmentStored_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EnsureEnrollmentStored'
+type Knapsack_EnsureEnrollmentStored_Call struct {
 	*mock.Call
 }
 
-// EnsureRegistrationStored is a helper method to define mock.On call
-//   - registrationId string
-func (_e *Knapsack_Expecter) EnsureRegistrationStored(registrationId interface{}) *Knapsack_EnsureRegistrationStored_Call {
-	return &Knapsack_EnsureRegistrationStored_Call{Call: _e.mock.On("EnsureRegistrationStored", registrationId)}
+// EnsureEnrollmentStored is a helper method to define mock.On call
+//   - enrollmentId string
+func (_e *Knapsack_Expecter) EnsureEnrollmentStored(enrollmentId interface{}) *Knapsack_EnsureEnrollmentStored_Call {
+	return &Knapsack_EnsureEnrollmentStored_Call{Call: _e.mock.On("EnsureEnrollmentStored", enrollmentId)}
 }
 
-func (_c *Knapsack_EnsureRegistrationStored_Call) Run(run func(registrationId string)) *Knapsack_EnsureRegistrationStored_Call {
+func (_c *Knapsack_EnsureEnrollmentStored_Call) Run(run func(enrollmentId string)) *Knapsack_EnsureEnrollmentStored_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 string
 		if args[0] != nil {
@@ -1706,12 +1706,12 @@ func (_c *Knapsack_EnsureRegistrationStored_Call) Run(run func(registrationId st
 	return _c
 }
 
-func (_c *Knapsack_EnsureRegistrationStored_Call) Return(err error) *Knapsack_EnsureRegistrationStored_Call {
+func (_c *Knapsack_EnsureEnrollmentStored_Call) Return(err error) *Knapsack_EnsureEnrollmentStored_Call {
 	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *Knapsack_EnsureRegistrationStored_Call) RunAndReturn(run func(registrationId string) error) *Knapsack_EnsureRegistrationStored_Call {
+func (_c *Knapsack_EnsureEnrollmentStored_Call) RunAndReturn(run func(enrollmentId string) error) *Knapsack_EnsureEnrollmentStored_Call {
 	_c.Call.Return(run)
 	return _c
 }

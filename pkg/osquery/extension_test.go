@@ -348,7 +348,7 @@ func TestExtensionEnroll(t *testing.T) {
 	k.On("NodeKey", types.DefaultEnrollmentID).Return(expectedNodeKey, nil).Once()
 
 	// The next time we call Enroll, the extension should confirm that the registration is stored
-	k.On("EnsureRegistrationStored", types.DefaultEnrollmentID).Return(nil)
+	k.On("EnsureEnrollmentStored", types.DefaultEnrollmentID).Return(nil)
 
 	// Should not re-enroll with stored secret
 	m.RequestEnrollmentFuncInvoked = false
@@ -1227,7 +1227,7 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	k.On("NodeKey", testifymock.Anything).Return(expectedNodeKey, nil)
-	k.On("EnsureRegistrationStored", testifymock.Anything).Return(nil)
+	k.On("EnsureEnrollmentStored", testifymock.Anything).Return(nil)
 
 	// Create these buckets ahead of time
 	statusLogsStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.StatusLogsStore.String())
