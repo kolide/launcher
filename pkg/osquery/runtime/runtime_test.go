@@ -366,7 +366,7 @@ func TestPing(t *testing.T) {
 	require.NoError(t, err)
 	k.On("KatcConfigStore").Return(katcConfigStore).Maybe()
 	k.On("ConfigStore").Return(inmemory.NewStore()).Maybe()
-	k.On("RegistrationStore").Return(inmemory.NewStore()).Maybe()
+	k.On("EnrollmentStore").Return(inmemory.NewStore()).Maybe()
 	k.On("LauncherHistoryStore").Return(inmemory.NewStore()).Maybe()
 	k.On("ServerProvidedDataStore").Return(inmemory.NewStore()).Maybe()
 	k.On("AgentFlagsStore").Return(inmemory.NewStore()).Maybe()
@@ -664,10 +664,10 @@ func TestMultipleInstances(t *testing.T) {
 	logBytes, slogger := setUpTestSlogger()
 
 	// Add in an extra instance
-	extraRegistrationId := ulid.New()
+	extraEnrollmentId := ulid.New()
 
 	k := typesMocks.NewKnapsack(t)
-	k.On("EnrollmentIDs").Return([]string{types.DefaultEnrollmentID, extraRegistrationId})
+	k.On("EnrollmentIDs").Return([]string{types.DefaultEnrollmentID, extraEnrollmentId})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -682,8 +682,8 @@ func TestMultipleInstances(t *testing.T) {
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	k.On("NodeKey", types.DefaultEnrollmentID).Return(ulid.New(), nil).Maybe()
 	k.On("EnsureEnrollmentStored", types.DefaultEnrollmentID).Return(nil).Maybe()
-	k.On("NodeKey", extraRegistrationId).Return(ulid.New(), nil).Maybe()
-	k.On("EnsureEnrollmentStored", extraRegistrationId).Return(nil).Maybe()
+	k.On("NodeKey", extraEnrollmentId).Return(ulid.New(), nil).Maybe()
+	k.On("EnsureEnrollmentStored", extraEnrollmentId).Return(nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
@@ -718,8 +718,8 @@ func TestMultipleInstances(t *testing.T) {
 	require.NotNil(t, runner.instances[types.DefaultEnrollmentID].history)
 
 	// Confirm the additional instance was started
-	require.Contains(t, runner.instances, extraRegistrationId)
-	extraInstanceStats, err := osqHistory.LatestInstanceStats(extraRegistrationId)
+	require.Contains(t, runner.instances, extraEnrollmentId)
+	extraInstanceStats, err := osqHistory.LatestInstanceStats(extraEnrollmentId)
 	require.NoError(t, err)
 	require.Contains(t, extraInstanceStats, "start_time")
 	require.Contains(t, extraInstanceStats, "connect_time")
@@ -730,8 +730,8 @@ func TestMultipleInstances(t *testing.T) {
 	instanceStatuses := runner.InstanceStatuses()
 	require.Contains(t, instanceStatuses, types.DefaultEnrollmentID)
 	require.Equal(t, instanceStatuses[types.DefaultEnrollmentID], types.InstanceStatusHealthy)
-	require.Contains(t, instanceStatuses, extraRegistrationId)
-	require.Equal(t, instanceStatuses[extraRegistrationId], types.InstanceStatusHealthy)
+	require.Contains(t, instanceStatuses, extraEnrollmentId)
+	require.Equal(t, instanceStatuses[extraEnrollmentId], types.InstanceStatusHealthy)
 
 	waitShutdown(t, runner, logBytes)
 
@@ -742,8 +742,8 @@ func TestMultipleInstances(t *testing.T) {
 	require.Contains(t, defaultInstanceStats, "exit_time")
 	require.NotEmpty(t, defaultInstanceStats["exit_time"], "exit time should be added to default instance stats on shutdown")
 
-	require.Contains(t, runner.instances, extraRegistrationId)
-	extraInstanceStats, err = osqHistory.LatestInstanceStats(extraRegistrationId)
+	require.Contains(t, runner.instances, extraEnrollmentId)
+	extraInstanceStats, err = osqHistory.LatestInstanceStats(extraEnrollmentId)
 	require.NoError(t, err)
 	require.Contains(t, extraInstanceStats, "exit_time")
 	require.NotEmpty(t, extraInstanceStats["exit_time"], "exit time should be added to secondary instance stats on shutdown")
@@ -801,11 +801,11 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	ensureShutdownOnCleanup(t, runner, logBytes)
 
 	// Add in an extra instance
-	extraRegistrationId := ulid.New()
-	runner.enrollmentIds = append(runner.enrollmentIds, extraRegistrationId)
+	extraEnrollmentId := ulid.New()
+	runner.enrollmentIds = append(runner.enrollmentIds, extraEnrollmentId)
 
-	k.On("NodeKey", extraRegistrationId).Return(ulid.New(), nil).Maybe()
-	k.On("EnsureEnrollmentStored", extraRegistrationId).Return(nil).Maybe()
+	k.On("NodeKey", extraEnrollmentId).Return(ulid.New(), nil).Maybe()
+	k.On("EnsureEnrollmentStored", extraEnrollmentId).Return(nil).Maybe()
 
 	// Start the instance
 	go runner.Run()
@@ -826,9 +826,9 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	require.NotEmpty(t, defaultInstanceStats["exit_time"], "exit time should be added to default instance stats on shutdown")
 
 	// Confirm the additional instance was started, and then exited
-	require.Contains(t, runner.instances, extraRegistrationId)
-	require.NotNil(t, runner.instances[extraRegistrationId].history)
-	extraInstanceStats, err := osqHistory.LatestInstanceStats(extraRegistrationId)
+	require.Contains(t, runner.instances, extraEnrollmentId)
+	require.NotNil(t, runner.instances[extraEnrollmentId].history)
+	extraInstanceStats, err := osqHistory.LatestInstanceStats(extraEnrollmentId)
 	require.NoError(t, err)
 	require.Contains(t, extraInstanceStats, "start_time")
 	require.NotEmpty(t, extraInstanceStats["start_time"], "start time should be added to secondary instance stats on start up")
@@ -1146,7 +1146,7 @@ func setUpMockStores(t *testing.T, k *typesMocks.Knapsack) {
 	require.NoError(t, err)
 	k.On("KatcConfigStore").Return(store).Maybe()
 	k.On("ConfigStore").Return(inmemory.NewStore()).Maybe()
-	k.On("RegistrationStore").Return(inmemory.NewStore()).Maybe()
+	k.On("EnrollmentStore").Return(inmemory.NewStore()).Maybe()
 	k.On("LauncherHistoryStore").Return(inmemory.NewStore()).Maybe()
 	k.On("ServerProvidedDataStore").Return(inmemory.NewStore()).Maybe()
 	k.On("AgentFlagsStore").Return(inmemory.NewStore()).Maybe()

@@ -472,7 +472,7 @@ func TestReloadKatcExtension(t *testing.T) {
 	require.NoError(t, err)
 	k.On("KatcConfigStore").Return(katcConfigStore).Maybe()
 	k.On("ConfigStore").Return(inmemory.NewStore()).Maybe()
-	k.On("RegistrationStore").Return(inmemory.NewStore()).Maybe()
+	k.On("EnrollmentStore").Return(inmemory.NewStore()).Maybe()
 	k.On("LauncherHistoryStore").Return(inmemory.NewStore()).Maybe()
 	k.On("ServerProvidedDataStore").Return(inmemory.NewStore()).Maybe()
 	k.On("AgentFlagsStore").Return(inmemory.NewStore()).Maybe()

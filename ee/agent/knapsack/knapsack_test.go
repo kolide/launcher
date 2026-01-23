@@ -277,14 +277,14 @@ func TestSaveEnrollment(t *testing.T) {
 			require.Equal(t, tt.expectedNodeKey, string(storedKey))
 
 			// Confirm that the registration was stored
-			rawStoredRegistration, err := enrollmentStore.Get([]byte(tt.enrollmentId))
+			rawStoredEnrollment, err := enrollmentStore.Get([]byte(tt.enrollmentId))
 			require.NoError(t, err)
-			var storedRegistration types.Enrollment
-			require.NoError(t, json.Unmarshal(rawStoredRegistration, &storedRegistration))
-			require.Equal(t, tt.enrollmentId, storedRegistration.EnrollmentID)
-			require.Equal(t, tt.expectedMunemo, storedRegistration.Munemo)
-			require.Equal(t, tt.expectedNodeKey, storedRegistration.NodeKey)
-			require.Equal(t, tt.expectedEnrollSecret, storedRegistration.EnrollmentSecret)
+			var storedEnrollment types.Enrollment
+			require.NoError(t, json.Unmarshal(rawStoredEnrollment, &storedEnrollment))
+			require.Equal(t, tt.enrollmentId, storedEnrollment.EnrollmentID)
+			require.Equal(t, tt.expectedMunemo, storedEnrollment.Munemo)
+			require.Equal(t, tt.expectedNodeKey, storedEnrollment.NodeKey)
+			require.Equal(t, tt.expectedEnrollSecret, storedEnrollment.EnrollmentSecret)
 		})
 	}
 }
@@ -400,23 +400,23 @@ func TestEnsureEnrollmentStored(t *testing.T) {
 					NodeKey:          "",
 					EnrollmentSecret: enrollSecret,
 				}
-				rawRegistration, err := json.Marshal(r)
+				rawEnrollment, err := json.Marshal(r)
 				require.NoError(t, err)
-				require.NoError(t, enrollmentStore.Set([]byte(tt.enrollmentId), rawRegistration))
+				require.NoError(t, enrollmentStore.Set([]byte(tt.enrollmentId), rawEnrollment))
 
 				// Confirm enrollment was saved as expected
-				rawStoredRegistration, err := enrollmentStore.Get([]byte(tt.enrollmentId))
+				rawStoredEnrollment, err := enrollmentStore.Get([]byte(tt.enrollmentId))
 				require.NoError(t, err)
-				var storedRegistration types.Enrollment
-				require.NoError(t, json.Unmarshal(rawStoredRegistration, &storedRegistration))
-				require.Equal(t, "", storedRegistration.NodeKey)
+				var storedEnrollment types.Enrollment
+				require.NoError(t, json.Unmarshal(rawStoredEnrollment, &storedEnrollment))
+				require.Equal(t, "", storedEnrollment.NodeKey)
 			}
 
 			// Finally, set up our new node key. If stored, it should be stored in the config store only.
 			nodeKey := ulid.New()
 			if tt.nodeKeyStored {
-				nodeKeyKeyForRegistration := storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeEnrollment, []byte(tt.enrollmentId))
-				require.NoError(t, configStore.Set(nodeKeyKeyForRegistration, []byte(nodeKey)))
+				nodeKeyKeyForEnrollment := storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeEnrollment, []byte(tt.enrollmentId))
+				require.NoError(t, configStore.Set(nodeKeyKeyForEnrollment, []byte(nodeKey)))
 				savedNodeKey, err := testKnapsack.NodeKey(tt.enrollmentId)
 				require.NoError(t, err, "could not store node key during test setup")
 				require.Equal(t, nodeKey, savedNodeKey)
@@ -434,14 +434,14 @@ func TestEnsureEnrollmentStored(t *testing.T) {
 			rawUpdatedEnrollment, err := enrollmentStore.Get([]byte(tt.enrollmentId))
 			require.NoError(t, err)
 			if tt.successExpected {
-				var updatedRegistration types.Enrollment
-				require.NoError(t, json.Unmarshal(rawUpdatedEnrollment, &updatedRegistration))
+				var updatedEnrollment types.Enrollment
+				require.NoError(t, json.Unmarshal(rawUpdatedEnrollment, &updatedEnrollment))
 
 				// All data on the enrollment should be correct
-				require.Equal(t, nodeKey, updatedRegistration.NodeKey)
-				require.Equal(t, enrollSecret, updatedRegistration.EnrollmentSecret)
-				require.Equal(t, tt.enrollmentId, updatedRegistration.EnrollmentID)
-				require.Equal(t, testMunemo, updatedRegistration.Munemo)
+				require.Equal(t, nodeKey, updatedEnrollment.NodeKey)
+				require.Equal(t, enrollSecret, updatedEnrollment.EnrollmentSecret)
+				require.Equal(t, tt.enrollmentId, updatedEnrollment.EnrollmentID)
+				require.Equal(t, testMunemo, updatedEnrollment.Munemo)
 
 				return
 			}
