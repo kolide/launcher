@@ -6,10 +6,14 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
+	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
+	"github.com/kolide/launcher/ee/tables/ci"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -197,35 +201,36 @@ func TestRedact(t *testing.T) {
 
 // extractTestData reads the test zip file from disk and extracts it to a temp directory.
 // Returns the path to the extracted sample_project directory.
-func extractTestData(t *testing.T) string {
-	t.Helper()
+// Uses testing.TB interface to work with both *testing.T and *testing.B.
+func extractTestData(tb testing.TB) string {
+	tb.Helper()
 
-	tempDir := t.TempDir()
+	tempDir := tb.TempDir()
 
 	zipReader, err := zip.OpenReader("test_data/sample_project.zip")
-	require.NoError(t, err, "opening zip file")
+	require.NoError(tb, err, "opening zip file")
 	defer zipReader.Close()
 
 	for _, fileInZip := range zipReader.File {
 		filePath := filepath.Join(tempDir, fileInZip.Name)
 
 		if fileInZip.FileInfo().IsDir() {
-			require.NoError(t, os.MkdirAll(filePath, fileInZip.Mode()), "creating dir")
+			require.NoError(tb, os.MkdirAll(filePath, fileInZip.Mode()), "creating dir")
 			continue
 		}
 
-		require.NoError(t, os.MkdirAll(filepath.Dir(filePath), 0755), "creating parent dir")
+		require.NoError(tb, os.MkdirAll(filepath.Dir(filePath), 0755), "creating parent dir")
 
 		fileInZipReader, err := fileInZip.Open()
-		require.NoError(t, err, "opening file in zip")
+		require.NoError(tb, err, "opening file in zip")
 
 		outFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, fileInZip.Mode())
-		require.NoError(t, err, "opening output file")
+		require.NoError(tb, err, "opening output file")
 
 		_, err = io.Copy(outFile, fileInZipReader)
 		fileInZipReader.Close()
 		outFile.Close()
-		require.NoError(t, err, "copying from zip to temp dir")
+		require.NoError(tb, err, "copying from zip to temp dir")
 	}
 
 	return filepath.Join(tempDir, "sample_project")
@@ -241,4 +246,73 @@ func createTestTable(t *testing.T) *Table {
 		slogger: multislogger.NewNopLogger(),
 		config:  cfg,
 	}
+}
+
+// Benchmarks
+
+func BenchmarkSecretScanDirectory(b *testing.B) {
+	projectDir := extractTestData(b)
+
+	mockFlags := typesmocks.NewFlags(b)
+	mockFlags.On("TableGenerateTimeout").Return(1 * time.Minute)
+	mockFlags.On("RegisterChangeObserver", mock.Anything, mock.Anything).Return()
+
+	secretScanTable := TablePlugin(mockFlags, multislogger.NewNopLogger())
+	require.NotNil(b, secretScanTable)
+
+	baselineStats := ci.BaselineStats(b)
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for range b.N {
+		response := secretScanTable.Call(b.Context(), ci.BuildRequestWithSingleEqualConstraint("path", projectDir))
+		require.Equal(b, int32(0), response.Status.Code, response.Status.Message)
+	}
+
+	ci.ReportNonGolangMemoryUsage(b, baselineStats)
+}
+
+func BenchmarkSecretScanFile(b *testing.B) {
+	projectDir := extractTestData(b)
+	filePath := filepath.Join(projectDir, "config.yaml")
+
+	mockFlags := typesmocks.NewFlags(b)
+	mockFlags.On("TableGenerateTimeout").Return(1 * time.Minute)
+	mockFlags.On("RegisterChangeObserver", mock.Anything, mock.Anything).Return()
+
+	secretScanTable := TablePlugin(mockFlags, multislogger.NewNopLogger())
+	require.NotNil(b, secretScanTable)
+
+	baselineStats := ci.BaselineStats(b)
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for range b.N {
+		response := secretScanTable.Call(b.Context(), ci.BuildRequestWithSingleEqualConstraint("path", filePath))
+		require.Equal(b, int32(0), response.Status.Code, response.Status.Message)
+	}
+
+	ci.ReportNonGolangMemoryUsage(b, baselineStats)
+}
+
+func BenchmarkSecretScanRawData(b *testing.B) {
+	// Use single-line data to avoid JSON escaping issues in the request builder
+	rawData := `slack_bot_token: xoxb-9876543210-9876543210-zyxwvutsrqponmlk`
+	mockFlags := typesmocks.NewFlags(b)
+	mockFlags.On("TableGenerateTimeout").Return(1 * time.Minute)
+	mockFlags.On("RegisterChangeObserver", mock.Anything, mock.Anything).Return()
+
+	secretScanTable := TablePlugin(mockFlags, multislogger.NewNopLogger())
+	require.NotNil(b, secretScanTable)
+
+	baselineStats := ci.BaselineStats(b)
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for range b.N {
+		response := secretScanTable.Call(b.Context(), ci.BuildRequestWithSingleEqualConstraint("raw_data", rawData))
+		require.Equal(b, int32(0), response.Status.Code, response.Status.Message)
+	}
+
+	ci.ReportNonGolangMemoryUsage(b, baselineStats)
 }
