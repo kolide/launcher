@@ -512,43 +512,43 @@ func TestNodeKey(t *testing.T) {
 	}
 }
 
-func TestDeleteRegistration(t *testing.T) {
+func TestDeleteEnrollment(t *testing.T) {
 	t.Parallel()
 
 	for _, tt := range []struct {
-		testCaseName           string
-		expectedRegistrationId string
-		expectedMunemo         string
-		expectedNodeKey        string
-		expectedEnrollSecret   string
+		testCaseName         string
+		expectedEnrollmentId string
+		expectedMunemo       string
+		expectedNodeKey      string
+		expectedEnrollSecret string
 	}{
 		{
-			testCaseName:           "all data set, default registration id",
-			expectedRegistrationId: types.DefaultEnrollmentID,
-			expectedMunemo:         "test_munemo",
-			expectedNodeKey:        "test_node_key",
-			expectedEnrollSecret:   "test_jwt",
+			testCaseName:         "all data set, default enrollment id",
+			expectedEnrollmentId: types.DefaultEnrollmentID,
+			expectedMunemo:       "test_munemo",
+			expectedNodeKey:      "test_node_key",
+			expectedEnrollSecret: "test_jwt",
 		},
 		{
-			testCaseName:           "all data set, non-default registration id",
-			expectedRegistrationId: ulid.New(),
-			expectedMunemo:         "test_munemo",
-			expectedNodeKey:        "test_node_key",
-			expectedEnrollSecret:   "test_jwt",
+			testCaseName:         "all data set, non-default enrollment id",
+			expectedEnrollmentId: ulid.New(),
+			expectedMunemo:       "test_munemo",
+			expectedNodeKey:      "test_node_key",
+			expectedEnrollSecret: "test_jwt",
 		},
 		{
-			testCaseName:           "no enroll secret, default registration ID",
-			expectedRegistrationId: types.DefaultEnrollmentID,
-			expectedMunemo:         "test_munemo",
-			expectedNodeKey:        "test_node_key",
-			expectedEnrollSecret:   "",
+			testCaseName:         "no enroll secret, default enrollment ID",
+			expectedEnrollmentId: types.DefaultEnrollmentID,
+			expectedMunemo:       "test_munemo",
+			expectedNodeKey:      "test_node_key",
+			expectedEnrollSecret: "",
 		},
 		{
-			testCaseName:           "no enroll secret, non-default registration ID",
-			expectedRegistrationId: ulid.New(),
-			expectedMunemo:         "test_munemo",
-			expectedNodeKey:        "test_node_key",
-			expectedEnrollSecret:   "",
+			testCaseName:         "no enroll secret, non-default enrollment ID",
+			expectedEnrollmentId: ulid.New(),
+			expectedMunemo:       "test_munemo",
+			expectedNodeKey:      "test_node_key",
+			expectedEnrollSecret: "",
 		},
 	} {
 		t.Run(tt.testCaseName, func(t *testing.T) {
@@ -566,30 +566,30 @@ func TestDeleteRegistration(t *testing.T) {
 				storage.EnrollmentStore: enrollmentStore,
 			}, nil, nil, multislogger.New(), multislogger.New())
 
-			// Save the registration
-			require.NoError(t, testKnapsack.SaveRegistration(tt.expectedRegistrationId, tt.expectedMunemo, tt.expectedNodeKey, tt.expectedEnrollSecret))
+			// Save the enrollment
+			require.NoError(t, testKnapsack.SaveRegistration(tt.expectedEnrollmentId, tt.expectedMunemo, tt.expectedNodeKey, tt.expectedEnrollSecret))
 
-			// Confirm we have the registration
+			// Confirm we have the enrollment
 			registrationsAfterSave, err := testKnapsack.Registrations()
 			require.NoError(t, err)
 			require.Equal(t, 1, len(registrationsAfterSave))
-			require.Equal(t, tt.expectedRegistrationId, registrationsAfterSave[0].EnrollmentID)
+			require.Equal(t, tt.expectedEnrollmentId, registrationsAfterSave[0].EnrollmentID)
 
 			// Confirm we have the node key
-			nodeKey, err := testKnapsack.NodeKey(tt.expectedRegistrationId)
+			nodeKey, err := testKnapsack.NodeKey(tt.expectedEnrollmentId)
 			require.NoError(t, err)
 			require.Equal(t, tt.expectedNodeKey, nodeKey)
 
-			// Now, delete the registration
-			require.NoError(t, testKnapsack.DeleteRegistration(tt.expectedRegistrationId))
+			// Now, delete the enrollment
+			require.NoError(t, testKnapsack.DeleteEnrollment(tt.expectedEnrollmentId))
 
 			// Confirm the registration is gone
-			registrationsAfterDelete, err := testKnapsack.Registrations()
+			enrollmentsAfterDelete, err := testKnapsack.Registrations()
 			require.NoError(t, err)
-			require.Equal(t, 0, len(registrationsAfterDelete))
+			require.Equal(t, 0, len(enrollmentsAfterDelete))
 
 			// Confirm the node key was deleted
-			newNodeKey, err := testKnapsack.NodeKey(tt.expectedRegistrationId)
+			newNodeKey, err := testKnapsack.NodeKey(tt.expectedEnrollmentId)
 			require.NoError(t, err)
 			require.Equal(t, "", newNodeKey)
 		})

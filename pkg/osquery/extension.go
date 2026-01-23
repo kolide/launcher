@@ -44,7 +44,7 @@ type settingsStoreWriter interface {
 // osquery. It does not provide any tables.
 type Extension struct {
 	Opts                          ExtensionOpts
-	registrationId                string
+	enrollmentId                  string
 	knapsack                      types.Knapsack
 	serviceClient                 service.KolideService
 	logPublishClient              types.OsqueryPublisher
@@ -126,11 +126,11 @@ func (e iterationTerminatedError) Error() string {
 // NewExtension creates a new Extension from the provided service.KolideService
 // implementation. The background routines should be started by calling
 // Start().
-func NewExtension(ctx context.Context, client service.KolideService, logPublishClient types.OsqueryPublisher, settingsWriter settingsStoreWriter, k types.Knapsack, registrationId string, opts ExtensionOpts) (*Extension, error) {
+func NewExtension(ctx context.Context, client service.KolideService, logPublishClient types.OsqueryPublisher, settingsWriter settingsStoreWriter, k types.Knapsack, enrollmentId string, opts ExtensionOpts) (*Extension, error) {
 	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
-	slogger := k.Slogger().With("component", "osquery_extension", "registration_id", registrationId)
+	slogger := k.Slogger().With("component", "osquery_extension", "enrollment_id", enrollmentId)
 
 	if opts.MaxBytesPerBatch == 0 {
 		opts.MaxBytesPerBatch = defaultMaxBytesPerBatch
@@ -158,7 +158,7 @@ func NewExtension(ctx context.Context, client service.KolideService, logPublishC
 		serviceClient:                 client,
 		logPublishClient:              logPublishClient,
 		settingsWriter:                settingsWriter,
-		registrationId:                registrationId,
+		enrollmentId:                  enrollmentId,
 		knapsack:                      k,
 		Opts:                          opts,
 		enrollMutex:                   &sync.Mutex{},
@@ -188,13 +188,13 @@ func NewExtension(ctx context.Context, client service.KolideService, logPublishC
 }
 
 func (e *Extension) Execute() error {
-	// We want to make sure that if we have a node key, we also have a stored registration.
-	// Ensuring the registration is stored is currently also handled by any call to `Enroll`,
+	// We want to make sure that if we have a node key, we also have a stored enrollment.
+	// Ensuring the enrollment is stored is currently also handled by any call to `Enroll`,
 	// which is currently triggered by the osquery instance, immediately after creating the extension.
 	// We have the call here in case we ever remove it from the osquery instance.
-	if err := e.knapsack.EnsureRegistrationStored(e.registrationId); err != nil {
+	if err := e.knapsack.EnsureRegistrationStored(e.enrollmentId); err != nil {
 		e.slogger.Log(context.TODO(), slog.LevelError,
-			"could not ensure registration is stored",
+			"could not ensure enrollment is stored",
 			"err", err,
 		)
 	}
@@ -242,7 +242,7 @@ func (e *Extension) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) 
 // there is an existing identifier, that should be returned. If not, the
 // identifier should be randomly generated and persisted.
 func (e *Extension) getHostIdentifier() (string, error) {
-	return IdentifierFromDB(e.knapsack.ConfigStore(), e.registrationId)
+	return IdentifierFromDB(e.knapsack.ConfigStore(), e.enrollmentId)
 }
 
 // IdentifierFromDB returns the built-in launcher identifier from the config bucket.
@@ -319,7 +319,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 			"node key exists, skipping enrollment",
 		)
 		span.AddEvent("node_key_already_exists")
-		if err := e.knapsack.EnsureRegistrationStored(e.registrationId); err != nil {
+		if err := e.knapsack.EnsureRegistrationStored(e.enrollmentId); err != nil {
 			e.slogger.Log(ctx, slog.LevelError,
 				"could not ensure registration is stored for existing enrollment",
 				"err", err,
@@ -407,7 +407,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	// Save newly acquired node key if successful -- adding the registration
 	// will do this. SaveRegistration will extract the munemo from the enrollment
 	// secret for us.
-	if err := e.knapsack.SaveRegistration(e.registrationId, "", keyString, enrollSecret); err != nil {
+	if err := e.knapsack.SaveRegistration(e.enrollmentId, "", keyString, enrollSecret); err != nil {
 		e.slogger.Log(ctx, slog.LevelError,
 			"could not save registration",
 			"err", err,
@@ -439,7 +439,7 @@ func (e *Extension) enrolled() bool {
 
 // nodeKey returns the current node key for this registration.
 func (e *Extension) nodeKey() string {
-	nodeKey, _ := e.knapsack.NodeKey(e.registrationId)
+	nodeKey, _ := e.knapsack.NodeKey(e.enrollmentId)
 	return nodeKey
 }
 
@@ -458,9 +458,9 @@ func (e *Extension) RequireReenroll(ctx context.Context) {
 		return
 	}
 	// Clear the node key such that reenrollment is required.
-	if err := e.knapsack.DeleteRegistration(e.registrationId); err != nil {
+	if err := e.knapsack.DeleteEnrollment(e.enrollmentId); err != nil {
 		e.slogger.Log(ctx, slog.LevelError,
-			"could not remove registration to require reenroll",
+			"could not remove enrollment to require reenroll",
 			"err", err,
 		)
 	} else {
@@ -483,7 +483,7 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 		)
 		// Try to use cached config
 		var confBytes []byte
-		confBytes, _ = e.knapsack.ConfigStore().Get(storage.KeyByIdentifier([]byte(configKey), storage.IdentifierTypeRegistration, []byte(e.registrationId)))
+		confBytes, _ = e.knapsack.ConfigStore().Get(storage.KeyByIdentifier([]byte(configKey), storage.IdentifierTypeRegistration, []byte(e.enrollmentId)))
 
 		if len(confBytes) == 0 {
 			if !e.enrolled() {
@@ -495,7 +495,7 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 		config = string(confBytes)
 	} else {
 		// Store good config in both the knapsack and our settings store
-		if err := e.knapsack.ConfigStore().Set(storage.KeyByIdentifier([]byte(configKey), storage.IdentifierTypeRegistration, []byte(e.registrationId)), []byte(config)); err != nil {
+		if err := e.knapsack.ConfigStore().Set(storage.KeyByIdentifier([]byte(configKey), storage.IdentifierTypeRegistration, []byte(e.enrollmentId)), []byte(config)); err != nil {
 			e.slogger.Log(ctx, slog.LevelError,
 				"writing config to config store",
 				"err", err,
@@ -577,7 +577,7 @@ func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bo
 	configOptsToSet := startupOsqueryConfigOptions
 	osqHistory := e.knapsack.OsqueryHistory()
 	if osqHistory != nil {
-		if uptimeMins, err := osqHistory.LatestInstanceUptimeMinutes(e.registrationId); err == nil && uptimeMins >= 10 {
+		if uptimeMins, err := osqHistory.LatestInstanceUptimeMinutes(e.enrollmentId); err == nil && uptimeMins >= 10 {
 			// Only log the state change once -- RequestConfig happens every 5 mins
 			if uptimeMins <= 15 {
 				e.slogger.Log(ctx, slog.LevelDebug,

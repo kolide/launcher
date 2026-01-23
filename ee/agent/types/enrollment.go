@@ -42,7 +42,7 @@ type EnrollmentTracker interface {
 	SaveRegistration(registrationId, munemo, nodeKey, enrollmentSecret string) error
 	EnsureRegistrationStored(registrationId string) error
 	NodeKey(registrationId string) (string, error)
-	DeleteRegistration(registrationId string) error
+	DeleteEnrollment(enrollmentId string) error
 }
 
 // Enrollment represents a launcher installation's association with a given tenant.

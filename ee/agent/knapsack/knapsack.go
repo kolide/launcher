@@ -303,7 +303,7 @@ func (k *knapsack) NodeKey(registrationId string) (string, error) {
 	return "", nil
 }
 
-func (k *knapsack) DeleteRegistration(registrationId string) error {
+func (k *knapsack) DeleteEnrollment(enrollmentId string) error {
 	// First, get the stores we'll need
 	nodeKeyStore := k.getKVStore(storage.ConfigStore)
 	if nodeKeyStore == nil {
@@ -314,16 +314,16 @@ func (k *knapsack) DeleteRegistration(registrationId string) error {
 		return errors.New("no enrollment store")
 	}
 
-	if err := nodeKeyStore.Delete(storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(registrationId))); err != nil {
-		return fmt.Errorf("deleting node key for %s: %w", registrationId, err)
+	if err := nodeKeyStore.Delete(storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(enrollmentId))); err != nil {
+		return fmt.Errorf("deleting node key for %s: %w", enrollmentId, err)
 	}
-	if err := enrollmentStore.Delete([]byte(registrationId)); err != nil {
-		return fmt.Errorf("deleting enrollment for %s: %w", registrationId, err)
+	if err := enrollmentStore.Delete([]byte(enrollmentId)); err != nil {
+		return fmt.Errorf("deleting enrollment for %s: %w", enrollmentId, err)
 	}
 
 	k.Slogger().Log(context.Background(), slog.LevelInfo,
 		"deleted enrollment",
-		"registration_id", registrationId,
+		"registration_id", enrollmentId,
 	)
 
 	return nil

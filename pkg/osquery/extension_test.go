@@ -133,7 +133,7 @@ func makeKnapsackWithInvalidEnrollment(t *testing.T, expectedNodeKey string) typ
 	// At first, return a bad node key -- this will be called once by whatever function we're calling.
 	k.On("NodeKey", testifymock.Anything).Return("bad_node_key", nil).Once()
 	// We expect that we'll attempt to delete any existing enrollment before attempting reenroll.
-	k.On("DeleteRegistration", testifymock.Anything).Return(nil)
+	k.On("DeleteEnrollment", testifymock.Anything).Return(nil)
 	// On re-enroll, we'll check to confirm that we don't have a node key (perhaps from a different enroll thread).
 	// Return no node key, to confirm we proceed with reenrollment.
 	k.On("NodeKey", testifymock.Anything).Return("", nil).Once()
@@ -373,7 +373,7 @@ func TestExtensionEnroll(t *testing.T) {
 	// Re-enroll for new node key
 	expectedNodeKey = "new_node_key"
 	k.On("SaveRegistration", types.DefaultEnrollmentID, "", expectedNodeKey, expectedEnrollSecret).Return(nil).Once()
-	k.On("DeleteRegistration", types.DefaultEnrollmentID).Return(nil)
+	k.On("DeleteEnrollment", types.DefaultEnrollmentID).Return(nil)
 	k.On("NodeKey", types.DefaultEnrollmentID).Return("", nil).Once()
 	e.RequireReenroll(t.Context())
 	key, invalid, err = e.Enroll(t.Context())
@@ -948,7 +948,7 @@ func TestExtensionWriteBufferedLogsEnrollmentInvalid(t *testing.T) {
 	// At first, return a bad node key -- this will be called once by GenerateConfigs.
 	k.On("NodeKey", testifymock.Anything).Return("bad_node_key", nil).Once()
 	// We expect that we'll attempt to delete any existing enrollment before attempting reenroll.
-	k.On("DeleteRegistration", testifymock.Anything).Return(nil)
+	k.On("DeleteEnrollment", testifymock.Anything).Return(nil)
 	// On re-enroll, we'll check to confirm that we don't have a node key (perhaps from a different enroll thread).
 	// Return no node key, to confirm we proceed with reenrollment.
 	k.On("NodeKey", testifymock.Anything).Return("", nil).Once()
@@ -1718,7 +1718,7 @@ func TestExtensionWriteResultsEnrollmentInvalid(t *testing.T) {
 	// At first, return a bad node key -- this will be called once by WriteResults.
 	k.On("NodeKey", testifymock.Anything).Return("bad_node_key", nil).Once()
 	// We expect that we'll attempt to delete any existing enrollment before attempting reenroll.
-	k.On("DeleteRegistration", testifymock.Anything).Return(nil)
+	k.On("DeleteEnrollment", testifymock.Anything).Return(nil)
 	// On re-enroll, we'll check to confirm that we don't have a node key (perhaps from a different enroll thread).
 	// Return no node key, to confirm we proceed with reenrollment.
 	k.On("NodeKey", testifymock.Anything).Return("", nil).Once()

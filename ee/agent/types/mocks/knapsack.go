@@ -906,35 +906,35 @@ func (_c *Knapsack_DebugServerData_Call) RunAndReturn(run func() bool) *Knapsack
 	return _c
 }
 
-// DeleteRegistration provides a mock function for the type Knapsack
-func (_mock *Knapsack) DeleteRegistration(registrationId string) error {
-	ret := _mock.Called(registrationId)
+// DeleteEnrollment provides a mock function for the type Knapsack
+func (_mock *Knapsack) DeleteEnrollment(enrollmentId string) error {
+	ret := _mock.Called(enrollmentId)
 
 	if len(ret) == 0 {
-		panic("no return value specified for DeleteRegistration")
+		panic("no return value specified for DeleteEnrollment")
 	}
 
 	var r0 error
 	if returnFunc, ok := ret.Get(0).(func(string) error); ok {
-		r0 = returnFunc(registrationId)
+		r0 = returnFunc(enrollmentId)
 	} else {
 		r0 = ret.Error(0)
 	}
 	return r0
 }
 
-// Knapsack_DeleteRegistration_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteRegistration'
-type Knapsack_DeleteRegistration_Call struct {
+// Knapsack_DeleteEnrollment_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteEnrollment'
+type Knapsack_DeleteEnrollment_Call struct {
 	*mock.Call
 }
 
-// DeleteRegistration is a helper method to define mock.On call
-//   - registrationId string
-func (_e *Knapsack_Expecter) DeleteRegistration(registrationId interface{}) *Knapsack_DeleteRegistration_Call {
-	return &Knapsack_DeleteRegistration_Call{Call: _e.mock.On("DeleteRegistration", registrationId)}
+// DeleteEnrollment is a helper method to define mock.On call
+//   - enrollmentId string
+func (_e *Knapsack_Expecter) DeleteEnrollment(enrollmentId interface{}) *Knapsack_DeleteEnrollment_Call {
+	return &Knapsack_DeleteEnrollment_Call{Call: _e.mock.On("DeleteEnrollment", enrollmentId)}
 }
 
-func (_c *Knapsack_DeleteRegistration_Call) Run(run func(registrationId string)) *Knapsack_DeleteRegistration_Call {
+func (_c *Knapsack_DeleteEnrollment_Call) Run(run func(enrollmentId string)) *Knapsack_DeleteEnrollment_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 string
 		if args[0] != nil {
@@ -947,12 +947,12 @@ func (_c *Knapsack_DeleteRegistration_Call) Run(run func(registrationId string))
 	return _c
 }
 
-func (_c *Knapsack_DeleteRegistration_Call) Return(err error) *Knapsack_DeleteRegistration_Call {
+func (_c *Knapsack_DeleteEnrollment_Call) Return(err error) *Knapsack_DeleteEnrollment_Call {
 	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *Knapsack_DeleteRegistration_Call) RunAndReturn(run func(registrationId string) error) *Knapsack_DeleteRegistration_Call {
+func (_c *Knapsack_DeleteEnrollment_Call) RunAndReturn(run func(enrollmentId string) error) *Knapsack_DeleteEnrollment_Call {
 	_c.Call.Return(run)
 	return _c
 }
