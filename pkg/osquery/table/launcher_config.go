@@ -11,28 +11,28 @@ import (
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-func LauncherConfigTable(flags types.Flags, slogger *slog.Logger, store types.Getter, registrationTracker types.EnrollmentTracker) *table.Plugin {
+func LauncherConfigTable(flags types.Flags, slogger *slog.Logger, store types.Getter, enrollmentTracker types.EnrollmentTracker) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("config"),
-		table.TextColumn("registration_id"),
+		table.TextColumn("enrollment_id"),
 	}
-	return tablewrapper.New(flags, slogger, "kolide_launcher_config", columns, generateLauncherConfig(store, registrationTracker))
+	return tablewrapper.New(flags, slogger, "kolide_launcher_config", columns, generateLauncherConfig(store, enrollmentTracker))
 }
 
-func generateLauncherConfig(store types.Getter, registrationTracker types.EnrollmentTracker) table.GenerateFunc {
+func generateLauncherConfig(store types.Getter, enrollmentTracker types.EnrollmentTracker) table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 		_, span := observability.StartSpan(ctx, "table_name", "kolide_launcher_config")
 		defer span.End()
 
 		results := make([]map[string]string, 0)
-		for _, enrollmentId := range registrationTracker.EnrollmentIDs() {
+		for _, enrollmentId := range enrollmentTracker.EnrollmentIDs() {
 			config, err := osquery.Config(store, enrollmentId)
 			if err != nil {
 				return nil, err
 			}
 			results = append(results, map[string]string{
-				"config":          config,
-				"registration_id": enrollmentId,
+				"config":        config,
+				"enrollment_id": enrollmentId,
 			})
 		}
 		return results, nil
