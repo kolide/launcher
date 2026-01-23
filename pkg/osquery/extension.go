@@ -247,9 +247,9 @@ func (e *Extension) getHostIdentifier() (string, error) {
 
 // IdentifierFromDB returns the built-in launcher identifier from the config bucket.
 // The function is exported to allow for building the kolide_launcher_info table.
-func IdentifierFromDB(configStore types.GetterSetter, registrationId string) (string, error) {
+func IdentifierFromDB(configStore types.GetterSetter, enrollmentId string) (string, error) {
 	var identifier string
-	uuidBytes, _ := configStore.Get(storage.KeyByIdentifier([]byte(uuidKey), storage.IdentifierTypeEnrollment, []byte(registrationId)))
+	uuidBytes, _ := configStore.Get(storage.KeyByIdentifier([]byte(uuidKey), storage.IdentifierTypeEnrollment, []byte(enrollmentId)))
 	gotID, err := uuid.ParseBytes(uuidBytes)
 
 	// Use existing UUID
@@ -266,7 +266,7 @@ func IdentifierFromDB(configStore types.GetterSetter, registrationId string) (st
 	identifier = gotID.String()
 
 	// Save new UUID
-	err = configStore.Set(storage.KeyByIdentifier([]byte(uuidKey), storage.IdentifierTypeEnrollment, []byte(registrationId)), []byte(identifier))
+	err = configStore.Set(storage.KeyByIdentifier([]byte(uuidKey), storage.IdentifierTypeEnrollment, []byte(enrollmentId)), []byte(identifier))
 	if err != nil {
 		return "", fmt.Errorf("saving new UUID: %w", err)
 	}
@@ -275,8 +275,8 @@ func IdentifierFromDB(configStore types.GetterSetter, registrationId string) (st
 }
 
 // Config returns the device config from the storage layer
-func Config(getter types.Getter, registrationId string) (string, error) {
-	key, err := getter.Get(storage.KeyByIdentifier([]byte(configKey), storage.IdentifierTypeEnrollment, []byte(registrationId)))
+func Config(getter types.Getter, enrollmentId string) (string, error) {
+	key, err := getter.Get(storage.KeyByIdentifier([]byte(configKey), storage.IdentifierTypeEnrollment, []byte(enrollmentId)))
 	if err != nil {
 		return "", fmt.Errorf("error getting config key: %w", err)
 	}
@@ -321,7 +321,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		span.AddEvent("node_key_already_exists")
 		if err := e.knapsack.EnsureEnrollmentStored(e.enrollmentId); err != nil {
 			e.slogger.Log(ctx, slog.LevelError,
-				"could not ensure registration is stored for existing enrollment",
+				"could not ensure enrollment is stored for existing enrollment",
 				"err", err,
 			)
 		}
@@ -409,7 +409,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	// secret for us.
 	if err := e.knapsack.SaveEnrollment(e.enrollmentId, "", keyString, enrollSecret); err != nil {
 		e.slogger.Log(ctx, slog.LevelError,
-			"could not save registration",
+			"could not save enrollment",
 			"err", err,
 		)
 	}
@@ -437,7 +437,7 @@ func (e *Extension) enrolled() bool {
 	return e.nodeKey() != ""
 }
 
-// nodeKey returns the current node key for this registration.
+// nodeKey returns the current node key for this enrollment.
 func (e *Extension) nodeKey() string {
 	nodeKey, _ := e.knapsack.NodeKey(e.enrollmentId)
 	return nodeKey
@@ -465,7 +465,7 @@ func (e *Extension) RequireReenroll(ctx context.Context) {
 		)
 	} else {
 		e.slogger.Log(ctx, slog.LevelWarn,
-			"required reeenroll by removing registration",
+			"required reeenroll by removing enrollment",
 		)
 	}
 }

@@ -233,7 +233,7 @@ func (k *knapsack) EnsureEnrollmentStored(enrollmentId string) error {
 	// Check to see if we have an existing enrollment first
 	existingEnrollmentRaw, err := enrollmentStore.Get([]byte(enrollmentId))
 	if err != nil {
-		return fmt.Errorf("getting existing registration: %w", err)
+		return fmt.Errorf("getting existing enrollment: %w", err)
 	}
 
 	// No enrollment exists yet -- add it if we can
@@ -276,7 +276,7 @@ func (k *knapsack) EnsureEnrollmentStored(enrollmentId string) error {
 	k.Slogger().Log(context.TODO(), slog.LevelInfo,
 		"successfully updated enrollment's node key",
 		"munemo", existingEnrollment.Munemo,
-		"registration_id", enrollmentId,
+		"enrollment_id", enrollmentId,
 	)
 	return nil
 }
@@ -323,7 +323,7 @@ func (k *knapsack) DeleteEnrollment(enrollmentId string) error {
 
 	k.Slogger().Log(context.Background(), slog.LevelInfo,
 		"deleted enrollment",
-		"registration_id", enrollmentId,
+		"enrollment_id", enrollmentId,
 	)
 
 	return nil

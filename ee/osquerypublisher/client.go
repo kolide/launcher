@@ -114,8 +114,8 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 
 // PublishResults publishes results to the agent-ingester service.
 // It returns the response from the agent-ingester service and any error that occurred.
-// In the future we will likely want to pass a registration id in here to allow for selection of
-// the correct agent-ingester token to use. For now, we can use the default registration token.
+// In the future we will likely want to pass an enrollment id in here to allow for selection of
+// the correct agent-ingester token to use. For now, we can use the token associated with the default enrollment.
 func (lpc *LogPublisherClient) PublishResults(ctx context.Context, results []distributed.Result) (*types.OsqueryPublicationResponse, error) {
 	if !lpc.shouldPublishLogs() {
 		return nil, nil

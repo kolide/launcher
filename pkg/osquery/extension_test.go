@@ -40,7 +40,7 @@ import (
 
 // makeKnapsack returns a types.Knapsack ready for use in most tests. Use this when your test
 // expects the extension to already be enrolled. If you need an unenrolled extension, use makeKnapsackUnenrolled.
-// If you need to manipulate the registration state (e.g. by changing node keys), then set up the mock knapsack
+// If you need to manipulate the enrollment state (e.g. by changing node keys), then set up the mock knapsack
 // manually in your test instead.
 func makeKnapsack(t *testing.T) types.Knapsack {
 	m := mocks.NewKnapsack(t)
@@ -77,7 +77,7 @@ func makeTestOsqLogPublisher(k types.Knapsack) types.OsqueryPublisher {
 }
 
 // makeKnapsackUnenrolled returns a types.Knapsack ready for use in any test that requires
-// an unenrolled extension. If you need to manipulate the registration state (e.g. by changing
+// an unenrolled extension. If you need to manipulate the enrollment state (e.g. by changing
 // node keys), then set up the mock knapsack manually in your test instead.
 func makeKnapsackUnenrolled(t *testing.T) types.Knapsack {
 	m := mocks.NewKnapsack(t)
@@ -347,7 +347,7 @@ func TestExtensionEnroll(t *testing.T) {
 	// The next enroll request will have access to the new node key
 	k.On("NodeKey", types.DefaultEnrollmentID).Return(expectedNodeKey, nil).Once()
 
-	// The next time we call Enroll, the extension should confirm that the registration is stored
+	// The next time we call Enroll, the extension should confirm that the enrollment is stored
 	k.On("EnsureEnrollmentStored", types.DefaultEnrollmentID).Return(nil)
 
 	// Should not re-enroll with stored secret

@@ -627,14 +627,14 @@ func TestMunemoCheck(t *testing.T) {
 	tests := []struct {
 		name                      string
 		headers                   map[string][]string
-		registrations             []types.Enrollment
+		enrollments               []types.Enrollment
 		expectMunemoExtractionErr bool
 		expectMiddleWareCheckErr  bool
 	}{
 		{
 			name:    "matching munemo",
 			headers: validTestHeader,
-			registrations: []types.Enrollment{
+			enrollments: []types.Enrollment{
 				{
 					EnrollmentID: types.DefaultEnrollmentID,
 					Munemo:       expectedMunemo,
@@ -643,7 +643,7 @@ func TestMunemoCheck(t *testing.T) {
 		},
 		{
 			name: "no munemo header",
-			registrations: []types.Enrollment{
+			enrollments: []types.Enrollment{
 				{
 					EnrollmentID: types.DefaultEnrollmentID,
 					Munemo:       expectedMunemo,
@@ -651,15 +651,15 @@ func TestMunemoCheck(t *testing.T) {
 			},
 		},
 		{
-			name:                      "no registrations",
+			name:                      "no enrollments",
 			headers:                   validTestHeader,
-			registrations:             []types.Enrollment{},
+			enrollments:               []types.Enrollment{},
 			expectMunemoExtractionErr: true,
 		},
 		{
 			name:    "no default enrollment",
 			headers: validTestHeader,
-			registrations: []types.Enrollment{
+			enrollments: []types.Enrollment{
 				{
 					EnrollmentID: "some-other-enrollment-id",
 					Munemo:       "some-other-munemo",
@@ -670,7 +670,7 @@ func TestMunemoCheck(t *testing.T) {
 		{
 			name:    "header and munemo dont match",
 			headers: map[string][]string{kolideMunemoHeaderKey: {"other-munemo"}},
-			registrations: []types.Enrollment{
+			enrollments: []types.Enrollment{
 				{
 					EnrollmentID: types.DefaultEnrollmentID,
 					Munemo:       expectedMunemo,
@@ -685,7 +685,7 @@ func TestMunemoCheck(t *testing.T) {
 			t.Parallel()
 
 			k := typesmocks.NewKnapsack(t)
-			k.On("Enrollments").Return(tt.registrations, nil)
+			k.On("Enrollments").Return(tt.enrollments, nil)
 			testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 			require.NoError(t, err, "could not create test config store")
 			k.On("ConfigStore").Return(testConfigStore).Maybe()

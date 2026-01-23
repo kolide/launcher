@@ -120,8 +120,8 @@ func (s *startupSettingsWriter) Close() error {
 	return s.kvStore.Close()
 }
 
-func (s *startupSettingsWriter) extractAutoTableConstructionConfig(registrationId string) (string, error) {
-	osqConfig, err := s.knapsack.ConfigStore().Get(storage.KeyByIdentifier([]byte("config"), storage.IdentifierTypeEnrollment, []byte(registrationId)))
+func (s *startupSettingsWriter) extractAutoTableConstructionConfig(enrollmentId string) (string, error) {
+	osqConfig, err := s.knapsack.ConfigStore().Get(storage.KeyByIdentifier([]byte("config"), storage.IdentifierTypeEnrollment, []byte(enrollmentId)))
 	if err != nil {
 		return "", fmt.Errorf("could not get osquery config from store: %w", err)
 	}
@@ -148,11 +148,11 @@ func (s *startupSettingsWriter) extractAutoTableConstructionConfig(registrationI
 	return string(atcJson), nil
 }
 
-func (s *startupSettingsWriter) extractKATCConstructionConfig(registrationId string) (string, error) {
+func (s *startupSettingsWriter) extractKATCConstructionConfig(enrollmentId string) (string, error) {
 	kolideCfg := make(map[string]string)
 	if err := s.knapsack.KatcConfigStore().ForEach(func(k []byte, v []byte) error {
 		key, _, identifier := storage.SplitKey(k)
-		if string(identifier) == registrationId {
+		if string(identifier) == enrollmentId {
 			kolideCfg[string(key)] = string(v)
 		}
 		return nil

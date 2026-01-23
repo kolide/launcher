@@ -31,11 +31,11 @@ func TestKeyByIdentifier(t *testing.T) {
 			expectedKey:    []byte("config"),
 		},
 		{
-			testCaseName:   "registration identifier",
+			testCaseName:   "enrollment identifier",
 			key:            []byte("uuid"),
 			identifierType: IdentifierTypeEnrollment,
-			identifier:     []byte("some-test-registration-id"),
-			expectedKey:    []byte("uuid:registration:some-test-registration-id"),
+			identifier:     []byte("some-test-enrollment-id"),
+			expectedKey:    []byte("uuid:registration:some-test-enrollment-id"),
 		},
 	} {
 		t.Run(tt.testCaseName, func(t *testing.T) {
@@ -64,18 +64,18 @@ func TestSplitKey(t *testing.T) {
 			expectedIdentifier:     []byte("default"),
 		},
 		{
-			testCaseName:           "uuid by registration",
-			key:                    []byte("uuid:registration:some-test-registration-id"),
+			testCaseName:           "uuid by enrollment",
+			key:                    []byte("uuid:registration:some-test-enrollment-id"),
 			expectedKey:            []byte("uuid"),
 			expectedIdentifierType: IdentifierTypeEnrollment,
-			expectedIdentifier:     []byte("some-test-registration-id"),
+			expectedIdentifier:     []byte("some-test-enrollment-id"),
 		},
 		{
-			testCaseName:           "katc table by registration",
-			key:                    []byte("katc_some_test_table:registration:another-test-registration-id"),
+			testCaseName:           "katc table by enrollment",
+			key:                    []byte("katc_some_test_table:registration:another-test-enrollment-id"),
 			expectedKey:            []byte("katc_some_test_table"),
 			expectedIdentifierType: IdentifierTypeEnrollment,
-			expectedIdentifier:     []byte("another-test-registration-id"),
+			expectedIdentifier:     []byte("another-test-enrollment-id"),
 		},
 	} {
 		t.Run(tt.testCaseName, func(t *testing.T) {

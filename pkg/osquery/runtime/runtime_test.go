@@ -558,7 +558,7 @@ func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Thread
 		}
 
 		if latestInstanceStats == nil {
-			return errors.New("no latest instance stats for registration id")
+			return errors.New("no latest instance stats for enrollment id")
 		}
 
 		if startTime, ok := latestInstanceStats["start_time"]; !ok || startTime == "" {

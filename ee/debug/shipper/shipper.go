@@ -311,7 +311,7 @@ func enrollSecret(k types.Knapsack) string {
 	return string(b)
 }
 
-// munemo fetches the registration's munemo from the knapsack. If that is not available,
+// munemo fetches the enrollment's munemo from the knapsack. If that is not available,
 // it looks for the munemo stored in metadata.json.
 func munemo(k types.Knapsack) string {
 	if k == nil {

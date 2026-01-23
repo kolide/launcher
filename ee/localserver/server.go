@@ -459,7 +459,7 @@ func (ls *localServer) rateLimitHandler(l *rate.Limiter, next http.Handler) http
 	})
 }
 
-// getMunemoFromKnapsack retrieves the munemo from the stored registrations
+// getMunemoFromKnapsack retrieves the munemo from the stored enrollments
 func getMunemoFromKnapsack(k types.Knapsack) (string, error) {
 	enrollments, err := k.Enrollments()
 	if err != nil {

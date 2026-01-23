@@ -192,7 +192,7 @@ func TestSaveEnrollment(t *testing.T) {
 
 		if !isDefaultEnrollmentId {
 			enrollmentId = ulid.New()
-			testCaseNameSuffix = " (non-default registration ID)"
+			testCaseNameSuffix = " (non-default enrollment ID)"
 		}
 
 		testMunemo := ulid.New()
@@ -276,7 +276,7 @@ func TestSaveEnrollment(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, tt.expectedNodeKey, string(storedKey))
 
-			// Confirm that the registration was stored
+			// Confirm that the enrollment was stored
 			rawStoredEnrollment, err := enrollmentStore.Get([]byte(tt.enrollmentId))
 			require.NoError(t, err)
 			var storedEnrollment types.Enrollment
@@ -447,7 +447,7 @@ func TestEnsureEnrollmentStored(t *testing.T) {
 			}
 
 			// Success was not expected.
-			// If the registration already existed -- we expect that the node key was not updated.
+			// If the enrollment already existed -- we expect that the node key was not updated.
 			if tt.enrollmentExists {
 				var updatedEnrollment types.Enrollment
 				require.NoError(t, json.Unmarshal(rawUpdatedEnrollment, &updatedEnrollment))
@@ -455,7 +455,7 @@ func TestEnsureEnrollmentStored(t *testing.T) {
 				return
 			}
 
-			// If the registration did not already exist, then we should not have created it at all.
+			// If the enrollment did not already exist, then we should not have created it at all.
 			require.Nil(t, rawUpdatedEnrollment)
 		})
 	}
@@ -495,7 +495,7 @@ func TestNodeKey(t *testing.T) {
 				storage.EnrollmentStore: enrollmentStore,
 			}, nil, nil, multislogger.New(), multislogger.New())
 
-			// Set up our registration
+			// Set up our enrollment
 			require.NoError(t, testKnapsack.SaveEnrollment(tt.enrollmentId, "test_munemo", tt.expectedNodeKey, ""))
 
 			// Confirm that the node key was stored
