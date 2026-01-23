@@ -58,7 +58,7 @@ func TestUninstall(t *testing.T) {
 			k.On("EnrollSecretPath").Return(enrollSecretPath)
 			k.On("Slogger").Return(multislogger.NewNopLogger())
 			k.On("RootDirectory").Return(tempRootDir)
-			k.On("RegistrationIDs").Return([]string{types.DefaultEnrollmentID})
+			k.On("EnrollmentIDs").Return([]string{types.DefaultEnrollmentID})
 			testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 			require.NoError(t, err, "could not create test config store")
 			k.On("ConfigStore").Return(testConfigStore)

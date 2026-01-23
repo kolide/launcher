@@ -333,7 +333,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 				storage.ServerProvidedDataStore: testServerProvidedDataStore,
 			}).Maybe()
 			mockKnapsack.On("ResetOnHardwareChangeEnabled").Return(tt.resetOnHardwareChangeEnabled).Maybe()
-			mockKnapsack.On("RegistrationIDs").Return([]string{"default"}).Maybe()
+			mockKnapsack.On("EnrollmentIDs").Return([]string{"default"}).Maybe()
 
 			// Set up dependencies: ensure that retrieved hardware data matches expectations
 			var actualSerial, actualHardwareUUID string
@@ -522,7 +522,7 @@ func TestDetectAndRemediateHardwareChange_SavesDataOverMultipleResets(t *testing
 			Munemo:       "test-munemo-1",
 		},
 	}, nil)
-	mockKnapsack.On("RegistrationIDs").Return([]string{"default"})
+	mockKnapsack.On("EnrollmentIDs").Return([]string{"default"})
 
 	// Set up dependencies: ensure that all hardware data is incorrect so that a reset will be triggered
 	require.NoError(t, testHostDataStore.Set(hostDataKeySerial, []byte("not-the-correct-serial")), "could not set serial in test store")
@@ -622,7 +622,7 @@ func TestExecute(t *testing.T) {
 			Munemo:       "test-munemo-1",
 		},
 	}, nil)
-	mockKnapsack.On("RegistrationIDs").Return([]string{"default"})
+	mockKnapsack.On("EnrollmentIDs").Return([]string{"default"})
 
 	// Set up dependencies: ensure that all hardware data is incorrect so that a reset will be triggered
 	require.NoError(t, testHostDataStore.Set(hostDataKeySerial, []byte("not-the-correct-serial")), "could not set serial in test store")

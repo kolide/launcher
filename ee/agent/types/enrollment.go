@@ -34,10 +34,10 @@ type EnrollmentDetails struct {
 }
 
 // EnrollmentTracker manages the current set of enrollments for this launcher installation.
-// Right now, the list is hardcoded to only the default registration ID. In the future, this
+// Right now, the list is hardcoded to only the default enrollment ID. In the future, this
 // data may be provided by e.g. a control server subsystem.
 type EnrollmentTracker interface {
-	RegistrationIDs() []string
+	EnrollmentIDs() []string
 	Registrations() ([]Enrollment, error)
 	SaveRegistration(registrationId, munemo, nodeKey, enrollmentSecret string) error
 	EnsureRegistrationStored(registrationId string) error

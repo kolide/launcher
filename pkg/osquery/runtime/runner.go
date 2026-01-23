@@ -26,8 +26,8 @@ type settingsStoreWriter interface {
 }
 
 type Runner struct {
-	registrationIds  []string                    // we expect to run one instance per registration ID
-	instances        map[string]*OsqueryInstance // maps registration ID to currently-running instance
+	enrollmentIds    []string                    // we expect to run one instance per enrollment ID
+	instances        map[string]*OsqueryInstance // maps enrollment ID to currently-running instance
 	instanceLock     sync.Mutex                  // locks access to `instances` to avoid e.g. restarting an instance that isn't running yet
 	slogger          *slog.Logger
 	knapsack         types.Knapsack
@@ -43,7 +43,7 @@ type Runner struct {
 
 func New(k types.Knapsack, serviceClient service.KolideService, logPublishClient types.OsqueryPublisher, settingsWriter settingsStoreWriter, opts ...OsqueryInstanceOption) *Runner {
 	runner := &Runner{
-		registrationIds:  k.RegistrationIDs(),
+		enrollmentIds:    k.EnrollmentIDs(),
 		instances:        make(map[string]*OsqueryInstance),
 		slogger:          k.Slogger().With("component", "osquery_runner"),
 		knapsack:         k,
@@ -72,7 +72,7 @@ func (r *Runner) Run() error {
 	wg, ctx := errgroup.WithContext(context.TODO())
 
 	// Start each worker for each instance
-	for _, registrationId := range r.registrationIds {
+	for _, registrationId := range r.enrollmentIds {
 		id := registrationId
 		wg.Go(func() error {
 			if err := r.runInstance(id); err != nil {
@@ -405,15 +405,15 @@ func (r *Runner) Healthy() error {
 	defer r.instanceLock.Unlock()
 
 	healthcheckErrs := make([]error, 0)
-	for _, registrationId := range r.registrationIds {
-		instance, ok := r.instances[registrationId]
+	for _, enrollmentId := range r.enrollmentIds {
+		instance, ok := r.instances[enrollmentId]
 		if !ok {
-			healthcheckErrs = append(healthcheckErrs, fmt.Errorf("running instance does not exist for %s", registrationId))
+			healthcheckErrs = append(healthcheckErrs, fmt.Errorf("running instance does not exist for %s", enrollmentId))
 			continue
 		}
 
 		if err := instance.Healthy(); err != nil {
-			healthcheckErrs = append(healthcheckErrs, fmt.Errorf("healthcheck error for %s: %w", registrationId, err))
+			healthcheckErrs = append(healthcheckErrs, fmt.Errorf("healthcheck error for %s: %w", enrollmentId, err))
 		}
 	}
 
@@ -429,19 +429,19 @@ func (r *Runner) InstanceStatuses() map[string]types.InstanceStatus {
 	defer r.instanceLock.Unlock()
 
 	instanceStatuses := make(map[string]types.InstanceStatus)
-	for _, registrationId := range r.registrationIds {
-		instance, ok := r.instances[registrationId]
+	for _, enrollmentId := range r.enrollmentIds {
+		instance, ok := r.instances[enrollmentId]
 		if !ok {
-			instanceStatuses[registrationId] = types.InstanceStatusNotStarted
+			instanceStatuses[enrollmentId] = types.InstanceStatusNotStarted
 			continue
 		}
 
 		if err := instance.Healthy(); err != nil {
-			instanceStatuses[registrationId] = types.InstanceStatusUnhealthy
+			instanceStatuses[enrollmentId] = types.InstanceStatusUnhealthy
 			continue
 		}
 
-		instanceStatuses[registrationId] = types.InstanceStatusHealthy
+		instanceStatuses[enrollmentId] = types.InstanceStatusHealthy
 	}
 
 	return instanceStatuses

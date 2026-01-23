@@ -91,7 +91,7 @@ func TestBadBinaryPath(t *testing.T) {
 	logBytes, slogger := setUpTestSlogger()
 
 	k := typesMocks.NewKnapsack(t)
-	k.On("RegistrationIDs").Return([]string{types.DefaultEnrollmentID})
+	k.On("EnrollmentIDs").Return([]string{types.DefaultEnrollmentID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -149,7 +149,7 @@ func TestWithOsqueryFlags(t *testing.T) {
 	logBytes, slogger := setUpTestSlogger()
 
 	k := typesMocks.NewKnapsack(t)
-	k.On("RegistrationIDs").Return([]string{types.DefaultEnrollmentID})
+	k.On("EnrollmentIDs").Return([]string{types.DefaultEnrollmentID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -203,7 +203,7 @@ func TestFlagsChanged(t *testing.T) {
 	logBytes, slogger := setUpTestSlogger()
 
 	k := typesMocks.NewKnapsack(t)
-	k.On("RegistrationIDs").Return([]string{types.DefaultEnrollmentID})
+	k.On("EnrollmentIDs").Return([]string{types.DefaultEnrollmentID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false).Once() // WatchdogEnabled should initially return false
 	k.On("WatchdogMemoryLimitMB").Return(150)
@@ -337,7 +337,7 @@ func TestPing(t *testing.T) {
 	rootDirectory := testRootDirectory(t)
 	logBytes, slogger := setUpTestSlogger()
 	k := typesMocks.NewKnapsack(t)
-	k.On("RegistrationIDs").Return([]string{types.DefaultEnrollmentID})
+	k.On("EnrollmentIDs").Return([]string{types.DefaultEnrollmentID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -610,7 +610,7 @@ func TestSimplePath(t *testing.T) {
 	logBytes, slogger := setUpTestSlogger()
 
 	k := typesMocks.NewKnapsack(t)
-	k.On("RegistrationIDs").Return([]string{types.DefaultEnrollmentID})
+	k.On("EnrollmentIDs").Return([]string{types.DefaultEnrollmentID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -667,7 +667,7 @@ func TestMultipleInstances(t *testing.T) {
 	extraRegistrationId := ulid.New()
 
 	k := typesMocks.NewKnapsack(t)
-	k.On("RegistrationIDs").Return([]string{types.DefaultEnrollmentID, extraRegistrationId})
+	k.On("EnrollmentIDs").Return([]string{types.DefaultEnrollmentID, extraRegistrationId})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -760,7 +760,7 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	logBytes, slogger := setUpTestSlogger()
 
 	k := typesMocks.NewKnapsack(t)
-	k.On("RegistrationIDs").Return([]string{types.DefaultEnrollmentID})
+	k.On("EnrollmentIDs").Return([]string{types.DefaultEnrollmentID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -802,7 +802,7 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 
 	// Add in an extra instance
 	extraRegistrationId := ulid.New()
-	runner.registrationIds = append(runner.registrationIds, extraRegistrationId)
+	runner.enrollmentIds = append(runner.enrollmentIds, extraRegistrationId)
 
 	k.On("NodeKey", extraRegistrationId).Return(ulid.New(), nil).Maybe()
 	k.On("EnsureRegistrationStored", extraRegistrationId).Return(nil).Maybe()
@@ -849,7 +849,7 @@ func TestMultipleShutdowns(t *testing.T) {
 	logBytes, slogger := setUpTestSlogger()
 
 	k := typesMocks.NewKnapsack(t)
-	k.On("RegistrationIDs").Return([]string{types.DefaultEnrollmentID})
+	k.On("EnrollmentIDs").Return([]string{types.DefaultEnrollmentID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -907,7 +907,7 @@ func TestOsqueryDies(t *testing.T) {
 	logBytes, slogger := setUpTestSlogger()
 
 	k := typesMocks.NewKnapsack(t)
-	k.On("RegistrationIDs").Return([]string{types.DefaultEnrollmentID})
+	k.On("EnrollmentIDs").Return([]string{types.DefaultEnrollmentID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -987,7 +987,7 @@ func TestNotStarted(t *testing.T) {
 	rootDirectory := t.TempDir()
 
 	k := typesMocks.NewKnapsack(t)
-	k.On("RegistrationIDs").Return([]string{types.DefaultEnrollmentID})
+	k.On("EnrollmentIDs").Return([]string{types.DefaultEnrollmentID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return()
@@ -1092,7 +1092,7 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 	logBytes, slogger := setUpTestSlogger()
 
 	k := typesMocks.NewKnapsack(t)
-	k.On("RegistrationIDs").Return([]string{types.DefaultEnrollmentID})
+	k.On("EnrollmentIDs").Return([]string{types.DefaultEnrollmentID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(true)
 	k.On("WatchdogMemoryLimitMB").Return(150)

@@ -25,14 +25,14 @@ func generateLauncherConfig(store types.Getter, registrationTracker types.Enroll
 		defer span.End()
 
 		results := make([]map[string]string, 0)
-		for _, registrationId := range registrationTracker.RegistrationIDs() {
-			config, err := osquery.Config(store, registrationId)
+		for _, enrollmentId := range registrationTracker.EnrollmentIDs() {
+			config, err := osquery.Config(store, enrollmentId)
 			if err != nil {
 				return nil, err
 			}
 			results = append(results, map[string]string{
 				"config":          config,
-				"registration_id": registrationId,
+				"registration_id": enrollmentId,
 			})
 		}
 		return results, nil

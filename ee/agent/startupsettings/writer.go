@@ -71,25 +71,25 @@ func (s *startupSettingsWriter) WriteSettings() error {
 	}
 	updatedFlags["use_tuf_autoupdater"] = "enabled" // Hardcode for backwards compatibility circa v1.5.3
 
-	for _, registrationId := range s.knapsack.RegistrationIDs() {
-		atcConfig, err := s.extractAutoTableConstructionConfig(registrationId)
+	for _, enrollmentId := range s.knapsack.EnrollmentIDs() {
+		atcConfig, err := s.extractAutoTableConstructionConfig(enrollmentId)
 		if err != nil {
 			s.knapsack.Slogger().Log(context.TODO(), slog.LevelDebug,
 				"extracting auto_table_construction config",
 				"err", err,
 			)
 		} else {
-			atcConfigKey := storage.KeyByIdentifier([]byte("auto_table_construction"), storage.IdentifierTypeRegistration, []byte(registrationId))
+			atcConfigKey := storage.KeyByIdentifier([]byte("auto_table_construction"), storage.IdentifierTypeRegistration, []byte(enrollmentId))
 			updatedFlags[string(atcConfigKey)] = atcConfig
 		}
 
-		if katcConfig, err := s.extractKATCConstructionConfig(registrationId); err != nil {
+		if katcConfig, err := s.extractKATCConstructionConfig(enrollmentId); err != nil {
 			s.knapsack.Slogger().Log(context.TODO(), slog.LevelDebug,
 				"extracting katc_config",
 				"err", err,
 			)
 		} else {
-			katcConfigKey := storage.KeyByIdentifier([]byte("katc_config"), storage.IdentifierTypeRegistration, []byte(registrationId))
+			katcConfigKey := storage.KeyByIdentifier([]byte("katc_config"), storage.IdentifierTypeRegistration, []byte(enrollmentId))
 			updatedFlags[string(katcConfigKey)] = katcConfig
 		}
 	}

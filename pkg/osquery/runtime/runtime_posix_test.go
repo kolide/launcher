@@ -47,7 +47,7 @@ func TestOsquerySlowStart(t *testing.T) {
 	logBytes, slogger := setUpTestSlogger()
 
 	k := typesMocks.NewKnapsack(t)
-	k.On("RegistrationIDs").Return([]string{types.DefaultEnrollmentID})
+	k.On("EnrollmentIDs").Return([]string{types.DefaultEnrollmentID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
@@ -119,7 +119,7 @@ func TestExtensionSocketPath(t *testing.T) {
 	logBytes, slogger := setUpTestSlogger()
 
 	k := typesMocks.NewKnapsack(t)
-	k.On("RegistrationIDs").Return([]string{types.DefaultEnrollmentID})
+	k.On("EnrollmentIDs").Return([]string{types.DefaultEnrollmentID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)

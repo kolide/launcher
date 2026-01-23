@@ -1573,6 +1573,52 @@ func (_c *Knapsack_EnrollmentDetailsStore_Call) RunAndReturn(run func() types.KV
 	return _c
 }
 
+// EnrollmentIDs provides a mock function for the type Knapsack
+func (_mock *Knapsack) EnrollmentIDs() []string {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for EnrollmentIDs")
+	}
+
+	var r0 []string
+	if returnFunc, ok := ret.Get(0).(func() []string); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+	return r0
+}
+
+// Knapsack_EnrollmentIDs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EnrollmentIDs'
+type Knapsack_EnrollmentIDs_Call struct {
+	*mock.Call
+}
+
+// EnrollmentIDs is a helper method to define mock.On call
+func (_e *Knapsack_Expecter) EnrollmentIDs() *Knapsack_EnrollmentIDs_Call {
+	return &Knapsack_EnrollmentIDs_Call{Call: _e.mock.On("EnrollmentIDs")}
+}
+
+func (_c *Knapsack_EnrollmentIDs_Call) Run(run func()) *Knapsack_EnrollmentIDs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Knapsack_EnrollmentIDs_Call) Return(strings []string) *Knapsack_EnrollmentIDs_Call {
+	_c.Call.Return(strings)
+	return _c
+}
+
+func (_c *Knapsack_EnrollmentIDs_Call) RunAndReturn(run func() []string) *Knapsack_EnrollmentIDs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // EnrollmentStore provides a mock function for the type Knapsack
 func (_mock *Knapsack) EnrollmentStore() types.KVStore {
 	ret := _mock.Called()
@@ -3536,52 +3582,6 @@ func (_c *Knapsack_RegisterChangeObserver_Call) Return() *Knapsack_RegisterChang
 
 func (_c *Knapsack_RegisterChangeObserver_Call) RunAndReturn(run func(observer types.FlagsChangeObserver, flagKeys ...keys.FlagKey)) *Knapsack_RegisterChangeObserver_Call {
 	_c.Run(run)
-	return _c
-}
-
-// RegistrationIDs provides a mock function for the type Knapsack
-func (_mock *Knapsack) RegistrationIDs() []string {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for RegistrationIDs")
-	}
-
-	var r0 []string
-	if returnFunc, ok := ret.Get(0).(func() []string); ok {
-		r0 = returnFunc()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]string)
-		}
-	}
-	return r0
-}
-
-// Knapsack_RegistrationIDs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RegistrationIDs'
-type Knapsack_RegistrationIDs_Call struct {
-	*mock.Call
-}
-
-// RegistrationIDs is a helper method to define mock.On call
-func (_e *Knapsack_Expecter) RegistrationIDs() *Knapsack_RegistrationIDs_Call {
-	return &Knapsack_RegistrationIDs_Call{Call: _e.mock.On("RegistrationIDs")}
-}
-
-func (_c *Knapsack_RegistrationIDs_Call) Run(run func()) *Knapsack_RegistrationIDs_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *Knapsack_RegistrationIDs_Call) Return(strings []string) *Knapsack_RegistrationIDs_Call {
-	_c.Call.Return(strings)
-	return _c
-}
-
-func (_c *Knapsack_RegistrationIDs_Call) RunAndReturn(run func() []string) *Knapsack_RegistrationIDs_Call {
-	_c.Call.Return(run)
 	return _c
 }
 
