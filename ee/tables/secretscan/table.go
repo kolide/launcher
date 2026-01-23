@@ -64,7 +64,7 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		table.IntegerColumn("column_start"),
 		table.IntegerColumn("column_end"),
 		table.TextColumn("entropy"),
-		table.TextColumn("redacted_context"),
+		table.TextColumn("redacted_secret"),
 	}
 
 	cfg, err := getSharedConfig()
@@ -155,7 +155,7 @@ func (t *Table) scanPath(ctx context.Context, detector *detect.Detector, targetP
 			return nil, fmt.Errorf("scanning directory: %w", err)
 		}
 
-		return t.findingsToRows(findings), nil
+		return t.findingsToRows(findings, ""), nil
 	}
 
 	file, err := os.Open(targetPath)
@@ -175,7 +175,7 @@ func (t *Table) scanPath(ctx context.Context, detector *detect.Detector, targetP
 		return nil, fmt.Errorf("scanning file: %w", err)
 	}
 
-	return t.findingsToRowsWithPath(findings, targetPath), nil
+	return t.findingsToRows(findings, targetPath), nil
 }
 
 func (t *Table) scanContent(ctx context.Context, detector *detect.Detector, content []byte) []map[string]string {
@@ -194,44 +194,27 @@ func (t *Table) scanContent(ctx context.Context, detector *detect.Detector, cont
 		return nil
 	}
 
-	return t.findingsToRows(findings)
+	return t.findingsToRows(findings, "")
 }
 
-func (t *Table) findingsToRows(findings []report.Finding) []map[string]string {
+func (t *Table) findingsToRows(findings []report.Finding, path string) []map[string]string {
 	results := make([]map[string]string, 0, len(findings))
 
 	for _, f := range findings {
-		row := map[string]string{
-			"path":             f.File,
-			"raw_data":         "",
-			"rule_id":          f.RuleID,
-			"description":      f.Description,
-			"line_number":      fmt.Sprintf("%d", f.StartLine),
-			"column_start":     fmt.Sprintf("%d", f.StartColumn),
-			"column_end":       fmt.Sprintf("%d", f.EndColumn),
-			"entropy":          fmt.Sprintf("%.2f", f.Entropy),
-			"redacted_context": redact(f.Match),
+		filePath := path
+		if filePath == "" {
+			filePath = f.File
 		}
-		results = append(results, row)
-	}
-
-	return results
-}
-
-func (t *Table) findingsToRowsWithPath(findings []report.Finding, path string) []map[string]string {
-	results := make([]map[string]string, 0, len(findings))
-
-	for _, f := range findings {
 		row := map[string]string{
-			"path":             path,
-			"raw_data":         "",
-			"rule_id":          f.RuleID,
-			"description":      f.Description,
-			"line_number":      fmt.Sprintf("%d", f.StartLine),
-			"column_start":     fmt.Sprintf("%d", f.StartColumn),
-			"column_end":       fmt.Sprintf("%d", f.EndColumn),
-			"entropy":          fmt.Sprintf("%.2f", f.Entropy),
-			"redacted_context": redact(f.Match),
+			"path":            filePath,
+			"raw_data":        "",
+			"rule_id":         f.RuleID,
+			"description":     f.Description,
+			"line_number":     fmt.Sprintf("%d", f.StartLine),
+			"column_start":    fmt.Sprintf("%d", f.StartColumn),
+			"column_end":      fmt.Sprintf("%d", f.EndColumn),
+			"entropy":         fmt.Sprintf("%.2f", f.Entropy),
+			"redacted_secret": redact(f.Match),
 		}
 		results = append(results, row)
 	}
@@ -240,7 +223,8 @@ func (t *Table) findingsToRowsWithPath(findings []report.Finding, path string) [
 }
 
 func redact(secret string) string {
-	if len(secret) <= redactPrefixLength {
+	// Only show prefix if secret is long enough that we're not revealing too much
+	if len(secret) <= redactPrefixLength*2 {
 		return "***"
 	}
 	return secret[:redactPrefixLength] + "..."

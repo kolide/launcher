@@ -2,36 +2,28 @@ package secretscan
 
 import (
 	"archive/zip"
-	_ "embed"
 	"io"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/pkg/log/multislogger"
-	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-//go:embed test_data/sample_project.zip
-var sampleProjectZip []byte
 
 func TestSecretScan(t *testing.T) {
 	t.Parallel()
 
 	// Extract test data once for all subtests
-	tempDir := t.TempDir()
-	extractTestData(t, tempDir)
-	projectDir := filepath.Join(tempDir, "sample_project")
+	projectDir := extractTestData(t)
 
 	for _, tt := range []struct {
 		name string
 		// Input configuration
-		scanType   string // "file", "directory", or "raw_data"
-		targetPath string // relative path within sample_project (for file/directory) or raw content
-		// Expected outputs
-		expectFindings    bool
+		scanType          string // "path" or "raw_data"
+		targetPath        string // relative path within sample_project (for file/directory) or raw content
 		minFindingsCount  int
 		expectedRuleIDs   []string // rule IDs we expect to find (at least one)
 		expectedFileNames []string // file names we expect in findings (at least one)
@@ -39,9 +31,8 @@ func TestSecretScan(t *testing.T) {
 	}{
 		{
 			name:              "scan directory finds multiple secrets",
-			scanType:          "directory",
+			scanType:          "path",
 			targetPath:        "", // root of sample_project
-			expectFindings:    true,
 			minFindingsCount:  2,
 			expectedRuleIDs:   []string{"slack-bot-token", "github-pat"},
 			expectedFileNames: []string{"config.yaml", "github_token.env"},
@@ -49,28 +40,24 @@ func TestSecretScan(t *testing.T) {
 		},
 		{
 			name:              "scan single file with slack token",
-			scanType:          "file",
+			scanType:          "path",
 			targetPath:        "config.yaml",
-			expectFindings:    true,
 			minFindingsCount:  1,
 			expectedRuleIDs:   []string{"slack-bot-token"},
 			expectedFileNames: []string{"config.yaml"},
 		},
 		{
 			name:              "scan subdirectory file with github token",
-			scanType:          "file",
+			scanType:          "path",
 			targetPath:        "subdir/github_token.env",
-			expectFindings:    true,
 			minFindingsCount:  1,
 			expectedRuleIDs:   []string{"github-pat"},
 			expectedFileNames: []string{"github_token.env"},
 		},
 		{
-			name:             "scan clean file finds no secrets",
-			scanType:         "file",
-			targetPath:       "clean_file.txt",
-			expectFindings:   false,
-			minFindingsCount: 0,
+			name:       "scan clean file finds no secrets",
+			scanType:   "path",
+			targetPath: "clean_file.txt",
 		},
 		{
 			name:     "scan raw data with slack token",
@@ -78,23 +65,18 @@ func TestSecretScan(t *testing.T) {
 			targetPath: `config:
   slack_bot_token: "xoxb-9876543210-9876543210-zyxwvutsrqponmlk"
 `,
-			expectFindings:   true,
 			minFindingsCount: 1,
 			expectedRuleIDs:  []string{"slack-bot-token"},
 		},
 		{
-			name:             "scan raw data without secrets",
-			scanType:         "raw_data",
-			targetPath:       "app_name = 'my-app'\nversion = '1.0.0'\n",
-			expectFindings:   false,
-			minFindingsCount: 0,
+			name:       "scan raw data without secrets",
+			scanType:   "raw_data",
+			targetPath: "app_name = 'my-app'\nversion = '1.0.0'\n",
 		},
 		{
-			name:             "scan nonexistent file returns empty",
-			scanType:         "file",
-			targetPath:       "/nonexistent/path/to/file.txt",
-			expectFindings:   false,
-			minFindingsCount: 0,
+			name:       "scan nonexistent file returns empty",
+			scanType:   "path",
+			targetPath: "/nonexistent/path/to/file.txt",
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -102,63 +84,31 @@ func TestSecretScan(t *testing.T) {
 
 			tbl := createTestTable(t)
 
-			var queryContext table.QueryContext
-			var fullPath string
+			var queryContext map[string][]string
 
 			switch tt.scanType {
-			case "directory":
-				fullPath = projectDir
-				if tt.targetPath != "" {
+			case "path":
+				fullPath := tt.targetPath
+				if tt.targetPath == "" {
+					fullPath = projectDir
+				} else if !filepath.IsAbs(tt.targetPath) {
 					fullPath = filepath.Join(projectDir, tt.targetPath)
 				}
-				queryContext = table.QueryContext{
-					Constraints: map[string]table.ConstraintList{
-						"path": {
-							Constraints: []table.Constraint{
-								{Operator: table.OperatorEquals, Expression: fullPath},
-							},
-						},
-					},
-				}
-			case "file":
-				// Support absolute paths (e.g., for nonexistent file tests)
-				if filepath.IsAbs(tt.targetPath) {
-					fullPath = tt.targetPath
-				} else {
-					fullPath = filepath.Join(projectDir, tt.targetPath)
-				}
-				queryContext = table.QueryContext{
-					Constraints: map[string]table.ConstraintList{
-						"path": {
-							Constraints: []table.Constraint{
-								{Operator: table.OperatorEquals, Expression: fullPath},
-							},
-						},
-					},
-				}
+				queryContext = map[string][]string{"path": {fullPath}}
 			case "raw_data":
-				queryContext = table.QueryContext{
-					Constraints: map[string]table.ConstraintList{
-						"raw_data": {
-							Constraints: []table.Constraint{
-								{Operator: table.OperatorEquals, Expression: tt.targetPath},
-							},
-						},
-					},
-				}
+				queryContext = map[string][]string{"raw_data": {tt.targetPath}}
 			}
 
-			results, err := tbl.generate(t.Context(), queryContext)
+			results, err := tbl.generate(t.Context(), tablehelpers.MockQueryContext(queryContext))
 			require.NoError(t, err)
 
 			// Check findings count
-			if !tt.expectFindings {
+			if tt.minFindingsCount == 0 {
 				assert.Empty(t, results, "expected no secrets to be found")
 				return
 			}
 
-			require.NotEmpty(t, results, "expected to find secrets")
-			assert.GreaterOrEqual(t, len(results), tt.minFindingsCount,
+			require.GreaterOrEqual(t, len(results), tt.minFindingsCount,
 				"expected at least %d findings, got %d", tt.minFindingsCount, len(results))
 
 			// Collect actual findings
@@ -171,7 +121,7 @@ func TestSecretScan(t *testing.T) {
 				// Verify columns are properly populated
 				assert.NotEmpty(t, row["rule_id"], "rule_id should be populated")
 				assert.NotEmpty(t, row["description"], "description should be populated")
-				assert.NotEmpty(t, row["redacted_context"], "redacted_context should be populated")
+				assert.NotEmpty(t, row["redacted_secret"], "redacted_secret should be populated")
 				assert.NotEqual(t, "0", row["line_number"], "line_number should be > 0")
 
 				// For raw_data scans, verify the original input is returned (for SQLite filtering to work)
@@ -220,13 +170,13 @@ func TestRedact(t *testing.T) {
 			expected: "***",
 		},
 		{
-			name:     "exactly 4 chars",
-			input:    "abcd",
-			expected: "abc...",
+			name:     "exactly 6 chars redacts fully",
+			input:    "abcdef",
+			expected: "***",
 		},
 		{
-			name:     "5 chars",
-			input:    "abcde",
+			name:     "7 chars shows prefix",
+			input:    "abcdefg",
 			expected: "abc...",
 		},
 		{
@@ -245,43 +195,40 @@ func TestRedact(t *testing.T) {
 
 // Helper functions
 
-func extractTestData(t *testing.T, tempDir string) {
+// extractTestData reads the test zip file from disk and extracts it to a temp directory.
+// Returns the path to the extracted sample_project directory.
+func extractTestData(t *testing.T) string {
 	t.Helper()
 
-	zipFile := filepath.Join(tempDir, "sample_project.zip")
-	require.NoError(t, os.WriteFile(zipFile, sampleProjectZip, 0755), "writing zip to temp dir")
+	tempDir := t.TempDir()
 
-	zipReader, err := zip.OpenReader(zipFile)
-	require.NoError(t, err, "opening reader to zip file")
+	zipReader, err := zip.OpenReader("test_data/sample_project.zip")
+	require.NoError(t, err, "opening zip file")
 	defer zipReader.Close()
 
 	for _, fileInZip := range zipReader.File {
-		unzipFile(t, fileInZip, tempDir)
+		filePath := filepath.Join(tempDir, fileInZip.Name)
+
+		if fileInZip.FileInfo().IsDir() {
+			require.NoError(t, os.MkdirAll(filePath, fileInZip.Mode()), "creating dir")
+			continue
+		}
+
+		require.NoError(t, os.MkdirAll(filepath.Dir(filePath), 0755), "creating parent dir")
+
+		fileInZipReader, err := fileInZip.Open()
+		require.NoError(t, err, "opening file in zip")
+
+		outFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, fileInZip.Mode())
+		require.NoError(t, err, "opening output file")
+
+		_, err = io.Copy(outFile, fileInZipReader)
+		fileInZipReader.Close()
+		outFile.Close()
+		require.NoError(t, err, "copying from zip to temp dir")
 	}
-}
 
-func unzipFile(t *testing.T, fileInZip *zip.File, tempDir string) {
-	t.Helper()
-
-	fileInZipReader, err := fileInZip.Open()
-	require.NoError(t, err, "opening file in zip")
-	defer fileInZipReader.Close()
-
-	filePath := filepath.Join(tempDir, fileInZip.Name)
-
-	if fileInZip.FileInfo().IsDir() {
-		require.NoError(t, os.MkdirAll(filePath, fileInZip.Mode()), "creating dir")
-		return
-	}
-
-	require.NoError(t, os.MkdirAll(filepath.Dir(filePath), 0755), "creating parent dir")
-
-	outFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, fileInZip.Mode())
-	require.NoError(t, err, "opening output file")
-	defer outFile.Close()
-
-	_, err = io.Copy(outFile, fileInZipReader)
-	require.NoError(t, err, "copying from zip to temp dir")
+	return filepath.Join(tempDir, "sample_project")
 }
 
 func createTestTable(t *testing.T) *Table {
