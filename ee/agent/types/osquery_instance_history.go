@@ -19,6 +19,8 @@ type OsqueryHistorian interface {
 	SetExited(runId string, exitError error) error
 }
 
+//mockery:generate: true
+//mockery:filename: querier.go
 type Querier interface {
 	Query(query string) ([]map[string]string, error)
 }

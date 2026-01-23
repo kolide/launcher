@@ -1,6 +1,9 @@
 package types
 
 // Getter is an interface for getting data from a key/value store.
+//
+//mockery:generate: true
+//mockery:filename: keyvalue_store.go
 type Getter interface {
 	// Get retrieves the value for a key.
 	// Returns a nil value if the key does not exist.
@@ -8,6 +11,9 @@ type Getter interface {
 }
 
 // Setter is an interface for setting data in a key/value store.
+//
+//mockery:generate: true
+//mockery:filename: keyvalue_store.go
 type Setter interface {
 	// Set sets the value for a key.
 	// If the key exist then its previous value will be overwritten.
@@ -16,6 +22,9 @@ type Setter interface {
 }
 
 // Deleter is an interface for deleting data in a key/value store.
+//
+//mockery:generate: true
+//mockery:filename: keyvalue_store.go
 type Deleter interface {
 	// Delete removes a key.
 	// If the key does not exist then nothing is done and a nil error is returned.
@@ -25,6 +34,9 @@ type Deleter interface {
 }
 
 // Iterator is an interface for iterating data in a key/value store.
+//
+//mockery:generate: true
+//mockery:filename: keyvalue_store.go
 type Iterator interface {
 	// ForEach executes a function for each key/value pair in a store.
 	// If the provided function returns an error then the iteration is stopped and
@@ -34,6 +46,9 @@ type Iterator interface {
 }
 
 // Updater is an interface for bulk replacing data in a key/value store.
+//
+//mockery:generate: true
+//mockery:filename: keyvalue_store.go
 type Updater interface {
 	// Update takes a map of key-value pairs, and inserts
 	// these key-values into the store. Any preexisting keys in the store which
@@ -43,6 +58,9 @@ type Updater interface {
 
 // Counter is an interface for reporting the count of key-value
 // pairs held by the underlying storage methodology
+//
+//mockery:generate: true
+//mockery:filename: keyvalue_store.go
 type Counter interface {
 	// Count should return the total number of current key-value pairs
 	Count() (int, error)
@@ -50,34 +68,51 @@ type Counter interface {
 
 // Appender is an interface for supporting the ordered addition of values to a store
 // implementations should generate keys to ensure an ordered iteration is possible
+//
+//mockery:generate: true
+//mockery:filename: keyvalue_store.go
 type Appender interface {
 	// AppendValues takes 1 or more ordered values
 	AppendValues(values ...[]byte) error
 }
 
 // GetterSetter is an interface that groups the Get and Set methods.
+//
+//mockery:generate: true
+//mockery:filename: keyvalue_store.go
 type GetterSetter interface {
 	Getter
 	Setter
 }
 
+//mockery:generate: true
+//mockery:filename: keyvalue_store.go
 type Closer interface {
 	Close() error
 }
 
 // GetterCloser extends the Getter interface with a Close method.
+//
+//mockery:generate: true
+//mockery:filename: keyvalue_store.go
 type GetterCloser interface {
 	Getter
 	Closer
 }
 
 // GetterUpdaterCloser groups the Get, Update, and Close methods.
+//
+//mockery:generate: true
+//mockery:filename: keyvalue_store.go
 type GetterUpdaterCloser interface {
 	Updater
 	GetterCloser
 }
 
 // GetterSetterDeleter is an interface that groups the Get, Set, and Delete methods.
+//
+//mockery:generate: true
+//mockery:filename: keyvalue_store.go
 type GetterSetterDeleter interface {
 	Getter
 	Setter
@@ -85,6 +120,9 @@ type GetterSetterDeleter interface {
 }
 
 // GetterSetterDeleterIterator is an interface that groups the Get, Set, Delete, and ForEach methods.
+//
+//mockery:generate: true
+//mockery:filename: keyvalue_store.go
 type GetterSetterDeleterIterator interface {
 	Getter
 	Setter
@@ -93,6 +131,9 @@ type GetterSetterDeleterIterator interface {
 }
 
 // GetterSetterDeleterIteratorUpdater is an interface that groups the Get, Set, Delete, ForEach, and Update methods.
+//
+//mockery:generate: true
+//mockery:filename: keyvalue_store.go
 type GetterSetterDeleterIteratorUpdaterCounterAppender interface {
 	Getter
 	Setter
@@ -104,4 +145,7 @@ type GetterSetterDeleterIteratorUpdaterCounterAppender interface {
 }
 
 // Convenient alias for a key value store that supports all methods
+//
+//mockery:generate: true
+//mockery:filename: keyvalue_store.go
 type KVStore = GetterSetterDeleterIteratorUpdaterCounterAppender

@@ -42,6 +42,8 @@ type requestAcclerator interface {
 	SetDistributedForwardingIntervalOverride(time.Duration, time.Duration)
 }
 
+//mockery:generate: true
+//mockery:filename: messenger.go
 type Messenger interface {
 	SendMessage(method string, params any) error
 }
