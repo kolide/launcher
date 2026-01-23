@@ -1573,6 +1573,52 @@ func (_c *Knapsack_EnrollmentDetailsStore_Call) RunAndReturn(run func() types.KV
 	return _c
 }
 
+// EnrollmentStore provides a mock function for the type Knapsack
+func (_mock *Knapsack) EnrollmentStore() types.KVStore {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for EnrollmentStore")
+	}
+
+	var r0 types.KVStore
+	if returnFunc, ok := ret.Get(0).(func() types.KVStore); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(types.KVStore)
+		}
+	}
+	return r0
+}
+
+// Knapsack_EnrollmentStore_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EnrollmentStore'
+type Knapsack_EnrollmentStore_Call struct {
+	*mock.Call
+}
+
+// EnrollmentStore is a helper method to define mock.On call
+func (_e *Knapsack_Expecter) EnrollmentStore() *Knapsack_EnrollmentStore_Call {
+	return &Knapsack_EnrollmentStore_Call{Call: _e.mock.On("EnrollmentStore")}
+}
+
+func (_c *Knapsack_EnrollmentStore_Call) Run(run func()) *Knapsack_EnrollmentStore_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Knapsack_EnrollmentStore_Call) Return(v types.KVStore) *Knapsack_EnrollmentStore_Call {
+	_c.Call.Return(v)
+	return _c
+}
+
+func (_c *Knapsack_EnrollmentStore_Call) RunAndReturn(run func() types.KVStore) *Knapsack_EnrollmentStore_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // EnsureRegistrationStored provides a mock function for the type Knapsack
 func (_mock *Knapsack) EnsureRegistrationStored(registrationId string) error {
 	ret := _mock.Called(registrationId)
@@ -3535,52 +3581,6 @@ func (_c *Knapsack_RegistrationIDs_Call) Return(strings []string) *Knapsack_Regi
 }
 
 func (_c *Knapsack_RegistrationIDs_Call) RunAndReturn(run func() []string) *Knapsack_RegistrationIDs_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// RegistrationStore provides a mock function for the type Knapsack
-func (_mock *Knapsack) RegistrationStore() types.KVStore {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for RegistrationStore")
-	}
-
-	var r0 types.KVStore
-	if returnFunc, ok := ret.Get(0).(func() types.KVStore); ok {
-		r0 = returnFunc()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(types.KVStore)
-		}
-	}
-	return r0
-}
-
-// Knapsack_RegistrationStore_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RegistrationStore'
-type Knapsack_RegistrationStore_Call struct {
-	*mock.Call
-}
-
-// RegistrationStore is a helper method to define mock.On call
-func (_e *Knapsack_Expecter) RegistrationStore() *Knapsack_RegistrationStore_Call {
-	return &Knapsack_RegistrationStore_Call{Call: _e.mock.On("RegistrationStore")}
-}
-
-func (_c *Knapsack_RegistrationStore_Call) Run(run func()) *Knapsack_RegistrationStore_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *Knapsack_RegistrationStore_Call) Return(v types.KVStore) *Knapsack_RegistrationStore_Call {
-	_c.Call.Return(v)
-	return _c
-}
-
-func (_c *Knapsack_RegistrationStore_Call) RunAndReturn(run func() types.KVStore) *Knapsack_RegistrationStore_Call {
 	_c.Call.Return(run)
 	return _c
 }

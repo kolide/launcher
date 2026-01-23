@@ -254,13 +254,13 @@ func TestSaveRegistration(t *testing.T) {
 			// Set up our stores
 			configStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 			require.NoError(t, err)
-			registrationStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.RegistrationStore.String())
+			registrationStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.EnrollmentStore.String())
 			require.NoError(t, err)
 
 			// Set up our knapsack
 			testKnapsack := New(map[storage.Store]types.KVStore{
-				storage.ConfigStore:       configStore,
-				storage.RegistrationStore: registrationStore,
+				storage.ConfigStore:     configStore,
+				storage.EnrollmentStore: registrationStore,
 			}, nil, nil, multislogger.New(), multislogger.New())
 
 			err = testKnapsack.SaveRegistration(tt.registrationId, tt.munemo, tt.expectedNodeKey, tt.expectedEnrollSecret)
@@ -369,14 +369,14 @@ func TestEnsureRegistrationStored(t *testing.T) {
 			// Set up our stores
 			configStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 			require.NoError(t, err)
-			registrationStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.RegistrationStore.String())
+			registrationStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.EnrollmentStore.String())
 			require.NoError(t, err)
 
 			// Set up our knapsack
 			mockFlags := typesmocks.NewFlags(t)
 			testKnapsack := New(map[storage.Store]types.KVStore{
-				storage.ConfigStore:       configStore,
-				storage.RegistrationStore: registrationStore,
+				storage.ConfigStore:     configStore,
+				storage.EnrollmentStore: registrationStore,
 			}, mockFlags, nil, multislogger.New(), multislogger.New())
 
 			// Set up our test enrollment secret
@@ -486,13 +486,13 @@ func TestNodeKey(t *testing.T) {
 			// Set up our stores
 			configStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 			require.NoError(t, err)
-			registrationStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.RegistrationStore.String())
+			registrationStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.EnrollmentStore.String())
 			require.NoError(t, err)
 
 			// Set up our knapsack
 			testKnapsack := New(map[storage.Store]types.KVStore{
-				storage.ConfigStore:       configStore,
-				storage.RegistrationStore: registrationStore,
+				storage.ConfigStore:     configStore,
+				storage.EnrollmentStore: registrationStore,
 			}, nil, nil, multislogger.New(), multislogger.New())
 
 			// Set up our registration
@@ -557,13 +557,13 @@ func TestDeleteRegistration(t *testing.T) {
 			// Set up our stores
 			configStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 			require.NoError(t, err)
-			registrationStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.RegistrationStore.String())
+			registrationStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.EnrollmentStore.String())
 			require.NoError(t, err)
 
 			// Set up our knapsack
 			testKnapsack := New(map[storage.Store]types.KVStore{
-				storage.ConfigStore:       configStore,
-				storage.RegistrationStore: registrationStore,
+				storage.ConfigStore:     configStore,
+				storage.EnrollmentStore: registrationStore,
 			}, nil, nil, multislogger.New(), multislogger.New())
 
 			// Save the registration
@@ -696,14 +696,14 @@ func TestCurrentEnrollmentStatus(t *testing.T) {
 			// Set up our stores
 			configStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 			require.NoError(t, err)
-			registrationStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.RegistrationStore.String())
+			registrationStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.EnrollmentStore.String())
 			require.NoError(t, err)
 
 			// Set up our knapsack
 			mockFlags := typesmocks.NewFlags(t)
 			testKnapsack := New(map[storage.Store]types.KVStore{
-				storage.ConfigStore:       configStore,
-				storage.RegistrationStore: registrationStore,
+				storage.ConfigStore:     configStore,
+				storage.EnrollmentStore: registrationStore,
 			}, mockFlags, nil, multislogger.New(), multislogger.New())
 
 			testMunemo := ulid.New()

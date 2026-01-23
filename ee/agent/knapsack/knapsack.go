@@ -111,11 +111,11 @@ func (k *knapsack) RegistrationIDs() []string {
 
 func (k *knapsack) Registrations() ([]types.Registration, error) {
 	registrations := make([]types.Registration, 0)
-	registrationStore := k.getKVStore(storage.RegistrationStore)
-	if registrationStore == nil {
-		return nil, errors.New("no registration store")
+	enrollmentStore := k.getKVStore(storage.EnrollmentStore)
+	if enrollmentStore == nil {
+		return nil, errors.New("no enrollment store")
 	}
-	if err := registrationStore.ForEach(func(k []byte, v []byte) error {
+	if err := enrollmentStore.ForEach(func(k []byte, v []byte) error {
 		var r types.Registration
 		if err := json.Unmarshal(v, &r); err != nil {
 			return fmt.Errorf("unmarshalling registration %s: %w", string(k), err)
@@ -123,7 +123,7 @@ func (k *knapsack) Registrations() ([]types.Registration, error) {
 		registrations = append(registrations, r)
 		return nil
 	}); err != nil {
-		return nil, fmt.Errorf("fetching registrations from store: %w", err)
+		return nil, fmt.Errorf("fetching enrollments from store: %w", err)
 	}
 	return registrations, nil
 }
@@ -139,9 +139,9 @@ func (k *knapsack) SaveRegistration(registrationId, munemo, nodeKey, enrollmentS
 	if nodeKeyStore == nil {
 		return errors.New("no config store")
 	}
-	registrationStore := k.getKVStore(storage.RegistrationStore)
-	if registrationStore == nil {
-		return errors.New("no registration store")
+	enrollmentStore := k.getKVStore(storage.EnrollmentStore)
+	if enrollmentStore == nil {
+		return errors.New("no enrollment store")
 	}
 
 	// Ensure we have the minimum information required to save a registration
@@ -189,7 +189,7 @@ func (k *knapsack) SaveRegistration(registrationId, munemo, nodeKey, enrollmentS
 	if err := nodeKeyStore.Set(nodeKeyKeyForRegistration, []byte(nodeKey)); err != nil {
 		return fmt.Errorf("setting node key in store: %w", err)
 	}
-	if err := registrationStore.Set([]byte(registrationId), rawRegistration); err != nil {
+	if err := enrollmentStore.Set([]byte(registrationId), rawRegistration); err != nil {
 		return fmt.Errorf("adding registration to store: %w", err)
 	}
 
@@ -212,9 +212,9 @@ func (k *knapsack) EnsureRegistrationStored(registrationId string) error {
 	if nodeKeyStore == nil {
 		return errors.New("no config store, cannot ensure registration is stored")
 	}
-	registrationStore := k.getKVStore(storage.RegistrationStore)
-	if registrationStore == nil {
-		return errors.New("no registration store, cannot ensure registration is stored")
+	enrollmentStore := k.getKVStore(storage.EnrollmentStore)
+	if enrollmentStore == nil {
+		return errors.New("no enrollment store, cannot ensure enrollment is stored")
 	}
 
 	// Get the existing node key from the config store. If we can't get this, then
@@ -231,7 +231,7 @@ func (k *knapsack) EnsureRegistrationStored(registrationId string) error {
 	}
 
 	// Check to see if we have an existing registration first
-	existingRegistrationRaw, err := registrationStore.Get([]byte(registrationId))
+	existingRegistrationRaw, err := enrollmentStore.Get([]byte(registrationId))
 	if err != nil {
 		return fmt.Errorf("getting existing registration: %w", err)
 	}
@@ -269,7 +269,7 @@ func (k *knapsack) EnsureRegistrationStored(registrationId string) error {
 	if err != nil {
 		return fmt.Errorf("marshalling updated registration: %w", err)
 	}
-	if err := registrationStore.Set([]byte(registrationId), updatedRegistrationRaw); err != nil {
+	if err := enrollmentStore.Set([]byte(registrationId), updatedRegistrationRaw); err != nil {
 		return fmt.Errorf("updating registration in store: %w", err)
 	}
 
@@ -309,15 +309,15 @@ func (k *knapsack) DeleteRegistration(registrationId string) error {
 	if nodeKeyStore == nil {
 		return errors.New("no config store")
 	}
-	registrationStore := k.getKVStore(storage.RegistrationStore)
-	if registrationStore == nil {
-		return errors.New("no registration store")
+	enrollmentStore := k.getKVStore(storage.EnrollmentStore)
+	if enrollmentStore == nil {
+		return errors.New("no enrollment store")
 	}
 
 	if err := nodeKeyStore.Delete(storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(registrationId))); err != nil {
 		return fmt.Errorf("deleting node key for %s: %w", registrationId, err)
 	}
-	if err := registrationStore.Delete([]byte(registrationId)); err != nil {
+	if err := enrollmentStore.Delete([]byte(registrationId)); err != nil {
 		return fmt.Errorf("deleting registration for %s: %w", registrationId, err)
 	}
 
@@ -412,8 +412,8 @@ func (k *knapsack) WindowsUpdatesCacheStore() types.KVStore {
 	return k.getKVStore(storage.WindowsUpdatesCacheStore)
 }
 
-func (k *knapsack) RegistrationStore() types.KVStore {
-	return k.getKVStore(storage.RegistrationStore)
+func (k *knapsack) EnrollmentStore() types.KVStore {
+	return k.getKVStore(storage.EnrollmentStore)
 }
 
 func (k *knapsack) EnrollmentDetailsStore() types.KVStore {

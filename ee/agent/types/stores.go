@@ -19,7 +19,7 @@ type Stores interface {
 	LauncherHistoryStore() KVStore
 	Dt4aInfoStore() KVStore
 	WindowsUpdatesCacheStore() KVStore
-	RegistrationStore() KVStore
+	EnrollmentStore() KVStore
 	EnrollmentDetailsStore() KVStore
 	ServerReleaseTrackerDataStore() KVStore
 }
