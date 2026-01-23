@@ -2832,8 +2832,8 @@ func (_c *Knapsack_MirrorServerURL_Call) RunAndReturn(run func() string) *Knapsa
 }
 
 // NodeKey provides a mock function for the type Knapsack
-func (_mock *Knapsack) NodeKey(registrationId string) (string, error) {
-	ret := _mock.Called(registrationId)
+func (_mock *Knapsack) NodeKey(enrollmentId string) (string, error) {
+	ret := _mock.Called(enrollmentId)
 
 	if len(ret) == 0 {
 		panic("no return value specified for NodeKey")
@@ -2842,15 +2842,15 @@ func (_mock *Knapsack) NodeKey(registrationId string) (string, error) {
 	var r0 string
 	var r1 error
 	if returnFunc, ok := ret.Get(0).(func(string) (string, error)); ok {
-		return returnFunc(registrationId)
+		return returnFunc(enrollmentId)
 	}
 	if returnFunc, ok := ret.Get(0).(func(string) string); ok {
-		r0 = returnFunc(registrationId)
+		r0 = returnFunc(enrollmentId)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
-		r1 = returnFunc(registrationId)
+		r1 = returnFunc(enrollmentId)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -2863,12 +2863,12 @@ type Knapsack_NodeKey_Call struct {
 }
 
 // NodeKey is a helper method to define mock.On call
-//   - registrationId string
-func (_e *Knapsack_Expecter) NodeKey(registrationId interface{}) *Knapsack_NodeKey_Call {
-	return &Knapsack_NodeKey_Call{Call: _e.mock.On("NodeKey", registrationId)}
+//   - enrollmentId string
+func (_e *Knapsack_Expecter) NodeKey(enrollmentId interface{}) *Knapsack_NodeKey_Call {
+	return &Knapsack_NodeKey_Call{Call: _e.mock.On("NodeKey", enrollmentId)}
 }
 
-func (_c *Knapsack_NodeKey_Call) Run(run func(registrationId string)) *Knapsack_NodeKey_Call {
+func (_c *Knapsack_NodeKey_Call) Run(run func(enrollmentId string)) *Knapsack_NodeKey_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 string
 		if args[0] != nil {
@@ -2886,7 +2886,7 @@ func (_c *Knapsack_NodeKey_Call) Return(s string, err error) *Knapsack_NodeKey_C
 	return _c
 }
 
-func (_c *Knapsack_NodeKey_Call) RunAndReturn(run func(registrationId string) (string, error)) *Knapsack_NodeKey_Call {
+func (_c *Knapsack_NodeKey_Call) RunAndReturn(run func(enrollmentId string) (string, error)) *Knapsack_NodeKey_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -281,9 +281,9 @@ func (k *knapsack) EnsureEnrollmentStored(enrollmentId string) error {
 	return nil
 }
 
-func (k *knapsack) NodeKey(registrationId string) (string, error) {
+func (k *knapsack) NodeKey(enrollmentId string) (string, error) {
 	// First, get the store we'll need. For now, we continue to pull the node key from
-	// the config store, but in the future, we will be able to pull it from the registrations
+	// the config store, but in the future, we will be able to pull it from the enrollment
 	// store instead.
 	nodeKeyStore := k.getKVStore(storage.ConfigStore)
 	if nodeKeyStore == nil {
@@ -291,7 +291,7 @@ func (k *knapsack) NodeKey(registrationId string) (string, error) {
 	}
 
 	// Retrieve the key from the store
-	key, err := nodeKeyStore.Get(storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(registrationId)))
+	key, err := nodeKeyStore.Get(storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(enrollmentId)))
 	if err != nil {
 		return "", fmt.Errorf("error getting node key: %w", err)
 	}

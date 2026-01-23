@@ -41,7 +41,7 @@ type EnrollmentTracker interface {
 	Registrations() ([]Enrollment, error)
 	SaveRegistration(registrationId, munemo, nodeKey, enrollmentSecret string) error
 	EnsureEnrollmentStored(enrollmentId string) error
-	NodeKey(registrationId string) (string, error)
+	NodeKey(enrollmentId string) (string, error)
 	DeleteEnrollment(enrollmentId string) error
 }
 
