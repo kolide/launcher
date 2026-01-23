@@ -86,7 +86,7 @@ type kryptoEcMiddleware struct {
 	presenceDetectionLock sync.Mutex
 	tenantMunemo          *atomic.String
 	callbackQueue         chan *http.Request
-	registrationTracker   types.RegistrationTracker
+	enrollmentTracker     types.EnrollmentTracker
 	tokenStore            types.KVStore
 	osqueryPublisher      types.OsqueryPublisher
 
@@ -113,7 +113,7 @@ func newKryptoEcMiddleware(slogger *slog.Logger, knapsack types.Knapsack,
 		presenceDetectionStatusUpdateInterval: 30 * time.Second,
 		tenantMunemo:                          atomicMunemo,
 		callbackQueue:                         callbackQueue,
-		registrationTracker:                   knapsack,
+		enrollmentTracker:                     knapsack,
 		tokenStore:                            knapsack.TokenStore(),
 		osqueryPublisher:                      knapsack.OsqueryPublisher(),
 	}
@@ -210,7 +210,7 @@ func (e *kryptoEcMiddleware) callbackWorker() {
 			}
 
 			// Until we tackle multitenancy, store the key under the default registration ID
-			if err := e.registrationTracker.SaveRegistration(types.DefaultRegistrationID, r.Munemo, r.NodeKey, ""); err != nil {
+			if err := e.enrollmentTracker.SaveRegistration(types.DefaultRegistrationID, r.Munemo, r.NodeKey, ""); err != nil {
 				return fmt.Errorf("saving registration: %w", err)
 			}
 

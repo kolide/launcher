@@ -12,7 +12,7 @@ type Knapsack interface {
 	BboltDB
 	Flags
 	Slogger
-	RegistrationTracker
+	EnrollmentTracker
 	InstanceQuerier
 	OsqueryInstanceTracker
 	DesktopRunner

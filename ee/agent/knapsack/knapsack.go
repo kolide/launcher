@@ -104,7 +104,7 @@ func (k *knapsack) SetInstanceQuerier(q types.InstanceQuerier) {
 	k.querier = q
 }
 
-// RegistrationTracker interface methods
+// EnrollmentTracker interface methods
 func (k *knapsack) RegistrationIDs() []string {
 	return []string{types.DefaultRegistrationID}
 }

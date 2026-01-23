@@ -4,10 +4,10 @@ const (
 	DefaultRegistrationID = "default"
 )
 
-// RegistrationTracker manages the current set of registrations for this launcher installation.
+// EnrollmentTracker manages the current set of enrollments for this launcher installation.
 // Right now, the list is hardcoded to only the default registration ID. In the future, this
 // data may be provided by e.g. a control server subsystem.
-type RegistrationTracker interface {
+type EnrollmentTracker interface {
 	RegistrationIDs() []string
 	Registrations() ([]Registration, error)
 	SaveRegistration(registrationId, munemo, nodeKey, enrollmentSecret string) error
