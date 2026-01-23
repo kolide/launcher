@@ -1,0 +1,18 @@
+all: false # Only generate mocks when the `mockery:generate` directive is present
+dir: "{{.InterfaceDir}}/mocks"
+force-file-write: true # Overwrite files that already exist
+formatter: goimports
+generate: true # We use the generate directive
+log-level: info
+pkgname: mocks
+recursive: true # Generate for all launcher packages
+require-template-schema-exists: true
+structname: "{{.InterfaceName}}"
+template-data:
+  unroll-variadic: true # Required for consistent behavior with how previous version of mockery handled variadic args
+template: testify
+template-schema: '{{.Template}}.schema.json'
+packages:
+  github.com/kolide/launcher:
+    config:
+      all: false # Only generate mocks when the `mockery:generate` directive is present

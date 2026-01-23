@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kolide/launcher/pkg/osquery/runtime/history/mocks"
+	"github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
