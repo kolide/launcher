@@ -58,10 +58,10 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 			mockKnapsack := typesMocks.NewKnapsack(t)
 			mockKnapsack.On("KolideServerURL").Return("localhost")
 			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
-			mockKnapsack.On("Registrations").Return([]types.Registration{
+			mockKnapsack.On("Registrations").Return([]types.Enrollment{
 				{
-					RegistrationID: types.DefaultEnrollmentID,
-					Munemo:         "test-munemo",
+					EnrollmentID: types.DefaultEnrollmentID,
+					Munemo:       "test-munemo",
 				},
 			}, nil)
 			testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
@@ -233,10 +233,10 @@ func Test_localServer_requestRunScheduledQueryHandler(t *testing.T) {
 			mockKnapsack := typesMocks.NewKnapsack(t)
 			mockKnapsack.On("KolideServerURL").Return("localhost")
 			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
-			mockKnapsack.On("Registrations").Return([]types.Registration{
+			mockKnapsack.On("Registrations").Return([]types.Enrollment{
 				{
-					RegistrationID: types.DefaultEnrollmentID,
-					Munemo:         "test-munemo",
+					EnrollmentID: types.DefaultEnrollmentID,
+					Munemo:       "test-munemo",
 				},
 			}, nil)
 			testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())

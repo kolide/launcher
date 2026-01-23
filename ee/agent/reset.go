@@ -341,7 +341,7 @@ func currentMunemo(k types.Knapsack) (string, error) {
 
 	// For now, we just want the default registration.
 	for _, r := range registrations {
-		if r.RegistrationID == types.DefaultEnrollmentID {
+		if r.EnrollmentID == types.DefaultEnrollmentID {
 			return r.Munemo, nil
 		}
 	}

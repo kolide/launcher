@@ -3586,23 +3586,23 @@ func (_c *Knapsack_RegistrationIDs_Call) RunAndReturn(run func() []string) *Knap
 }
 
 // Registrations provides a mock function for the type Knapsack
-func (_mock *Knapsack) Registrations() ([]types.Registration, error) {
+func (_mock *Knapsack) Registrations() ([]types.Enrollment, error) {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for Registrations")
 	}
 
-	var r0 []types.Registration
+	var r0 []types.Enrollment
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() ([]types.Registration, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func() ([]types.Enrollment, error)); ok {
 		return returnFunc()
 	}
-	if returnFunc, ok := ret.Get(0).(func() []types.Registration); ok {
+	if returnFunc, ok := ret.Get(0).(func() []types.Enrollment); ok {
 		r0 = returnFunc()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]types.Registration)
+			r0 = ret.Get(0).([]types.Enrollment)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func() error); ok {
@@ -3630,12 +3630,12 @@ func (_c *Knapsack_Registrations_Call) Run(run func()) *Knapsack_Registrations_C
 	return _c
 }
 
-func (_c *Knapsack_Registrations_Call) Return(registrations []types.Registration, err error) *Knapsack_Registrations_Call {
-	_c.Call.Return(registrations, err)
+func (_c *Knapsack_Registrations_Call) Return(enrollments []types.Enrollment, err error) *Knapsack_Registrations_Call {
+	_c.Call.Return(enrollments, err)
 	return _c
 }
 
-func (_c *Knapsack_Registrations_Call) RunAndReturn(run func() ([]types.Registration, error)) *Knapsack_Registrations_Call {
+func (_c *Knapsack_Registrations_Call) RunAndReturn(run func() ([]types.Enrollment, error)) *Knapsack_Registrations_Call {
 	_c.Call.Return(run)
 	return _c
 }

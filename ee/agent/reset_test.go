@@ -378,10 +378,10 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			munemoValue := []byte("test-munemo")
 
 			if tt.registrationsExist {
-				mockKnapsack.On("Registrations").Return([]types.Registration{
+				mockKnapsack.On("Registrations").Return([]types.Enrollment{
 					{
-						RegistrationID: types.DefaultEnrollmentID,
-						Munemo:         string(munemoValue),
+						EnrollmentID: types.DefaultEnrollmentID,
+						Munemo:       string(munemoValue),
 					},
 				}, nil)
 			} else {
@@ -516,10 +516,10 @@ func TestDetectAndRemediateHardwareChange_SavesDataOverMultipleResets(t *testing
 	})
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	mockKnapsack.On("ResetOnHardwareChangeEnabled").Return(true)
-	mockKnapsack.On("Registrations").Return([]types.Registration{
+	mockKnapsack.On("Registrations").Return([]types.Enrollment{
 		{
-			RegistrationID: types.DefaultEnrollmentID,
-			Munemo:         "test-munemo-1",
+			EnrollmentID: types.DefaultEnrollmentID,
+			Munemo:       "test-munemo-1",
 		},
 	}, nil)
 	mockKnapsack.On("RegistrationIDs").Return([]string{"default"})
@@ -616,10 +616,10 @@ func TestExecute(t *testing.T) {
 	})
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	mockKnapsack.On("ResetOnHardwareChangeEnabled").Return(true)
-	mockKnapsack.On("Registrations").Return([]types.Registration{
+	mockKnapsack.On("Registrations").Return([]types.Enrollment{
 		{
-			RegistrationID: types.DefaultEnrollmentID,
-			Munemo:         "test-munemo-1",
+			EnrollmentID: types.DefaultEnrollmentID,
+			Munemo:       "test-munemo-1",
 		},
 	}, nil)
 	mockKnapsack.On("RegistrationIDs").Return([]string{"default"})
@@ -658,10 +658,10 @@ func TestInterrupt_Multiple(t *testing.T) {
 	testHostDataStore, err := storageci.NewStore(t, slogger, storage.PersistentHostDataStore.String())
 	require.NoError(t, err, "could not create test host data store")
 	mockKnapsack.On("PersistentHostDataStore").Return(testHostDataStore)
-	mockKnapsack.On("Registrations").Return([]types.Registration{
+	mockKnapsack.On("Registrations").Return([]types.Enrollment{
 		{
-			RegistrationID: types.DefaultEnrollmentID,
-			Munemo:         "test-munemo",
+			EnrollmentID: types.DefaultEnrollmentID,
+			Munemo:       "test-munemo",
 		},
 	}, nil)
 

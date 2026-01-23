@@ -26,10 +26,10 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 	mockKnapsack.On("KolideServerURL").Return("localhost")
 	mockKnapsack.On("CurrentEnrollmentStatus").Return(types.Enrolled, nil)
 	mockKnapsack.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil)
-	mockKnapsack.On("Registrations").Return([]types.Registration{
+	mockKnapsack.On("Registrations").Return([]types.Enrollment{
 		{
-			RegistrationID: types.DefaultEnrollmentID,
-			Munemo:         "test-munemo",
+			EnrollmentID: types.DefaultEnrollmentID,
+			Munemo:       "test-munemo",
 		},
 	}, nil)
 	testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())

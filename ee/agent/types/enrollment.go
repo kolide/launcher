@@ -38,18 +38,18 @@ type EnrollmentDetails struct {
 // data may be provided by e.g. a control server subsystem.
 type EnrollmentTracker interface {
 	RegistrationIDs() []string
-	Registrations() ([]Registration, error)
+	Registrations() ([]Enrollment, error)
 	SaveRegistration(registrationId, munemo, nodeKey, enrollmentSecret string) error
 	EnsureRegistrationStored(registrationId string) error
 	NodeKey(registrationId string) (string, error)
 	DeleteRegistration(registrationId string) error
 }
 
-// Registration represents a launcher installation's association with a given tenant.
-// For now, until we tackle the multitenancy project, the registration ID is always
-// DefaultRegistrationID, and we expect a launcher installation to have only one registration.
-type Registration struct {
-	RegistrationID   string `json:"registration_id"`
+// Enrollment represents a launcher installation's association with a given tenant.
+// For now, until we tackle the multitenancy project, the enrollment ID is always
+// DefaultEnrollmentID, and we expect a launcher installation to have only one enrollment.
+type Enrollment struct {
+	EnrollmentID     string `json:"registration_id"` // Stored under "registration_id" for legacy reasons/backwards compatibility
 	Munemo           string `json:"munemo"`
 	EnrollmentSecret string `json:"enrollment_secret,omitempty"`
 	NodeKey          string `json:"node_key"`

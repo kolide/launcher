@@ -627,42 +627,42 @@ func TestMunemoCheck(t *testing.T) {
 	tests := []struct {
 		name                      string
 		headers                   map[string][]string
-		registrations             []types.Registration
+		registrations             []types.Enrollment
 		expectMunemoExtractionErr bool
 		expectMiddleWareCheckErr  bool
 	}{
 		{
 			name:    "matching munemo",
 			headers: validTestHeader,
-			registrations: []types.Registration{
+			registrations: []types.Enrollment{
 				{
-					RegistrationID: types.DefaultEnrollmentID,
-					Munemo:         expectedMunemo,
+					EnrollmentID: types.DefaultEnrollmentID,
+					Munemo:       expectedMunemo,
 				},
 			},
 		},
 		{
 			name: "no munemo header",
-			registrations: []types.Registration{
+			registrations: []types.Enrollment{
 				{
-					RegistrationID: types.DefaultEnrollmentID,
-					Munemo:         expectedMunemo,
+					EnrollmentID: types.DefaultEnrollmentID,
+					Munemo:       expectedMunemo,
 				},
 			},
 		},
 		{
 			name:                      "no registrations",
 			headers:                   validTestHeader,
-			registrations:             []types.Registration{},
+			registrations:             []types.Enrollment{},
 			expectMunemoExtractionErr: true,
 		},
 		{
 			name:    "no default enrollment",
 			headers: validTestHeader,
-			registrations: []types.Registration{
+			registrations: []types.Enrollment{
 				{
-					RegistrationID: "some-other-enrollment-id",
-					Munemo:         "some-other-munemo",
+					EnrollmentID: "some-other-enrollment-id",
+					Munemo:       "some-other-munemo",
 				},
 			},
 			expectMunemoExtractionErr: true,
@@ -670,10 +670,10 @@ func TestMunemoCheck(t *testing.T) {
 		{
 			name:    "header and munemo dont match",
 			headers: map[string][]string{kolideMunemoHeaderKey: {"other-munemo"}},
-			registrations: []types.Registration{
+			registrations: []types.Enrollment{
 				{
-					RegistrationID: types.DefaultEnrollmentID,
-					Munemo:         expectedMunemo,
+					EnrollmentID: types.DefaultEnrollmentID,
+					Munemo:       expectedMunemo,
 				},
 			},
 			expectMiddleWareCheckErr: true,
