@@ -30,6 +30,10 @@ import (
 )
 
 // settingsStoreWriter writes to our startup settings store
+//
+//mockery:generate: true
+//mockery:filename: settings_store_writer.go
+//mockery:structname: SettingsStoreWriter
 type settingsStoreWriter interface {
 	WriteSettings() error
 }

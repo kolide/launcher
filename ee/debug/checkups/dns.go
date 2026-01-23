@@ -11,18 +11,19 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 )
 
-type (
-	HostResolver interface {
-		LookupHost(ctx context.Context, host string) ([]string, error)
-	}
-	dnsCheckup struct {
-		k        types.Knapsack
-		status   Status
-		summary  string
-		data     map[string]any
-		resolver HostResolver
-	}
-)
+//mockery:generate: true
+//mockery:filename: HostResolver.go
+type HostResolver interface {
+	LookupHost(ctx context.Context, host string) ([]string, error)
+}
+
+type dnsCheckup struct {
+	k        types.Knapsack
+	status   Status
+	summary  string
+	data     map[string]any
+	resolver HostResolver
+}
 
 func (dc *dnsCheckup) Data() any             { return dc.data }
 func (dc *dnsCheckup) ExtraFileName() string { return "" }

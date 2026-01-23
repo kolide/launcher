@@ -7,6 +7,9 @@ import (
 )
 
 // Flags is an interface for setting and retrieving launcher agent flags.
+//
+//mockery:generate: true
+//mockery:filename: flags.go
 type Flags interface {
 	// Registers an observer to receive messages when the specified keys change.
 	RegisterChangeObserver(observer FlagsChangeObserver, flagKeys ...keys.FlagKey)
