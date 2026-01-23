@@ -126,7 +126,7 @@ func katcFromStartupSettings(k types.Knapsack, registrationId string) (map[strin
 	}
 	defer r.Close()
 
-	katcConfigKey := storage.KeyByIdentifier([]byte("katc_config"), storage.IdentifierTypeRegistration, []byte(registrationId))
+	katcConfigKey := storage.KeyByIdentifier([]byte("katc_config"), storage.IdentifierTypeEnrollment, []byte(registrationId))
 	katcConfig, err := r.Get(string(katcConfigKey))
 	if err != nil {
 		return nil, fmt.Errorf("error getting katc_config from startup settings: %w", err)

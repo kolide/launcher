@@ -355,7 +355,7 @@ func currentMunemo(k types.Knapsack) (string, error) {
 func prepareDatabaseResetRecords(ctx context.Context, k types.Knapsack, slogger *slog.Logger, resetReason string) ([]byte, error) { // nolint:unused
 	nodeKeys := make([]string, 0)
 	for _, enrollmentId := range k.EnrollmentIDs() {
-		nodeKey, err := k.ConfigStore().Get(storage.KeyByIdentifier([]byte("nodeKey"), storage.IdentifierTypeRegistration, []byte(enrollmentId)))
+		nodeKey, err := k.ConfigStore().Get(storage.KeyByIdentifier([]byte("nodeKey"), storage.IdentifierTypeEnrollment, []byte(enrollmentId)))
 		if err != nil {
 			slogger.Log(ctx, slog.LevelWarn,
 				"could not get node key from store",

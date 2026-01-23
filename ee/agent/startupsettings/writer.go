@@ -79,7 +79,7 @@ func (s *startupSettingsWriter) WriteSettings() error {
 				"err", err,
 			)
 		} else {
-			atcConfigKey := storage.KeyByIdentifier([]byte("auto_table_construction"), storage.IdentifierTypeRegistration, []byte(enrollmentId))
+			atcConfigKey := storage.KeyByIdentifier([]byte("auto_table_construction"), storage.IdentifierTypeEnrollment, []byte(enrollmentId))
 			updatedFlags[string(atcConfigKey)] = atcConfig
 		}
 
@@ -89,7 +89,7 @@ func (s *startupSettingsWriter) WriteSettings() error {
 				"err", err,
 			)
 		} else {
-			katcConfigKey := storage.KeyByIdentifier([]byte("katc_config"), storage.IdentifierTypeRegistration, []byte(enrollmentId))
+			katcConfigKey := storage.KeyByIdentifier([]byte("katc_config"), storage.IdentifierTypeEnrollment, []byte(enrollmentId))
 			updatedFlags[string(katcConfigKey)] = katcConfig
 		}
 	}
@@ -121,7 +121,7 @@ func (s *startupSettingsWriter) Close() error {
 }
 
 func (s *startupSettingsWriter) extractAutoTableConstructionConfig(registrationId string) (string, error) {
-	osqConfig, err := s.knapsack.ConfigStore().Get(storage.KeyByIdentifier([]byte("config"), storage.IdentifierTypeRegistration, []byte(registrationId)))
+	osqConfig, err := s.knapsack.ConfigStore().Get(storage.KeyByIdentifier([]byte("config"), storage.IdentifierTypeEnrollment, []byte(registrationId)))
 	if err != nil {
 		return "", fmt.Errorf("could not get osquery config from store: %w", err)
 	}

@@ -227,7 +227,7 @@ func generateConfigPlugin(slogger *slog.Logger, launcherDaemonRootDir string) (*
 	defer r.Close()
 
 	// Use the default registration's config
-	atcConfigKey := storage.KeyByIdentifier([]byte("auto_table_construction"), storage.IdentifierTypeRegistration, []byte(types.DefaultEnrollmentID))
+	atcConfigKey := storage.KeyByIdentifier([]byte("auto_table_construction"), storage.IdentifierTypeEnrollment, []byte(types.DefaultEnrollmentID))
 	atcConfig, err := r.Get(string(atcConfigKey))
 	if err != nil {
 		return nil, fmt.Errorf("error getting auto_table_construction from startup settings: %w", err)

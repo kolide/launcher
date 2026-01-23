@@ -249,7 +249,7 @@ func (e *Extension) getHostIdentifier() (string, error) {
 // The function is exported to allow for building the kolide_launcher_info table.
 func IdentifierFromDB(configStore types.GetterSetter, registrationId string) (string, error) {
 	var identifier string
-	uuidBytes, _ := configStore.Get(storage.KeyByIdentifier([]byte(uuidKey), storage.IdentifierTypeRegistration, []byte(registrationId)))
+	uuidBytes, _ := configStore.Get(storage.KeyByIdentifier([]byte(uuidKey), storage.IdentifierTypeEnrollment, []byte(registrationId)))
 	gotID, err := uuid.ParseBytes(uuidBytes)
 
 	// Use existing UUID
@@ -266,7 +266,7 @@ func IdentifierFromDB(configStore types.GetterSetter, registrationId string) (st
 	identifier = gotID.String()
 
 	// Save new UUID
-	err = configStore.Set(storage.KeyByIdentifier([]byte(uuidKey), storage.IdentifierTypeRegistration, []byte(registrationId)), []byte(identifier))
+	err = configStore.Set(storage.KeyByIdentifier([]byte(uuidKey), storage.IdentifierTypeEnrollment, []byte(registrationId)), []byte(identifier))
 	if err != nil {
 		return "", fmt.Errorf("saving new UUID: %w", err)
 	}
@@ -276,7 +276,7 @@ func IdentifierFromDB(configStore types.GetterSetter, registrationId string) (st
 
 // Config returns the device config from the storage layer
 func Config(getter types.Getter, registrationId string) (string, error) {
-	key, err := getter.Get(storage.KeyByIdentifier([]byte(configKey), storage.IdentifierTypeRegistration, []byte(registrationId)))
+	key, err := getter.Get(storage.KeyByIdentifier([]byte(configKey), storage.IdentifierTypeEnrollment, []byte(registrationId)))
 	if err != nil {
 		return "", fmt.Errorf("error getting config key: %w", err)
 	}
@@ -483,7 +483,7 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 		)
 		// Try to use cached config
 		var confBytes []byte
-		confBytes, _ = e.knapsack.ConfigStore().Get(storage.KeyByIdentifier([]byte(configKey), storage.IdentifierTypeRegistration, []byte(e.enrollmentId)))
+		confBytes, _ = e.knapsack.ConfigStore().Get(storage.KeyByIdentifier([]byte(configKey), storage.IdentifierTypeEnrollment, []byte(e.enrollmentId)))
 
 		if len(confBytes) == 0 {
 			if !e.enrolled() {
@@ -495,7 +495,7 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 		config = string(confBytes)
 	} else {
 		// Store good config in both the knapsack and our settings store
-		if err := e.knapsack.ConfigStore().Set(storage.KeyByIdentifier([]byte(configKey), storage.IdentifierTypeRegistration, []byte(e.enrollmentId)), []byte(config)); err != nil {
+		if err := e.knapsack.ConfigStore().Set(storage.KeyByIdentifier([]byte(configKey), storage.IdentifierTypeEnrollment, []byte(e.enrollmentId)), []byte(config)); err != nil {
 			e.slogger.Log(ctx, slog.LevelError,
 				"writing config to config store",
 				"err", err,

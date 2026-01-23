@@ -185,7 +185,7 @@ func (k *knapsack) SaveEnrollment(enrollmentId, munemo, nodeKey, enrollmentSecre
 	}
 
 	// Now, store our data
-	nodeKeyKeyForEnrollment := storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(enrollmentId))
+	nodeKeyKeyForEnrollment := storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeEnrollment, []byte(enrollmentId))
 	if err := nodeKeyStore.Set(nodeKeyKeyForEnrollment, []byte(nodeKey)); err != nil {
 		return fmt.Errorf("setting node key in store: %w", err)
 	}
@@ -220,7 +220,7 @@ func (k *knapsack) EnsureEnrollmentStored(enrollmentId string) error {
 	// Get the existing node key from the config store. If we can't get this, then
 	// there's nothing more we can do here -- we won't save an enrollment without
 	// a node key.
-	nodeKeyKeyForEnrollment := storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(enrollmentId))
+	nodeKeyKeyForEnrollment := storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeEnrollment, []byte(enrollmentId))
 	keyRaw, err := nodeKeyStore.Get(nodeKeyKeyForEnrollment)
 	if err != nil {
 		return fmt.Errorf("retrieving node key: %w", err)
@@ -291,7 +291,7 @@ func (k *knapsack) NodeKey(enrollmentId string) (string, error) {
 	}
 
 	// Retrieve the key from the store
-	key, err := nodeKeyStore.Get(storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(enrollmentId)))
+	key, err := nodeKeyStore.Get(storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeEnrollment, []byte(enrollmentId)))
 	if err != nil {
 		return "", fmt.Errorf("error getting node key: %w", err)
 	}
@@ -314,7 +314,7 @@ func (k *knapsack) DeleteEnrollment(enrollmentId string) error {
 		return errors.New("no enrollment store")
 	}
 
-	if err := nodeKeyStore.Delete(storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(enrollmentId))); err != nil {
+	if err := nodeKeyStore.Delete(storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeEnrollment, []byte(enrollmentId))); err != nil {
 		return fmt.Errorf("deleting node key for %s: %w", enrollmentId, err)
 	}
 	if err := enrollmentStore.Delete([]byte(enrollmentId)); err != nil {
@@ -465,7 +465,7 @@ func (k *knapsack) ReadEnrollSecret() (string, error) {
 		return "", errors.New("token store not available")
 	}
 	// For now, only checking for default enrollment
-	secret, err := store.Get(storage.KeyByIdentifier(storage.EnrollmentSecretTokenKey, storage.IdentifierTypeRegistration, []byte(types.DefaultEnrollmentID)))
+	secret, err := store.Get(storage.KeyByIdentifier(storage.EnrollmentSecretTokenKey, storage.IdentifierTypeEnrollment, []byte(types.DefaultEnrollmentID)))
 	if err != nil {
 		return "", fmt.Errorf("getting enrollment secret from token store: %w", err)
 	}

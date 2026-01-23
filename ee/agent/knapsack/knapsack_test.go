@@ -271,7 +271,7 @@ func TestSaveEnrollment(t *testing.T) {
 			require.NoError(t, err)
 
 			// Confirm that the node key was stored
-			expectedNodeKeyKey := storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(tt.enrollmentId))
+			expectedNodeKeyKey := storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeEnrollment, []byte(tt.enrollmentId))
 			storedKey, err := configStore.Get(expectedNodeKeyKey)
 			require.NoError(t, err)
 			require.Equal(t, tt.expectedNodeKey, string(storedKey))
@@ -415,7 +415,7 @@ func TestEnsureEnrollmentStored(t *testing.T) {
 			// Finally, set up our new node key. If stored, it should be stored in the config store only.
 			nodeKey := ulid.New()
 			if tt.nodeKeyStored {
-				nodeKeyKeyForRegistration := storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(tt.enrollmentId))
+				nodeKeyKeyForRegistration := storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeEnrollment, []byte(tt.enrollmentId))
 				require.NoError(t, configStore.Set(nodeKeyKeyForRegistration, []byte(nodeKey)))
 				savedNodeKey, err := testKnapsack.NodeKey(tt.enrollmentId)
 				require.NoError(t, err, "could not store node key during test setup")
@@ -499,7 +499,7 @@ func TestNodeKey(t *testing.T) {
 			require.NoError(t, testKnapsack.SaveEnrollment(tt.enrollmentId, "test_munemo", tt.expectedNodeKey, ""))
 
 			// Confirm that the node key was stored
-			expectedNodeKeyKey := storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(tt.enrollmentId))
+			expectedNodeKeyKey := storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeEnrollment, []byte(tt.enrollmentId))
 			storedKey, err := configStore.Get(expectedNodeKeyKey)
 			require.NoError(t, err)
 			require.Equal(t, tt.expectedNodeKey, string(storedKey))
@@ -789,7 +789,7 @@ func TestReadEnrollSecret(t *testing.T) {
 			}
 
 			if tt.setInTokenStore {
-				require.NoError(t, tokenStore.Set(storage.KeyByIdentifier(storage.EnrollmentSecretTokenKey, storage.IdentifierTypeRegistration, []byte(types.DefaultEnrollmentID)), []byte(testEnrollSecret)))
+				require.NoError(t, tokenStore.Set(storage.KeyByIdentifier(storage.EnrollmentSecretTokenKey, storage.IdentifierTypeEnrollment, []byte(types.DefaultEnrollmentID)), []byte(testEnrollSecret)))
 			}
 
 			gotSecret, err := testKnapsack.ReadEnrollSecret()
