@@ -60,7 +60,7 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 			mockKnapsack.On("Registrations").Return([]types.Registration{
 				{
-					RegistrationID: types.DefaultRegistrationID,
+					RegistrationID: types.DefaultEnrollmentID,
 					Munemo:         "test-munemo",
 				},
 			}, nil)
@@ -72,9 +72,6 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 			mockKnapsack.On("TokenStore").Return(tokenStore)
 			osqPublisher := osquerypublisher.NewLogPublisherClient(multislogger.NewNopLogger(), mockKnapsack, http.DefaultClient)
 			mockKnapsack.On("OsqueryPublisher").Return(osqPublisher)
-
-			//go:generate mockery --name Querier
-			// https://github.com/vektra/mockery <-- cli tool to generate mocks for usage with testify
 			mockQuerier := mocks.NewQuerier(t)
 
 			if tt.mockQueryResult != nil {
@@ -238,7 +235,7 @@ func Test_localServer_requestRunScheduledQueryHandler(t *testing.T) {
 			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 			mockKnapsack.On("Registrations").Return([]types.Registration{
 				{
-					RegistrationID: types.DefaultRegistrationID,
+					RegistrationID: types.DefaultEnrollmentID,
 					Munemo:         "test-munemo",
 				},
 			}, nil)

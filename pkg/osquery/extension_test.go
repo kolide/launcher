@@ -218,7 +218,7 @@ func TestExtensionEnrollTransportError(t *testing.T) {
 
 	k := makeKnapsackUnenrolled(t)
 	lpc := makeTestOsqLogPublisher(k)
-	e, err := NewExtension(t.Context(), m, lpc, settingsstoremock.NewSettingsStoreWriter(t), k, types.DefaultRegistrationID, ExtensionOpts{})
+	e, err := NewExtension(t.Context(), m, lpc, settingsstoremock.NewSettingsStoreWriter(t), k, types.DefaultEnrollmentID, ExtensionOpts{})
 	require.Nil(t, err)
 
 	key, invalid, err := e.Enroll(t.Context())
@@ -328,13 +328,13 @@ func TestExtensionEnroll(t *testing.T) {
 	k.On("TokenStore").Return(tokenStore).Maybe()
 	lpc := makeTestOsqLogPublisher(k)
 
-	e, err := NewExtension(t.Context(), m, lpc, s, k, types.DefaultRegistrationID, ExtensionOpts{})
+	e, err := NewExtension(t.Context(), m, lpc, s, k, types.DefaultEnrollmentID, ExtensionOpts{})
 	require.Nil(t, err)
 
 	// We should attempt to fetch the node key once during enrollment, and we shouldn't have a node key yet
-	k.On("NodeKey", types.DefaultRegistrationID).Return("", nil).Once()
+	k.On("NodeKey", types.DefaultEnrollmentID).Return("", nil).Once()
 	// We expect enrollment to complete, and that we store the updated registration
-	k.On("SaveRegistration", types.DefaultRegistrationID, testifymock.Anything, expectedNodeKey, expectedEnrollSecret).Return(nil).Once()
+	k.On("SaveRegistration", types.DefaultEnrollmentID, testifymock.Anything, expectedNodeKey, expectedEnrollSecret).Return(nil).Once()
 
 	// Attempt enrollment
 	key, invalid, err := e.Enroll(t.Context())
@@ -345,10 +345,10 @@ func TestExtensionEnroll(t *testing.T) {
 	assert.Equal(t, expectedEnrollSecret, gotEnrollSecret)
 
 	// The next enroll request will have access to the new node key
-	k.On("NodeKey", types.DefaultRegistrationID).Return(expectedNodeKey, nil).Once()
+	k.On("NodeKey", types.DefaultEnrollmentID).Return(expectedNodeKey, nil).Once()
 
 	// The next time we call Enroll, the extension should confirm that the registration is stored
-	k.On("EnsureRegistrationStored", types.DefaultRegistrationID).Return(nil)
+	k.On("EnsureRegistrationStored", types.DefaultEnrollmentID).Return(nil)
 
 	// Should not re-enroll with stored secret
 	m.RequestEnrollmentFuncInvoked = false
@@ -359,10 +359,10 @@ func TestExtensionEnroll(t *testing.T) {
 	assert.Equal(t, expectedNodeKey, key)
 	assert.Equal(t, expectedEnrollSecret, gotEnrollSecret)
 
-	e, err = NewExtension(t.Context(), m, lpc, s, k, types.DefaultRegistrationID, ExtensionOpts{})
+	e, err = NewExtension(t.Context(), m, lpc, s, k, types.DefaultEnrollmentID, ExtensionOpts{})
 	require.Nil(t, err)
 	// Still should not re-enroll (because node key stored in DB)
-	k.On("NodeKey", types.DefaultRegistrationID).Return(expectedNodeKey, nil).Once()
+	k.On("NodeKey", types.DefaultEnrollmentID).Return(expectedNodeKey, nil).Once()
 	key, invalid, err = e.Enroll(t.Context())
 	require.Nil(t, err)
 	assert.False(t, m.RequestEnrollmentFuncInvoked) // Note False here.
@@ -372,9 +372,9 @@ func TestExtensionEnroll(t *testing.T) {
 
 	// Re-enroll for new node key
 	expectedNodeKey = "new_node_key"
-	k.On("SaveRegistration", types.DefaultRegistrationID, "", expectedNodeKey, expectedEnrollSecret).Return(nil).Once()
-	k.On("DeleteRegistration", types.DefaultRegistrationID).Return(nil)
-	k.On("NodeKey", types.DefaultRegistrationID).Return("", nil).Once()
+	k.On("SaveRegistration", types.DefaultEnrollmentID, "", expectedNodeKey, expectedEnrollSecret).Return(nil).Once()
+	k.On("DeleteRegistration", types.DefaultEnrollmentID).Return(nil)
+	k.On("NodeKey", types.DefaultEnrollmentID).Return("", nil).Once()
 	e.RequireReenroll(t.Context())
 	key, invalid, err = e.Enroll(t.Context())
 	require.Nil(t, err)
@@ -395,7 +395,7 @@ func TestExtensionGenerateConfigsTransportError(t *testing.T) {
 	}
 	k := makeKnapsack(t)
 	lpc := makeTestOsqLogPublisher(k)
-	e, err := NewExtension(t.Context(), m, lpc, settingsstoremock.NewSettingsStoreWriter(t), k, types.DefaultRegistrationID, ExtensionOpts{})
+	e, err := NewExtension(t.Context(), m, lpc, settingsstoremock.NewSettingsStoreWriter(t), k, types.DefaultEnrollmentID, ExtensionOpts{})
 	require.Nil(t, err)
 
 	configs, err := e.GenerateConfigs(t.Context())
@@ -578,7 +578,7 @@ func TestGenerateConfigs_WorksAfterSecretlessEnrollment(t *testing.T) {
 	k.On("TokenStore").Return(tokenStore).Maybe()
 	lpc := makeTestOsqLogPublisher(k)
 
-	e, err := NewExtension(t.Context(), s, lpc, settingsStore, k, types.DefaultRegistrationID, ExtensionOpts{})
+	e, err := NewExtension(t.Context(), s, lpc, settingsStore, k, types.DefaultEnrollmentID, ExtensionOpts{})
 	require.Nil(t, err)
 
 	// First request to generate configs -- we shouldn't be able to get anything yet,
@@ -1612,7 +1612,7 @@ func TestGetQueries_WorksWithSecretlessEnrollment(t *testing.T) {
 	k.On("TokenStore").Return(tokenStore).Maybe()
 	lpc := makeTestOsqLogPublisher(k)
 
-	e, err := NewExtension(t.Context(), s, lpc, settingsStore, k, types.DefaultRegistrationID, ExtensionOpts{})
+	e, err := NewExtension(t.Context(), s, lpc, settingsStore, k, types.DefaultEnrollmentID, ExtensionOpts{})
 	require.Nil(t, err)
 
 	// First request to generate configs -- we shouldn't be able to get anything yet,

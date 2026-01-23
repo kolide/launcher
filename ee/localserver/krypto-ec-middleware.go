@@ -209,8 +209,8 @@ func (e *kryptoEcMiddleware) callbackWorker() {
 				e.tenantMunemo.Store(r.Munemo)
 			}
 
-			// Until we tackle multitenancy, store the key under the default registration ID
-			if err := e.enrollmentTracker.SaveRegistration(types.DefaultRegistrationID, r.Munemo, r.NodeKey, ""); err != nil {
+			// Until we tackle multitenancy, store the key under the default enrollment ID
+			if err := e.enrollmentTracker.SaveRegistration(types.DefaultEnrollmentID, r.Munemo, r.NodeKey, ""); err != nil {
 				return fmt.Errorf("saving registration: %w", err)
 			}
 

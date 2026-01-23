@@ -380,7 +380,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			if tt.registrationsExist {
 				mockKnapsack.On("Registrations").Return([]types.Registration{
 					{
-						RegistrationID: types.DefaultRegistrationID,
+						RegistrationID: types.DefaultEnrollmentID,
 						Munemo:         string(munemoValue),
 					},
 				}, nil)
@@ -518,7 +518,7 @@ func TestDetectAndRemediateHardwareChange_SavesDataOverMultipleResets(t *testing
 	mockKnapsack.On("ResetOnHardwareChangeEnabled").Return(true)
 	mockKnapsack.On("Registrations").Return([]types.Registration{
 		{
-			RegistrationID: types.DefaultRegistrationID,
+			RegistrationID: types.DefaultEnrollmentID,
 			Munemo:         "test-munemo-1",
 		},
 	}, nil)
@@ -618,7 +618,7 @@ func TestExecute(t *testing.T) {
 	mockKnapsack.On("ResetOnHardwareChangeEnabled").Return(true)
 	mockKnapsack.On("Registrations").Return([]types.Registration{
 		{
-			RegistrationID: types.DefaultRegistrationID,
+			RegistrationID: types.DefaultEnrollmentID,
 			Munemo:         "test-munemo-1",
 		},
 	}, nil)
@@ -660,7 +660,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	mockKnapsack.On("PersistentHostDataStore").Return(testHostDataStore)
 	mockKnapsack.On("Registrations").Return([]types.Registration{
 		{
-			RegistrationID: types.DefaultRegistrationID,
+			RegistrationID: types.DefaultEnrollmentID,
 			Munemo:         "test-munemo",
 		},
 	}, nil)

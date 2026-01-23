@@ -8,7 +8,7 @@ const (
 	Enrolled        EnrollmentStatus = "enrolled"
 	Unknown         EnrollmentStatus = "unknown"
 
-	DefaultRegistrationID = "default"
+	DefaultEnrollmentID = "default"
 )
 
 // EnrollmentDetails is the set of details that are collected from osqueryd

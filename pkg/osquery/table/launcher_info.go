@@ -60,7 +60,7 @@ func generateLauncherInfoTable(knapsack types.Knapsack, configStore types.Getter
 		_, span := observability.StartSpan(ctx, "table_name", "kolide_launcher_info")
 		defer span.End()
 
-		identifier, err := osquery.IdentifierFromDB(configStore, types.DefaultRegistrationID)
+		identifier, err := osquery.IdentifierFromDB(configStore, types.DefaultEnrollmentID)
 		if err != nil {
 			return nil, err
 		}
@@ -68,7 +68,7 @@ func generateLauncherInfoTable(knapsack types.Knapsack, configStore types.Getter
 		osqueryInstanceID := ""
 		osqHistory := knapsack.OsqueryHistory()
 		if osqHistory != nil { // gather latest instance id if able, move on otherwise
-			latestId, err := osqHistory.LatestInstanceId(types.DefaultRegistrationID)
+			latestId, err := osqHistory.LatestInstanceId(types.DefaultEnrollmentID)
 			if err == nil {
 				osqueryInstanceID = latestId
 			}
@@ -96,7 +96,7 @@ func generateLauncherInfoTable(knapsack types.Knapsack, configStore types.Getter
 				"revision":            version.Version().Revision,
 				"version":             version.Version().Version,
 				"version_chain":       os.Getenv("KOLIDE_LAUNCHER_VERSION_CHAIN"),
-				"registration_id":     types.DefaultRegistrationID,
+				"registration_id":     types.DefaultEnrollmentID,
 				"identifier":          identifier,
 				"osquery_instance_id": osqueryInstanceID,
 				"fingerprint":         "",

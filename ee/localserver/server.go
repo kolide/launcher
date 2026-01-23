@@ -469,12 +469,12 @@ func getMunemoFromKnapsack(k types.Knapsack) (string, error) {
 		return "", errors.New("no registrations in knapsack")
 	}
 
-	// For now, we just want the default registration.
+	// For now, we just want the default enrollment.
 	for _, r := range registrations {
-		if r.RegistrationID == types.DefaultRegistrationID {
+		if r.RegistrationID == types.DefaultEnrollmentID {
 			return r.Munemo, nil
 		}
 	}
 
-	return "", fmt.Errorf("no registration found for `%s` registration ID, cannot find munemo", types.DefaultRegistrationID)
+	return "", fmt.Errorf("no enrollment found for `%s` enrollment ID, cannot find munemo", types.DefaultEnrollmentID)
 }

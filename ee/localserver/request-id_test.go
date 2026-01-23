@@ -28,7 +28,7 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 	mockKnapsack.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil)
 	mockKnapsack.On("Registrations").Return([]types.Registration{
 		{
-			RegistrationID: types.DefaultRegistrationID,
+			RegistrationID: types.DefaultEnrollmentID,
 			Munemo:         "test-munemo",
 		},
 	}, nil)

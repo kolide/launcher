@@ -106,7 +106,7 @@ func (k *knapsack) SetInstanceQuerier(q types.InstanceQuerier) {
 
 // EnrollmentTracker interface methods
 func (k *knapsack) RegistrationIDs() []string {
-	return []string{types.DefaultRegistrationID}
+	return []string{types.DefaultEnrollmentID}
 }
 
 func (k *knapsack) Registrations() ([]types.Registration, error) {
@@ -465,7 +465,7 @@ func (k *knapsack) ReadEnrollSecret() (string, error) {
 		return "", errors.New("token store not available")
 	}
 	// For now, only checking for default enrollment
-	secret, err := store.Get(storage.KeyByIdentifier(storage.EnrollmentSecretTokenKey, storage.IdentifierTypeRegistration, []byte(types.DefaultRegistrationID)))
+	secret, err := store.Get(storage.KeyByIdentifier(storage.EnrollmentSecretTokenKey, storage.IdentifierTypeRegistration, []byte(types.DefaultEnrollmentID)))
 	if err != nil {
 		return "", fmt.Errorf("getting enrollment secret from token store: %w", err)
 	}
@@ -477,8 +477,8 @@ func (k *knapsack) ReadEnrollSecret() (string, error) {
 }
 
 func (k *knapsack) CurrentEnrollmentStatus() (types.EnrollmentStatus, error) {
-	// Check to see if we have a node key for the default registration.
-	key, err := k.NodeKey(types.DefaultRegistrationID)
+	// Check to see if we have a node key for the default enrollment.
+	key, err := k.NodeKey(types.DefaultEnrollmentID)
 	if err != nil {
 		return types.Unknown, fmt.Errorf("getting node key from store: %w", err)
 	}

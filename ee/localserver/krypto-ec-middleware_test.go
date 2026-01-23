@@ -636,7 +636,7 @@ func TestMunemoCheck(t *testing.T) {
 			headers: validTestHeader,
 			registrations: []types.Registration{
 				{
-					RegistrationID: types.DefaultRegistrationID,
+					RegistrationID: types.DefaultEnrollmentID,
 					Munemo:         expectedMunemo,
 				},
 			},
@@ -645,7 +645,7 @@ func TestMunemoCheck(t *testing.T) {
 			name: "no munemo header",
 			registrations: []types.Registration{
 				{
-					RegistrationID: types.DefaultRegistrationID,
+					RegistrationID: types.DefaultEnrollmentID,
 					Munemo:         expectedMunemo,
 				},
 			},
@@ -657,11 +657,11 @@ func TestMunemoCheck(t *testing.T) {
 			expectMunemoExtractionErr: true,
 		},
 		{
-			name:    "no default registration",
+			name:    "no default enrollment",
 			headers: validTestHeader,
 			registrations: []types.Registration{
 				{
-					RegistrationID: "some-other-registration-id",
+					RegistrationID: "some-other-enrollment-id",
 					Munemo:         "some-other-munemo",
 				},
 			},
@@ -672,7 +672,7 @@ func TestMunemoCheck(t *testing.T) {
 			headers: map[string][]string{kolideMunemoHeaderKey: {"other-munemo"}},
 			registrations: []types.Registration{
 				{
-					RegistrationID: types.DefaultRegistrationID,
+					RegistrationID: types.DefaultEnrollmentID,
 					Munemo:         expectedMunemo,
 				},
 			},
@@ -792,7 +792,7 @@ func Test_sendCallback_handlesEnrollment(t *testing.T) {
 		Level:     slog.LevelDebug,
 	}))
 	k := typesmocks.NewKnapsack(t)
-	k.On("SaveRegistration", types.DefaultRegistrationID, expectedMunemo, expectedNodeKey, "").Return(nil)
+	k.On("SaveRegistration", types.DefaultEnrollmentID, expectedMunemo, expectedNodeKey, "").Return(nil)
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore)
@@ -851,7 +851,7 @@ func Test_sendCallback_handlesEnrollmentWithAgentIngesterToken(t *testing.T) {
 
 	slogger := multislogger.NewNopLogger()
 	k := typesmocks.NewKnapsack(t)
-	k.On("SaveRegistration", types.DefaultRegistrationID, expectedMunemo, expectedNodeKey, "").Return(nil)
+	k.On("SaveRegistration", types.DefaultEnrollmentID, expectedMunemo, expectedNodeKey, "").Return(nil)
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore)

@@ -240,7 +240,7 @@ func (l *launcherListener) handleEnrollmentRequest(e enrollmentRequest) error {
 		// Should never happen, but we check just in case
 		return errors.New("token store not available")
 	}
-	if err := tokenStore.Set(storage.KeyByIdentifier(storage.EnrollmentSecretTokenKey, storage.IdentifierTypeRegistration, []byte(types.DefaultRegistrationID)), []byte(e.EnrollmentSecret)); err != nil {
+	if err := tokenStore.Set(storage.KeyByIdentifier(storage.EnrollmentSecretTokenKey, storage.IdentifierTypeRegistration, []byte(types.DefaultEnrollmentID)), []byte(e.EnrollmentSecret)); err != nil {
 		return fmt.Errorf("storing enrollment secret: %w", err)
 	}
 

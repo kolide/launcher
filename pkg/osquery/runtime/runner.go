@@ -216,7 +216,7 @@ func (r *Runner) Query(query string) ([]map[string]string, error) {
 	defer r.instanceLock.Unlock()
 
 	// For now, grab the default (i.e. only) instance
-	instance, ok := r.instances[types.DefaultRegistrationID]
+	instance, ok := r.instances[types.DefaultEnrollmentID]
 	if !ok {
 		return nil, errors.New("no default instance exists, cannot query")
 	}

@@ -91,7 +91,7 @@ func TestBadBinaryPath(t *testing.T) {
 	logBytes, slogger := setUpTestSlogger()
 
 	k := typesMocks.NewKnapsack(t)
-	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
+	k.On("RegistrationIDs").Return([]string{types.DefaultEnrollmentID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -104,8 +104,8 @@ func TestBadBinaryPath(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
-	k.On("NodeKey", types.DefaultRegistrationID).Return(ulid.New(), nil).Maybe()
-	k.On("EnsureRegistrationStored", types.DefaultRegistrationID).Return(nil).Maybe()
+	k.On("NodeKey", types.DefaultEnrollmentID).Return(ulid.New(), nil).Maybe()
+	k.On("EnsureRegistrationStored", types.DefaultEnrollmentID).Return(nil).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
@@ -149,7 +149,7 @@ func TestWithOsqueryFlags(t *testing.T) {
 	logBytes, slogger := setUpTestSlogger()
 
 	k := typesMocks.NewKnapsack(t)
-	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
+	k.On("RegistrationIDs").Return([]string{types.DefaultEnrollmentID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -162,8 +162,8 @@ func TestWithOsqueryFlags(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
-	k.On("NodeKey", types.DefaultRegistrationID).Return(ulid.New(), nil).Maybe()
-	k.On("EnsureRegistrationStored", types.DefaultRegistrationID).Return(nil).Maybe()
+	k.On("NodeKey", types.DefaultEnrollmentID).Return(ulid.New(), nil).Maybe()
+	k.On("EnsureRegistrationStored", types.DefaultEnrollmentID).Return(nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
@@ -203,7 +203,7 @@ func TestFlagsChanged(t *testing.T) {
 	logBytes, slogger := setUpTestSlogger()
 
 	k := typesMocks.NewKnapsack(t)
-	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
+	k.On("RegistrationIDs").Return([]string{types.DefaultEnrollmentID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false).Once() // WatchdogEnabled should initially return false
 	k.On("WatchdogMemoryLimitMB").Return(150)
@@ -219,8 +219,8 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
-	k.On("NodeKey", types.DefaultRegistrationID).Return(ulid.New(), nil).Maybe()
-	k.On("EnsureRegistrationStored", types.DefaultRegistrationID).Return(nil).Maybe()
+	k.On("NodeKey", types.DefaultEnrollmentID).Return(ulid.New(), nil).Maybe()
+	k.On("EnsureRegistrationStored", types.DefaultEnrollmentID).Return(nil).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
@@ -254,7 +254,7 @@ func TestFlagsChanged(t *testing.T) {
 
 	// Confirm watchdog is disabled
 	watchdogDisabled := false
-	for _, a := range runner.instances[types.DefaultRegistrationID].cmd.Args {
+	for _, a := range runner.instances[types.DefaultEnrollmentID].cmd.Args {
 		if strings.Contains(a, "disable_watchdog") {
 			watchdogDisabled = true
 			break
@@ -262,7 +262,7 @@ func TestFlagsChanged(t *testing.T) {
 	}
 	require.True(t, watchdogDisabled, "instance not set up with watchdog disabled")
 
-	startingInstance := runner.instances[types.DefaultRegistrationID]
+	startingInstance := runner.instances[types.DefaultEnrollmentID]
 
 	// should start off false
 	require.False(t, runner.needsRestart.Load(), "runner should not be flagged as needing restart since it just started")
@@ -288,7 +288,7 @@ func TestFlagsChanged(t *testing.T) {
 	waitHealthy(t, runner, logBytes, osqHistory)
 
 	// Now confirm that the instance is new
-	require.NotEqual(t, startingInstance, runner.instances[types.DefaultRegistrationID], "instance not replaced")
+	require.NotEqual(t, startingInstance, runner.instances[types.DefaultEnrollmentID], "instance not replaced")
 
 	require.False(t, runner.needsRestart.Load(), "runner should no longer be marked as needing a restart after restart completed")
 
@@ -296,7 +296,7 @@ func TestFlagsChanged(t *testing.T) {
 	watchdogMemoryLimitMBFound := false
 	watchdogUtilizationLimitPercentFound := false
 	watchdogDelaySecFound := false
-	for _, a := range runner.instances[types.DefaultRegistrationID].cmd.Args {
+	for _, a := range runner.instances[types.DefaultEnrollmentID].cmd.Args {
 		if strings.Contains(a, "disable_watchdog") {
 			t.Error("disable_watchdog flag set")
 			t.FailNow()
@@ -337,7 +337,7 @@ func TestPing(t *testing.T) {
 	rootDirectory := testRootDirectory(t)
 	logBytes, slogger := setUpTestSlogger()
 	k := typesMocks.NewKnapsack(t)
-	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
+	k.On("RegistrationIDs").Return([]string{types.DefaultEnrollmentID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -350,8 +350,8 @@ func TestPing(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
-	k.On("NodeKey", types.DefaultRegistrationID).Return(ulid.New(), nil).Maybe()
-	k.On("EnsureRegistrationStored", types.DefaultRegistrationID).Return(nil).Maybe()
+	k.On("NodeKey", types.DefaultEnrollmentID).Return(ulid.New(), nil).Maybe()
+	k.On("EnsureRegistrationStored", types.DefaultEnrollmentID).Return(nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
@@ -391,7 +391,7 @@ func TestPing(t *testing.T) {
 
 	// Wait for the instance to start
 	waitHealthy(t, runner, logBytes, osqHistory)
-	startingInstance := runner.instances[types.DefaultRegistrationID]
+	startingInstance := runner.instances[types.DefaultEnrollmentID]
 
 	// Confirm the instance doesn't have the KATC table yet
 	testKatcTableName := "katc_test"
@@ -422,7 +422,7 @@ func TestPing(t *testing.T) {
 	require.NoError(t, err, "could not query new table", logBytes.String())
 
 	// Confirm that the instance did not restart
-	require.Equal(t, startingInstance, runner.instances[types.DefaultRegistrationID], "instance restarted, but it should not have")
+	require.Equal(t, startingInstance, runner.instances[types.DefaultEnrollmentID], "instance restarted, but it should not have")
 
 	// Now, add a new table to our KATC configuration
 	secondTestKatcTableName := "katc_test"
@@ -448,7 +448,7 @@ func TestPing(t *testing.T) {
 	require.NoError(t, err, "could not query new table", logBytes.String())
 
 	// Confirm that the instance did not restart
-	require.Equal(t, startingInstance, runner.instances[types.DefaultRegistrationID], "instance restarted, but it should not have")
+	require.Equal(t, startingInstance, runner.instances[types.DefaultEnrollmentID], "instance restarted, but it should not have")
 
 	// Delete both tables from the KATC config
 	require.NoError(t, katcConfigStore.Delete([]byte(testKatcTableName), []byte(secondTestKatcTableName)))
@@ -467,7 +467,7 @@ func TestPing(t *testing.T) {
 	require.NoError(t, err, "able to query deleted tables", logBytes.String())
 
 	// Confirm that the instance did not restart
-	require.Equal(t, startingInstance, runner.instances[types.DefaultRegistrationID], "instance restarted, but it should not have")
+	require.Equal(t, startingInstance, runner.instances[types.DefaultEnrollmentID], "instance restarted, but it should not have")
 
 	k.AssertExpectations(t)
 
@@ -543,7 +543,7 @@ func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Thread
 		}
 
 		// Confirm osquery instance setup is complete
-		if runner.instances[types.DefaultRegistrationID] == nil {
+		if runner.instances[types.DefaultEnrollmentID] == nil {
 			return errors.New("default instance does not exist yet")
 		}
 
@@ -552,7 +552,7 @@ func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Thread
 			return errors.New("osquery history is uninitialized in knapsack")
 		}
 
-		latestInstanceStats, err := osqHistory.LatestInstanceStats(types.DefaultRegistrationID)
+		latestInstanceStats, err := osqHistory.LatestInstanceStats(types.DefaultEnrollmentID)
 		if err != nil {
 			return fmt.Errorf("gathering latest default history instance for waitHealthy: %w", err)
 		}
@@ -582,9 +582,9 @@ func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Thread
 	debugInfo := fmt.Sprintf("instance not healthy by %s: runner logs:\n\n%s", time.Now().String(), logBytes.String())
 
 	// Instance is not healthy -- gather info about osquery proc, then fail
-	require.NotNil(t, runner.instances[types.DefaultRegistrationID].cmd, "cmd not set on instance", debugInfo)
-	require.NotNil(t, runner.instances[types.DefaultRegistrationID].cmd.Process, "instance cmd does not have process", debugInfo)
-	osqueryProc, err := process.NewProcessWithContext(t.Context(), int32(runner.instances[types.DefaultRegistrationID].cmd.Process.Pid))
+	require.NotNil(t, runner.instances[types.DefaultEnrollmentID].cmd, "cmd not set on instance", debugInfo)
+	require.NotNil(t, runner.instances[types.DefaultEnrollmentID].cmd.Process, "instance cmd does not have process", debugInfo)
+	osqueryProc, err := process.NewProcessWithContext(t.Context(), int32(runner.instances[types.DefaultEnrollmentID].cmd.Process.Pid))
 	require.NoError(t, err, "getting osquery process info after instance failed to become healthy", debugInfo)
 
 	isRunning, err := osqueryProc.IsRunningWithContext(t.Context())
@@ -610,7 +610,7 @@ func TestSimplePath(t *testing.T) {
 	logBytes, slogger := setUpTestSlogger()
 
 	k := typesMocks.NewKnapsack(t)
-	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
+	k.On("RegistrationIDs").Return([]string{types.DefaultEnrollmentID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -623,8 +623,8 @@ func TestSimplePath(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
-	k.On("NodeKey", types.DefaultRegistrationID).Return(ulid.New(), nil).Maybe()
-	k.On("EnsureRegistrationStored", types.DefaultRegistrationID).Return(nil).Maybe()
+	k.On("NodeKey", types.DefaultEnrollmentID).Return(ulid.New(), nil).Maybe()
+	k.On("EnsureRegistrationStored", types.DefaultEnrollmentID).Return(nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
@@ -667,7 +667,7 @@ func TestMultipleInstances(t *testing.T) {
 	extraRegistrationId := ulid.New()
 
 	k := typesMocks.NewKnapsack(t)
-	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID, extraRegistrationId})
+	k.On("RegistrationIDs").Return([]string{types.DefaultEnrollmentID, extraRegistrationId})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -680,8 +680,8 @@ func TestMultipleInstances(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
-	k.On("NodeKey", types.DefaultRegistrationID).Return(ulid.New(), nil).Maybe()
-	k.On("EnsureRegistrationStored", types.DefaultRegistrationID).Return(nil).Maybe()
+	k.On("NodeKey", types.DefaultEnrollmentID).Return(ulid.New(), nil).Maybe()
+	k.On("EnsureRegistrationStored", types.DefaultEnrollmentID).Return(nil).Maybe()
 	k.On("NodeKey", extraRegistrationId).Return(ulid.New(), nil).Maybe()
 	k.On("EnsureRegistrationStored", extraRegistrationId).Return(nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
@@ -714,8 +714,8 @@ func TestMultipleInstances(t *testing.T) {
 	waitHealthy(t, runner, logBytes, osqHistory)
 
 	// Confirm the default instance was started
-	require.Contains(t, runner.instances, types.DefaultRegistrationID)
-	require.NotNil(t, runner.instances[types.DefaultRegistrationID].history)
+	require.Contains(t, runner.instances, types.DefaultEnrollmentID)
+	require.NotNil(t, runner.instances[types.DefaultEnrollmentID].history)
 
 	// Confirm the additional instance was started
 	require.Contains(t, runner.instances, extraRegistrationId)
@@ -728,16 +728,16 @@ func TestMultipleInstances(t *testing.T) {
 
 	// Confirm instance statuses are reported correctly
 	instanceStatuses := runner.InstanceStatuses()
-	require.Contains(t, instanceStatuses, types.DefaultRegistrationID)
-	require.Equal(t, instanceStatuses[types.DefaultRegistrationID], types.InstanceStatusHealthy)
+	require.Contains(t, instanceStatuses, types.DefaultEnrollmentID)
+	require.Equal(t, instanceStatuses[types.DefaultEnrollmentID], types.InstanceStatusHealthy)
 	require.Contains(t, instanceStatuses, extraRegistrationId)
 	require.Equal(t, instanceStatuses[extraRegistrationId], types.InstanceStatusHealthy)
 
 	waitShutdown(t, runner, logBytes)
 
 	// Confirm both instances exited
-	require.Contains(t, runner.instances, types.DefaultRegistrationID)
-	defaultInstanceStats, err := osqHistory.LatestInstanceStats(types.DefaultRegistrationID)
+	require.Contains(t, runner.instances, types.DefaultEnrollmentID)
+	defaultInstanceStats, err := osqHistory.LatestInstanceStats(types.DefaultEnrollmentID)
 	require.NoError(t, err)
 	require.Contains(t, defaultInstanceStats, "exit_time")
 	require.NotEmpty(t, defaultInstanceStats["exit_time"], "exit time should be added to default instance stats on shutdown")
@@ -760,7 +760,7 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	logBytes, slogger := setUpTestSlogger()
 
 	k := typesMocks.NewKnapsack(t)
-	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
+	k.On("RegistrationIDs").Return([]string{types.DefaultEnrollmentID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -773,8 +773,8 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
-	k.On("NodeKey", types.DefaultRegistrationID).Return(ulid.New(), nil).Maybe()
-	k.On("EnsureRegistrationStored", types.DefaultRegistrationID).Return(nil).Maybe()
+	k.On("NodeKey", types.DefaultEnrollmentID).Return(ulid.New(), nil).Maybe()
+	k.On("EnsureRegistrationStored", types.DefaultEnrollmentID).Return(nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
@@ -815,8 +815,8 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	waitShutdown(t, runner, logBytes)
 
 	// Confirm the default instance was started, and then exited
-	require.Contains(t, runner.instances, types.DefaultRegistrationID)
-	defaultInstanceStats, err := osqHistory.LatestInstanceStats(types.DefaultRegistrationID)
+	require.Contains(t, runner.instances, types.DefaultEnrollmentID)
+	defaultInstanceStats, err := osqHistory.LatestInstanceStats(types.DefaultEnrollmentID)
 	require.NoError(t, err)
 	require.Contains(t, defaultInstanceStats, "start_time")
 	require.NotEmpty(t, defaultInstanceStats["start_time"], "start time should be added to default instance stats on start up")
@@ -849,7 +849,7 @@ func TestMultipleShutdowns(t *testing.T) {
 	logBytes, slogger := setUpTestSlogger()
 
 	k := typesMocks.NewKnapsack(t)
-	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
+	k.On("RegistrationIDs").Return([]string{types.DefaultEnrollmentID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -862,8 +862,8 @@ func TestMultipleShutdowns(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
-	k.On("NodeKey", types.DefaultRegistrationID).Return(ulid.New(), nil).Maybe()
-	k.On("EnsureRegistrationStored", types.DefaultRegistrationID).Return(nil).Maybe()
+	k.On("NodeKey", types.DefaultEnrollmentID).Return(ulid.New(), nil).Maybe()
+	k.On("EnsureRegistrationStored", types.DefaultEnrollmentID).Return(nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
@@ -907,7 +907,7 @@ func TestOsqueryDies(t *testing.T) {
 	logBytes, slogger := setUpTestSlogger()
 
 	k := typesMocks.NewKnapsack(t)
-	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
+	k.On("RegistrationIDs").Return([]string{types.DefaultEnrollmentID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -920,8 +920,8 @@ func TestOsqueryDies(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
-	k.On("NodeKey", types.DefaultRegistrationID).Return(ulid.New(), nil).Maybe()
-	k.On("EnsureRegistrationStored", types.DefaultRegistrationID).Return(nil).Maybe()
+	k.On("NodeKey", types.DefaultEnrollmentID).Return(ulid.New(), nil).Maybe()
+	k.On("EnsureRegistrationStored", types.DefaultEnrollmentID).Return(nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
@@ -949,12 +949,12 @@ func TestOsqueryDies(t *testing.T) {
 
 	waitHealthy(t, runner, logBytes, osqHistory)
 
-	require.Contains(t, runner.instances, types.DefaultRegistrationID)
+	require.Contains(t, runner.instances, types.DefaultEnrollmentID)
 
 	// Simulate the osquery process unexpectedly dying
 	runner.instanceLock.Lock()
-	require.NoError(t, killProcessGroup(runner.instances[types.DefaultRegistrationID].cmd))
-	runner.instances[types.DefaultRegistrationID].errgroup.Wait(t.Context())
+	require.NoError(t, killProcessGroup(runner.instances[types.DefaultEnrollmentID].cmd))
+	runner.instances[types.DefaultEnrollmentID].errgroup.Wait(t.Context())
 	runner.instanceLock.Unlock()
 
 	waitHealthy(t, runner, logBytes, osqHistory)
@@ -987,7 +987,7 @@ func TestNotStarted(t *testing.T) {
 	rootDirectory := t.TempDir()
 
 	k := typesMocks.NewKnapsack(t)
-	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
+	k.On("RegistrationIDs").Return([]string{types.DefaultEnrollmentID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return()
@@ -1022,10 +1022,10 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 	runner, logBytes, osqHistory := setupOsqueryInstanceForTests(t)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 
-	requirePgidMatch(t, runner.instances[types.DefaultRegistrationID].cmd.Process.Pid)
+	requirePgidMatch(t, runner.instances[types.DefaultEnrollmentID].cmd.Process.Pid)
 
 	// kill the current osquery process but not the extension
-	require.NoError(t, runner.instances[types.DefaultRegistrationID].cmd.Process.Kill())
+	require.NoError(t, runner.instances[types.DefaultEnrollmentID].cmd.Process.Kill())
 
 	// We need to (a) let the runner restart osquery, and (b) wait for
 	// the extension to die. Both of these may take up to 30s. We'll
@@ -1092,7 +1092,7 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 	logBytes, slogger := setUpTestSlogger()
 
 	k := typesMocks.NewKnapsack(t)
-	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
+	k.On("RegistrationIDs").Return([]string{types.DefaultEnrollmentID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(true)
 	k.On("WatchdogMemoryLimitMB").Return(150)
@@ -1108,8 +1108,8 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
-	k.On("NodeKey", types.DefaultRegistrationID).Return(ulid.New(), nil).Maybe()
-	k.On("EnsureRegistrationStored", types.DefaultRegistrationID).Return(nil).Maybe()
+	k.On("NodeKey", types.DefaultEnrollmentID).Return(ulid.New(), nil).Maybe()
+	k.On("EnsureRegistrationStored", types.DefaultEnrollmentID).Return(nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
@@ -1135,7 +1135,7 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 	go runner.Run()
 	waitHealthy(t, runner, logBytes, osqHistory)
 
-	requirePgidMatch(t, runner.instances[types.DefaultRegistrationID].cmd.Process.Pid)
+	requirePgidMatch(t, runner.instances[types.DefaultEnrollmentID].cmd.Process.Pid)
 
 	return runner, logBytes, osqHistory
 }

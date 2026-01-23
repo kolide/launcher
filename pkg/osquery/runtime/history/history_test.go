@@ -157,16 +157,16 @@ func TestLatestInstance(t *testing.T) {
 			initialInstances: []*instance{
 				{
 					StartTime:      "first_expected_start_time",
-					RegistrationId: types.DefaultRegistrationID,
+					RegistrationId: types.DefaultEnrollmentID,
 				},
 				{
 					StartTime:      "second_expected_start_time",
-					RegistrationId: types.DefaultRegistrationID,
+					RegistrationId: types.DefaultEnrollmentID,
 				},
 			},
 			want: &instance{
 				StartTime:      "second_expected_start_time",
-				RegistrationId: types.DefaultRegistrationID,
+				RegistrationId: types.DefaultEnrollmentID,
 			},
 		},
 		{
@@ -180,7 +180,7 @@ func TestLatestInstance(t *testing.T) {
 			currentHistory, err := InitHistory(setupStorage(t, tt.initialInstances...))
 			require.NoError(t, err, "expected to be able to initialize history without error")
 
-			got, err := currentHistory.latestInstance(types.DefaultRegistrationID)
+			got, err := currentHistory.latestInstance(types.DefaultEnrollmentID)
 
 			if tt.errString != "" {
 				assert.EqualError(t, err, tt.errString)
@@ -279,21 +279,21 @@ func TestLatestInstanceUptimeMinutes(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name             string
-		registrationId   string
+		enrollmentId     string
 		initialInstances []*instance
 		want             int64
 		expectedErr      bool
 	}{
 		{
-			name:           "success",
-			registrationId: types.DefaultRegistrationID,
+			name:         "success",
+			enrollmentId: types.DefaultEnrollmentID,
 			initialInstances: []*instance{
 				{
-					RegistrationId: types.DefaultRegistrationID,
+					RegistrationId: types.DefaultEnrollmentID,
 					StartTime:      time.Now().UTC().Add(-30 * time.Minute).Format(time.RFC3339),
 				},
 				{
-					RegistrationId: types.DefaultRegistrationID,
+					RegistrationId: types.DefaultEnrollmentID,
 					StartTime:      time.Now().UTC().Add(-10 * time.Minute).Format(time.RFC3339),
 				},
 			},
@@ -301,11 +301,11 @@ func TestLatestInstanceUptimeMinutes(t *testing.T) {
 			expectedErr: false,
 		},
 		{
-			name:           "success_different_registration_ids",
-			registrationId: "notTheDefault",
+			name:         "success_different_registration_ids",
+			enrollmentId: "notTheDefault",
 			initialInstances: []*instance{
 				{
-					RegistrationId: types.DefaultRegistrationID,
+					RegistrationId: types.DefaultEnrollmentID,
 					StartTime:      time.Now().UTC().Add(-45 * time.Minute).Format(time.RFC3339),
 				},
 				{
@@ -313,7 +313,7 @@ func TestLatestInstanceUptimeMinutes(t *testing.T) {
 					StartTime:      time.Now().UTC().Add(-40 * time.Minute).Format(time.RFC3339),
 				},
 				{
-					RegistrationId: types.DefaultRegistrationID,
+					RegistrationId: types.DefaultEnrollmentID,
 					StartTime:      time.Now().UTC().Add(-35 * time.Minute).Format(time.RFC3339),
 				},
 				{
@@ -329,10 +329,10 @@ func TestLatestInstanceUptimeMinutes(t *testing.T) {
 			expectedErr: false,
 		},
 		{
-			name:           "no_instances_error",
-			registrationId: types.DefaultRegistrationID,
-			want:           0,
-			expectedErr:    true,
+			name:         "no_instances_error",
+			enrollmentId: types.DefaultEnrollmentID,
+			want:         0,
+			expectedErr:  true,
 		},
 	}
 	for _, tt := range tests {
@@ -341,7 +341,7 @@ func TestLatestInstanceUptimeMinutes(t *testing.T) {
 			currentHistory, err := InitHistory(setupStorage(t, tt.initialInstances...))
 			require.NoError(t, err, "expected to be able to initialize history without error")
 
-			got, err := currentHistory.LatestInstanceUptimeMinutes(tt.registrationId)
+			got, err := currentHistory.LatestInstanceUptimeMinutes(tt.enrollmentId)
 
 			if tt.expectedErr {
 				require.Error(t, err)
@@ -357,26 +357,26 @@ func TestLatestInstanceId(t *testing.T) {
 	tests := []struct {
 		name             string
 		initialInstances []*instance
-		registrationId   string
+		enrollmentId     string
 		want             string
 		expectedErr      bool
 	}{
 		{
-			name:           "success_same_registration_ids",
-			registrationId: types.DefaultRegistrationID,
+			name:         "success_same_registration_ids",
+			enrollmentId: types.DefaultEnrollmentID,
 			initialInstances: []*instance{
 				{
-					RegistrationId: types.DefaultRegistrationID,
+					RegistrationId: types.DefaultEnrollmentID,
 					StartTime:      time.Now().UTC().Add(-30 * time.Minute).Format(time.RFC3339),
 					InstanceId:     ulid.New(),
 				},
 				{
-					RegistrationId: types.DefaultRegistrationID,
+					RegistrationId: types.DefaultEnrollmentID,
 					StartTime:      time.Now().UTC().Add(-20 * time.Minute).Format(time.RFC3339),
 					InstanceId:     ulid.New(),
 				},
 				{
-					RegistrationId: types.DefaultRegistrationID,
+					RegistrationId: types.DefaultEnrollmentID,
 					StartTime:      time.Now().UTC().Add(-10 * time.Minute).Format(time.RFC3339),
 					InstanceId:     "9b093496-9999-9999-ab70-6ceb816b8775",
 				},
@@ -385,21 +385,21 @@ func TestLatestInstanceId(t *testing.T) {
 			expectedErr: false,
 		},
 		{
-			name:           "success_different_registration_ids",
-			registrationId: types.DefaultRegistrationID,
+			name:         "success_different_registration_ids",
+			enrollmentId: types.DefaultEnrollmentID,
 			initialInstances: []*instance{
 				{
-					RegistrationId: types.DefaultRegistrationID,
+					RegistrationId: types.DefaultEnrollmentID,
 					StartTime:      time.Now().UTC().Add(-30 * time.Minute).Format(time.RFC3339),
 					InstanceId:     ulid.New(),
 				},
 				{
-					RegistrationId: types.DefaultRegistrationID,
+					RegistrationId: types.DefaultEnrollmentID,
 					StartTime:      time.Now().UTC().Add(-20 * time.Minute).Format(time.RFC3339),
 					InstanceId:     ulid.New(),
 				},
 				{
-					RegistrationId: types.DefaultRegistrationID,
+					RegistrationId: types.DefaultEnrollmentID,
 					StartTime:      time.Now().UTC().Add(-10 * time.Minute).Format(time.RFC3339),
 					InstanceId:     "9b093496-9999-9999-ab70-6ceb816b8775",
 				},
@@ -429,7 +429,7 @@ func TestLatestInstanceId(t *testing.T) {
 			currentHistory, err := InitHistory(setupStorage(t, tt.initialInstances...))
 			require.NoError(t, err, "expected to be able to initialize history without error")
 
-			got, err := currentHistory.LatestInstanceId(types.DefaultRegistrationID)
+			got, err := currentHistory.LatestInstanceId(types.DefaultEnrollmentID)
 
 			if tt.expectedErr {
 				require.Error(t, err)
@@ -464,17 +464,17 @@ func TestSetConnected(t *testing.T) {
 			},
 			initialInstances: []*instance{
 				{
-					RegistrationId: types.DefaultRegistrationID,
+					RegistrationId: types.DefaultEnrollmentID,
 					StartTime:      time.Now().UTC().Add(-30 * time.Minute).Format(time.RFC3339),
 					RunId:          ulid.New(),
 				},
 				{
-					RegistrationId: types.DefaultRegistrationID,
+					RegistrationId: types.DefaultEnrollmentID,
 					StartTime:      time.Now().UTC().Add(-20 * time.Minute).Format(time.RFC3339),
 					RunId:          "99999999-9999-9999-9999-999999999999",
 				},
 				{
-					RegistrationId: types.DefaultRegistrationID,
+					RegistrationId: types.DefaultEnrollmentID,
 					StartTime:      time.Now().UTC().Add(-10 * time.Minute).Format(time.RFC3339),
 					RunId:          ulid.New(),
 				},
@@ -495,17 +495,17 @@ func TestSetConnected(t *testing.T) {
 			},
 			initialInstances: []*instance{
 				{
-					RegistrationId: types.DefaultRegistrationID,
+					RegistrationId: types.DefaultEnrollmentID,
 					StartTime:      time.Now().UTC().Add(-30 * time.Minute).Format(time.RFC3339),
 					RunId:          ulid.New(),
 				},
 				{
-					RegistrationId: types.DefaultRegistrationID,
+					RegistrationId: types.DefaultEnrollmentID,
 					StartTime:      time.Now().UTC().Add(-20 * time.Minute).Format(time.RFC3339),
 					RunId:          ulid.New(),
 				},
 				{
-					RegistrationId: types.DefaultRegistrationID,
+					RegistrationId: types.DefaultEnrollmentID,
 					StartTime:      time.Now().UTC().Add(-10 * time.Minute).Format(time.RFC3339),
 					RunId:          "99999999-9999-9999-9999-999999999999",
 				},
@@ -534,7 +534,7 @@ func TestSetConnected(t *testing.T) {
 			},
 			initialInstances: []*instance{
 				{
-					RegistrationId: types.DefaultRegistrationID,
+					RegistrationId: types.DefaultEnrollmentID,
 					StartTime:      time.Now().UTC().Add(-10 * time.Minute).Format(time.RFC3339),
 					RunId:          "99999999-9999-9999-9999-999999999999",
 				},
@@ -595,17 +595,17 @@ func TestSetExited(t *testing.T) {
 			runId: "99999999-9999-9999-9999-999999999999",
 			initialInstances: []*instance{
 				{
-					RegistrationId: types.DefaultRegistrationID,
+					RegistrationId: types.DefaultEnrollmentID,
 					StartTime:      time.Now().UTC().Add(-30 * time.Minute).Format(time.RFC3339),
 					RunId:          ulid.New(),
 				},
 				{
-					RegistrationId: types.DefaultRegistrationID,
+					RegistrationId: types.DefaultEnrollmentID,
 					StartTime:      time.Now().UTC().Add(-20 * time.Minute).Format(time.RFC3339),
 					RunId:          "99999999-9999-9999-9999-999999999999",
 				},
 				{
-					RegistrationId: types.DefaultRegistrationID,
+					RegistrationId: types.DefaultEnrollmentID,
 					StartTime:      time.Now().UTC().Add(-10 * time.Minute).Format(time.RFC3339),
 					RunId:          ulid.New(),
 				},
@@ -618,12 +618,12 @@ func TestSetExited(t *testing.T) {
 			runId: "99999999-9999-9999-9999-999999999999",
 			initialInstances: []*instance{
 				{
-					RegistrationId: types.DefaultRegistrationID,
+					RegistrationId: types.DefaultEnrollmentID,
 					StartTime:      time.Now().UTC().Add(-30 * time.Minute).Format(time.RFC3339),
 					RunId:          ulid.New(),
 				},
 				{
-					RegistrationId: types.DefaultRegistrationID,
+					RegistrationId: types.DefaultEnrollmentID,
 					StartTime:      time.Now().UTC().Add(-10 * time.Minute).Format(time.RFC3339),
 					RunId:          "99999999-9999-9999-9999-999999999999",
 				},

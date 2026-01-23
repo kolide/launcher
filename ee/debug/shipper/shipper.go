@@ -323,9 +323,9 @@ func munemo(k types.Knapsack) string {
 		return munemoFromMetadataJson(k.RootDirectory())
 	}
 
-	// For now, we can return the munemo for the default registration (also, the only registration currently)
+	// For now, we can return the munemo for the default enrollment (also, the only enrollment currently)
 	for _, registration := range registrations {
-		if registration.RegistrationID == types.DefaultRegistrationID {
+		if registration.RegistrationID == types.DefaultEnrollmentID {
 			return registration.Munemo
 		}
 	}

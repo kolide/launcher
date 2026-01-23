@@ -35,7 +35,7 @@ func TestOpenWriter_NewDatabase(t *testing.T) {
 	k.On("ConfigStore").Return(inmemory.NewStore())
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("KatcConfigStore").Return(inmemory.NewStore())
-	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
+	k.On("RegistrationIDs").Return([]string{types.DefaultEnrollmentID})
 
 	// Set up storage db, which should create the database and set all flags
 	s, err := OpenWriter(t.Context(), k)
@@ -88,7 +88,7 @@ func TestOpenWriter_DatabaseAlreadyExists(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel)
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion)
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion)
-	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
+	k.On("RegistrationIDs").Return([]string{types.DefaultEnrollmentID})
 
 	// Set up flag
 	updateChannelVal := "alpha"
@@ -134,7 +134,7 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel)
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion)
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion)
-	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
+	k.On("RegistrationIDs").Return([]string{types.DefaultEnrollmentID})
 	updateChannelVal := "beta"
 	k.On("UpdateChannel").Return(updateChannelVal).Once()
 	pinnedLauncherVersion := "1.2.3"

@@ -769,7 +769,7 @@ func calculateOsqueryPaths(rootDirectory string, registrationId string, runId st
 	}
 
 	// Keep default database path for default instance
-	if registrationId == types.DefaultRegistrationID {
+	if registrationId == types.DefaultEnrollmentID {
 		osqueryFilePaths.databasePath = filepath.Join(rootDirectory, "osquery.db")
 	}
 

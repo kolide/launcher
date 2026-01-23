@@ -155,11 +155,11 @@ func (lpc *LogPublisherClient) PublishResults(ctx context.Context, results []dis
 // publish handles the common logic for publishing logs and results to the agent-ingester service. This
 // includes marshalling the payload, fetching the auth token, issuing the request, and handling the response/logging.
 func (lpc *LogPublisherClient) publish(ctx context.Context, slogger *slog.Logger, payload any, publicationPath string) (*types.OsqueryPublicationResponse, error) {
-	// in the future we will want to plumb a registration ID through here, for now just use the default
-	registrationID := types.DefaultRegistrationID
-	authToken := lpc.getTokenForRegistration(registrationID)
+	// in the future we will want to plumb an enrollment ID through here, for now just use the default
+	enrollmentID := types.DefaultEnrollmentID
+	authToken := lpc.getTokenForRegistration(enrollmentID)
 	if authToken == "" {
-		return nil, fmt.Errorf("no auth token found for registration: %s", registrationID)
+		return nil, fmt.Errorf("no auth token found for enrollment: %s", enrollmentID)
 	}
 
 	requestUUID := uuid.NewForRequest()
@@ -256,7 +256,7 @@ func (lpc *LogPublisherClient) Ping() {
 // refreshTokenCache loads in the agent ingester auth token from the TokenStore and stores it in
 // our locally cached map
 func (lpc *LogPublisherClient) refreshTokenCache() error {
-	// for now we will only see a single token for the default registration, in the future we
+	// for now we will only see a single token for the default enrollment, in the future we
 	// will iterate the TokenStorage and grab everything with a key prefix of storage.AgentIngesterAuthTokenKey
 	newToken, err := lpc.knapsack.TokenStore().Get(storage.AgentIngesterAuthTokenKey)
 	if err != nil || len(newToken) == 0 {
@@ -266,7 +266,7 @@ func (lpc *LogPublisherClient) refreshTokenCache() error {
 	lpc.tokensMutex.Lock()
 	defer lpc.tokensMutex.Unlock()
 
-	lpc.tokens[types.DefaultRegistrationID] = string(newToken)
+	lpc.tokens[types.DefaultEnrollmentID] = string(newToken)
 	return nil
 }
 

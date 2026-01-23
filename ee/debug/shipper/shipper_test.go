@@ -36,7 +36,7 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 				k.On("EnrollSecretPath").Return("")
 				k.On("Registrations").Return([]types.Registration{
 					{
-						RegistrationID: types.DefaultRegistrationID,
+						RegistrationID: types.DefaultEnrollmentID,
 						Munemo:         "test-munemo",
 					},
 				}, nil)
@@ -76,7 +76,7 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 				k.On("EnrollSecret").Return("enroll_secret_value")
 				k.On("Registrations").Return([]types.Registration{
 					{
-						RegistrationID: types.DefaultRegistrationID,
+						RegistrationID: types.DefaultEnrollmentID,
 						Munemo:         "test-munemo",
 					},
 				}, nil)
@@ -176,7 +176,7 @@ func TestShipToS3(t *testing.T) { //nolint:paralleltest
 				k.On("EnrollSecret").Return("enroll_secret_value")
 				k.On("Registrations").Return([]types.Registration{
 					{
-						RegistrationID: types.DefaultRegistrationID,
+						RegistrationID: types.DefaultEnrollmentID,
 						Munemo:         "test-munemo",
 					},
 				}, nil)
@@ -195,7 +195,7 @@ func TestShipToS3(t *testing.T) { //nolint:paralleltest
 				k.On("EnrollSecret").Return("enroll_secret_value")
 				k.On("Registrations").Return([]types.Registration{
 					{
-						RegistrationID: types.DefaultRegistrationID,
+						RegistrationID: types.DefaultEnrollmentID,
 						Munemo:         "test-munemo",
 					},
 				}, nil)
@@ -214,7 +214,7 @@ func TestShipToS3(t *testing.T) { //nolint:paralleltest
 				k.On("EnrollSecret").Return("enroll_secret_value")
 				k.On("Registrations").Return([]types.Registration{
 					{
-						RegistrationID: types.DefaultRegistrationID,
+						RegistrationID: types.DefaultEnrollmentID,
 						Munemo:         "test-munemo",
 					},
 				}, nil)
