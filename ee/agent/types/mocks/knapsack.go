@@ -1665,6 +1665,61 @@ func (_c *Knapsack_EnrollmentStore_Call) RunAndReturn(run func() types.KVStore) 
 	return _c
 }
 
+// Enrollments provides a mock function for the type Knapsack
+func (_mock *Knapsack) Enrollments() ([]types.Enrollment, error) {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Enrollments")
+	}
+
+	var r0 []types.Enrollment
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func() ([]types.Enrollment, error)); ok {
+		return returnFunc()
+	}
+	if returnFunc, ok := ret.Get(0).(func() []types.Enrollment); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.Enrollment)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func() error); ok {
+		r1 = returnFunc()
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Knapsack_Enrollments_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Enrollments'
+type Knapsack_Enrollments_Call struct {
+	*mock.Call
+}
+
+// Enrollments is a helper method to define mock.On call
+func (_e *Knapsack_Expecter) Enrollments() *Knapsack_Enrollments_Call {
+	return &Knapsack_Enrollments_Call{Call: _e.mock.On("Enrollments")}
+}
+
+func (_c *Knapsack_Enrollments_Call) Run(run func()) *Knapsack_Enrollments_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Knapsack_Enrollments_Call) Return(enrollments []types.Enrollment, err error) *Knapsack_Enrollments_Call {
+	_c.Call.Return(enrollments, err)
+	return _c
+}
+
+func (_c *Knapsack_Enrollments_Call) RunAndReturn(run func() ([]types.Enrollment, error)) *Knapsack_Enrollments_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // EnsureEnrollmentStored provides a mock function for the type Knapsack
 func (_mock *Knapsack) EnsureEnrollmentStored(enrollmentId string) error {
 	ret := _mock.Called(enrollmentId)
@@ -3582,61 +3637,6 @@ func (_c *Knapsack_RegisterChangeObserver_Call) Return() *Knapsack_RegisterChang
 
 func (_c *Knapsack_RegisterChangeObserver_Call) RunAndReturn(run func(observer types.FlagsChangeObserver, flagKeys ...keys.FlagKey)) *Knapsack_RegisterChangeObserver_Call {
 	_c.Run(run)
-	return _c
-}
-
-// Registrations provides a mock function for the type Knapsack
-func (_mock *Knapsack) Registrations() ([]types.Enrollment, error) {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for Registrations")
-	}
-
-	var r0 []types.Enrollment
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() ([]types.Enrollment, error)); ok {
-		return returnFunc()
-	}
-	if returnFunc, ok := ret.Get(0).(func() []types.Enrollment); ok {
-		r0 = returnFunc()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]types.Enrollment)
-		}
-	}
-	if returnFunc, ok := ret.Get(1).(func() error); ok {
-		r1 = returnFunc()
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// Knapsack_Registrations_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Registrations'
-type Knapsack_Registrations_Call struct {
-	*mock.Call
-}
-
-// Registrations is a helper method to define mock.On call
-func (_e *Knapsack_Expecter) Registrations() *Knapsack_Registrations_Call {
-	return &Knapsack_Registrations_Call{Call: _e.mock.On("Registrations")}
-}
-
-func (_c *Knapsack_Registrations_Call) Run(run func()) *Knapsack_Registrations_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *Knapsack_Registrations_Call) Return(enrollments []types.Enrollment, err error) *Knapsack_Registrations_Call {
-	_c.Call.Return(enrollments, err)
-	return _c
-}
-
-func (_c *Knapsack_Registrations_Call) RunAndReturn(run func() ([]types.Enrollment, error)) *Knapsack_Registrations_Call {
-	_c.Call.Return(run)
 	return _c
 }
 

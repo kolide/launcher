@@ -378,14 +378,14 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			munemoValue := []byte("test-munemo")
 
 			if tt.registrationsExist {
-				mockKnapsack.On("Registrations").Return([]types.Enrollment{
+				mockKnapsack.On("Enrollments").Return([]types.Enrollment{
 					{
 						EnrollmentID: types.DefaultEnrollmentID,
 						Munemo:       string(munemoValue),
 					},
 				}, nil)
 			} else {
-				mockKnapsack.On("Registrations").Return(nil, nil)
+				mockKnapsack.On("Enrollments").Return(nil, nil)
 			}
 
 			if tt.munemoSetInStore {
@@ -516,7 +516,7 @@ func TestDetectAndRemediateHardwareChange_SavesDataOverMultipleResets(t *testing
 	})
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	mockKnapsack.On("ResetOnHardwareChangeEnabled").Return(true)
-	mockKnapsack.On("Registrations").Return([]types.Enrollment{
+	mockKnapsack.On("Enrollments").Return([]types.Enrollment{
 		{
 			EnrollmentID: types.DefaultEnrollmentID,
 			Munemo:       "test-munemo-1",
@@ -616,7 +616,7 @@ func TestExecute(t *testing.T) {
 	})
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	mockKnapsack.On("ResetOnHardwareChangeEnabled").Return(true)
-	mockKnapsack.On("Registrations").Return([]types.Enrollment{
+	mockKnapsack.On("Enrollments").Return([]types.Enrollment{
 		{
 			EnrollmentID: types.DefaultEnrollmentID,
 			Munemo:       "test-munemo-1",
@@ -658,7 +658,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	testHostDataStore, err := storageci.NewStore(t, slogger, storage.PersistentHostDataStore.String())
 	require.NoError(t, err, "could not create test host data store")
 	mockKnapsack.On("PersistentHostDataStore").Return(testHostDataStore)
-	mockKnapsack.On("Registrations").Return([]types.Enrollment{
+	mockKnapsack.On("Enrollments").Return([]types.Enrollment{
 		{
 			EnrollmentID: types.DefaultEnrollmentID,
 			Munemo:       "test-munemo",

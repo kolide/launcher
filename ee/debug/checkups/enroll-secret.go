@@ -27,7 +27,7 @@ func (c *enrollSecretCheckup) Run(_ context.Context, extraFH io.Writer) error {
 	secretSummary := make(map[string]string, 0)
 
 	// Check enrollments first -- will only be available if we're running in situ
-	if enrollments, err := c.k.Registrations(); err == nil {
+	if enrollments, err := c.k.Enrollments(); err == nil {
 		if len(enrollments) == 0 {
 			fmt.Fprint(extraFH, "no enrollments found in knapsack")
 		} else {

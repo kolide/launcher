@@ -109,18 +109,18 @@ func (k *knapsack) EnrollmentIDs() []string {
 	return []string{types.DefaultEnrollmentID}
 }
 
-func (k *knapsack) Registrations() ([]types.Enrollment, error) {
+func (k *knapsack) Enrollments() ([]types.Enrollment, error) {
 	enrollments := make([]types.Enrollment, 0)
 	enrollmentStore := k.getKVStore(storage.EnrollmentStore)
 	if enrollmentStore == nil {
 		return nil, errors.New("no enrollment store")
 	}
 	if err := enrollmentStore.ForEach(func(k []byte, v []byte) error {
-		var r types.Enrollment
-		if err := json.Unmarshal(v, &r); err != nil {
+		var e types.Enrollment
+		if err := json.Unmarshal(v, &e); err != nil {
 			return fmt.Errorf("unmarshalling enrollment %s: %w", string(k), err)
 		}
-		enrollments = append(enrollments, r)
+		enrollments = append(enrollments, e)
 		return nil
 	}); err != nil {
 		return nil, fmt.Errorf("fetching enrollments from store: %w", err)

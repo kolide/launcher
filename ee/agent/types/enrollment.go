@@ -38,7 +38,7 @@ type EnrollmentDetails struct {
 // data may be provided by e.g. a control server subsystem.
 type EnrollmentTracker interface {
 	EnrollmentIDs() []string
-	Registrations() ([]Enrollment, error)
+	Enrollments() ([]Enrollment, error)
 	SaveEnrollment(enrollmentId, munemo, nodeKey, enrollmentSecret string) error
 	EnsureEnrollmentStored(enrollmentId string) error
 	NodeKey(enrollmentId string) (string, error)

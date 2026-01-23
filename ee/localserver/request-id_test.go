@@ -26,7 +26,7 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 	mockKnapsack.On("KolideServerURL").Return("localhost")
 	mockKnapsack.On("CurrentEnrollmentStatus").Return(types.Enrolled, nil)
 	mockKnapsack.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil)
-	mockKnapsack.On("Registrations").Return([]types.Enrollment{
+	mockKnapsack.On("Enrollments").Return([]types.Enrollment{
 		{
 			EnrollmentID: types.DefaultEnrollmentID,
 			Munemo:       "test-munemo",

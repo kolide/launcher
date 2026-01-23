@@ -461,12 +461,12 @@ func (ls *localServer) rateLimitHandler(l *rate.Limiter, next http.Handler) http
 
 // getMunemoFromKnapsack retrieves the munemo from the stored registrations
 func getMunemoFromKnapsack(k types.Knapsack) (string, error) {
-	enrollments, err := k.Registrations()
+	enrollments, err := k.Enrollments()
 	if err != nil {
-		return "", fmt.Errorf("getting registrations from knapsack: %w", err)
+		return "", fmt.Errorf("getting enrollments from knapsack: %w", err)
 	}
 	if len(enrollments) == 0 {
-		return "", errors.New("no registrations in knapsack")
+		return "", errors.New("no enrollments in knapsack")
 	}
 
 	// For now, we just want the default enrollment.

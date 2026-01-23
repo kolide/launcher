@@ -318,7 +318,7 @@ func munemo(k types.Knapsack) string {
 		return munemoFromMetadataJson(launcher.DefaultRootDirectoryPath)
 	}
 
-	enrollments, err := k.Registrations()
+	enrollments, err := k.Enrollments()
 	if err != nil {
 		return munemoFromMetadataJson(k.RootDirectory())
 	}

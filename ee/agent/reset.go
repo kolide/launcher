@@ -331,18 +331,18 @@ func valueChanged(ctx context.Context, k types.Knapsack, slogger *slog.Logger, c
 // currentMunemo retrieves the enrollment secret from either the knapsack or the filesystem,
 // depending on launcher configuration, and then parses the tenant munemo from it.
 func currentMunemo(k types.Knapsack) (string, error) {
-	registrations, err := k.Registrations()
+	enrollments, err := k.Enrollments()
 	if err != nil {
-		return "", fmt.Errorf("getting registrations from knapsack: %w", err)
+		return "", fmt.Errorf("getting enrollments from knapsack: %w", err)
 	}
-	if len(registrations) == 0 {
-		return "", errors.New("no registrations in knapsack")
+	if len(enrollments) == 0 {
+		return "", errors.New("no enrollments in knapsack")
 	}
 
-	// For now, we just want the default registration.
-	for _, r := range registrations {
-		if r.EnrollmentID == types.DefaultEnrollmentID {
-			return r.Munemo, nil
+	// For now, we just want the default enrollment.
+	for _, e := range enrollments {
+		if e.EnrollmentID == types.DefaultEnrollmentID {
+			return e.Munemo, nil
 		}
 	}
 

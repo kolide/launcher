@@ -26,7 +26,7 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 		m := mocks.NewKnapsack(t)
 		m.On("KolideServerURL").Return("localhost")
 		m.On("Slogger").Return(slogger)
-		m.On("Registrations").Return([]types.Enrollment{
+		m.On("Enrollments").Return([]types.Enrollment{
 			{Munemo: "test-munemo"},
 		}, nil)
 		testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
@@ -62,7 +62,7 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 				m.On("SetControlRequestIntervalOverride", 250*time.Millisecond, 1*time.Second)
 				m.On("SetDistributedForwardingIntervalOverride", 250*time.Millisecond, 1*time.Second)
 				m.On("Slogger").Return(slogger)
-				m.On("Registrations").Return([]types.Enrollment{
+				m.On("Enrollments").Return([]types.Enrollment{
 					{Munemo: "test-munemo"},
 				}, nil)
 				testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())

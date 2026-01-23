@@ -570,10 +570,10 @@ func TestDeleteEnrollment(t *testing.T) {
 			require.NoError(t, testKnapsack.SaveEnrollment(tt.expectedEnrollmentId, tt.expectedMunemo, tt.expectedNodeKey, tt.expectedEnrollSecret))
 
 			// Confirm we have the enrollment
-			registrationsAfterSave, err := testKnapsack.Registrations()
+			enrollmentsAfterSave, err := testKnapsack.Enrollments()
 			require.NoError(t, err)
-			require.Equal(t, 1, len(registrationsAfterSave))
-			require.Equal(t, tt.expectedEnrollmentId, registrationsAfterSave[0].EnrollmentID)
+			require.Equal(t, 1, len(enrollmentsAfterSave))
+			require.Equal(t, tt.expectedEnrollmentId, enrollmentsAfterSave[0].EnrollmentID)
 
 			// Confirm we have the node key
 			nodeKey, err := testKnapsack.NodeKey(tt.expectedEnrollmentId)
@@ -583,8 +583,8 @@ func TestDeleteEnrollment(t *testing.T) {
 			// Now, delete the enrollment
 			require.NoError(t, testKnapsack.DeleteEnrollment(tt.expectedEnrollmentId))
 
-			// Confirm the registration is gone
-			enrollmentsAfterDelete, err := testKnapsack.Registrations()
+			// Confirm the enrollment is gone
+			enrollmentsAfterDelete, err := testKnapsack.Enrollments()
 			require.NoError(t, err)
 			require.Equal(t, 0, len(enrollmentsAfterDelete))
 

@@ -685,7 +685,7 @@ func TestMunemoCheck(t *testing.T) {
 			t.Parallel()
 
 			k := typesmocks.NewKnapsack(t)
-			k.On("Registrations").Return(tt.registrations, nil)
+			k.On("Enrollments").Return(tt.registrations, nil)
 			testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 			require.NoError(t, err, "could not create test config store")
 			k.On("ConfigStore").Return(testConfigStore).Maybe()
