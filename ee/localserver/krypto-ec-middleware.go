@@ -210,8 +210,8 @@ func (e *kryptoEcMiddleware) callbackWorker() {
 			}
 
 			// Until we tackle multitenancy, store the key under the default enrollment ID
-			if err := e.enrollmentTracker.SaveRegistration(types.DefaultEnrollmentID, r.Munemo, r.NodeKey, ""); err != nil {
-				return fmt.Errorf("saving registration: %w", err)
+			if err := e.enrollmentTracker.SaveEnrollment(types.DefaultEnrollmentID, r.Munemo, r.NodeKey, ""); err != nil {
+				return fmt.Errorf("saving enrollment: %w", err)
 			}
 
 			// if we receive an agent ingester token, save it to the token store and ping the osquery publisher to update its token cache.

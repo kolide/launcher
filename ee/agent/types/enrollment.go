@@ -39,7 +39,7 @@ type EnrollmentDetails struct {
 type EnrollmentTracker interface {
 	EnrollmentIDs() []string
 	Registrations() ([]Enrollment, error)
-	SaveRegistration(registrationId, munemo, nodeKey, enrollmentSecret string) error
+	SaveEnrollment(enrollmentId, munemo, nodeKey, enrollmentSecret string) error
 	EnsureEnrollmentStored(enrollmentId string) error
 	NodeKey(enrollmentId string) (string, error)
 	DeleteEnrollment(enrollmentId string) error

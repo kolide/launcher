@@ -3886,38 +3886,38 @@ func (_c *Knapsack_RootPEM_Call) RunAndReturn(run func() string) *Knapsack_RootP
 	return _c
 }
 
-// SaveRegistration provides a mock function for the type Knapsack
-func (_mock *Knapsack) SaveRegistration(registrationId string, munemo string, nodeKey string, enrollmentSecret string) error {
-	ret := _mock.Called(registrationId, munemo, nodeKey, enrollmentSecret)
+// SaveEnrollment provides a mock function for the type Knapsack
+func (_mock *Knapsack) SaveEnrollment(enrollmentId string, munemo string, nodeKey string, enrollmentSecret string) error {
+	ret := _mock.Called(enrollmentId, munemo, nodeKey, enrollmentSecret)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SaveRegistration")
+		panic("no return value specified for SaveEnrollment")
 	}
 
 	var r0 error
 	if returnFunc, ok := ret.Get(0).(func(string, string, string, string) error); ok {
-		r0 = returnFunc(registrationId, munemo, nodeKey, enrollmentSecret)
+		r0 = returnFunc(enrollmentId, munemo, nodeKey, enrollmentSecret)
 	} else {
 		r0 = ret.Error(0)
 	}
 	return r0
 }
 
-// Knapsack_SaveRegistration_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SaveRegistration'
-type Knapsack_SaveRegistration_Call struct {
+// Knapsack_SaveEnrollment_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SaveEnrollment'
+type Knapsack_SaveEnrollment_Call struct {
 	*mock.Call
 }
 
-// SaveRegistration is a helper method to define mock.On call
-//   - registrationId string
+// SaveEnrollment is a helper method to define mock.On call
+//   - enrollmentId string
 //   - munemo string
 //   - nodeKey string
 //   - enrollmentSecret string
-func (_e *Knapsack_Expecter) SaveRegistration(registrationId interface{}, munemo interface{}, nodeKey interface{}, enrollmentSecret interface{}) *Knapsack_SaveRegistration_Call {
-	return &Knapsack_SaveRegistration_Call{Call: _e.mock.On("SaveRegistration", registrationId, munemo, nodeKey, enrollmentSecret)}
+func (_e *Knapsack_Expecter) SaveEnrollment(enrollmentId interface{}, munemo interface{}, nodeKey interface{}, enrollmentSecret interface{}) *Knapsack_SaveEnrollment_Call {
+	return &Knapsack_SaveEnrollment_Call{Call: _e.mock.On("SaveEnrollment", enrollmentId, munemo, nodeKey, enrollmentSecret)}
 }
 
-func (_c *Knapsack_SaveRegistration_Call) Run(run func(registrationId string, munemo string, nodeKey string, enrollmentSecret string)) *Knapsack_SaveRegistration_Call {
+func (_c *Knapsack_SaveEnrollment_Call) Run(run func(enrollmentId string, munemo string, nodeKey string, enrollmentSecret string)) *Knapsack_SaveEnrollment_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 string
 		if args[0] != nil {
@@ -3945,12 +3945,12 @@ func (_c *Knapsack_SaveRegistration_Call) Run(run func(registrationId string, mu
 	return _c
 }
 
-func (_c *Knapsack_SaveRegistration_Call) Return(err error) *Knapsack_SaveRegistration_Call {
+func (_c *Knapsack_SaveEnrollment_Call) Return(err error) *Knapsack_SaveEnrollment_Call {
 	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *Knapsack_SaveRegistration_Call) RunAndReturn(run func(registrationId string, munemo string, nodeKey string, enrollmentSecret string) error) *Knapsack_SaveRegistration_Call {
+func (_c *Knapsack_SaveEnrollment_Call) RunAndReturn(run func(enrollmentId string, munemo string, nodeKey string, enrollmentSecret string) error) *Knapsack_SaveEnrollment_Call {
 	_c.Call.Return(run)
 	return _c
 }

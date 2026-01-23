@@ -137,8 +137,8 @@ func makeKnapsackWithInvalidEnrollment(t *testing.T, expectedNodeKey string) typ
 	// On re-enroll, we'll check to confirm that we don't have a node key (perhaps from a different enroll thread).
 	// Return no node key, to confirm we proceed with reenrollment.
 	k.On("NodeKey", testifymock.Anything).Return("", nil).Once()
-	// Post-enrollment, we'll save the registration.
-	k.On("SaveRegistration", testifymock.Anything, "", expectedNodeKey, testifymock.Anything).Return(nil).Once()
+	// Post-enrollment, we'll save the enrollment.
+	k.On("SaveEnrollment", testifymock.Anything, "", expectedNodeKey, testifymock.Anything).Return(nil).Once()
 	// Next, post-enrollment, we'll want to start returning the correct node key.
 	k.On("NodeKey", testifymock.Anything).Return(expectedNodeKey, nil)
 	// for now, don't enable dual log publication (cutover to new agent-ingester service) for these
@@ -333,8 +333,8 @@ func TestExtensionEnroll(t *testing.T) {
 
 	// We should attempt to fetch the node key once during enrollment, and we shouldn't have a node key yet
 	k.On("NodeKey", types.DefaultEnrollmentID).Return("", nil).Once()
-	// We expect enrollment to complete, and that we store the updated registration
-	k.On("SaveRegistration", types.DefaultEnrollmentID, testifymock.Anything, expectedNodeKey, expectedEnrollSecret).Return(nil).Once()
+	// We expect enrollment to complete, and that we store the updated enrollment
+	k.On("SaveEnrollment", types.DefaultEnrollmentID, testifymock.Anything, expectedNodeKey, expectedEnrollSecret).Return(nil).Once()
 
 	// Attempt enrollment
 	key, invalid, err := e.Enroll(t.Context())
@@ -372,7 +372,7 @@ func TestExtensionEnroll(t *testing.T) {
 
 	// Re-enroll for new node key
 	expectedNodeKey = "new_node_key"
-	k.On("SaveRegistration", types.DefaultEnrollmentID, "", expectedNodeKey, expectedEnrollSecret).Return(nil).Once()
+	k.On("SaveEnrollment", types.DefaultEnrollmentID, "", expectedNodeKey, expectedEnrollSecret).Return(nil).Once()
 	k.On("DeleteEnrollment", types.DefaultEnrollmentID).Return(nil)
 	k.On("NodeKey", types.DefaultEnrollmentID).Return("", nil).Once()
 	e.RequireReenroll(t.Context())
@@ -516,8 +516,8 @@ func TestGenerateConfigs_CannotEnrollYet(t *testing.T) {
 	k.On("OsqueryHistory").Return(osqHistory).Maybe()
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
 
-	// Post-enrollment, we'll save the registration.
-	k.On("SaveRegistration", testifymock.Anything, "", expectedNodeKey, testifymock.Anything).Return(nil).Once()
+	// Post-enrollment, we'll save the enrollment.
+	k.On("SaveEnrollment", testifymock.Anything, "", expectedNodeKey, testifymock.Anything).Return(nil).Once()
 
 	// We need NodeKey to return empty twice more to trigger reenrollment:
 	// once on the initial call to RequestConfigs, and once at the top of Enroll.
@@ -952,8 +952,8 @@ func TestExtensionWriteBufferedLogsEnrollmentInvalid(t *testing.T) {
 	// On re-enroll, we'll check to confirm that we don't have a node key (perhaps from a different enroll thread).
 	// Return no node key, to confirm we proceed with reenrollment.
 	k.On("NodeKey", testifymock.Anything).Return("", nil).Once()
-	// Post-enrollment, we'll save the registration.
-	k.On("SaveRegistration", testifymock.Anything, "", expectedNodeKey, testifymock.Anything).Return(nil).Once()
+	// Post-enrollment, we'll save the enrollment.
+	k.On("SaveEnrollment", testifymock.Anything, "", expectedNodeKey, testifymock.Anything).Return(nil).Once()
 	// Next, post-enrollment, we'll want to start returning the correct node key.
 	k.On("NodeKey", testifymock.Anything).Return(expectedNodeKey, nil)
 
@@ -1722,8 +1722,8 @@ func TestExtensionWriteResultsEnrollmentInvalid(t *testing.T) {
 	// On re-enroll, we'll check to confirm that we don't have a node key (perhaps from a different enroll thread).
 	// Return no node key, to confirm we proceed with reenrollment.
 	k.On("NodeKey", testifymock.Anything).Return("", nil).Once()
-	// Post-enrollment, we'll save the registration.
-	k.On("SaveRegistration", testifymock.Anything, "", expectedNodeKey, testifymock.Anything).Return(nil).Once()
+	// Post-enrollment, we'll save the enrollment.
+	k.On("SaveEnrollment", testifymock.Anything, "", expectedNodeKey, testifymock.Anything).Return(nil).Once()
 	// Next, post-enrollment, we'll want to start returning the correct node key.
 	k.On("NodeKey", testifymock.Anything).Return(expectedNodeKey, nil)
 

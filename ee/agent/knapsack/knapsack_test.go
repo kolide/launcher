@@ -171,7 +171,7 @@ func TestMergeEnrollmentDetails(t *testing.T) {
 	}
 }
 
-func TestSaveRegistration(t *testing.T) {
+func TestSaveEnrollment(t *testing.T) {
 	t.Parallel()
 
 	type testCase struct {
@@ -263,7 +263,7 @@ func TestSaveRegistration(t *testing.T) {
 				storage.EnrollmentStore: enrollmentStore,
 			}, nil, nil, multislogger.New(), multislogger.New())
 
-			err = testKnapsack.SaveRegistration(tt.enrollmentId, tt.munemo, tt.expectedNodeKey, tt.expectedEnrollSecret)
+			err = testKnapsack.SaveEnrollment(tt.enrollmentId, tt.munemo, tt.expectedNodeKey, tt.expectedEnrollSecret)
 			if tt.errorExpected {
 				require.Error(t, err)
 				return // nothing else to test
@@ -496,7 +496,7 @@ func TestNodeKey(t *testing.T) {
 			}, nil, nil, multislogger.New(), multislogger.New())
 
 			// Set up our registration
-			require.NoError(t, testKnapsack.SaveRegistration(tt.enrollmentId, "test_munemo", tt.expectedNodeKey, ""))
+			require.NoError(t, testKnapsack.SaveEnrollment(tt.enrollmentId, "test_munemo", tt.expectedNodeKey, ""))
 
 			// Confirm that the node key was stored
 			expectedNodeKeyKey := storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(tt.enrollmentId))
@@ -567,7 +567,7 @@ func TestDeleteEnrollment(t *testing.T) {
 			}, nil, nil, multislogger.New(), multislogger.New())
 
 			// Save the enrollment
-			require.NoError(t, testKnapsack.SaveRegistration(tt.expectedEnrollmentId, tt.expectedMunemo, tt.expectedNodeKey, tt.expectedEnrollSecret))
+			require.NoError(t, testKnapsack.SaveEnrollment(tt.expectedEnrollmentId, tt.expectedMunemo, tt.expectedNodeKey, tt.expectedEnrollSecret))
 
 			// Confirm we have the enrollment
 			registrationsAfterSave, err := testKnapsack.Registrations()
@@ -716,7 +716,7 @@ func TestCurrentEnrollmentStatus(t *testing.T) {
 			mockFlags.On("EnrollSecretPath").Return("").Maybe()
 
 			if tt.hasNodeKey {
-				require.NoError(t, testKnapsack.SaveRegistration(types.DefaultEnrollmentID, testMunemo, ulid.New(), testEnrollSecret))
+				require.NoError(t, testKnapsack.SaveEnrollment(types.DefaultEnrollmentID, testMunemo, ulid.New(), testEnrollSecret))
 			}
 
 			gotStatus, err := testKnapsack.CurrentEnrollmentStatus()

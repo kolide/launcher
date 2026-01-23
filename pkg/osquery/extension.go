@@ -404,10 +404,10 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		return "", false, err
 	}
 
-	// Save newly acquired node key if successful -- adding the registration
-	// will do this. SaveRegistration will extract the munemo from the enrollment
+	// Save newly acquired node key if successful -- adding the enrollment
+	// will do this. SaveEnrollment will extract the munemo from the enrollment
 	// secret for us.
-	if err := e.knapsack.SaveRegistration(e.enrollmentId, "", keyString, enrollSecret); err != nil {
+	if err := e.knapsack.SaveEnrollment(e.enrollmentId, "", keyString, enrollSecret); err != nil {
 		e.slogger.Log(ctx, slog.LevelError,
 			"could not save registration",
 			"err", err,

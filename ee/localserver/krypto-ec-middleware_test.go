@@ -792,7 +792,7 @@ func Test_sendCallback_handlesEnrollment(t *testing.T) {
 		Level:     slog.LevelDebug,
 	}))
 	k := typesmocks.NewKnapsack(t)
-	k.On("SaveRegistration", types.DefaultEnrollmentID, expectedMunemo, expectedNodeKey, "").Return(nil)
+	k.On("SaveEnrollment", types.DefaultEnrollmentID, expectedMunemo, expectedNodeKey, "").Return(nil)
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore)
@@ -822,7 +822,7 @@ func Test_sendCallback_handlesEnrollment(t *testing.T) {
 	// We should have sent at least some of them
 	require.GreaterOrEqual(t, int(requestsReceived.Load()), maxDesiredCallbackQueueSize, "queue worker did not process expected number of requests; logs: ", logBytes.String())
 
-	// We should have called SaveRegistration
+	// We should have called SaveEnrollment
 	k.AssertExpectations(t)
 }
 
@@ -851,7 +851,7 @@ func Test_sendCallback_handlesEnrollmentWithAgentIngesterToken(t *testing.T) {
 
 	slogger := multislogger.NewNopLogger()
 	k := typesmocks.NewKnapsack(t)
-	k.On("SaveRegistration", types.DefaultEnrollmentID, expectedMunemo, expectedNodeKey, "").Return(nil)
+	k.On("SaveEnrollment", types.DefaultEnrollmentID, expectedMunemo, expectedNodeKey, "").Return(nil)
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore)
@@ -870,6 +870,6 @@ func Test_sendCallback_handlesEnrollmentWithAgentIngesterToken(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, expectedAgentIngesterToken, string(setToken), "expected agent ingester token to be set")
 
-	// We should have called SaveRegistration
+	// We should have called SaveEnrollment
 	k.AssertExpectations(t)
 }
