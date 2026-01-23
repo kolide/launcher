@@ -72,8 +72,8 @@ func NewPublisherHTTPClient() PublisherHTTPClient {
 
 // PublishLogs publishes logs to the agent-ingester service.
 // It returns the response from the agent-ingester service and any error that occurred.
-// In the future we will likely want to pass a registration id in here to allow for selection of
-// the correct agent-ingester token to use. For now, we can use the default registration token.
+// In the future we will likely want to pass an enrollment id in here to allow for selection of
+// the correct agent-ingester token to use. For now, we can use the default enrollment token.
 func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.LogType, logs []string) (*types.OsqueryPublicationResponse, error) {
 	if !lpc.shouldPublishLogs() {
 		return nil, nil
@@ -157,7 +157,7 @@ func (lpc *LogPublisherClient) PublishResults(ctx context.Context, results []dis
 func (lpc *LogPublisherClient) publish(ctx context.Context, slogger *slog.Logger, payload any, publicationPath string) (*types.OsqueryPublicationResponse, error) {
 	// in the future we will want to plumb an enrollment ID through here, for now just use the default
 	enrollmentID := types.DefaultEnrollmentID
-	authToken := lpc.getTokenForRegistration(enrollmentID)
+	authToken := lpc.getTokenForEnrollment(enrollmentID)
 	if authToken == "" {
 		return nil, fmt.Errorf("no auth token found for enrollment: %s", enrollmentID)
 	}
@@ -270,10 +270,10 @@ func (lpc *LogPublisherClient) refreshTokenCache() error {
 	return nil
 }
 
-func (lpc *LogPublisherClient) getTokenForRegistration(registrationID string) string {
+func (lpc *LogPublisherClient) getTokenForEnrollment(enrollmentID string) string {
 	lpc.tokensMutex.RLock()
 	defer lpc.tokensMutex.RUnlock()
-	if token, ok := lpc.tokens[registrationID]; ok {
+	if token, ok := lpc.tokens[enrollmentID]; ok {
 		return token
 	}
 
