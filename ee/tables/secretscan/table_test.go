@@ -27,7 +27,7 @@ func TestSecretScan(t *testing.T) {
 		name string
 		// Input configuration
 		scanType          string // "path" or "raw_data"
-		targetPath        string // relative path within sample_project (for file/directory) or raw content
+		targetPath        string // relative path within test_data (for file/directory) or raw content
 		minFindingsCount  int
 		expectedRuleIDs   []string // rule IDs we expect to find (at least one)
 		expectedFileNames []string // file names we expect in findings (at least one)
@@ -36,7 +36,7 @@ func TestSecretScan(t *testing.T) {
 		{
 			name:              "scan directory finds multiple secrets",
 			scanType:          "path",
-			targetPath:        "", // root of sample_project
+			targetPath:        "", // root of test_data
 			minFindingsCount:  2,
 			expectedRuleIDs:   []string{"slack-bot-token", "github-pat"},
 			expectedFileNames: []string{"config.yaml", "github_token.env"},
@@ -200,14 +200,14 @@ func TestRedact(t *testing.T) {
 // Helper functions
 
 // extractTestData reads the test zip file from disk and extracts it to a temp directory.
-// Returns the path to the extracted sample_project directory.
+// Returns the path to the extracted test_data directory.
 // Uses testing.TB interface to work with both *testing.T and *testing.B.
 func extractTestData(tb testing.TB) string {
 	tb.Helper()
 
 	tempDir := tb.TempDir()
 
-	zipReader, err := zip.OpenReader("test_data/sample_project.zip")
+	zipReader, err := zip.OpenReader("test_data/test_data.zip")
 	require.NoError(tb, err, "opening zip file")
 	defer zipReader.Close()
 
@@ -233,7 +233,7 @@ func extractTestData(tb testing.TB) string {
 		require.NoError(tb, err, "copying from zip to temp dir")
 	}
 
-	return filepath.Join(tempDir, "sample_project")
+	return filepath.Join(tempDir, "test_data")
 }
 
 func createTestTable(t *testing.T) *Table {
