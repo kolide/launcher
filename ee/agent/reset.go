@@ -331,22 +331,22 @@ func valueChanged(ctx context.Context, k types.Knapsack, slogger *slog.Logger, c
 // currentMunemo retrieves the enrollment secret from either the knapsack or the filesystem,
 // depending on launcher configuration, and then parses the tenant munemo from it.
 func currentMunemo(k types.Knapsack) (string, error) {
-	registrations, err := k.Registrations()
+	enrollments, err := k.Enrollments()
 	if err != nil {
-		return "", fmt.Errorf("getting registrations from knapsack: %w", err)
+		return "", fmt.Errorf("getting enrollments from knapsack: %w", err)
 	}
-	if len(registrations) == 0 {
-		return "", errors.New("no registrations in knapsack")
+	if len(enrollments) == 0 {
+		return "", errors.New("no enrollments in knapsack")
 	}
 
-	// For now, we just want the default registration.
-	for _, r := range registrations {
-		if r.RegistrationID == types.DefaultRegistrationID {
-			return r.Munemo, nil
+	// For now, we just want the default enrollment.
+	for _, e := range enrollments {
+		if e.EnrollmentID == types.DefaultEnrollmentID {
+			return e.Munemo, nil
 		}
 	}
 
-	return "", fmt.Errorf("no registration found for `%s` registration ID, cannot find munemo", types.DefaultRegistrationID)
+	return "", fmt.Errorf("no enrollment found for `%s` enrollment ID, cannot find munemo", types.DefaultEnrollmentID)
 }
 
 // prepareDatabaseResetRecords retrieves the data we want to preserve from various db stores
@@ -354,12 +354,12 @@ func currentMunemo(k types.Knapsack) (string, error) {
 // to previous records if they exist, and returns the collection ready for storage.
 func prepareDatabaseResetRecords(ctx context.Context, k types.Knapsack, slogger *slog.Logger, resetReason string) ([]byte, error) { // nolint:unused
 	nodeKeys := make([]string, 0)
-	for _, registrationId := range k.RegistrationIDs() {
-		nodeKey, err := k.ConfigStore().Get(storage.KeyByIdentifier([]byte("nodeKey"), storage.IdentifierTypeRegistration, []byte(registrationId)))
+	for _, enrollmentId := range k.EnrollmentIDs() {
+		nodeKey, err := k.ConfigStore().Get(storage.KeyByIdentifier([]byte("nodeKey"), storage.IdentifierTypeEnrollment, []byte(enrollmentId)))
 		if err != nil {
 			slogger.Log(ctx, slog.LevelWarn,
 				"could not get node key from store",
-				"registration_id", registrationId,
+				"enrollment_id", enrollmentId,
 				"err", err,
 			)
 			continue

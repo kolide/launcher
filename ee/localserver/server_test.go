@@ -28,7 +28,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 		Level: slog.LevelDebug,
 	}))
 	k.On("Slogger").Return(slogger)
-	k.On("Registrations").Return([]types.Registration{}, nil) // return empty set of registrations so we will get a munemo worker
+	k.On("Enrollments").Return([]types.Enrollment{}, nil) // return empty set of enrollments so we will get a munemo worker
 	k.On("LatestOsquerydPath", mock.Anything).Return("")
 	testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 	require.NoError(t, err, "could not create test config store")

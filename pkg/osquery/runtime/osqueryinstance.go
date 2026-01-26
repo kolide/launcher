@@ -104,7 +104,7 @@ func WithAugeasLensFunction(f func(dir string) error) OsqueryInstanceOption {
 // of osqueryd.
 type OsqueryInstance struct {
 	opts             osqueryOptions
-	registrationId   string
+	enrollmentId     string
 	knapsack         types.Knapsack
 	slogger          *slog.Logger
 	serviceClient    service.KolideService
@@ -219,12 +219,12 @@ type osqueryOptions struct {
 	extensionSocketPath string
 }
 
-func newInstance(registrationId string, knapsack types.Knapsack, serviceClient service.KolideService, logPublishClient types.OsqueryPublisher, settingsWriter settingsStoreWriter, opts ...OsqueryInstanceOption) *OsqueryInstance {
+func newInstance(enrollmentId string, knapsack types.Knapsack, serviceClient service.KolideService, logPublishClient types.OsqueryPublisher, settingsWriter settingsStoreWriter, opts ...OsqueryInstanceOption) *OsqueryInstance {
 	runId := ulid.New()
 	i := &OsqueryInstance{
-		registrationId:          registrationId,
+		enrollmentId:            enrollmentId,
 		knapsack:                knapsack,
-		slogger:                 knapsack.Slogger().With("component", "osquery_instance", "registration_id", registrationId, "instance_run_id", runId),
+		slogger:                 knapsack.Slogger().With("component", "osquery_instance", "enrollment_id", enrollmentId, "instance_run_id", runId),
 		serviceClient:           serviceClient,
 		logPublishClient:        logPublishClient,
 		settingsWriter:          settingsWriter,
@@ -327,7 +327,7 @@ func (i *OsqueryInstance) startKatcExtensionManagerServer(ctx context.Context, c
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
-	katcTables := table.KolideCustomAtcTables(i.knapsack, i.registrationId, i.knapsack.Slogger().With("component", "katc_tables"))
+	katcTables := table.KolideCustomAtcTables(i.knapsack, i.enrollmentId, i.knapsack.Slogger().With("component", "katc_tables"))
 	if len(katcTables) == 0 {
 		return nil
 	}
@@ -359,7 +359,7 @@ func (i *OsqueryInstance) Launch() error {
 
 	// Based on the root directory, calculate the file names of all of the
 	// required osquery artifact files.
-	paths, err := calculateOsqueryPaths(i.knapsack.RootDirectory(), i.registrationId, i.runId, i.opts)
+	paths, err := calculateOsqueryPaths(i.knapsack.RootDirectory(), i.enrollmentId, i.runId, i.opts)
 	if err != nil {
 		observability.SetError(span, fmt.Errorf("could not calculate osquery file paths: %w", err))
 		return fmt.Errorf("could not calculate osquery file paths: %w", err)
@@ -468,7 +468,7 @@ func (i *OsqueryInstance) Launch() error {
 			"err", err,
 		)
 	} else {
-		err := i.history.NewInstance(i.registrationId, i.runId)
+		err := i.history.NewInstance(i.enrollmentId, i.runId)
 		if err != nil {
 			i.slogger.Log(ctx, slog.LevelWarn,
 				"could not create new osquery instance history",
@@ -516,7 +516,7 @@ func (i *OsqueryInstance) Launch() error {
 		distributed.NewPlugin(KolideSaasExtensionName, i.saasExtension.GetQueries, i.saasExtension.WriteResults),
 		osquerylogger.NewPlugin(KolideSaasExtensionName, i.saasExtension.LogString),
 	}
-	kolideSaasPlugins = append(kolideSaasPlugins, table.PlatformTables(i.knapsack, i.registrationId, i.knapsack.Slogger().With("component", "platform_tables"), currentOsquerydBinaryPath)...)
+	kolideSaasPlugins = append(kolideSaasPlugins, table.PlatformTables(i.knapsack, i.enrollmentId, i.knapsack.Slogger().With("component", "platform_tables"), currentOsquerydBinaryPath)...)
 	kolideSaasPlugins = append(kolideSaasPlugins, table.LauncherTables(i.knapsack, i.knapsack.Slogger().With("component", "launcher_tables"))...)
 
 	if err := i.StartOsqueryExtensionManagerServer(KolideSaasExtensionName, i.extensionManagerClient, kolideSaasPlugins, false); err != nil {
@@ -697,7 +697,7 @@ func (i *OsqueryInstance) startKolideSaasExtension(ctx context.Context) error {
 
 	// Create the extension
 	var err error
-	i.saasExtension, err = launcherosq.NewExtension(ctx, i.serviceClient, i.logPublishClient, i.settingsWriter, i.knapsack, i.registrationId, extOpts)
+	i.saasExtension, err = launcherosq.NewExtension(ctx, i.serviceClient, i.logPublishClient, i.settingsWriter, i.knapsack, i.enrollmentId, extOpts)
 	if err != nil {
 		return fmt.Errorf("creating new extension: %w", err)
 	}
@@ -748,7 +748,7 @@ type osqueryFilePaths struct {
 // In return, a structure of paths is returned that can be used to launch an
 // osqueryd instance. An error may be returned if the supplied parameters are
 // unacceptable.
-func calculateOsqueryPaths(rootDirectory string, registrationId string, runId string, opts osqueryOptions) (*osqueryFilePaths, error) {
+func calculateOsqueryPaths(rootDirectory string, enrollmentId string, runId string, opts osqueryOptions) (*osqueryFilePaths, error) {
 
 	// Determine the path to the extension socket
 	extensionSocketPath := opts.extensionSocketPath
@@ -762,14 +762,14 @@ func calculateOsqueryPaths(rootDirectory string, registrationId string, runId st
 	// See: https://github.com/kolide/launcher/issues/1599
 	osqueryFilePaths := &osqueryFilePaths{
 		pidfilePath:           filepath.Join(rootDirectory, fmt.Sprintf("osquery-%s.pid", runId)),
-		databasePath:          filepath.Join(rootDirectory, fmt.Sprintf("osquery-%s.db", registrationId)),
+		databasePath:          filepath.Join(rootDirectory, fmt.Sprintf("osquery-%s.db", enrollmentId)),
 		augeasPath:            filepath.Join(rootDirectory, "augeas-lenses"),
 		extensionSocketPath:   extensionSocketPath,
 		extensionAutoloadPath: extensionAutoloadPath,
 	}
 
 	// Keep default database path for default instance
-	if registrationId == types.DefaultRegistrationID {
+	if enrollmentId == types.DefaultEnrollmentID {
 		osqueryFilePaths.databasePath = filepath.Join(rootDirectory, "osquery.db")
 	}
 
@@ -844,7 +844,7 @@ func (i *OsqueryInstance) createOsquerydCommand(osquerydBinary string) (*exec.Cm
 		i.knapsack.Slogger().With(
 			"component", "osquery",
 			"osqlevel", "stdout",
-			"registration_id", i.registrationId,
+			"enrollment_id", i.enrollmentId,
 			"instance_run_id", i.runId,
 		),
 		i.knapsack.RootDirectory(),
@@ -854,7 +854,7 @@ func (i *OsqueryInstance) createOsquerydCommand(osquerydBinary string) (*exec.Cm
 		i.knapsack.Slogger().With(
 			"component", "osquery",
 			"osqlevel", "stderr",
-			"registration_id", i.registrationId,
+			"enrollment_id", i.enrollmentId,
 			"instance_run_id", i.runId,
 		),
 		i.knapsack.RootDirectory(),

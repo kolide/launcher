@@ -63,7 +63,7 @@ func TestEnroll(t *testing.T) {
 	require.Contains(t, logLines, "processing request to enroll")
 
 	// Confirm that the listener stored the enrollment secret
-	storedToken, err := tokenStore.Get(storage.KeyByIdentifier(storage.EnrollmentSecretTokenKey, storage.IdentifierTypeRegistration, []byte(types.DefaultRegistrationID)))
+	storedToken, err := tokenStore.Get(storage.KeyByIdentifier(storage.EnrollmentSecretTokenKey, storage.IdentifierTypeEnrollment, []byte(types.DefaultEnrollmentID)))
 	require.NoError(t, err)
 	require.Equal(t, enrollSecret, string(storedToken))
 }

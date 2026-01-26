@@ -7,15 +7,15 @@ import (
 )
 
 type instance struct {
-	RegistrationId string // which registration this instance belongs to
-	RunId          string // ID for instance, assigned by launcher
-	StartTime      string
-	ConnectTime    string
-	ExitTime       string
-	Hostname       string
-	InstanceId     string // ID from osquery
-	Version        string
-	Error          string
+	EnrollmentId string // which enrollment this instance belongs to
+	RunId        string // ID for instance, assigned by launcher
+	StartTime    string
+	ConnectTime  string
+	ExitTime     string
+	Hostname     string
+	InstanceId   string // ID from osquery
+	Version      string
+	Error        string
 }
 
 type ExpectedAtLeastOneRowError struct{}
@@ -69,7 +69,7 @@ func (i *instance) toMap() map[string]string {
 	}
 
 	return map[string]string{
-		"registration_id": i.RegistrationId,
+		"enrollment_id":   i.EnrollmentId,
 		"instance_run_id": i.RunId,
 		"start_time":      i.StartTime,
 		"connect_time":    i.ConnectTime,

@@ -26,8 +26,8 @@ type settingsStoreWriter interface {
 }
 
 type Runner struct {
-	registrationIds  []string                    // we expect to run one instance per registration ID
-	instances        map[string]*OsqueryInstance // maps registration ID to currently-running instance
+	enrollmentIds    []string                    // we expect to run one instance per enrollment ID
+	instances        map[string]*OsqueryInstance // maps enrollment ID to currently-running instance
 	instanceLock     sync.Mutex                  // locks access to `instances` to avoid e.g. restarting an instance that isn't running yet
 	slogger          *slog.Logger
 	knapsack         types.Knapsack
@@ -43,7 +43,7 @@ type Runner struct {
 
 func New(k types.Knapsack, serviceClient service.KolideService, logPublishClient types.OsqueryPublisher, settingsWriter settingsStoreWriter, opts ...OsqueryInstanceOption) *Runner {
 	runner := &Runner{
-		registrationIds:  k.RegistrationIDs(),
+		enrollmentIds:    k.EnrollmentIDs(),
 		instances:        make(map[string]*OsqueryInstance),
 		slogger:          k.Slogger().With("component", "osquery_runner"),
 		knapsack:         k,
@@ -72,8 +72,8 @@ func (r *Runner) Run() error {
 	wg, ctx := errgroup.WithContext(context.TODO())
 
 	// Start each worker for each instance
-	for _, registrationId := range r.registrationIds {
-		id := registrationId
+	for _, enrollmentId := range r.enrollmentIds {
+		id := enrollmentId
 		wg.Go(func() error {
 			if err := r.runInstance(id); err != nil {
 				// This is likely due to calling runner.Interrupt -- if not, the error will have
@@ -104,19 +104,19 @@ func (r *Runner) Run() error {
 	return nil
 }
 
-// runInstance starts a worker that launches the instance for the given registration ID, and
+// runInstance starts a worker that launches the instance for the given enrollment ID, and
 // then ensures that instance stays up. It exits if `Shutdown` is called, or if the instance
 // exits and cannot be restarted.
-func (r *Runner) runInstance(registrationId string) error {
-	slogger := r.slogger.With("registration_id", registrationId)
+func (r *Runner) runInstance(enrollmentId string) error {
+	slogger := r.slogger.With("enrollment_id", enrollmentId)
 	ctx := context.TODO()
 
 	// First, launch the instance.
-	instance, err := r.launchInstanceWithRetries(ctx, registrationId)
+	instance, err := r.launchInstanceWithRetries(ctx, enrollmentId)
 	if err != nil {
 		// We only receive an error on launch if the runner has been shut down -- in that case,
 		// return now.
-		return fmt.Errorf("starting instance for %s: %w", registrationId, err)
+		return fmt.Errorf("starting instance for %s: %w", enrollmentId, err)
 	}
 
 	// This loop restarts the instance as necessary. It exits when `Shutdown` is called,
@@ -147,32 +147,32 @@ func (r *Runner) runInstance(registrationId string) error {
 		}
 
 		var launchErr error
-		instance, launchErr = r.launchInstanceWithRetries(ctx, registrationId)
+		instance, launchErr = r.launchInstanceWithRetries(ctx, enrollmentId)
 		if launchErr != nil {
 			// We only receive an error on launch if the runner has been shut down -- in that case,
 			// return now.
-			return fmt.Errorf("restarting instance for %s after unexpected exit: %w", registrationId, launchErr)
+			return fmt.Errorf("restarting instance for %s after unexpected exit: %w", enrollmentId, launchErr)
 		}
 	}
 }
 
 // launchInstanceWithRetries repeatedly tries to create and launch a new osquery instance.
 // It will retry until it succeeds, or until the runner is shut down.
-func (r *Runner) launchInstanceWithRetries(ctx context.Context, registrationId string) (*OsqueryInstance, error) {
+func (r *Runner) launchInstanceWithRetries(ctx context.Context, enrollmentId string) (*OsqueryInstance, error) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	for {
 		// Never attempt to launch an instance if shutdown has already been initiated
 		if r.interrupted.Load() {
-			return nil, fmt.Errorf("runner received shutdown, halting before initiating launching instance for %s", registrationId)
+			return nil, fmt.Errorf("runner received shutdown, halting before initiating launching instance for %s", enrollmentId)
 		}
 
 		// Add the instance to our instances map right away, so that if we receive a shutdown
 		// request during launch, we can shut down the instance.
 		r.instanceLock.Lock()
-		instance := newInstance(registrationId, r.knapsack, r.serviceClient, r.logPublishClient, r.settingsWriter, r.opts...)
-		r.instances[registrationId] = instance
+		instance := newInstance(enrollmentId, r.knapsack, r.serviceClient, r.logPublishClient, r.settingsWriter, r.opts...)
+		r.instances[enrollmentId] = instance
 		r.instanceLock.Unlock()
 		err := instance.Launch()
 
@@ -180,7 +180,7 @@ func (r *Runner) launchInstanceWithRetries(ctx context.Context, registrationId s
 		if err == nil {
 			r.slogger.Log(ctx, slog.LevelInfo,
 				"runner successfully launched instance",
-				"registration_id", registrationId,
+				"enrollment_id", enrollmentId,
 			)
 
 			return instance, nil
@@ -190,20 +190,20 @@ func (r *Runner) launchInstanceWithRetries(ctx context.Context, registrationId s
 		r.slogger.Log(ctx, slog.LevelWarn,
 			"could not launch instance, will retry after delay",
 			"err", err,
-			"registration_id", registrationId,
+			"enrollment_id", enrollmentId,
 		)
 		instance.BeginShutdown()
 		if err := instance.WaitShutdown(ctx); err != context.Canceled && err != nil {
 			r.slogger.Log(ctx, slog.LevelWarn,
 				"error shutting down instance that failed to launch",
 				"err", err,
-				"registration_id", registrationId,
+				"enrollment_id", enrollmentId,
 			)
 		}
 
 		select {
 		case <-r.shutdown:
-			return nil, fmt.Errorf("runner received shutdown, halting before successfully launching instance for %s", registrationId)
+			return nil, fmt.Errorf("runner received shutdown, halting before successfully launching instance for %s", enrollmentId)
 		case <-time.After(launchRetryDelay):
 			// Continue to retry
 			continue
@@ -216,7 +216,7 @@ func (r *Runner) Query(query string) ([]map[string]string, error) {
 	defer r.instanceLock.Unlock()
 
 	// For now, grab the default (i.e. only) instance
-	instance, ok := r.instances[types.DefaultRegistrationID]
+	instance, ok := r.instances[types.DefaultEnrollmentID]
 	if !ok {
 		return nil, errors.New("no default instance exists, cannot query")
 	}
@@ -263,8 +263,8 @@ func (r *Runner) triggerShutdownForInstances(ctx context.Context) error {
 
 	// Shut down the instances in parallel
 	shutdownWg, ctx := errgroup.WithContext(ctx)
-	for registrationId, instance := range r.instances {
-		id := registrationId
+	for enrollmentId, instance := range r.instances {
+		id := enrollmentId
 		i := instance
 		shutdownWg.Go(func() error {
 			i.BeginShutdown()
@@ -405,15 +405,15 @@ func (r *Runner) Healthy() error {
 	defer r.instanceLock.Unlock()
 
 	healthcheckErrs := make([]error, 0)
-	for _, registrationId := range r.registrationIds {
-		instance, ok := r.instances[registrationId]
+	for _, enrollmentId := range r.enrollmentIds {
+		instance, ok := r.instances[enrollmentId]
 		if !ok {
-			healthcheckErrs = append(healthcheckErrs, fmt.Errorf("running instance does not exist for %s", registrationId))
+			healthcheckErrs = append(healthcheckErrs, fmt.Errorf("running instance does not exist for %s", enrollmentId))
 			continue
 		}
 
 		if err := instance.Healthy(); err != nil {
-			healthcheckErrs = append(healthcheckErrs, fmt.Errorf("healthcheck error for %s: %w", registrationId, err))
+			healthcheckErrs = append(healthcheckErrs, fmt.Errorf("healthcheck error for %s: %w", enrollmentId, err))
 		}
 	}
 
@@ -429,19 +429,19 @@ func (r *Runner) InstanceStatuses() map[string]types.InstanceStatus {
 	defer r.instanceLock.Unlock()
 
 	instanceStatuses := make(map[string]types.InstanceStatus)
-	for _, registrationId := range r.registrationIds {
-		instance, ok := r.instances[registrationId]
+	for _, enrollmentId := range r.enrollmentIds {
+		instance, ok := r.instances[enrollmentId]
 		if !ok {
-			instanceStatuses[registrationId] = types.InstanceStatusNotStarted
+			instanceStatuses[enrollmentId] = types.InstanceStatusNotStarted
 			continue
 		}
 
 		if err := instance.Healthy(); err != nil {
-			instanceStatuses[registrationId] = types.InstanceStatusUnhealthy
+			instanceStatuses[enrollmentId] = types.InstanceStatusUnhealthy
 			continue
 		}
 
-		instanceStatuses[registrationId] = types.InstanceStatusHealthy
+		instanceStatuses[enrollmentId] = types.InstanceStatusHealthy
 	}
 
 	return instanceStatuses

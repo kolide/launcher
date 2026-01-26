@@ -55,16 +55,16 @@ func (h *History) GetHistory() ([]map[string]string, error) {
 }
 
 // latestInstance is our internal helper for grabbing the latest history instance
-// by registration id. it does not lock history because many of our exposed methods
+// by enrollment id. it does not lock history because many of our exposed methods
 // need to do further manipulation after grabbing the instance here, so that
 // responsibility is maintained outside of this
-func (h *History) latestInstance(registrationId string) (*instance, error) {
+func (h *History) latestInstance(enrollmentId string) (*instance, error) {
 	if len(h.instances) == 0 {
 		return nil, NoInstancesError{}
 	}
 
 	for i := len(h.instances) - 1; i > -1; i -= 1 {
-		if h.instances[i].RegistrationId == registrationId {
+		if h.instances[i].EnrollmentId == enrollmentId {
 			return h.instances[i], nil
 		}
 	}
@@ -73,12 +73,12 @@ func (h *History) latestInstance(registrationId string) (*instance, error) {
 }
 
 // LatestInstanceStats provides a map[string]string copy of our latest instance
-// for the provided registration id
-func (h *History) LatestInstanceStats(registrationId string) (map[string]string, error) {
+// for the provided enrollment id
+func (h *History) LatestInstanceStats(enrollmentId string) (map[string]string, error) {
 	h.Lock()
 	defer h.Unlock()
 
-	instance, err := h.latestInstance(registrationId)
+	instance, err := h.latestInstance(enrollmentId)
 	if err != nil {
 		return nil, err
 	}
@@ -87,12 +87,12 @@ func (h *History) LatestInstanceStats(registrationId string) (map[string]string,
 }
 
 // LatestInstanceId provides the instance id (queried from osquery) for our
-// latest history instance by registration id
-func (h *History) LatestInstanceId(registrationId string) (string, error) {
+// latest history instance by enrollment id
+func (h *History) LatestInstanceId(enrollmentId string) (string, error) {
 	h.Lock()
 	defer h.Unlock()
 
-	instance, err := h.latestInstance(registrationId)
+	instance, err := h.latestInstance(enrollmentId)
 	if err != nil {
 		return "", err
 	}
@@ -101,12 +101,12 @@ func (h *History) LatestInstanceId(registrationId string) (string, error) {
 }
 
 // LatestInstanceUptimeMinutes calculates the number of minutes since StartTime for our
-// latest history instance by registration id
-func (h *History) LatestInstanceUptimeMinutes(registrationId string) (int64, error) {
+// latest history instance by enrollment id
+func (h *History) LatestInstanceUptimeMinutes(enrollmentId string) (int64, error) {
 	h.Lock()
 	defer h.Unlock()
 
-	lastInstance, err := h.latestInstance(registrationId)
+	lastInstance, err := h.latestInstance(enrollmentId)
 	if err != nil {
 		return 0, fmt.Errorf("getting latest instance: %w", err)
 	}
@@ -126,7 +126,7 @@ func (h *History) LatestInstanceUptimeMinutes(registrationId string) (int64, err
 
 // NewInstance adds a new instance to the osquery instance history after setting
 // all available metadata and saves this new instance internally
-func (h *History) NewInstance(registrationId string, runId string) error {
+func (h *History) NewInstance(enrollmentId string, runId string) error {
 	h.Lock()
 	defer h.Unlock()
 
@@ -136,10 +136,10 @@ func (h *History) NewInstance(registrationId string, runId string) error {
 	}
 
 	newInstance := &instance{
-		RegistrationId: registrationId,
-		RunId:          runId,
-		StartTime:      timeNow(),
-		Hostname:       hostname,
+		EnrollmentId: enrollmentId,
+		RunId:        runId,
+		StartTime:    timeNow(),
+		Hostname:     hostname,
 	}
 
 	h.addInstanceToHistory(newInstance)

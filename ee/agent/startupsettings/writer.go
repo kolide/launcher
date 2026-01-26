@@ -71,25 +71,25 @@ func (s *startupSettingsWriter) WriteSettings() error {
 	}
 	updatedFlags["use_tuf_autoupdater"] = "enabled" // Hardcode for backwards compatibility circa v1.5.3
 
-	for _, registrationId := range s.knapsack.RegistrationIDs() {
-		atcConfig, err := s.extractAutoTableConstructionConfig(registrationId)
+	for _, enrollmentId := range s.knapsack.EnrollmentIDs() {
+		atcConfig, err := s.extractAutoTableConstructionConfig(enrollmentId)
 		if err != nil {
 			s.knapsack.Slogger().Log(context.TODO(), slog.LevelDebug,
 				"extracting auto_table_construction config",
 				"err", err,
 			)
 		} else {
-			atcConfigKey := storage.KeyByIdentifier([]byte("auto_table_construction"), storage.IdentifierTypeRegistration, []byte(registrationId))
+			atcConfigKey := storage.KeyByIdentifier([]byte("auto_table_construction"), storage.IdentifierTypeEnrollment, []byte(enrollmentId))
 			updatedFlags[string(atcConfigKey)] = atcConfig
 		}
 
-		if katcConfig, err := s.extractKATCConstructionConfig(registrationId); err != nil {
+		if katcConfig, err := s.extractKATCConstructionConfig(enrollmentId); err != nil {
 			s.knapsack.Slogger().Log(context.TODO(), slog.LevelDebug,
 				"extracting katc_config",
 				"err", err,
 			)
 		} else {
-			katcConfigKey := storage.KeyByIdentifier([]byte("katc_config"), storage.IdentifierTypeRegistration, []byte(registrationId))
+			katcConfigKey := storage.KeyByIdentifier([]byte("katc_config"), storage.IdentifierTypeEnrollment, []byte(enrollmentId))
 			updatedFlags[string(katcConfigKey)] = katcConfig
 		}
 	}
@@ -120,8 +120,8 @@ func (s *startupSettingsWriter) Close() error {
 	return s.kvStore.Close()
 }
 
-func (s *startupSettingsWriter) extractAutoTableConstructionConfig(registrationId string) (string, error) {
-	osqConfig, err := s.knapsack.ConfigStore().Get(storage.KeyByIdentifier([]byte("config"), storage.IdentifierTypeRegistration, []byte(registrationId)))
+func (s *startupSettingsWriter) extractAutoTableConstructionConfig(enrollmentId string) (string, error) {
+	osqConfig, err := s.knapsack.ConfigStore().Get(storage.KeyByIdentifier([]byte("config"), storage.IdentifierTypeEnrollment, []byte(enrollmentId)))
 	if err != nil {
 		return "", fmt.Errorf("could not get osquery config from store: %w", err)
 	}
@@ -148,11 +148,11 @@ func (s *startupSettingsWriter) extractAutoTableConstructionConfig(registrationI
 	return string(atcJson), nil
 }
 
-func (s *startupSettingsWriter) extractKATCConstructionConfig(registrationId string) (string, error) {
+func (s *startupSettingsWriter) extractKATCConstructionConfig(enrollmentId string) (string, error) {
 	kolideCfg := make(map[string]string)
 	if err := s.knapsack.KatcConfigStore().ForEach(func(k []byte, v []byte) error {
 		key, _, identifier := storage.SplitKey(k)
-		if string(identifier) == registrationId {
+		if string(identifier) == enrollmentId {
 			kolideCfg[string(key)] = string(v)
 		}
 		return nil

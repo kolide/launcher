@@ -171,12 +171,12 @@ func TestMergeEnrollmentDetails(t *testing.T) {
 	}
 }
 
-func TestSaveRegistration(t *testing.T) {
+func TestSaveEnrollment(t *testing.T) {
 	t.Parallel()
 
 	type testCase struct {
 		testCaseName         string
-		registrationId       string
+		enrollmentId         string
 		munemo               string
 		expectedMunemo       string
 		expectedNodeKey      string
@@ -186,13 +186,13 @@ func TestSaveRegistration(t *testing.T) {
 
 	testCases := make([]testCase, 0)
 
-	for _, isDefaultRegistrationId := range []bool{true, false} {
-		registrationId := types.DefaultRegistrationID
-		testCaseNameSuffix := " (default registration ID)"
+	for _, isDefaultEnrollmentId := range []bool{true, false} {
+		enrollmentId := types.DefaultEnrollmentID
+		testCaseNameSuffix := " (default enrollment ID)"
 
-		if !isDefaultRegistrationId {
-			registrationId = ulid.New()
-			testCaseNameSuffix = " (non-default registration ID)"
+		if !isDefaultEnrollmentId {
+			enrollmentId = ulid.New()
+			testCaseNameSuffix = " (non-default enrollment ID)"
 		}
 
 		testMunemo := ulid.New()
@@ -201,7 +201,7 @@ func TestSaveRegistration(t *testing.T) {
 		testCases = append(testCases, []testCase{
 			{
 				testCaseName:         "all data set" + testCaseNameSuffix,
-				registrationId:       registrationId,
+				enrollmentId:         enrollmentId,
 				munemo:               testMunemo,
 				expectedMunemo:       testMunemo,
 				expectedNodeKey:      ulid.New(),
@@ -210,7 +210,7 @@ func TestSaveRegistration(t *testing.T) {
 			},
 			{
 				testCaseName:         "no enroll secret" + testCaseNameSuffix,
-				registrationId:       registrationId,
+				enrollmentId:         enrollmentId,
 				munemo:               testMunemo,
 				expectedMunemo:       testMunemo,
 				expectedNodeKey:      ulid.New(),
@@ -219,7 +219,7 @@ func TestSaveRegistration(t *testing.T) {
 			},
 			{
 				testCaseName:         "no munemo given, but set in enrollment secret" + testCaseNameSuffix,
-				registrationId:       registrationId,
+				enrollmentId:         enrollmentId,
 				munemo:               "",
 				expectedMunemo:       testMunemo,
 				expectedNodeKey:      ulid.New(),
@@ -228,7 +228,7 @@ func TestSaveRegistration(t *testing.T) {
 			},
 			{
 				testCaseName:         "no munemo or enrollment secret given" + testCaseNameSuffix,
-				registrationId:       registrationId,
+				enrollmentId:         enrollmentId,
 				munemo:               "",
 				expectedMunemo:       testMunemo,
 				expectedNodeKey:      ulid.New(),
@@ -237,7 +237,7 @@ func TestSaveRegistration(t *testing.T) {
 			},
 			{
 				testCaseName:         "no node key given" + testCaseNameSuffix,
-				registrationId:       registrationId,
+				enrollmentId:         enrollmentId,
 				munemo:               testMunemo,
 				expectedMunemo:       testMunemo,
 				expectedNodeKey:      "",
@@ -254,16 +254,16 @@ func TestSaveRegistration(t *testing.T) {
 			// Set up our stores
 			configStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 			require.NoError(t, err)
-			registrationStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.RegistrationStore.String())
+			enrollmentStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.EnrollmentStore.String())
 			require.NoError(t, err)
 
 			// Set up our knapsack
 			testKnapsack := New(map[storage.Store]types.KVStore{
-				storage.ConfigStore:       configStore,
-				storage.RegistrationStore: registrationStore,
+				storage.ConfigStore:     configStore,
+				storage.EnrollmentStore: enrollmentStore,
 			}, nil, nil, multislogger.New(), multislogger.New())
 
-			err = testKnapsack.SaveRegistration(tt.registrationId, tt.munemo, tt.expectedNodeKey, tt.expectedEnrollSecret)
+			err = testKnapsack.SaveEnrollment(tt.enrollmentId, tt.munemo, tt.expectedNodeKey, tt.expectedEnrollSecret)
 			if tt.errorExpected {
 				require.Error(t, err)
 				return // nothing else to test
@@ -271,92 +271,92 @@ func TestSaveRegistration(t *testing.T) {
 			require.NoError(t, err)
 
 			// Confirm that the node key was stored
-			expectedNodeKeyKey := storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(tt.registrationId))
+			expectedNodeKeyKey := storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeEnrollment, []byte(tt.enrollmentId))
 			storedKey, err := configStore.Get(expectedNodeKeyKey)
 			require.NoError(t, err)
 			require.Equal(t, tt.expectedNodeKey, string(storedKey))
 
-			// Confirm that the registration was stored
-			rawStoredRegistration, err := registrationStore.Get([]byte(tt.registrationId))
+			// Confirm that the enrollment was stored
+			rawStoredEnrollment, err := enrollmentStore.Get([]byte(tt.enrollmentId))
 			require.NoError(t, err)
-			var storedRegistration types.Registration
-			require.NoError(t, json.Unmarshal(rawStoredRegistration, &storedRegistration))
-			require.Equal(t, tt.registrationId, storedRegistration.RegistrationID)
-			require.Equal(t, tt.expectedMunemo, storedRegistration.Munemo)
-			require.Equal(t, tt.expectedNodeKey, storedRegistration.NodeKey)
-			require.Equal(t, tt.expectedEnrollSecret, storedRegistration.EnrollmentSecret)
+			var storedEnrollment types.Enrollment
+			require.NoError(t, json.Unmarshal(rawStoredEnrollment, &storedEnrollment))
+			require.Equal(t, tt.enrollmentId, storedEnrollment.EnrollmentID)
+			require.Equal(t, tt.expectedMunemo, storedEnrollment.Munemo)
+			require.Equal(t, tt.expectedNodeKey, storedEnrollment.NodeKey)
+			require.Equal(t, tt.expectedEnrollSecret, storedEnrollment.EnrollmentSecret)
 		})
 	}
 }
 
-func TestEnsureRegistrationStored(t *testing.T) {
+func TestEnsureEnrollmentStored(t *testing.T) {
 	t.Parallel()
 
 	type testCase struct {
 		testCaseName           string
-		registrationId         string
+		enrollmentId           string
 		nodeKeyStored          bool
 		enrollmentSecretExists bool
 		enrollmentSecretValid  bool
-		registrationExists     bool
+		enrollmentExists       bool
 		successExpected        bool
 	}
 
 	testCases := make([]testCase, 0)
 
-	for _, isDefaultRegistrationId := range []bool{true, false} {
-		registrationId := types.DefaultRegistrationID
-		testCaseNameSuffix := " (default registration ID)"
+	for _, isDefaultEnrollmentId := range []bool{true, false} {
+		enrollmentId := types.DefaultEnrollmentID
+		testCaseNameSuffix := " (default enrollment ID)"
 
-		if !isDefaultRegistrationId {
-			registrationId = ulid.New()
-			testCaseNameSuffix = " (non-default registration ID)"
+		if !isDefaultEnrollmentId {
+			enrollmentId = ulid.New()
+			testCaseNameSuffix = " (non-default enrollment ID)"
 		}
 
 		testCases = append(testCases, []testCase{
 			{
-				testCaseName:           "happy path, creating registration from scratch" + testCaseNameSuffix,
-				registrationId:         registrationId,
+				testCaseName:           "happy path, creating enrollment from scratch" + testCaseNameSuffix,
+				enrollmentId:           enrollmentId,
 				nodeKeyStored:          true,
 				enrollmentSecretExists: true,
 				enrollmentSecretValid:  true,
-				registrationExists:     false,
+				enrollmentExists:       false,
 				successExpected:        true,
 			},
 			{
-				testCaseName:           "happy path, updating registration to add node key" + testCaseNameSuffix,
-				registrationId:         registrationId,
+				testCaseName:           "happy path, updating enrollment to add node key" + testCaseNameSuffix,
+				enrollmentId:           enrollmentId,
 				nodeKeyStored:          true,
 				enrollmentSecretExists: false, // value does not matter for this test case, we should not need enrollment secret
 				enrollmentSecretValid:  false, // value does not matter for this test case, we should not need enrollment secret
-				registrationExists:     true,
+				enrollmentExists:       true,
 				successExpected:        true,
 			},
 			{
 				testCaseName:           "no node key" + testCaseNameSuffix,
-				registrationId:         registrationId,
+				enrollmentId:           enrollmentId,
 				nodeKeyStored:          false,
 				enrollmentSecretExists: false, // value does not matter for this test case, we should not need enrollment secret
 				enrollmentSecretValid:  false, // value does not matter for this test case, we should not need enrollment secret
-				registrationExists:     false, // value does not matter for this test case
+				enrollmentExists:       false, // value does not matter for this test case
 				successExpected:        false,
 			},
 			{
-				testCaseName:           "no registration, and no enrollment secret" + testCaseNameSuffix,
-				registrationId:         registrationId,
+				testCaseName:           "no enrollment, and no enrollment secret" + testCaseNameSuffix,
+				enrollmentId:           enrollmentId,
 				nodeKeyStored:          true,
 				enrollmentSecretExists: false,
 				enrollmentSecretValid:  false, // value does not matter for this test case
-				registrationExists:     false,
+				enrollmentExists:       false,
 				successExpected:        false,
 			},
 			{
-				testCaseName:           "no registration, and no valid enrollment secret" + testCaseNameSuffix,
-				registrationId:         registrationId,
+				testCaseName:           "no enrollment, and no valid enrollment secret" + testCaseNameSuffix,
+				enrollmentId:           enrollmentId,
 				nodeKeyStored:          true,
 				enrollmentSecretExists: true,
 				enrollmentSecretValid:  false,
-				registrationExists:     false,
+				enrollmentExists:       false,
 				successExpected:        false,
 			},
 		}...)
@@ -369,14 +369,14 @@ func TestEnsureRegistrationStored(t *testing.T) {
 			// Set up our stores
 			configStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 			require.NoError(t, err)
-			registrationStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.RegistrationStore.String())
+			enrollmentStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.EnrollmentStore.String())
 			require.NoError(t, err)
 
 			// Set up our knapsack
 			mockFlags := typesmocks.NewFlags(t)
 			testKnapsack := New(map[storage.Store]types.KVStore{
-				storage.ConfigStore:       configStore,
-				storage.RegistrationStore: registrationStore,
+				storage.ConfigStore:     configStore,
+				storage.EnrollmentStore: enrollmentStore,
 			}, mockFlags, nil, multislogger.New(), multislogger.New())
 
 			// Set up our test enrollment secret
@@ -391,72 +391,72 @@ func TestEnsureRegistrationStored(t *testing.T) {
 			mockFlags.On("EnrollSecret").Return(enrollSecret, nil).Maybe()
 			mockFlags.On("EnrollSecretPath").Return("", nil).Maybe() // We never expect to read the enrollment secret from here
 
-			// Set up registration with node key missing
-			if tt.registrationExists {
-				// Save the registration
-				r := types.Registration{
-					RegistrationID:   tt.registrationId,
+			// Set up enrollment with node key missing
+			if tt.enrollmentExists {
+				// Save the enrollment
+				r := types.Enrollment{
+					EnrollmentID:     tt.enrollmentId,
 					Munemo:           testMunemo,
 					NodeKey:          "",
 					EnrollmentSecret: enrollSecret,
 				}
-				rawRegistration, err := json.Marshal(r)
+				rawEnrollment, err := json.Marshal(r)
 				require.NoError(t, err)
-				require.NoError(t, registrationStore.Set([]byte(tt.registrationId), rawRegistration))
+				require.NoError(t, enrollmentStore.Set([]byte(tt.enrollmentId), rawEnrollment))
 
-				// Confirm registration was saved as expected
-				rawStoredRegistration, err := registrationStore.Get([]byte(tt.registrationId))
+				// Confirm enrollment was saved as expected
+				rawStoredEnrollment, err := enrollmentStore.Get([]byte(tt.enrollmentId))
 				require.NoError(t, err)
-				var storedRegistration types.Registration
-				require.NoError(t, json.Unmarshal(rawStoredRegistration, &storedRegistration))
-				require.Equal(t, "", storedRegistration.NodeKey)
+				var storedEnrollment types.Enrollment
+				require.NoError(t, json.Unmarshal(rawStoredEnrollment, &storedEnrollment))
+				require.Equal(t, "", storedEnrollment.NodeKey)
 			}
 
 			// Finally, set up our new node key. If stored, it should be stored in the config store only.
 			nodeKey := ulid.New()
 			if tt.nodeKeyStored {
-				nodeKeyKeyForRegistration := storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(tt.registrationId))
-				require.NoError(t, configStore.Set(nodeKeyKeyForRegistration, []byte(nodeKey)))
-				savedNodeKey, err := testKnapsack.NodeKey(tt.registrationId)
+				nodeKeyKeyForEnrollment := storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeEnrollment, []byte(tt.enrollmentId))
+				require.NoError(t, configStore.Set(nodeKeyKeyForEnrollment, []byte(nodeKey)))
+				savedNodeKey, err := testKnapsack.NodeKey(tt.enrollmentId)
 				require.NoError(t, err, "could not store node key during test setup")
 				require.Equal(t, nodeKey, savedNodeKey)
 			}
 
-			// Now we're ready to test -- call the function, then check to make sure the registration
+			// Now we're ready to test -- call the function, then check to make sure the enrollment
 			// looks how we expect.
-			err = testKnapsack.EnsureRegistrationStored(tt.registrationId)
+			err = testKnapsack.EnsureEnrollmentStored(tt.enrollmentId)
 			if tt.successExpected {
 				require.NoError(t, err)
 			} else {
 				require.Error(t, err)
 			}
 
-			rawUpdatedRegistration, err := registrationStore.Get([]byte(tt.registrationId))
+			rawUpdatedEnrollment, err := enrollmentStore.Get([]byte(tt.enrollmentId))
 			require.NoError(t, err)
 			if tt.successExpected {
-				var updatedRegistration types.Registration
-				require.NoError(t, json.Unmarshal(rawUpdatedRegistration, &updatedRegistration))
+				var updatedEnrollment types.Enrollment
+				require.NoError(t, json.Unmarshal(rawUpdatedEnrollment, &updatedEnrollment))
 
-				// All data on the registration should be correct
-				require.Equal(t, nodeKey, updatedRegistration.NodeKey)
-				require.Equal(t, enrollSecret, updatedRegistration.EnrollmentSecret)
-				require.Equal(t, tt.registrationId, updatedRegistration.RegistrationID)
-				require.Equal(t, testMunemo, updatedRegistration.Munemo)
+				// All data on the enrollment should be correct
+				require.Equal(t, nodeKey, updatedEnrollment.NodeKey)
+				require.Equal(t, enrollSecret, updatedEnrollment.EnrollmentSecret)
+				require.Equal(t, tt.enrollmentId, updatedEnrollment.EnrollmentID)
+				require.Equal(t, testMunemo, updatedEnrollment.Munemo)
 
 				return
 			}
 
 			// Success was not expected.
-			// If the registration already existed -- we expect that the node key was not updated.
-			if tt.registrationExists {
-				var updatedRegistration types.Registration
-				require.NoError(t, json.Unmarshal(rawUpdatedRegistration, &updatedRegistration))
-				require.Equal(t, "", updatedRegistration.NodeKey)
+			// If the enrollment already existed -- we expect that the node key was not updated.
+			if tt.enrollmentExists {
+				var updatedEnrollment types.Enrollment
+				require.NoError(t, json.Unmarshal(rawUpdatedEnrollment, &updatedEnrollment))
+				require.Equal(t, "", updatedEnrollment.NodeKey)
 				return
 			}
 
-			// If the registration did not already exist, then we should not have created it at all.
-			require.Nil(t, rawUpdatedRegistration)
+			// If the enrollment did not already exist, then we should not have created it at all.
+			require.Nil(t, rawUpdatedEnrollment)
 		})
 	}
 }
@@ -466,17 +466,17 @@ func TestNodeKey(t *testing.T) {
 
 	for _, tt := range []struct {
 		testCaseName    string
-		registrationId  string
+		enrollmentId    string
 		expectedNodeKey string
 	}{
 		{
-			testCaseName:    "default registration id",
-			registrationId:  types.DefaultRegistrationID,
+			testCaseName:    "default enrollment id",
+			enrollmentId:    types.DefaultEnrollmentID,
 			expectedNodeKey: "test_node_key",
 		},
 		{
-			testCaseName:    "non-default registration id",
-			registrationId:  ulid.New(),
+			testCaseName:    "non-default enrollment id",
+			enrollmentId:    ulid.New(),
 			expectedNodeKey: "test_node_key_2",
 		},
 	} {
@@ -486,69 +486,69 @@ func TestNodeKey(t *testing.T) {
 			// Set up our stores
 			configStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 			require.NoError(t, err)
-			registrationStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.RegistrationStore.String())
+			enrollmentStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.EnrollmentStore.String())
 			require.NoError(t, err)
 
 			// Set up our knapsack
 			testKnapsack := New(map[storage.Store]types.KVStore{
-				storage.ConfigStore:       configStore,
-				storage.RegistrationStore: registrationStore,
+				storage.ConfigStore:     configStore,
+				storage.EnrollmentStore: enrollmentStore,
 			}, nil, nil, multislogger.New(), multislogger.New())
 
-			// Set up our registration
-			require.NoError(t, testKnapsack.SaveRegistration(tt.registrationId, "test_munemo", tt.expectedNodeKey, ""))
+			// Set up our enrollment
+			require.NoError(t, testKnapsack.SaveEnrollment(tt.enrollmentId, "test_munemo", tt.expectedNodeKey, ""))
 
 			// Confirm that the node key was stored
-			expectedNodeKeyKey := storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(tt.registrationId))
+			expectedNodeKeyKey := storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeEnrollment, []byte(tt.enrollmentId))
 			storedKey, err := configStore.Get(expectedNodeKeyKey)
 			require.NoError(t, err)
 			require.Equal(t, tt.expectedNodeKey, string(storedKey))
 
 			// Fetch the node key
-			nodeKey, err := testKnapsack.NodeKey(tt.registrationId)
+			nodeKey, err := testKnapsack.NodeKey(tt.enrollmentId)
 			require.NoError(t, err)
 			require.Equal(t, tt.expectedNodeKey, nodeKey)
 		})
 	}
 }
 
-func TestDeleteRegistration(t *testing.T) {
+func TestDeleteEnrollment(t *testing.T) {
 	t.Parallel()
 
 	for _, tt := range []struct {
-		testCaseName           string
-		expectedRegistrationId string
-		expectedMunemo         string
-		expectedNodeKey        string
-		expectedEnrollSecret   string
+		testCaseName         string
+		expectedEnrollmentId string
+		expectedMunemo       string
+		expectedNodeKey      string
+		expectedEnrollSecret string
 	}{
 		{
-			testCaseName:           "all data set, default registration id",
-			expectedRegistrationId: types.DefaultRegistrationID,
-			expectedMunemo:         "test_munemo",
-			expectedNodeKey:        "test_node_key",
-			expectedEnrollSecret:   "test_jwt",
+			testCaseName:         "all data set, default enrollment id",
+			expectedEnrollmentId: types.DefaultEnrollmentID,
+			expectedMunemo:       "test_munemo",
+			expectedNodeKey:      "test_node_key",
+			expectedEnrollSecret: "test_jwt",
 		},
 		{
-			testCaseName:           "all data set, non-default registration id",
-			expectedRegistrationId: ulid.New(),
-			expectedMunemo:         "test_munemo",
-			expectedNodeKey:        "test_node_key",
-			expectedEnrollSecret:   "test_jwt",
+			testCaseName:         "all data set, non-default enrollment id",
+			expectedEnrollmentId: ulid.New(),
+			expectedMunemo:       "test_munemo",
+			expectedNodeKey:      "test_node_key",
+			expectedEnrollSecret: "test_jwt",
 		},
 		{
-			testCaseName:           "no enroll secret, default registration ID",
-			expectedRegistrationId: types.DefaultRegistrationID,
-			expectedMunemo:         "test_munemo",
-			expectedNodeKey:        "test_node_key",
-			expectedEnrollSecret:   "",
+			testCaseName:         "no enroll secret, default enrollment ID",
+			expectedEnrollmentId: types.DefaultEnrollmentID,
+			expectedMunemo:       "test_munemo",
+			expectedNodeKey:      "test_node_key",
+			expectedEnrollSecret: "",
 		},
 		{
-			testCaseName:           "no enroll secret, non-default registration ID",
-			expectedRegistrationId: ulid.New(),
-			expectedMunemo:         "test_munemo",
-			expectedNodeKey:        "test_node_key",
-			expectedEnrollSecret:   "",
+			testCaseName:         "no enroll secret, non-default enrollment ID",
+			expectedEnrollmentId: ulid.New(),
+			expectedMunemo:       "test_munemo",
+			expectedNodeKey:      "test_node_key",
+			expectedEnrollSecret: "",
 		},
 	} {
 		t.Run(tt.testCaseName, func(t *testing.T) {
@@ -557,39 +557,39 @@ func TestDeleteRegistration(t *testing.T) {
 			// Set up our stores
 			configStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 			require.NoError(t, err)
-			registrationStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.RegistrationStore.String())
+			enrollmentStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.EnrollmentStore.String())
 			require.NoError(t, err)
 
 			// Set up our knapsack
 			testKnapsack := New(map[storage.Store]types.KVStore{
-				storage.ConfigStore:       configStore,
-				storage.RegistrationStore: registrationStore,
+				storage.ConfigStore:     configStore,
+				storage.EnrollmentStore: enrollmentStore,
 			}, nil, nil, multislogger.New(), multislogger.New())
 
-			// Save the registration
-			require.NoError(t, testKnapsack.SaveRegistration(tt.expectedRegistrationId, tt.expectedMunemo, tt.expectedNodeKey, tt.expectedEnrollSecret))
+			// Save the enrollment
+			require.NoError(t, testKnapsack.SaveEnrollment(tt.expectedEnrollmentId, tt.expectedMunemo, tt.expectedNodeKey, tt.expectedEnrollSecret))
 
-			// Confirm we have the registration
-			registrationsAfterSave, err := testKnapsack.Registrations()
+			// Confirm we have the enrollment
+			enrollmentsAfterSave, err := testKnapsack.Enrollments()
 			require.NoError(t, err)
-			require.Equal(t, 1, len(registrationsAfterSave))
-			require.Equal(t, tt.expectedRegistrationId, registrationsAfterSave[0].RegistrationID)
+			require.Equal(t, 1, len(enrollmentsAfterSave))
+			require.Equal(t, tt.expectedEnrollmentId, enrollmentsAfterSave[0].EnrollmentID)
 
 			// Confirm we have the node key
-			nodeKey, err := testKnapsack.NodeKey(tt.expectedRegistrationId)
+			nodeKey, err := testKnapsack.NodeKey(tt.expectedEnrollmentId)
 			require.NoError(t, err)
 			require.Equal(t, tt.expectedNodeKey, nodeKey)
 
-			// Now, delete the registration
-			require.NoError(t, testKnapsack.DeleteRegistration(tt.expectedRegistrationId))
+			// Now, delete the enrollment
+			require.NoError(t, testKnapsack.DeleteEnrollment(tt.expectedEnrollmentId))
 
-			// Confirm the registration is gone
-			registrationsAfterDelete, err := testKnapsack.Registrations()
+			// Confirm the enrollment is gone
+			enrollmentsAfterDelete, err := testKnapsack.Enrollments()
 			require.NoError(t, err)
-			require.Equal(t, 0, len(registrationsAfterDelete))
+			require.Equal(t, 0, len(enrollmentsAfterDelete))
 
 			// Confirm the node key was deleted
-			newNodeKey, err := testKnapsack.NodeKey(tt.expectedRegistrationId)
+			newNodeKey, err := testKnapsack.NodeKey(tt.expectedEnrollmentId)
 			require.NoError(t, err)
 			require.Equal(t, "", newNodeKey)
 		})
@@ -696,14 +696,14 @@ func TestCurrentEnrollmentStatus(t *testing.T) {
 			// Set up our stores
 			configStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 			require.NoError(t, err)
-			registrationStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.RegistrationStore.String())
+			enrollmentStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.EnrollmentStore.String())
 			require.NoError(t, err)
 
 			// Set up our knapsack
 			mockFlags := typesmocks.NewFlags(t)
 			testKnapsack := New(map[storage.Store]types.KVStore{
-				storage.ConfigStore:       configStore,
-				storage.RegistrationStore: registrationStore,
+				storage.ConfigStore:     configStore,
+				storage.EnrollmentStore: enrollmentStore,
 			}, mockFlags, nil, multislogger.New(), multislogger.New())
 
 			testMunemo := ulid.New()
@@ -716,7 +716,7 @@ func TestCurrentEnrollmentStatus(t *testing.T) {
 			mockFlags.On("EnrollSecretPath").Return("").Maybe()
 
 			if tt.hasNodeKey {
-				require.NoError(t, testKnapsack.SaveRegistration(types.DefaultRegistrationID, testMunemo, ulid.New(), testEnrollSecret))
+				require.NoError(t, testKnapsack.SaveEnrollment(types.DefaultEnrollmentID, testMunemo, ulid.New(), testEnrollSecret))
 			}
 
 			gotStatus, err := testKnapsack.CurrentEnrollmentStatus()
@@ -789,7 +789,7 @@ func TestReadEnrollSecret(t *testing.T) {
 			}
 
 			if tt.setInTokenStore {
-				require.NoError(t, tokenStore.Set(storage.KeyByIdentifier(storage.EnrollmentSecretTokenKey, storage.IdentifierTypeRegistration, []byte(types.DefaultRegistrationID)), []byte(testEnrollSecret)))
+				require.NoError(t, tokenStore.Set(storage.KeyByIdentifier(storage.EnrollmentSecretTokenKey, storage.IdentifierTypeEnrollment, []byte(types.DefaultEnrollmentID)), []byte(testEnrollSecret)))
 			}
 
 			gotSecret, err := testKnapsack.ReadEnrollSecret()

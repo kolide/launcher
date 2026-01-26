@@ -49,7 +49,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 		osquerySuccess               bool
 		munemoSetInStore             bool
 		munemoChanged                bool
-		registrationsExist           bool
+		enrollmentsExist             bool
 		resetOnHardwareChangeEnabled bool
 		expectDatabaseWipe           bool
 	}{
@@ -64,7 +64,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			osquerySuccess:               true,
 			munemoSetInStore:             true,
 			munemoChanged:                false,
-			registrationsExist:           true,
+			enrollmentsExist:             true,
 			resetOnHardwareChangeEnabled: true,
 			expectDatabaseWipe:           false,
 		},
@@ -79,7 +79,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			osquerySuccess:               true,
 			munemoSetInStore:             true,
 			munemoChanged:                false,
-			registrationsExist:           true,
+			enrollmentsExist:             true,
 			resetOnHardwareChangeEnabled: true,
 			expectDatabaseWipe:           false,
 		},
@@ -94,7 +94,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			osquerySuccess:               true,
 			munemoSetInStore:             true,
 			munemoChanged:                false,
-			registrationsExist:           true,
+			enrollmentsExist:             true,
 			resetOnHardwareChangeEnabled: true,
 			expectDatabaseWipe:           false,
 		},
@@ -109,7 +109,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			osquerySuccess:               true,
 			munemoSetInStore:             true,
 			munemoChanged:                true,
-			registrationsExist:           true,
+			enrollmentsExist:             true,
 			resetOnHardwareChangeEnabled: true,
 			expectDatabaseWipe:           false,
 		},
@@ -124,7 +124,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			osquerySuccess:               true,
 			munemoSetInStore:             true,
 			munemoChanged:                true,
-			registrationsExist:           true,
+			enrollmentsExist:             true,
 			resetOnHardwareChangeEnabled: true,
 			expectDatabaseWipe:           true,
 		},
@@ -139,7 +139,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			osquerySuccess:               true,
 			munemoSetInStore:             true,
 			munemoChanged:                true,
-			registrationsExist:           true,
+			enrollmentsExist:             true,
 			resetOnHardwareChangeEnabled: false,
 			expectDatabaseWipe:           false,
 		},
@@ -154,7 +154,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			osquerySuccess:               true,
 			munemoSetInStore:             true,
 			munemoChanged:                true,
-			registrationsExist:           true,
+			enrollmentsExist:             true,
 			resetOnHardwareChangeEnabled: true,
 			expectDatabaseWipe:           runtime.GOOS != "windows",
 		},
@@ -169,7 +169,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			osquerySuccess:               false,
 			munemoSetInStore:             true,
 			munemoChanged:                false,
-			registrationsExist:           true,
+			enrollmentsExist:             true,
 			resetOnHardwareChangeEnabled: true,
 			expectDatabaseWipe:           false,
 		},
@@ -184,7 +184,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			osquerySuccess:               true,
 			munemoSetInStore:             true,
 			munemoChanged:                false,
-			registrationsExist:           false,
+			enrollmentsExist:             false,
 			resetOnHardwareChangeEnabled: true,
 			expectDatabaseWipe:           false,
 		},
@@ -199,7 +199,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			osquerySuccess:               true,
 			munemoSetInStore:             true,
 			munemoChanged:                false,
-			registrationsExist:           true,
+			enrollmentsExist:             true,
 			resetOnHardwareChangeEnabled: true,
 			expectDatabaseWipe:           false,
 		},
@@ -214,7 +214,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			osquerySuccess:               true,
 			munemoSetInStore:             true,
 			munemoChanged:                false,
-			registrationsExist:           true,
+			enrollmentsExist:             true,
 			resetOnHardwareChangeEnabled: true,
 			expectDatabaseWipe:           false,
 		},
@@ -229,7 +229,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			osquerySuccess:               true,
 			munemoSetInStore:             false,
 			munemoChanged:                false,
-			registrationsExist:           true,
+			enrollmentsExist:             true,
 			resetOnHardwareChangeEnabled: true,
 			expectDatabaseWipe:           false,
 		},
@@ -244,7 +244,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			osquerySuccess:               true,
 			munemoSetInStore:             true,
 			munemoChanged:                false,
-			registrationsExist:           true,
+			enrollmentsExist:             true,
 			resetOnHardwareChangeEnabled: true,
 			expectDatabaseWipe:           false,
 		},
@@ -259,7 +259,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			osquerySuccess:               true,
 			munemoSetInStore:             true,
 			munemoChanged:                false,
-			registrationsExist:           true,
+			enrollmentsExist:             true,
 			resetOnHardwareChangeEnabled: true,
 			expectDatabaseWipe:           false,
 		},
@@ -274,7 +274,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			osquerySuccess:               true,
 			munemoSetInStore:             true,
 			munemoChanged:                false,
-			registrationsExist:           true,
+			enrollmentsExist:             true,
 			resetOnHardwareChangeEnabled: true,
 			expectDatabaseWipe:           false,
 		},
@@ -289,7 +289,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			osquerySuccess:               true,
 			munemoSetInStore:             true,
 			munemoChanged:                false,
-			registrationsExist:           true,
+			enrollmentsExist:             true,
 			resetOnHardwareChangeEnabled: true,
 			expectDatabaseWipe:           runtime.GOOS == "windows",
 		},
@@ -304,7 +304,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			osquerySuccess:               true,
 			munemoSetInStore:             true,
 			munemoChanged:                false,
-			registrationsExist:           true,
+			enrollmentsExist:             true,
 			resetOnHardwareChangeEnabled: false,
 			expectDatabaseWipe:           false,
 		},
@@ -333,7 +333,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 				storage.ServerProvidedDataStore: testServerProvidedDataStore,
 			}).Maybe()
 			mockKnapsack.On("ResetOnHardwareChangeEnabled").Return(tt.resetOnHardwareChangeEnabled).Maybe()
-			mockKnapsack.On("RegistrationIDs").Return([]string{"default"}).Maybe()
+			mockKnapsack.On("EnrollmentIDs").Return([]string{"default"}).Maybe()
 
 			// Set up dependencies: ensure that retrieved hardware data matches expectations
 			var actualSerial, actualHardwareUUID string
@@ -377,15 +377,15 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			// Set up dependencies: ensure that retrieved tenant matches current data
 			munemoValue := []byte("test-munemo")
 
-			if tt.registrationsExist {
-				mockKnapsack.On("Registrations").Return([]types.Registration{
+			if tt.enrollmentsExist {
+				mockKnapsack.On("Enrollments").Return([]types.Enrollment{
 					{
-						RegistrationID: types.DefaultRegistrationID,
-						Munemo:         string(munemoValue),
+						EnrollmentID: types.DefaultEnrollmentID,
+						Munemo:       string(munemoValue),
 					},
 				}, nil)
 			} else {
-				mockKnapsack.On("Registrations").Return(nil, nil)
+				mockKnapsack.On("Enrollments").Return(nil, nil)
 			}
 
 			if tt.munemoSetInStore {
@@ -480,7 +480,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 				require.NoError(t, err, "could not get hardware UUID from test store")
 				require.Equal(t, actualHardwareUUID, string(hardwareUUID), "hardware UUID in test store does not match expected hardware UUID")
 			}
-			if tt.registrationsExist {
+			if tt.enrollmentsExist {
 				munemo, err := testHostDataStore.Get(hostDataKeyMunemo)
 				require.NoError(t, err, "could not get munemo from test store")
 				require.Equal(t, munemoValue, munemo, "munemo in test store does not match expected munemo")
@@ -516,13 +516,13 @@ func TestDetectAndRemediateHardwareChange_SavesDataOverMultipleResets(t *testing
 	})
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	mockKnapsack.On("ResetOnHardwareChangeEnabled").Return(true)
-	mockKnapsack.On("Registrations").Return([]types.Registration{
+	mockKnapsack.On("Enrollments").Return([]types.Enrollment{
 		{
-			RegistrationID: types.DefaultRegistrationID,
-			Munemo:         "test-munemo-1",
+			EnrollmentID: types.DefaultEnrollmentID,
+			Munemo:       "test-munemo-1",
 		},
 	}, nil)
-	mockKnapsack.On("RegistrationIDs").Return([]string{"default"})
+	mockKnapsack.On("EnrollmentIDs").Return([]string{"default"})
 
 	// Set up dependencies: ensure that all hardware data is incorrect so that a reset will be triggered
 	require.NoError(t, testHostDataStore.Set(hostDataKeySerial, []byte("not-the-correct-serial")), "could not set serial in test store")
@@ -616,13 +616,13 @@ func TestExecute(t *testing.T) {
 	})
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	mockKnapsack.On("ResetOnHardwareChangeEnabled").Return(true)
-	mockKnapsack.On("Registrations").Return([]types.Registration{
+	mockKnapsack.On("Enrollments").Return([]types.Enrollment{
 		{
-			RegistrationID: types.DefaultRegistrationID,
-			Munemo:         "test-munemo-1",
+			EnrollmentID: types.DefaultEnrollmentID,
+			Munemo:       "test-munemo-1",
 		},
 	}, nil)
-	mockKnapsack.On("RegistrationIDs").Return([]string{"default"})
+	mockKnapsack.On("EnrollmentIDs").Return([]string{"default"})
 
 	// Set up dependencies: ensure that all hardware data is incorrect so that a reset will be triggered
 	require.NoError(t, testHostDataStore.Set(hostDataKeySerial, []byte("not-the-correct-serial")), "could not set serial in test store")
@@ -658,10 +658,10 @@ func TestInterrupt_Multiple(t *testing.T) {
 	testHostDataStore, err := storageci.NewStore(t, slogger, storage.PersistentHostDataStore.String())
 	require.NoError(t, err, "could not create test host data store")
 	mockKnapsack.On("PersistentHostDataStore").Return(testHostDataStore)
-	mockKnapsack.On("Registrations").Return([]types.Registration{
+	mockKnapsack.On("Enrollments").Return([]types.Enrollment{
 		{
-			RegistrationID: types.DefaultRegistrationID,
-			Munemo:         "test-munemo",
+			EnrollmentID: types.DefaultEnrollmentID,
+			Munemo:       "test-munemo",
 		},
 	}, nil)
 
