@@ -13,7 +13,7 @@ import (
 
 func TablePlugin(k types.Knapsack, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
-		table.TextColumn("registration_id"),
+		table.TextColumn("enrollment_id"),
 		table.TextColumn("instance_run_id"),
 		table.TextColumn("start_time"),
 		table.TextColumn("connect_time"),

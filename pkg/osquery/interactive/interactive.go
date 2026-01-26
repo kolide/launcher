@@ -62,8 +62,8 @@ func StartProcess(knapsack types.Knapsack, interactiveRootDir string, inFile, ou
 	}
 
 	// start building list of osq plugins with the kolide tables
-	osqPlugins := table.PlatformTables(knapsack, types.DefaultRegistrationID, knapsack.Slogger(), knapsack.OsquerydPath())
-	osqPlugins = append(osqPlugins, table.KolideCustomAtcTables(knapsack, types.DefaultRegistrationID, knapsack.Slogger())...)
+	osqPlugins := table.PlatformTables(knapsack, types.DefaultEnrollmentID, knapsack.Slogger(), knapsack.OsquerydPath())
+	osqPlugins = append(osqPlugins, table.KolideCustomAtcTables(knapsack, types.DefaultEnrollmentID, knapsack.Slogger())...)
 
 	osqueryFlags := knapsack.OsqueryFlags()
 	// if we were not provided a config path flag, try to add default config
@@ -226,8 +226,8 @@ func generateConfigPlugin(slogger *slog.Logger, launcherDaemonRootDir string) (*
 	}
 	defer r.Close()
 
-	// Use the default registration's config
-	atcConfigKey := storage.KeyByIdentifier([]byte("auto_table_construction"), storage.IdentifierTypeRegistration, []byte(types.DefaultRegistrationID))
+	// Use the default enrollment's config
+	atcConfigKey := storage.KeyByIdentifier([]byte("auto_table_construction"), storage.IdentifierTypeEnrollment, []byte(types.DefaultEnrollmentID))
 	atcConfig, err := r.Get(string(atcConfigKey))
 	if err != nil {
 		return nil, fmt.Errorf("error getting auto_table_construction from startup settings: %w", err)

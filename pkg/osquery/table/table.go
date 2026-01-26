@@ -48,7 +48,7 @@ func LauncherTables(k types.Knapsack, slogger *slog.Logger) []osquery.OsqueryPlu
 }
 
 // PlatformTables returns all tables for the launcher build platform.
-func PlatformTables(k types.Knapsack, registrationId string, slogger *slog.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
+func PlatformTables(k types.Knapsack, enrollmentId string, slogger *slog.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
 	// Common tables to all platforms
 	tables := []osquery.OsqueryPlugin{
 		ChromeLoginDataEmails(k, slogger),
@@ -80,16 +80,16 @@ func PlatformTables(k types.Knapsack, registrationId string, slogger *slog.Logge
 
 // KolideCustomAtcTables retrieves Kolide ATC config from the appropriate data store(s),
 // then constructs the tables.
-func KolideCustomAtcTables(k types.Knapsack, registrationId string, slogger *slog.Logger) []osquery.OsqueryPlugin {
+func KolideCustomAtcTables(k types.Knapsack, enrollmentId string, slogger *slog.Logger) []osquery.OsqueryPlugin {
 	// Fetch tables from KVStore or from startup settings
-	config, err := katcFromDb(k, registrationId)
+	config, err := katcFromDb(k, enrollmentId)
 	if err != nil {
 		slogger.Log(context.TODO(), slog.LevelDebug,
 			"could not retrieve KATC config from store, may not have access -- falling back to startup settings",
 			"err", err,
 		)
 
-		config, err = katcFromStartupSettings(k, registrationId)
+		config, err = katcFromStartupSettings(k, enrollmentId)
 		if err != nil {
 			slogger.Log(context.TODO(), slog.LevelWarn,
 				"could not retrieve KATC config from startup settings",
@@ -102,14 +102,14 @@ func KolideCustomAtcTables(k types.Knapsack, registrationId string, slogger *slo
 	return katc.ConstructKATCTables(config, k, slogger)
 }
 
-func katcFromDb(k types.Knapsack, registrationId string) (map[string]string, error) {
+func katcFromDb(k types.Knapsack, enrollmentId string) (map[string]string, error) {
 	if k == nil || k.KatcConfigStore() == nil {
 		return nil, errors.New("stores in knapsack not available")
 	}
 	katcCfg := make(map[string]string)
 	if err := k.KatcConfigStore().ForEach(func(k []byte, v []byte) error {
 		key, _, identifier := storage.SplitKey(k)
-		if string(identifier) == registrationId {
+		if string(identifier) == enrollmentId {
 			katcCfg[string(key)] = string(v)
 		}
 
@@ -121,14 +121,14 @@ func katcFromDb(k types.Knapsack, registrationId string) (map[string]string, err
 	return katcCfg, nil
 }
 
-func katcFromStartupSettings(k types.Knapsack, registrationId string) (map[string]string, error) {
+func katcFromStartupSettings(k types.Knapsack, enrollmentId string) (map[string]string, error) {
 	r, err := startupsettings.OpenReader(context.TODO(), k.Slogger(), k.RootDirectory())
 	if err != nil {
 		return nil, fmt.Errorf("error opening startup settings reader: %w", err)
 	}
 	defer r.Close()
 
-	katcConfigKey := storage.KeyByIdentifier([]byte("katc_config"), storage.IdentifierTypeRegistration, []byte(registrationId))
+	katcConfigKey := storage.KeyByIdentifier([]byte("katc_config"), storage.IdentifierTypeEnrollment, []byte(enrollmentId))
 	katcConfig, err := r.Get(string(katcConfigKey))
 	if err != nil {
 		return nil, fmt.Errorf("error getting katc_config from startup settings: %w", err)

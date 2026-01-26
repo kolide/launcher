@@ -311,22 +311,22 @@ func enrollSecret(k types.Knapsack) string {
 	return string(b)
 }
 
-// munemo fetches the registration's munemo from the knapsack. If that is not available,
+// munemo fetches the enrollment's munemo from the knapsack. If that is not available,
 // it looks for the munemo stored in metadata.json.
 func munemo(k types.Knapsack) string {
 	if k == nil {
 		return munemoFromMetadataJson(launcher.DefaultRootDirectoryPath)
 	}
 
-	registrations, err := k.Registrations()
+	enrollments, err := k.Enrollments()
 	if err != nil {
 		return munemoFromMetadataJson(k.RootDirectory())
 	}
 
-	// For now, we can return the munemo for the default registration (also, the only registration currently)
-	for _, registration := range registrations {
-		if registration.RegistrationID == types.DefaultRegistrationID {
-			return registration.Munemo
+	// For now, we can return the munemo for the default enrollment (also, the only enrollment currently)
+	for _, enrollment := range enrollments {
+		if enrollment.EnrollmentID == types.DefaultEnrollmentID {
+			return enrollment.Munemo
 		}
 	}
 

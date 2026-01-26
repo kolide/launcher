@@ -627,42 +627,42 @@ func TestMunemoCheck(t *testing.T) {
 	tests := []struct {
 		name                      string
 		headers                   map[string][]string
-		registrations             []types.Registration
+		enrollments               []types.Enrollment
 		expectMunemoExtractionErr bool
 		expectMiddleWareCheckErr  bool
 	}{
 		{
 			name:    "matching munemo",
 			headers: validTestHeader,
-			registrations: []types.Registration{
+			enrollments: []types.Enrollment{
 				{
-					RegistrationID: types.DefaultRegistrationID,
-					Munemo:         expectedMunemo,
+					EnrollmentID: types.DefaultEnrollmentID,
+					Munemo:       expectedMunemo,
 				},
 			},
 		},
 		{
 			name: "no munemo header",
-			registrations: []types.Registration{
+			enrollments: []types.Enrollment{
 				{
-					RegistrationID: types.DefaultRegistrationID,
-					Munemo:         expectedMunemo,
+					EnrollmentID: types.DefaultEnrollmentID,
+					Munemo:       expectedMunemo,
 				},
 			},
 		},
 		{
-			name:                      "no registrations",
+			name:                      "no enrollments",
 			headers:                   validTestHeader,
-			registrations:             []types.Registration{},
+			enrollments:               []types.Enrollment{},
 			expectMunemoExtractionErr: true,
 		},
 		{
-			name:    "no default registration",
+			name:    "no default enrollment",
 			headers: validTestHeader,
-			registrations: []types.Registration{
+			enrollments: []types.Enrollment{
 				{
-					RegistrationID: "some-other-registration-id",
-					Munemo:         "some-other-munemo",
+					EnrollmentID: "some-other-enrollment-id",
+					Munemo:       "some-other-munemo",
 				},
 			},
 			expectMunemoExtractionErr: true,
@@ -670,10 +670,10 @@ func TestMunemoCheck(t *testing.T) {
 		{
 			name:    "header and munemo dont match",
 			headers: map[string][]string{kolideMunemoHeaderKey: {"other-munemo"}},
-			registrations: []types.Registration{
+			enrollments: []types.Enrollment{
 				{
-					RegistrationID: types.DefaultRegistrationID,
-					Munemo:         expectedMunemo,
+					EnrollmentID: types.DefaultEnrollmentID,
+					Munemo:       expectedMunemo,
 				},
 			},
 			expectMiddleWareCheckErr: true,
@@ -685,7 +685,7 @@ func TestMunemoCheck(t *testing.T) {
 			t.Parallel()
 
 			k := typesmocks.NewKnapsack(t)
-			k.On("Registrations").Return(tt.registrations, nil)
+			k.On("Enrollments").Return(tt.enrollments, nil)
 			testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 			require.NoError(t, err, "could not create test config store")
 			k.On("ConfigStore").Return(testConfigStore).Maybe()
@@ -792,7 +792,7 @@ func Test_sendCallback_handlesEnrollment(t *testing.T) {
 		Level:     slog.LevelDebug,
 	}))
 	k := typesmocks.NewKnapsack(t)
-	k.On("SaveRegistration", types.DefaultRegistrationID, expectedMunemo, expectedNodeKey, "").Return(nil)
+	k.On("SaveEnrollment", types.DefaultEnrollmentID, expectedMunemo, expectedNodeKey, "").Return(nil)
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore)
@@ -822,7 +822,7 @@ func Test_sendCallback_handlesEnrollment(t *testing.T) {
 	// We should have sent at least some of them
 	require.GreaterOrEqual(t, int(requestsReceived.Load()), maxDesiredCallbackQueueSize, "queue worker did not process expected number of requests; logs: ", logBytes.String())
 
-	// We should have called SaveRegistration
+	// We should have called SaveEnrollment
 	k.AssertExpectations(t)
 }
 
@@ -851,7 +851,7 @@ func Test_sendCallback_handlesEnrollmentWithAgentIngesterToken(t *testing.T) {
 
 	slogger := multislogger.NewNopLogger()
 	k := typesmocks.NewKnapsack(t)
-	k.On("SaveRegistration", types.DefaultRegistrationID, expectedMunemo, expectedNodeKey, "").Return(nil)
+	k.On("SaveEnrollment", types.DefaultEnrollmentID, expectedMunemo, expectedNodeKey, "").Return(nil)
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore)
@@ -870,6 +870,6 @@ func Test_sendCallback_handlesEnrollmentWithAgentIngesterToken(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, expectedAgentIngesterToken, string(setToken), "expected agent ingester token to be set")
 
-	// We should have called SaveRegistration
+	// We should have called SaveEnrollment
 	k.AssertExpectations(t)
 }

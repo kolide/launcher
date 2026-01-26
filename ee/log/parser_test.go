@@ -41,7 +41,7 @@ func TestLogRawLogRecord(t *testing.T) {
 		},
 		{
 			testCaseName:       "valid info-level log",
-			rawLogRecord:       fmt.Appendf(nil, `{"time":"%s","level":"INFO","source":{"function":"github.com/kolide/launcher/ee/log/osquerylogs.(*OsqueryLogAdapter).Write","file":"/Users/runner/work/launcher/launcher/ee/log/osquerylogs/log.go","line":%d},"msg":"I0725 09:58:21.866813 1883975680 scheduler.cpp:201] Found results for query: pack:kolide_log_pipeline:example_noisy_pack:current_time","component":"osquery","osqlevel":"stderr","registration_id":"default","instance_run_id":"01K10511D8DCCGW37X8SR5WKC3","caller":"scheduler.cpp:201"}`, logTimeString, fileLineInt),
+			rawLogRecord:       fmt.Appendf(nil, `{"time":"%s","level":"INFO","source":{"function":"github.com/kolide/launcher/ee/log/osquerylogs.(*OsqueryLogAdapter).Write","file":"/Users/runner/work/launcher/launcher/ee/log/osquerylogs/log.go","line":%d},"msg":"I0725 09:58:21.866813 1883975680 scheduler.cpp:201] Found results for query: pack:kolide_log_pipeline:example_noisy_pack:current_time","component":"osquery","osqlevel":"stderr","enrollment_id":"default","instance_run_id":"01K10511D8DCCGW37X8SR5WKC3","caller":"scheduler.cpp:201"}`, logTimeString, fileLineInt),
 			expectedLogMessage: "I0725 09:58:21.866813 1883975680 scheduler.cpp:201] Found results for query: pack:kolide_log_pipeline:example_noisy_pack:current_time",
 			expectedLogLevel:   slog.LevelInfo,
 			expectedLogAttributes: []slog.Attr{
@@ -53,14 +53,14 @@ func TestLogRawLogRecord(t *testing.T) {
 				}),
 				slog.String("original.component", "osquery"),
 				slog.String("original.osqlevel", "stderr"),
-				slog.String("original.registration_id", "default"),
+				slog.String("original.enrollment_id", "default"),
 				slog.String("original.instance_run_id", "01K10511D8DCCGW37X8SR5WKC3"),
 				slog.String("original.caller", "scheduler.cpp:201"),
 			},
 		},
 		{
 			testCaseName:       "valid warn-level log",
-			rawLogRecord:       fmt.Appendf(nil, `{"time":"%s","level":"WARN","source":{"function":"github.com/kolide/launcher/pkg/osquery/runtime.(*OsqueryInstance).Launch.func4","file":"/Users/runner/work/launcher/launcher/pkg/osquery/runtime/osqueryinstance.go","line":%d},"msg":"error running osquery command","component":"osquery_instance","registration_id":"default","instance_run_id":"01K0YYVJK0G5A33RSC8VCKMK26","path":"/usr/local/kolide-nababe-k2/bin/osqueryd","err":"signal: killed"}`, logTimeString, fileLineInt),
+			rawLogRecord:       fmt.Appendf(nil, `{"time":"%s","level":"WARN","source":{"function":"github.com/kolide/launcher/pkg/osquery/runtime.(*OsqueryInstance).Launch.func4","file":"/Users/runner/work/launcher/launcher/pkg/osquery/runtime/osqueryinstance.go","line":%d},"msg":"error running osquery command","component":"osquery_instance","enrollment_id":"default","instance_run_id":"01K0YYVJK0G5A33RSC8VCKMK26","path":"/usr/local/kolide-nababe-k2/bin/osqueryd","err":"signal: killed"}`, logTimeString, fileLineInt),
 			expectedLogMessage: "error running osquery command",
 			expectedLogLevel:   slog.LevelWarn,
 			expectedLogAttributes: []slog.Attr{
@@ -71,7 +71,7 @@ func TestLogRawLogRecord(t *testing.T) {
 					"line":     fileLineAsFloat,
 				}),
 				slog.String("original.component", "osquery_instance"),
-				slog.String("original.registration_id", "default"),
+				slog.String("original.enrollment_id", "default"),
 				slog.String("original.instance_run_id", "01K0YYVJK0G5A33RSC8VCKMK26"),
 				slog.String("original.path", "/usr/local/kolide-nababe-k2/bin/osqueryd"),
 				slog.String("err", "signal: killed"),

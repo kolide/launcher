@@ -40,7 +40,7 @@ import (
 
 // makeKnapsack returns a types.Knapsack ready for use in most tests. Use this when your test
 // expects the extension to already be enrolled. If you need an unenrolled extension, use makeKnapsackUnenrolled.
-// If you need to manipulate the registration state (e.g. by changing node keys), then set up the mock knapsack
+// If you need to manipulate the enrollment state (e.g. by changing node keys), then set up the mock knapsack
 // manually in your test instead.
 func makeKnapsack(t *testing.T) types.Knapsack {
 	m := mocks.NewKnapsack(t)
@@ -77,7 +77,7 @@ func makeTestOsqLogPublisher(k types.Knapsack) types.OsqueryPublisher {
 }
 
 // makeKnapsackUnenrolled returns a types.Knapsack ready for use in any test that requires
-// an unenrolled extension. If you need to manipulate the registration state (e.g. by changing
+// an unenrolled extension. If you need to manipulate the enrollment state (e.g. by changing
 // node keys), then set up the mock knapsack manually in your test instead.
 func makeKnapsackUnenrolled(t *testing.T) types.Knapsack {
 	m := mocks.NewKnapsack(t)
@@ -133,12 +133,12 @@ func makeKnapsackWithInvalidEnrollment(t *testing.T, expectedNodeKey string) typ
 	// At first, return a bad node key -- this will be called once by whatever function we're calling.
 	k.On("NodeKey", testifymock.Anything).Return("bad_node_key", nil).Once()
 	// We expect that we'll attempt to delete any existing enrollment before attempting reenroll.
-	k.On("DeleteRegistration", testifymock.Anything).Return(nil)
+	k.On("DeleteEnrollment", testifymock.Anything).Return(nil)
 	// On re-enroll, we'll check to confirm that we don't have a node key (perhaps from a different enroll thread).
 	// Return no node key, to confirm we proceed with reenrollment.
 	k.On("NodeKey", testifymock.Anything).Return("", nil).Once()
-	// Post-enrollment, we'll save the registration.
-	k.On("SaveRegistration", testifymock.Anything, "", expectedNodeKey, testifymock.Anything).Return(nil).Once()
+	// Post-enrollment, we'll save the enrollment.
+	k.On("SaveEnrollment", testifymock.Anything, "", expectedNodeKey, testifymock.Anything).Return(nil).Once()
 	// Next, post-enrollment, we'll want to start returning the correct node key.
 	k.On("NodeKey", testifymock.Anything).Return(expectedNodeKey, nil)
 	// for now, don't enable dual log publication (cutover to new agent-ingester service) for these
@@ -218,7 +218,7 @@ func TestExtensionEnrollTransportError(t *testing.T) {
 
 	k := makeKnapsackUnenrolled(t)
 	lpc := makeTestOsqLogPublisher(k)
-	e, err := NewExtension(t.Context(), m, lpc, settingsstoremock.NewSettingsStoreWriter(t), k, types.DefaultRegistrationID, ExtensionOpts{})
+	e, err := NewExtension(t.Context(), m, lpc, settingsstoremock.NewSettingsStoreWriter(t), k, types.DefaultEnrollmentID, ExtensionOpts{})
 	require.Nil(t, err)
 
 	key, invalid, err := e.Enroll(t.Context())
@@ -328,13 +328,13 @@ func TestExtensionEnroll(t *testing.T) {
 	k.On("TokenStore").Return(tokenStore).Maybe()
 	lpc := makeTestOsqLogPublisher(k)
 
-	e, err := NewExtension(t.Context(), m, lpc, s, k, types.DefaultRegistrationID, ExtensionOpts{})
+	e, err := NewExtension(t.Context(), m, lpc, s, k, types.DefaultEnrollmentID, ExtensionOpts{})
 	require.Nil(t, err)
 
 	// We should attempt to fetch the node key once during enrollment, and we shouldn't have a node key yet
-	k.On("NodeKey", types.DefaultRegistrationID).Return("", nil).Once()
-	// We expect enrollment to complete, and that we store the updated registration
-	k.On("SaveRegistration", types.DefaultRegistrationID, testifymock.Anything, expectedNodeKey, expectedEnrollSecret).Return(nil).Once()
+	k.On("NodeKey", types.DefaultEnrollmentID).Return("", nil).Once()
+	// We expect enrollment to complete, and that we store the updated enrollment
+	k.On("SaveEnrollment", types.DefaultEnrollmentID, testifymock.Anything, expectedNodeKey, expectedEnrollSecret).Return(nil).Once()
 
 	// Attempt enrollment
 	key, invalid, err := e.Enroll(t.Context())
@@ -345,10 +345,10 @@ func TestExtensionEnroll(t *testing.T) {
 	assert.Equal(t, expectedEnrollSecret, gotEnrollSecret)
 
 	// The next enroll request will have access to the new node key
-	k.On("NodeKey", types.DefaultRegistrationID).Return(expectedNodeKey, nil).Once()
+	k.On("NodeKey", types.DefaultEnrollmentID).Return(expectedNodeKey, nil).Once()
 
-	// The next time we call Enroll, the extension should confirm that the registration is stored
-	k.On("EnsureRegistrationStored", types.DefaultRegistrationID).Return(nil)
+	// The next time we call Enroll, the extension should confirm that the enrollment is stored
+	k.On("EnsureEnrollmentStored", types.DefaultEnrollmentID).Return(nil)
 
 	// Should not re-enroll with stored secret
 	m.RequestEnrollmentFuncInvoked = false
@@ -359,10 +359,10 @@ func TestExtensionEnroll(t *testing.T) {
 	assert.Equal(t, expectedNodeKey, key)
 	assert.Equal(t, expectedEnrollSecret, gotEnrollSecret)
 
-	e, err = NewExtension(t.Context(), m, lpc, s, k, types.DefaultRegistrationID, ExtensionOpts{})
+	e, err = NewExtension(t.Context(), m, lpc, s, k, types.DefaultEnrollmentID, ExtensionOpts{})
 	require.Nil(t, err)
 	// Still should not re-enroll (because node key stored in DB)
-	k.On("NodeKey", types.DefaultRegistrationID).Return(expectedNodeKey, nil).Once()
+	k.On("NodeKey", types.DefaultEnrollmentID).Return(expectedNodeKey, nil).Once()
 	key, invalid, err = e.Enroll(t.Context())
 	require.Nil(t, err)
 	assert.False(t, m.RequestEnrollmentFuncInvoked) // Note False here.
@@ -372,9 +372,9 @@ func TestExtensionEnroll(t *testing.T) {
 
 	// Re-enroll for new node key
 	expectedNodeKey = "new_node_key"
-	k.On("SaveRegistration", types.DefaultRegistrationID, "", expectedNodeKey, expectedEnrollSecret).Return(nil).Once()
-	k.On("DeleteRegistration", types.DefaultRegistrationID).Return(nil)
-	k.On("NodeKey", types.DefaultRegistrationID).Return("", nil).Once()
+	k.On("SaveEnrollment", types.DefaultEnrollmentID, "", expectedNodeKey, expectedEnrollSecret).Return(nil).Once()
+	k.On("DeleteEnrollment", types.DefaultEnrollmentID).Return(nil)
+	k.On("NodeKey", types.DefaultEnrollmentID).Return("", nil).Once()
 	e.RequireReenroll(t.Context())
 	key, invalid, err = e.Enroll(t.Context())
 	require.Nil(t, err)
@@ -395,7 +395,7 @@ func TestExtensionGenerateConfigsTransportError(t *testing.T) {
 	}
 	k := makeKnapsack(t)
 	lpc := makeTestOsqLogPublisher(k)
-	e, err := NewExtension(t.Context(), m, lpc, settingsstoremock.NewSettingsStoreWriter(t), k, types.DefaultRegistrationID, ExtensionOpts{})
+	e, err := NewExtension(t.Context(), m, lpc, settingsstoremock.NewSettingsStoreWriter(t), k, types.DefaultEnrollmentID, ExtensionOpts{})
 	require.Nil(t, err)
 
 	configs, err := e.GenerateConfigs(t.Context())
@@ -516,8 +516,8 @@ func TestGenerateConfigs_CannotEnrollYet(t *testing.T) {
 	k.On("OsqueryHistory").Return(osqHistory).Maybe()
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
 
-	// Post-enrollment, we'll save the registration.
-	k.On("SaveRegistration", testifymock.Anything, "", expectedNodeKey, testifymock.Anything).Return(nil).Once()
+	// Post-enrollment, we'll save the enrollment.
+	k.On("SaveEnrollment", testifymock.Anything, "", expectedNodeKey, testifymock.Anything).Return(nil).Once()
 
 	// We need NodeKey to return empty twice more to trigger reenrollment:
 	// once on the initial call to RequestConfigs, and once at the top of Enroll.
@@ -578,7 +578,7 @@ func TestGenerateConfigs_WorksAfterSecretlessEnrollment(t *testing.T) {
 	k.On("TokenStore").Return(tokenStore).Maybe()
 	lpc := makeTestOsqLogPublisher(k)
 
-	e, err := NewExtension(t.Context(), s, lpc, settingsStore, k, types.DefaultRegistrationID, ExtensionOpts{})
+	e, err := NewExtension(t.Context(), s, lpc, settingsStore, k, types.DefaultEnrollmentID, ExtensionOpts{})
 	require.Nil(t, err)
 
 	// First request to generate configs -- we shouldn't be able to get anything yet,
@@ -948,12 +948,12 @@ func TestExtensionWriteBufferedLogsEnrollmentInvalid(t *testing.T) {
 	// At first, return a bad node key -- this will be called once by GenerateConfigs.
 	k.On("NodeKey", testifymock.Anything).Return("bad_node_key", nil).Once()
 	// We expect that we'll attempt to delete any existing enrollment before attempting reenroll.
-	k.On("DeleteRegistration", testifymock.Anything).Return(nil)
+	k.On("DeleteEnrollment", testifymock.Anything).Return(nil)
 	// On re-enroll, we'll check to confirm that we don't have a node key (perhaps from a different enroll thread).
 	// Return no node key, to confirm we proceed with reenrollment.
 	k.On("NodeKey", testifymock.Anything).Return("", nil).Once()
-	// Post-enrollment, we'll save the registration.
-	k.On("SaveRegistration", testifymock.Anything, "", expectedNodeKey, testifymock.Anything).Return(nil).Once()
+	// Post-enrollment, we'll save the enrollment.
+	k.On("SaveEnrollment", testifymock.Anything, "", expectedNodeKey, testifymock.Anything).Return(nil).Once()
 	// Next, post-enrollment, we'll want to start returning the correct node key.
 	k.On("NodeKey", testifymock.Anything).Return(expectedNodeKey, nil)
 
@@ -1227,7 +1227,7 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	k.On("NodeKey", testifymock.Anything).Return(expectedNodeKey, nil)
-	k.On("EnsureRegistrationStored", testifymock.Anything).Return(nil)
+	k.On("EnsureEnrollmentStored", testifymock.Anything).Return(nil)
 
 	// Create these buckets ahead of time
 	statusLogsStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.StatusLogsStore.String())
@@ -1612,7 +1612,7 @@ func TestGetQueries_WorksWithSecretlessEnrollment(t *testing.T) {
 	k.On("TokenStore").Return(tokenStore).Maybe()
 	lpc := makeTestOsqLogPublisher(k)
 
-	e, err := NewExtension(t.Context(), s, lpc, settingsStore, k, types.DefaultRegistrationID, ExtensionOpts{})
+	e, err := NewExtension(t.Context(), s, lpc, settingsStore, k, types.DefaultEnrollmentID, ExtensionOpts{})
 	require.Nil(t, err)
 
 	// First request to generate configs -- we shouldn't be able to get anything yet,
@@ -1718,12 +1718,12 @@ func TestExtensionWriteResultsEnrollmentInvalid(t *testing.T) {
 	// At first, return a bad node key -- this will be called once by WriteResults.
 	k.On("NodeKey", testifymock.Anything).Return("bad_node_key", nil).Once()
 	// We expect that we'll attempt to delete any existing enrollment before attempting reenroll.
-	k.On("DeleteRegistration", testifymock.Anything).Return(nil)
+	k.On("DeleteEnrollment", testifymock.Anything).Return(nil)
 	// On re-enroll, we'll check to confirm that we don't have a node key (perhaps from a different enroll thread).
 	// Return no node key, to confirm we proceed with reenrollment.
 	k.On("NodeKey", testifymock.Anything).Return("", nil).Once()
-	// Post-enrollment, we'll save the registration.
-	k.On("SaveRegistration", testifymock.Anything, "", expectedNodeKey, testifymock.Anything).Return(nil).Once()
+	// Post-enrollment, we'll save the enrollment.
+	k.On("SaveEnrollment", testifymock.Anything, "", expectedNodeKey, testifymock.Anything).Return(nil).Once()
 	// Next, post-enrollment, we'll want to start returning the correct node key.
 	k.On("NodeKey", testifymock.Anything).Return(expectedNodeKey, nil)
 
