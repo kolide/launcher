@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -53,7 +54,7 @@ func TestSecretScan(t *testing.T) {
 		{
 			name:              "scan subdirectory file with github token",
 			scanType:          "path",
-			targetPath:        "subdir/github_token.env",
+			targetPath:        "subdir/github_token.env", // Will be converted via filepath.FromSlash
 			minFindingsCount:  1,
 			expectedRuleIDs:   []string{"github-pat"},
 			expectedFileNames: []string{"github_token.env"},
@@ -80,7 +81,7 @@ func TestSecretScan(t *testing.T) {
 		{
 			name:       "scan nonexistent file returns empty",
 			scanType:   "path",
-			targetPath: "/nonexistent/path/to/file.txt",
+			targetPath: "nonexistent_file_that_does_not_exist.txt", // Relative path that won't exist
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -96,7 +97,8 @@ func TestSecretScan(t *testing.T) {
 				if tt.targetPath == "" {
 					fullPath = projectDir
 				} else if !filepath.IsAbs(tt.targetPath) {
-					fullPath = filepath.Join(projectDir, tt.targetPath)
+					// Convert forward slashes to OS-specific separator
+					fullPath = filepath.Join(projectDir, filepath.FromSlash(tt.targetPath))
 				}
 				queryContext = map[string][]string{"path": {fullPath}}
 			case "raw_data":
@@ -207,15 +209,23 @@ func extractTestData(tb testing.TB) string {
 
 	tempDir := tb.TempDir()
 
-	zipReader, err := zip.OpenReader("test_data/test_data.zip")
+	// Use filepath.FromSlash for cross-platform compatibility
+	zipPath := filepath.FromSlash("test_data/test_data.zip")
+	zipReader, err := zip.OpenReader(zipPath)
 	require.NoError(tb, err, "opening zip file")
 	defer zipReader.Close()
 
 	for _, fileInZip := range zipReader.File {
-		filePath := filepath.Join(tempDir, fileInZip.Name)
+		// Zip files always use forward slashes - convert to OS separator
+		// Also clean the path to remove any potential path traversal
+		cleanName := filepath.FromSlash(fileInZip.Name)
+		if strings.Contains(cleanName, "..") {
+			continue // Skip potentially malicious paths
+		}
+		filePath := filepath.Join(tempDir, cleanName)
 
 		if fileInZip.FileInfo().IsDir() {
-			require.NoError(tb, os.MkdirAll(filePath, fileInZip.Mode()), "creating dir")
+			require.NoError(tb, os.MkdirAll(filePath, 0755), "creating dir")
 			continue
 		}
 
@@ -224,7 +234,8 @@ func extractTestData(tb testing.TB) string {
 		fileInZipReader, err := fileInZip.Open()
 		require.NoError(tb, err, "opening file in zip")
 
-		outFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, fileInZip.Mode())
+		// Use 0644 as a safe default permission that works on all platforms
+		outFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 		require.NoError(tb, err, "opening output file")
 
 		_, err = io.Copy(outFile, fileInZipReader)
