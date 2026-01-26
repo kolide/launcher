@@ -324,8 +324,10 @@ jobs:
         echo "main-run-id=$(gh run list --repo kolide/launcher --branch main --workflow ci --limit 1 --json databaseId -q '.[].databaseId')" >> "$GITHUB_OUTPUT"
 
     - name: Download benchmark from main
+      id: download-benchmark
       if: github.ref != 'refs/heads/main'
       uses: actions/download-artifact@v4
+      continue-on-error: true
       with:
         name: ${{ runner.os }}-benchmark.txt
         github-token: ${{ github.token }} # Grants permission to read from other workflow runs
@@ -333,11 +335,11 @@ jobs:
         path: main
 
     - name: Install benchstat
-      if: github.ref != 'refs/heads/main'
+      if: github.ref != 'refs/heads/main' && steps.download-benchmark.outcome == 'success'
       run: go install golang.org/x/perf/cmd/benchstat@latest
 
     - name: Compare performance against main
-      if: github.ref != 'refs/heads/main'
+      if: github.ref != 'refs/heads/main' && steps.download-benchmark.outcome == 'success'
       shell: bash
       run: |
         benchstat main/benchmark.txt ./benchmark.txt > benchstat.txt
@@ -358,6 +360,12 @@ jobs:
           echo "$REGRESSIONS"
           exit 1
         fi
+
+    - name: Skip benchmark comparison (no baseline)
+      if: github.ref != 'refs/heads/main' && steps.download-benchmark.outcome != 'success'
+      shell: bash
+      run: |
+        echo "::notice::Skipping benchmark comparison - no baseline found on main branch. This is expected for new benchmarks."
 
     - name: Save benchmark results for main
       if: github.ref == 'refs/heads/main'
