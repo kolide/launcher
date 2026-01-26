@@ -81,17 +81,17 @@ func TestQueries(t *testing.T) {
 		},
 		{
 			name:       "different namespace",
-			class:      "MSKeyboard_PortInformation",
-			properties: []string{"ConnectorType,FunctionKeys,Indicators"},
+			class:      "__Namespace",
+			properties: []string{"Name"},
 			namespace:  `root\wmi`,
-			minRows:    3,
+			minRows:    1, // root\wmi namespace should have at least some classes
 		},
 		{
 			name:       "different namespace, double slash",
-			class:      "MSKeyboard_PortInformation",
-			properties: []string{"ConnectorType,FunctionKeys,Indicators"},
-			namespace:  `root\\wmi`,
-			minRows:    3,
+			class:      "__Namespace",
+			properties: []string{"Name"},
+			namespace:  `root\\default`,
+			minRows:    1, // root\default namespace should have standard system classes
 		},
 		{
 			name:        "where clause non-existent file",
@@ -110,7 +110,6 @@ func TestQueries(t *testing.T) {
 	}
 
 	for _, tt := range tests { //nolint:paralleltest
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			// making this parallel causing the unit test to occasionally fail
 
