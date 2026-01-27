@@ -142,7 +142,7 @@ jobs:
       run: make deps
 
     - name: Set up zig
-      uses: mlugg/setup-zig@v2
+      uses: mlugg/setup-zig@v2.2.0
 
     - name: Build (debug)
       if: github.ref_type != 'tag'
