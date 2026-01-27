@@ -7,13 +7,13 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 
 	"github.com/fatih/semgroup"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
+	"github.com/spf13/viper"
 	"github.com/zricethezav/gitleaks/v8/config"
 	"github.com/zricethezav/gitleaks/v8/detect"
 	"github.com/zricethezav/gitleaks/v8/report"
@@ -30,28 +30,27 @@ const (
 	redactPrefixLength = 3
 )
 
-// Shared config to avoid concurrent viper initialization issues (gitleaks uses viper internally)
-var (
-	sharedConfig     config.Config
-	sharedConfigOnce sync.Once
-	sharedConfigErr  error
-)
-
-func getSharedConfig() (config.Config, error) {
-	sharedConfigOnce.Do(func() {
-		detector, err := detect.NewDetectorDefaultConfig()
-		if err != nil {
-			sharedConfigErr = err
-			return
-		}
-		sharedConfig = detector.Config
-	})
-	return sharedConfig, sharedConfigErr
+func NewDetectorDefaultConfig() (*detect.Detector, error) {
+	v := viper.New() // init viper here so we don't update a global var
+	v.SetConfigType("toml")
+	err := v.ReadConfig(strings.NewReader(config.DefaultConfig))
+	if err != nil {
+		return nil, err
+	}
+	var vc config.ViperConfig
+	err = v.Unmarshal(&vc)
+	if err != nil {
+		return nil, err
+	}
+	cfg, err := vc.Translate()
+	if err != nil {
+		return nil, err
+	}
+	return detect.NewDetector(cfg), nil
 }
 
 type Table struct {
 	slogger *slog.Logger
-	config  config.Config
 }
 
 func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
@@ -67,18 +66,8 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		table.TextColumn("redacted_secret"),
 	}
 
-	cfg, err := getSharedConfig()
-	if err != nil {
-		slogger.Log(context.TODO(), slog.LevelError,
-			"failed to create gitleaks default config, table will not be available",
-			"err", err,
-		)
-		return nil
-	}
-
 	t := &Table{
 		slogger: slogger.With("table", tableName),
-		config:  cfg,
 	}
 
 	return tablewrapper.New(flags, slogger, tableName, columns, t.generate)
@@ -86,7 +75,10 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	// Fresh detector per query - gitleaks accumulates findings internally
-	detector := detect.NewDetector(t.config)
+	detector, err := NewDetectorDefaultConfig()
+	if err != nil {
+		return nil, fmt.Errorf("creating detector: %w", err)
+	}
 
 	var results []map[string]string
 

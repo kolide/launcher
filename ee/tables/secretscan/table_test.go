@@ -87,12 +87,8 @@ func TestSecretScan(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			cfg, err := getSharedConfig()
-			require.NoError(t, err)
-
 			tbl := &Table{
 				slogger: multislogger.NewNopLogger(),
-				config:  cfg,
 			}
 
 			var queryContext map[string][]string
