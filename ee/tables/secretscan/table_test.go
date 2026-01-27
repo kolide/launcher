@@ -109,6 +109,8 @@ func TestSecretScan(t *testing.T) {
 				queryContext = map[string][]string{"path": {fullPath}}
 			case "raw_data":
 				queryContext = map[string][]string{"raw_data": {tt.targetPath}}
+			default:
+				t.Fatalf("unknown scanType: %s", tt.scanType)
 			}
 
 			results, err := tbl.generate(t.Context(), tablehelpers.MockQueryContext(queryContext))
