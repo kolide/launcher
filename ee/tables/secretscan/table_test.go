@@ -87,7 +87,13 @@ func TestSecretScan(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			tbl := createTestTable(t)
+			cfg, err := getSharedConfig()
+			require.NoError(t, err)
+
+			tbl := &Table{
+				slogger: multislogger.NewNopLogger(),
+				config:  cfg,
+			}
 
 			var queryContext map[string][]string
 
@@ -245,18 +251,6 @@ func extractTestData(tb testing.TB) string {
 	}
 
 	return filepath.Join(tempDir, "test_data")
-}
-
-func createTestTable(t *testing.T) *Table {
-	t.Helper()
-
-	cfg, err := getSharedConfig()
-	require.NoError(t, err)
-
-	return &Table{
-		slogger: multislogger.NewNopLogger(),
-		config:  cfg,
-	}
 }
 
 // Benchmarks
