@@ -254,6 +254,16 @@ func TestOptionsSetControlServerHost(t *testing.T) { // nolint:paralleltest
 			expectedDisableControlTLS:  false,
 		},
 		{
+			testName: "eu",
+			testFlags: []string{
+				"--hostname", "k2device.kolide.eu",
+				"--osqueryd_path", windowsAddExe("/dev/null"),
+			},
+			expectedControlServer:      "k2control.kolide.eu",
+			expectedInsecureControlTLS: false,
+			expectedDisableControlTLS:  false,
+		},
+		{
 			testName: "heroku",
 			testFlags: []string{
 				"--hostname", "test.herokuapp.com",
