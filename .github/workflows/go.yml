@@ -160,7 +160,7 @@ jobs:
         enableCrossOsArchive: true
 
     - name: Attempt to fix permissions prior to step cleanup
-      run: sudo chown -R "$(id -un)":"$(id -gn)" "${{ github.workspace }}"
+      run: chown -R "$(id -un)":"$(id -gn)" "${{ github.workspace }}"
 
   # this job captures the version of launcher on one of the runners then that version is
   # compared to the version of all other runners during exec testing. This is to ensure
