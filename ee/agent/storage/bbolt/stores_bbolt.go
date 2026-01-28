@@ -38,6 +38,7 @@ func MakeStores(ctx context.Context, slogger *slog.Logger, db *bbolt.DB) (map[st
 		storage.EnrollmentStore,
 		storage.EnrollmentDetailsStore,
 		storage.ServerReleaseTrackerDataStore,
+		storage.TranslationsStore,
 	}
 
 	for _, storeName := range storeNames {

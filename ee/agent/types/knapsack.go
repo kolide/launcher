@@ -16,6 +16,7 @@ type Knapsack interface {
 	InstanceQuerier
 	OsqueryInstanceTracker
 	DesktopRunner
+	Translations
 	SetInstanceQuerier(q InstanceQuerier)
 	// OsqueryPublisher returns the osquery publisher client
 	OsqueryPublisher() OsqueryPublisher
@@ -33,4 +34,6 @@ type Knapsack interface {
 	GetEnrollmentDetails() EnrollmentDetails
 	// SetEnrollmentDetails sets the enrollment details for the launcher installation
 	SetEnrollmentDetails(details EnrollmentDetails)
+	// SetTranslations sets the translations for the launcher installation
+	SetTranslations(t Translations)
 }
