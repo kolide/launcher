@@ -130,13 +130,13 @@ jobs:
       uses: actions/cache@v5
       with:
         path: ${{ steps.go-cache-paths.outputs.go-build }}
-        key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
+        key: ${{ runner.os }}-go-build-${{ hashFiles('go.sum') }}
 
     - name: Go Mod Cache
       uses: actions/cache@v5
       with:
         path: ${{ steps.go-cache-paths.outputs.go-mod }}
-        key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
+        key: ${{ runner.os }}-go-mod-${{ hashFiles('go.sum') }}
 
     - name: Get dependencies
       run: make deps
@@ -181,6 +181,7 @@ jobs:
       with:
         path: ./build
         key: ${{ runner.os }}-${{ github.run_id }}
+        fail-on-cache-miss: true # Need launcher build from cache to run it below
         enableCrossOsArchive: true
 
     - id: version
@@ -390,6 +391,7 @@ jobs:
       with:
         path: ./build
         key: ${{ runner.os }}-${{ github.run_id }}
+        fail-on-cache-miss: true # If we can't restore the cache, then we won't have a launcher binary to run below
         enableCrossOsArchive: true
 
     - name: Launcher Version
@@ -467,6 +469,7 @@ jobs:
       with:
         path: ./build
         key: ${{ runner.os }}-${{ github.run_id }}
+        fail-on-cache-miss: true # If we can't restore the cache, then we won't have a launcher binary to run below
         enableCrossOsArchive: true
 
     - name: Launcher Version
@@ -515,6 +518,7 @@ jobs:
       with:
         path: ./build
         key: ${{ matrix.artifactos }}-${{ github.run_id }}
+        fail-on-cache-miss: true # If we can't restore the cache, then we won't have anything to upload
         enableCrossOsArchive: true
 
     - name: Upload Build
