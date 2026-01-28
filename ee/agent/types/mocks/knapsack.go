@@ -2551,6 +2551,11 @@ func (_m *Knapsack) SetTraceSamplingRateOverride(value float64, duration time.Du
 	_m.Called(value, duration)
 }
 
+// SetTranslations provides a mock function with given fields: t
+func (_m *Knapsack) SetTranslations(t types.Translations) {
+	_m.Called(t)
+}
+
 // SetTufServerURL provides a mock function with given fields: url
 func (_m *Knapsack) SetTufServerURL(url string) error {
 	ret := _m.Called(url)
@@ -2880,6 +2885,24 @@ func (_m *Knapsack) TraceSamplingRate() float64 {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(float64)
+	}
+
+	return r0
+}
+
+// Translations provides a mock function with no fields
+func (_m *Knapsack) Translations() types.TranslationsData {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Translations")
+	}
+
+	var r0 types.TranslationsData
+	if rf, ok := ret.Get(0).(func() types.TranslationsData); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(types.TranslationsData)
 	}
 
 	return r0

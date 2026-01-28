@@ -53,6 +53,8 @@ type knapsack struct {
 	desktopRunner types.DesktopRunner
 
 	osqueryPublisher types.OsqueryPublisher
+
+	translations types.Translations
 	// This struct is a work in progress, and will be iteratively added to as needs arise.
 }
 
@@ -420,6 +422,10 @@ func (k *knapsack) EnrollmentDetailsStore() types.KVStore {
 	return k.getKVStore(storage.EnrollmentDetailsStore)
 }
 
+func (k *knapsack) TranslationsStore() types.KVStore {
+	return k.getKVStore(storage.TranslationsStore)
+}
+
 func (k *knapsack) SetLauncherWatchdogDisabled(disabled bool) error {
 	return k.flags.SetLauncherWatchdogDisabled(disabled)
 }
@@ -676,4 +682,16 @@ func (k *knapsack) SetDesktopRunner(runner types.DesktopRunner) {
 
 func (k *knapsack) ServerReleaseTrackerDataStore() types.KVStore {
 	return k.getKVStore(storage.ServerReleaseTrackerDataStore)
+}
+
+func (k *knapsack) Translations() types.TranslationsData {
+	if k.translations == nil {
+		return types.TranslationsData{}
+	}
+
+	return k.translations.Translations()
+}
+
+func (k *knapsack) SetTranslations(t types.Translations) {
+	k.translations = t
 }

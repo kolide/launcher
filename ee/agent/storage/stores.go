@@ -23,6 +23,7 @@ const (
 	RegistrationStore             Store = "registrations"                      // The store used for persisting launcher's enrollments/registrations
 	EnrollmentDetailsStore        Store = "enrollment_details"                 // The store used for persisting enrollment details
 	ServerReleaseTrackerDataStore Store = "kolide_server_release_tracker_data" // The store used for release tracking data sent by control server.
+	TranslationsStore             Store = "translations"                       // The store used for translation data sent by control server.
 )
 
 func (storeType Store) String() string {
