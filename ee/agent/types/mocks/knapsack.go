@@ -6910,6 +6910,46 @@ func (_c *Knapsack_SetTraceSamplingRateOverride_Call) RunAndReturn(run func(valu
 	return _c
 }
 
+// SetTranslations provides a mock function for the type Knapsack
+func (_mock *Knapsack) SetTranslations(t types.Translations) {
+	_mock.Called(t)
+	return
+}
+
+// Knapsack_SetTranslations_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetTranslations'
+type Knapsack_SetTranslations_Call struct {
+	*mock.Call
+}
+
+// SetTranslations is a helper method to define mock.On call
+//   - t types.Translations
+func (_e *Knapsack_Expecter) SetTranslations(t interface{}) *Knapsack_SetTranslations_Call {
+	return &Knapsack_SetTranslations_Call{Call: _e.mock.On("SetTranslations", t)}
+}
+
+func (_c *Knapsack_SetTranslations_Call) Run(run func(t types.Translations)) *Knapsack_SetTranslations_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 types.Translations
+		if args[0] != nil {
+			arg0 = args[0].(types.Translations)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *Knapsack_SetTranslations_Call) Return() *Knapsack_SetTranslations_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *Knapsack_SetTranslations_Call) RunAndReturn(run func(t types.Translations)) *Knapsack_SetTranslations_Call {
+	_c.Run(run)
+	return _c
+}
+
 // SetTufServerURL provides a mock function for the type Knapsack
 func (_mock *Knapsack) SetTufServerURL(url string) error {
 	ret := _mock.Called(url)
@@ -7085,14 +7125,6 @@ type Knapsack_SetUseCachedDataForScheduledQueries_Call struct {
 	*mock.Call
 }
 
-// SetTranslations provides a mock function with given fields: t
-func (_m *Knapsack) SetTranslations(t types.Translations) {
-	_m.Called(t)
-}
-
-// SetTufServerURL provides a mock function with given fields: url
-func (_m *Knapsack) SetTufServerURL(url string) error {
-	ret := _m.Called(url)
 // SetUseCachedDataForScheduledQueries is a helper method to define mock.On call
 //   - enabled bool
 func (_e *Knapsack_Expecter) SetUseCachedDataForScheduledQueries(enabled interface{}) *Knapsack_SetUseCachedDataForScheduledQueries_Call {
@@ -7749,27 +7781,6 @@ func (_mock *Knapsack) TraceSamplingRate() float64 {
 	return r0
 }
 
-// Translations provides a mock function with no fields
-func (_m *Knapsack) Translations() types.TranslationsData {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for Translations")
-	}
-
-	var r0 types.TranslationsData
-	if rf, ok := ret.Get(0).(func() types.TranslationsData); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(types.TranslationsData)
-	}
-
-	return r0
-}
-
-// Transport provides a mock function with no fields
-func (_m *Knapsack) Transport() string {
-	ret := _m.Called()
 // Knapsack_TraceSamplingRate_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TraceSamplingRate'
 type Knapsack_TraceSamplingRate_Call struct {
 	*mock.Call
@@ -7793,6 +7804,50 @@ func (_c *Knapsack_TraceSamplingRate_Call) Return(f float64) *Knapsack_TraceSamp
 }
 
 func (_c *Knapsack_TraceSamplingRate_Call) RunAndReturn(run func() float64) *Knapsack_TraceSamplingRate_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Translations provides a mock function for the type Knapsack
+func (_mock *Knapsack) Translations() types.TranslationsData {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Translations")
+	}
+
+	var r0 types.TranslationsData
+	if returnFunc, ok := ret.Get(0).(func() types.TranslationsData); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(types.TranslationsData)
+	}
+	return r0
+}
+
+// Knapsack_Translations_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Translations'
+type Knapsack_Translations_Call struct {
+	*mock.Call
+}
+
+// Translations is a helper method to define mock.On call
+func (_e *Knapsack_Expecter) Translations() *Knapsack_Translations_Call {
+	return &Knapsack_Translations_Call{Call: _e.mock.On("Translations")}
+}
+
+func (_c *Knapsack_Translations_Call) Run(run func()) *Knapsack_Translations_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Knapsack_Translations_Call) Return(translationsData types.TranslationsData) *Knapsack_Translations_Call {
+	_c.Call.Return(translationsData)
+	return _c
+}
+
+func (_c *Knapsack_Translations_Call) RunAndReturn(run func() types.TranslationsData) *Knapsack_Translations_Call {
 	_c.Call.Return(run)
 	return _c
 }
