@@ -356,6 +356,14 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		controlServerURL = "k2control-preprod.kolide.com"
 		*flKolideHosted = true
 
+	case *flKolideServerURL == "k2device.kolide.eu":
+		controlServerURL = "k2control.kolide.eu"
+		*flKolideHosted = true
+
+	case *flKolideServerURL == "kolide-k2-device.eu.svc.1infra.net":
+		controlServerURL = "kolide-k2-control.eu.svc.1infra.net"
+		*flKolideHosted = true
+
 	case strings.HasSuffix(*flKolideServerURL, "herokuapp.com"):
 		controlServerURL = *flKolideServerURL
 		*flKolideHosted = true
