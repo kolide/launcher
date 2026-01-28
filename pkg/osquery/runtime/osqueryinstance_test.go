@@ -33,7 +33,7 @@ func TestCalculateOsqueryPaths(t *testing.T) {
 	rootDir := t.TempDir()
 
 	runId := ulid.New()
-	paths, err := calculateOsqueryPaths(rootDir, types.DefaultRegistrationID, runId, osqueryOptions{})
+	paths, err := calculateOsqueryPaths(rootDir, types.DefaultEnrollmentID, runId, osqueryOptions{})
 
 	require.NoError(t, err)
 
@@ -74,7 +74,7 @@ func TestCreateOsqueryCommand(t *testing.T) {
 	setupHistory(t, k)
 	lpc := makeTestOsqLogPublisher(t, k)
 
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
+	i := newInstance(types.DefaultEnrollmentID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
 	i.paths = paths
 
 	_, err := i.createOsquerydCommand("") // we do not actually exec so don't need to download a real osquery for this test
@@ -99,7 +99,7 @@ func TestCreateOsqueryCommandWithFlags(t *testing.T) {
 	setupHistory(t, k)
 	lpc := makeTestOsqLogPublisher(t, k)
 
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
+	i := newInstance(types.DefaultEnrollmentID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
 	i.paths = &osqueryFilePaths{}
 
 	cmd, err := i.createOsquerydCommand("") // we do not actually exec so don't need to download a real osquery for this test
@@ -134,7 +134,7 @@ func TestCreateOsqueryCommand_SetsEnabledWatchdogSettingsAppropriately(t *testin
 	setupHistory(t, k)
 	lpc := makeTestOsqLogPublisher(t, k)
 
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
+	i := newInstance(types.DefaultEnrollmentID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
 	i.paths = &osqueryFilePaths{}
 
 	cmd, err := i.createOsquerydCommand("") // we do not actually exec so don't need to download a real osquery for this test
@@ -185,7 +185,7 @@ func TestCreateOsqueryCommand_SetsDisabledWatchdogSettingsAppropriately(t *testi
 	setupHistory(t, k)
 	lpc := makeTestOsqLogPublisher(t, k)
 
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
+	i := newInstance(types.DefaultEnrollmentID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
 	i.paths = &osqueryFilePaths{}
 
 	cmd, err := i.createOsquerydCommand("") // we do not actually exec so don't need to download a real osquery for this test
@@ -226,7 +226,7 @@ func TestHealthy_DoesNotPassForUnlaunchedInstance(t *testing.T) {
 	setupHistory(t, k)
 	lpc := makeTestOsqLogPublisher(t, k)
 
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
+	i := newInstance(types.DefaultEnrollmentID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
 
 	require.Error(t, i.Healthy(), "unlaunched instance should not return healthy status")
 }
@@ -239,7 +239,7 @@ func TestQuery_ReturnsErrorForUnlaunchedInstance(t *testing.T) {
 	setupHistory(t, k)
 	lpc := makeTestOsqLogPublisher(t, k)
 
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
+	i := newInstance(types.DefaultEnrollmentID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
 
 	_, err := i.Query("select * from osquery_info;")
 	require.Error(t, err, "should not be able to query unlaunched instance")
@@ -252,7 +252,7 @@ func Test_healthcheckWithRetries(t *testing.T) {
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	setupHistory(t, k)
 	lpc := makeTestOsqLogPublisher(t, k)
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
+	i := newInstance(types.DefaultEnrollmentID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
 
 	// No client available, so healthcheck should fail despite retries
 	require.Error(t, i.healthcheckWithRetries(t.Context(), 5, 100*time.Millisecond))
@@ -280,8 +280,8 @@ func TestHealthy(t *testing.T) {
 	k.On("Transport").Return("jsonrpc")
 	setUpMockStores(t, k)
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
-	k.On("NodeKey", types.DefaultRegistrationID).Return(ulid.New(), nil).Maybe()
-	k.On("EnsureRegistrationStored", types.DefaultRegistrationID).Return(nil).Maybe()
+	k.On("NodeKey", types.DefaultEnrollmentID).Return(ulid.New(), nil).Maybe()
+	k.On("EnsureEnrollmentStored", types.DefaultEnrollmentID).Return(nil).Maybe()
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("OsqueryHealthcheckStartupDelay").Return(10 * time.Second)
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
@@ -291,7 +291,7 @@ func TestHealthy(t *testing.T) {
 	k.On("UpdateChannel").Return("stable").Maybe()
 	k.On("PinnedLauncherVersion").Return("").Maybe()
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
-	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID}).Maybe()
+	k.On("EnrollmentIDs").Return([]string{types.DefaultEnrollmentID}).Maybe()
 	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
@@ -305,7 +305,7 @@ func TestHealthy(t *testing.T) {
 	lpc := makeTestOsqLogPublisher(t, k)
 
 	// Run the instance
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), lpc, s)
+	i := newInstance(types.DefaultEnrollmentID, k, mockServiceClient(t), lpc, s)
 	go i.Launch()
 
 	// Wait for `Healthy` to pass
@@ -379,8 +379,8 @@ func TestLaunch(t *testing.T) {
 	k.On("Transport").Return("jsonrpc")
 	setUpMockStores(t, k)
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
-	k.On("NodeKey", types.DefaultRegistrationID).Return(ulid.New(), nil).Maybe()
-	k.On("EnsureRegistrationStored", types.DefaultRegistrationID).Return(nil).Maybe()
+	k.On("NodeKey", types.DefaultEnrollmentID).Return(ulid.New(), nil).Maybe()
+	k.On("EnsureEnrollmentStored", types.DefaultEnrollmentID).Return(nil).Maybe()
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("OsqueryHealthcheckStartupDelay").Return(10 * time.Second)
 	k.On("InModernStandby").Return(false).Maybe()
@@ -390,7 +390,7 @@ func TestLaunch(t *testing.T) {
 	k.On("UpdateChannel").Return("stable").Maybe()
 	k.On("PinnedLauncherVersion").Return("").Maybe()
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
-	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID}).Maybe()
+	k.On("EnrollmentIDs").Return([]string{types.DefaultEnrollmentID}).Maybe()
 	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
@@ -404,7 +404,7 @@ func TestLaunch(t *testing.T) {
 	osqHistory := setupHistory(t, k)
 	lpc := makeTestOsqLogPublisher(t, k)
 
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), lpc, s)
+	i := newInstance(types.DefaultEnrollmentID, k, mockServiceClient(t), lpc, s)
 	require.False(t, i.instanceStarted())
 	go i.Launch()
 
@@ -416,7 +416,7 @@ func TestLaunch(t *testing.T) {
 		}
 
 		// Confirm instance setup is complete
-		latestInstanceStats, err := osqHistory.LatestInstanceStats(types.DefaultRegistrationID)
+		latestInstanceStats, err := osqHistory.LatestInstanceStats(types.DefaultEnrollmentID)
 		if err != nil {
 			return fmt.Errorf("collecting latest instance stats: %w", err)
 		}
@@ -472,7 +472,7 @@ func TestReloadKatcExtension(t *testing.T) {
 	require.NoError(t, err)
 	k.On("KatcConfigStore").Return(katcConfigStore).Maybe()
 	k.On("ConfigStore").Return(inmemory.NewStore()).Maybe()
-	k.On("RegistrationStore").Return(inmemory.NewStore()).Maybe()
+	k.On("EnrollmentStore").Return(inmemory.NewStore()).Maybe()
 	k.On("LauncherHistoryStore").Return(inmemory.NewStore()).Maybe()
 	k.On("ServerProvidedDataStore").Return(inmemory.NewStore()).Maybe()
 	k.On("AgentFlagsStore").Return(inmemory.NewStore()).Maybe()
@@ -481,8 +481,8 @@ func TestReloadKatcExtension(t *testing.T) {
 	k.On("ResultLogsStore").Return(inmemory.NewStore()).Maybe()
 	k.On("BboltDB").Return(storageci.SetupDB(t)).Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
-	k.On("NodeKey", types.DefaultRegistrationID).Return(ulid.New(), nil).Maybe()
-	k.On("EnsureRegistrationStored", types.DefaultRegistrationID).Return(nil).Maybe()
+	k.On("NodeKey", types.DefaultEnrollmentID).Return(ulid.New(), nil).Maybe()
+	k.On("EnsureEnrollmentStored", types.DefaultEnrollmentID).Return(nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("OsqueryHealthcheckStartupDelay").Return(10 * time.Second)
@@ -492,7 +492,7 @@ func TestReloadKatcExtension(t *testing.T) {
 	k.On("UpdateChannel").Return("stable").Maybe()
 	k.On("PinnedLauncherVersion").Return("").Maybe()
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
-	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID}).Maybe()
+	k.On("EnrollmentIDs").Return([]string{types.DefaultEnrollmentID}).Maybe()
 	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
@@ -507,7 +507,7 @@ func TestReloadKatcExtension(t *testing.T) {
 	lpc := makeTestOsqLogPublisher(t, k)
 
 	// Create an instance and launch it
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), lpc, s)
+	i := newInstance(types.DefaultEnrollmentID, k, mockServiceClient(t), lpc, s)
 	go i.Launch()
 
 	// Wait for the instance to become healthy
@@ -518,7 +518,7 @@ func TestReloadKatcExtension(t *testing.T) {
 		}
 
 		// Confirm instance setup is complete
-		latestInstanceStats, err := osqHistory.LatestInstanceStats(types.DefaultRegistrationID)
+		latestInstanceStats, err := osqHistory.LatestInstanceStats(types.DefaultEnrollmentID)
 		if err != nil {
 			return fmt.Errorf("collecting latest instance stats: %w", err)
 		}

@@ -26,16 +26,16 @@ func (c *enrollSecretCheckup) Run(_ context.Context, extraFH io.Writer) error {
 	secretStatus := make(map[string]Status, 0)
 	secretSummary := make(map[string]string, 0)
 
-	// Check registrations first -- will only be available if we're running in situ
-	if registrations, err := c.k.Registrations(); err == nil {
-		if len(registrations) == 0 {
-			fmt.Fprint(extraFH, "no registrations found in knapsack")
+	// Check enrollments first -- will only be available if we're running in situ
+	if enrollments, err := c.k.Enrollments(); err == nil {
+		if len(enrollments) == 0 {
+			fmt.Fprint(extraFH, "no enrollments found in knapsack")
 		} else {
-			for i, registration := range registrations {
-				if registration.Munemo != "" {
-					fmt.Fprintf(extraFH, "registration store (%d/%s): %s\n", i, registration.RegistrationID, registration.Munemo)
+			for i, enrollment := range enrollments {
+				if enrollment.Munemo != "" {
+					fmt.Fprintf(extraFH, "enrollment store (%d/%s): %s\n", i, enrollment.EnrollmentID, enrollment.Munemo)
 				} else {
-					fmt.Fprintf(extraFH, "registration store (%d/%s): no munemo set\n", i, registration.RegistrationID)
+					fmt.Fprintf(extraFH, "enrollment store (%d/%s): no munemo set\n", i, enrollment.EnrollmentID)
 				}
 
 			}

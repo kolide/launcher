@@ -77,6 +77,11 @@ type (
 	}
 )
 
+//mockery:generate: true
+//mockery:dir: "{{.InterfaceDir}}"
+//mockery:filename: mock_librarian_test.go
+//mockery:pkgname: tuf
+//mockery:structname: Mocklibrarian
 type librarian interface {
 	Available(binary autoupdatableBinary, targetFilename string) bool
 	AddToLibrary(binary autoupdatableBinary, currentVersion string, targetFilename string, targetMetadata data.TargetFileMeta) error

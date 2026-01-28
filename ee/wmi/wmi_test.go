@@ -100,10 +100,10 @@ func TestQuery(t *testing.T) {
 		},
 		{
 			name:       "different namespace",
-			class:      "MSKeyboard_PortInformation",
-			properties: []string{"ConnectorType", "FunctionKeys", "Indicators"},
+			class:      "__Namespace",
+			properties: []string{"Name"},
 			options:    []Option{ConnectNamespace(`root\wmi`)},
-			minRows:    1,
+			minRows:    1, // root\wmi namespace should have at least some classes
 		},
 		{
 			name:       "where clause",
@@ -130,7 +130,6 @@ func TestQuery(t *testing.T) {
 	}
 
 	for _, tt := range tests { // nolint:paralleltest
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 
 			rows, err := Query(ctx, multislogger.NewNopLogger(), tt.class, tt.properties, tt.options...)

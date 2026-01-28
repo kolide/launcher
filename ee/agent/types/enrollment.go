@@ -7,6 +7,8 @@ const (
 	Unenrolled      EnrollmentStatus = "unenrolled"
 	Enrolled        EnrollmentStatus = "enrolled"
 	Unknown         EnrollmentStatus = "unknown"
+
+	DefaultEnrollmentID = "default"
 )
 
 // EnrollmentDetails is the set of details that are collected from osqueryd
@@ -29,4 +31,26 @@ type EnrollmentDetails struct {
 	GOOS                      string `json:"goos"`
 	GOARCH                    string `json:"goarch"`
 	HardwareUUID              string `json:"hardware_uuid"`
+}
+
+// EnrollmentTracker manages the current set of enrollments for this launcher installation.
+// Right now, the list is hardcoded to only the default enrollment ID. In the future, this
+// data may be provided by e.g. a control server subsystem.
+type EnrollmentTracker interface {
+	EnrollmentIDs() []string
+	Enrollments() ([]Enrollment, error)
+	SaveEnrollment(enrollmentId, munemo, nodeKey, enrollmentSecret string) error
+	EnsureEnrollmentStored(enrollmentId string) error
+	NodeKey(enrollmentId string) (string, error)
+	DeleteEnrollment(enrollmentId string) error
+}
+
+// Enrollment represents a launcher installation's association with a given tenant.
+// For now, until we tackle the multitenancy project, the enrollment ID is always
+// DefaultEnrollmentID, and we expect a launcher installation to have only one enrollment.
+type Enrollment struct {
+	EnrollmentID     string `json:"registration_id"` // Stored under "registration_id" for legacy reasons/backwards compatibility
+	Munemo           string `json:"munemo"`
+	EnrollmentSecret string `json:"enrollment_secret,omitempty"`
+	NodeKey          string `json:"node_key"`
 }

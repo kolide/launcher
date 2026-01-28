@@ -9,7 +9,7 @@ var (
 	EnrollmentSecretTokenKey        = []byte("enrollment_secret") // Enrollment secret set via `launcher enroll`
 
 	// Identifier types in complex keys
-	IdentifierTypeRegistration = []byte("registration")
+	IdentifierTypeEnrollment = []byte("registration") // stored under "registration" for legacy/backwards compatibility reasons
 
 	defaultIdentifier = []byte("default")
 )

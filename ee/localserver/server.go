@@ -34,6 +34,8 @@ var PortList = []int{
 	22322,
 }
 
+//mockery:generate: true
+//mockery:filename: querier.go
 type Querier interface {
 	Query(query string) ([]map[string]string, error)
 }
@@ -61,6 +63,9 @@ const (
 	defaultRateBurst = 2000
 )
 
+//mockery:generate: true
+//mockery:filename: presenceDetector.go
+//mockery:structname: PresenceDetector
 type presenceDetector interface {
 	DetectPresence(reason string, interval time.Duration) (time.Duration, error)
 }
@@ -454,22 +459,22 @@ func (ls *localServer) rateLimitHandler(l *rate.Limiter, next http.Handler) http
 	})
 }
 
-// getMunemoFromKnapsack retrieves the munemo from the stored registrations
+// getMunemoFromKnapsack retrieves the munemo from the stored enrollments
 func getMunemoFromKnapsack(k types.Knapsack) (string, error) {
-	registrations, err := k.Registrations()
+	enrollments, err := k.Enrollments()
 	if err != nil {
-		return "", fmt.Errorf("getting registrations from knapsack: %w", err)
+		return "", fmt.Errorf("getting enrollments from knapsack: %w", err)
 	}
-	if len(registrations) == 0 {
-		return "", errors.New("no registrations in knapsack")
+	if len(enrollments) == 0 {
+		return "", errors.New("no enrollments in knapsack")
 	}
 
-	// For now, we just want the default registration.
-	for _, r := range registrations {
-		if r.RegistrationID == types.DefaultRegistrationID {
-			return r.Munemo, nil
+	// For now, we just want the default enrollment.
+	for _, e := range enrollments {
+		if e.EnrollmentID == types.DefaultEnrollmentID {
+			return e.Munemo, nil
 		}
 	}
 
-	return "", fmt.Errorf("no registration found for `%s` registration ID, cannot find munemo", types.DefaultRegistrationID)
+	return "", fmt.Errorf("no enrollment found for `%s` enrollment ID, cannot find munemo", types.DefaultEnrollmentID)
 }

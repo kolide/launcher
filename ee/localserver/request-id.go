@@ -111,8 +111,8 @@ func (ls *localServer) requestIdHandlerFunc(w http.ResponseWriter, r *http.Reque
 	hostIdentifier := ls.hostIdentifier.Load()
 	if hostIdentifier == "" {
 		// Make a best-effort attempt to fetch the identifier.
-		// Until we tackle multitenancy, we'll use the default registration ID.
-		if updatedHostIdentifier, err := osquery.IdentifierFromDB(ls.knapsack.ConfigStore(), types.DefaultRegistrationID); err == nil {
+		// Until we tackle multitenancy, we'll use the default enrollment ID.
+		if updatedHostIdentifier, err := osquery.IdentifierFromDB(ls.knapsack.ConfigStore(), types.DefaultEnrollmentID); err == nil {
 			hostIdentifier = updatedHostIdentifier
 			ls.hostIdentifier.Store(updatedHostIdentifier)
 		}

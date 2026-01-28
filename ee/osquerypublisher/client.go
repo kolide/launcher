@@ -72,8 +72,8 @@ func NewPublisherHTTPClient() PublisherHTTPClient {
 
 // PublishLogs publishes logs to the agent-ingester service.
 // It returns the response from the agent-ingester service and any error that occurred.
-// In the future we will likely want to pass a registration id in here to allow for selection of
-// the correct agent-ingester token to use. For now, we can use the default registration token.
+// In the future we will likely want to pass an enrollment id in here to allow for selection of
+// the correct agent-ingester token to use. For now, we can use the default enrollment token.
 func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.LogType, logs []string) (*types.OsqueryPublicationResponse, error) {
 	if !lpc.shouldPublishLogs() {
 		return nil, nil
@@ -114,8 +114,8 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 
 // PublishResults publishes results to the agent-ingester service.
 // It returns the response from the agent-ingester service and any error that occurred.
-// In the future we will likely want to pass a registration id in here to allow for selection of
-// the correct agent-ingester token to use. For now, we can use the default registration token.
+// In the future we will likely want to pass an enrollment id in here to allow for selection of
+// the correct agent-ingester token to use. For now, we can use the token associated with the default enrollment.
 func (lpc *LogPublisherClient) PublishResults(ctx context.Context, results []distributed.Result) (*types.OsqueryPublicationResponse, error) {
 	if !lpc.shouldPublishLogs() {
 		return nil, nil
@@ -155,11 +155,11 @@ func (lpc *LogPublisherClient) PublishResults(ctx context.Context, results []dis
 // publish handles the common logic for publishing logs and results to the agent-ingester service. This
 // includes marshalling the payload, fetching the auth token, issuing the request, and handling the response/logging.
 func (lpc *LogPublisherClient) publish(ctx context.Context, slogger *slog.Logger, payload any, publicationPath string) (*types.OsqueryPublicationResponse, error) {
-	// in the future we will want to plumb a registration ID through here, for now just use the default
-	registrationID := types.DefaultRegistrationID
-	authToken := lpc.getTokenForRegistration(registrationID)
+	// in the future we will want to plumb an enrollment ID through here, for now just use the default
+	enrollmentID := types.DefaultEnrollmentID
+	authToken := lpc.getTokenForEnrollment(enrollmentID)
 	if authToken == "" {
-		return nil, fmt.Errorf("no auth token found for registration: %s", registrationID)
+		return nil, fmt.Errorf("no auth token found for enrollment: %s", enrollmentID)
 	}
 
 	requestUUID := uuid.NewForRequest()
@@ -256,7 +256,7 @@ func (lpc *LogPublisherClient) Ping() {
 // refreshTokenCache loads in the agent ingester auth token from the TokenStore and stores it in
 // our locally cached map
 func (lpc *LogPublisherClient) refreshTokenCache() error {
-	// for now we will only see a single token for the default registration, in the future we
+	// for now we will only see a single token for the default enrollment, in the future we
 	// will iterate the TokenStorage and grab everything with a key prefix of storage.AgentIngesterAuthTokenKey
 	newToken, err := lpc.knapsack.TokenStore().Get(storage.AgentIngesterAuthTokenKey)
 	if err != nil || len(newToken) == 0 {
@@ -266,14 +266,14 @@ func (lpc *LogPublisherClient) refreshTokenCache() error {
 	lpc.tokensMutex.Lock()
 	defer lpc.tokensMutex.Unlock()
 
-	lpc.tokens[types.DefaultRegistrationID] = string(newToken)
+	lpc.tokens[types.DefaultEnrollmentID] = string(newToken)
 	return nil
 }
 
-func (lpc *LogPublisherClient) getTokenForRegistration(registrationID string) string {
+func (lpc *LogPublisherClient) getTokenForEnrollment(enrollmentID string) string {
 	lpc.tokensMutex.RLock()
 	defer lpc.tokensMutex.RUnlock()
-	if token, ok := lpc.tokens[registrationID]; ok {
+	if token, ok := lpc.tokens[enrollmentID]; ok {
 		return token
 	}
 

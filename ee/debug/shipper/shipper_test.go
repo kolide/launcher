@@ -34,10 +34,10 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 				k := typesMocks.NewKnapsack(t)
 				k.On("EnrollSecret").Return("")
 				k.On("EnrollSecretPath").Return("")
-				k.On("Registrations").Return([]types.Registration{
+				k.On("Enrollments").Return([]types.Enrollment{
 					{
-						RegistrationID: types.DefaultRegistrationID,
-						Munemo:         "test-munemo",
+						EnrollmentID: types.DefaultEnrollmentID,
+						Munemo:       "test-munemo",
 					},
 				}, nil)
 				return k
@@ -55,7 +55,7 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 				k := typesMocks.NewKnapsack(t)
 				k.On("EnrollSecret").Return("")
 				k.On("EnrollSecretPath").Return("")
-				k.On("Registrations").Return([]types.Registration{}, nil)
+				k.On("Enrollments").Return([]types.Enrollment{}, nil)
 				k.On("RootDirectory").Return(t.TempDir())
 				return k
 			},
@@ -74,10 +74,10 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 
 				k := typesMocks.NewKnapsack(t)
 				k.On("EnrollSecret").Return("enroll_secret_value")
-				k.On("Registrations").Return([]types.Registration{
+				k.On("Enrollments").Return([]types.Enrollment{
 					{
-						RegistrationID: types.DefaultRegistrationID,
-						Munemo:         "test-munemo",
+						EnrollmentID: types.DefaultEnrollmentID,
+						Munemo:       "test-munemo",
 					},
 				}, nil)
 				return k
@@ -174,10 +174,10 @@ func TestShipToS3(t *testing.T) { //nolint:paralleltest
 			mockKnapsack: func(t *testing.T) *typesMocks.Knapsack {
 				k := typesMocks.NewKnapsack(t)
 				k.On("EnrollSecret").Return("enroll_secret_value")
-				k.On("Registrations").Return([]types.Registration{
+				k.On("Enrollments").Return([]types.Enrollment{
 					{
-						RegistrationID: types.DefaultRegistrationID,
-						Munemo:         "test-munemo",
+						EnrollmentID: types.DefaultEnrollmentID,
+						Munemo:       "test-munemo",
 					},
 				}, nil)
 				return k
@@ -193,10 +193,10 @@ func TestShipToS3(t *testing.T) { //nolint:paralleltest
 			mockKnapsack: func(t *testing.T) *typesMocks.Knapsack {
 				k := typesMocks.NewKnapsack(t)
 				k.On("EnrollSecret").Return("enroll_secret_value")
-				k.On("Registrations").Return([]types.Registration{
+				k.On("Enrollments").Return([]types.Enrollment{
 					{
-						RegistrationID: types.DefaultRegistrationID,
-						Munemo:         "test-munemo",
+						EnrollmentID: types.DefaultEnrollmentID,
+						Munemo:       "test-munemo",
 					},
 				}, nil)
 				return k
@@ -212,10 +212,10 @@ func TestShipToS3(t *testing.T) { //nolint:paralleltest
 			mockKnapsack: func(t *testing.T) *typesMocks.Knapsack {
 				k := typesMocks.NewKnapsack(t)
 				k.On("EnrollSecret").Return("enroll_secret_value")
-				k.On("Registrations").Return([]types.Registration{
+				k.On("Enrollments").Return([]types.Enrollment{
 					{
-						RegistrationID: types.DefaultRegistrationID,
-						Munemo:         "test-munemo",
+						EnrollmentID: types.DefaultEnrollmentID,
+						Munemo:       "test-munemo",
 					},
 				}, nil)
 				return k

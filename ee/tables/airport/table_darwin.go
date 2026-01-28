@@ -54,6 +54,9 @@ func (a *airportExecutor) Exec(option string) ([]byte, error) {
 	return tablehelpers.RunSimple(a.ctx, a.slogger, 30, allowedcmd.Airport, []string{"--" + option})
 }
 
+//mockery:generate: true
+//mockery:filename: executor.go
+//mockery:structname: Executor
 type executor interface {
 	Exec(string) ([]byte, error)
 }
