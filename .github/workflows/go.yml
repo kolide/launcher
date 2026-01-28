@@ -159,9 +159,6 @@ jobs:
         key: ${{ runner.os }}-${{ github.run_id }}
         enableCrossOsArchive: true
 
-    - name: Attempt to fix permissions prior to step cleanup
-      run: chown -R "$(id -un)":"$(id -gn)" "${{ github.workspace }}"
-
   # this job captures the version of launcher on one of the runners then that version is
   # compared to the version of all other runners during exec testing. This is to ensure
   # that the version of launcher is the same across all runners. We run this job in a container
