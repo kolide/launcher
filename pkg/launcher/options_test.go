@@ -345,7 +345,6 @@ func getArgsAndResponse() (map[string]string, *Options) {
 		TufServerURL:                    "https://tuf.kolide.com",
 		OsquerydPath:                    windowsAddExe("/dev/null"),
 		OsqueryHealthcheckStartupDelay:  10 * time.Minute,
-		Transport:                       "jsonrpc",
 		UpdateChannel:                   "stable",
 		DelayStart:                      0 * time.Second,
 		WatchdogEnabled:                 false,

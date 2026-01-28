@@ -128,8 +128,6 @@ func TestControllerStringFlags(t *testing.T) {
 				assert.Equal(t, expectedValue, value)
 				value = fc.RootPEM()
 				assert.Equal(t, expectedValue, value)
-				value = fc.Transport()
-				assert.Equal(t, expectedValue, value)
 			}
 
 			assertGettersValues("")

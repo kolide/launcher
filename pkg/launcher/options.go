@@ -49,9 +49,6 @@ type Options struct {
 	// EnableInitialRunner enables running scheduled queries immediately
 	// (before first schedule interval passes).
 	EnableInitialRunner bool
-	// Transport the transport that should be used for remote
-	// communication.
-	Transport string
 	// LogMaxBytesPerBatch sets the maximum bytes allowed in a batch
 	// of log. When blank, launcher will pick a value
 	// appropriate for the transport.
@@ -210,7 +207,6 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		flInitialRunner                   = flagset.Bool("with_initial_runner", false, "Run differential queries from config ahead of scheduled interval.")
 		flKolideServerURL                 = flagset.String("hostname", "", "The hostname of the gRPC server")
 		flKolideHosted                    = flagset.Bool("kolide_hosted", false, "Use Kolide SaaS settings for defaults")
-		flTransport                       = flagset.String("transport", "jsonrpc", "The transport protocol that should be used to communicate with remote (default: jsonrpc)")
 		flLoggingInterval                 = flagset.Duration("logging_interval", 60*time.Second, "The interval at which logs should be flushed to the server")
 		flOsquerydPath                    = flagset.String("osqueryd_path", "", "Path to the osqueryd binary to use (Default: find osqueryd in $PATH)")
 		flOsqueryHealthcheckStartupDelay  = flagset.Duration("osquery_healthcheck_startup_delay", 10*time.Minute, "time to wait before beginning osquery healthchecks")
@@ -267,6 +263,7 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		_ = flagset.String("distributed_tls_read_endpoint", "", "DEPRECATED")
 		_ = flagset.String("distributed_tls_write_endpoint", "", "DEPRECATED")
 		_ = flagset.Int64("compactdb-max-tx", 65536, "DEPRECATED") // moved to new flagset inside compactdb command
+		_ = flagset.String("transport", "jsonrpc", "DEPRECATED")   // we always do jsonrpc
 	)
 
 	flagset.Var(&flOsqueryFlags, "osquery_flag", "Flags to pass to osquery (possibly overriding Launcher defaults)")
@@ -428,7 +425,6 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		RootDirectory:                   *flRootDirectory,
 		RootPEM:                         *flRootPEM,
 		TraceSamplingRate:               *flTraceSamplingRate,
-		Transport:                       *flTransport,
 		UpdateChannel:                   updateChannel,
 		UpdateDirectory:                 *flUpdateDirectory,
 		WatchdogDelaySec:                *flWatchdogDelaySec,

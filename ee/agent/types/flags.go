@@ -54,10 +54,6 @@ type Flags interface {
 	// (before first schedule interval passes).
 	EnableInitialRunner() bool
 
-	// Transport the transport that should be used for remote
-	// communication.
-	Transport() string
-
 	// LogMaxBytesPerBatch sets the maximum bytes allowed in a batch
 	// of log. When blank, launcher will pick a value
 	// appropriate for the transport.

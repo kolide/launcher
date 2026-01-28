@@ -677,23 +677,9 @@ func (i *OsqueryInstance) startKolideSaasExtension(ctx context.Context) error {
 	// not be able to send the data over a low bandwidth
 	// connection before the connection is timed out.
 	//
-	// The logic for setting this is spread out. The underlying
-	// extension defaults to 3mb, to support GRPC's hardcoded 4MB
-	// limit. But as we're transport aware here. we can set it to
-	// 5MB for others.
-	if i.knapsack.LogMaxBytesPerBatch() != 0 {
-		if i.knapsack.Transport() == "grpc" && i.knapsack.LogMaxBytesPerBatch() > 3 {
-			i.slogger.Log(ctx, slog.LevelInfo,
-				"LogMaxBytesPerBatch is set above the grpc recommended maximum of 3. Expect errors",
-				"log_max_bytes_per_batch", i.knapsack.LogMaxBytesPerBatch(),
-			)
-		}
-		extOpts.MaxBytesPerBatch = i.knapsack.LogMaxBytesPerBatch() << 20
-	} else if i.knapsack.Transport() == "grpc" {
-		extOpts.MaxBytesPerBatch = 3 << 20
-	} else if i.knapsack.Transport() != "grpc" {
-		extOpts.MaxBytesPerBatch = 5 << 20
-	}
+	// We only support jsonrpc currently, so we set the max bytes per batch
+	// to 5MB, since we don't have to worry about grpc limits.
+	extOpts.MaxBytesPerBatch = 5 << 20
 
 	// Create the extension
 	var err error
