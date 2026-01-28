@@ -8,7 +8,6 @@ import (
 	"crypto/x509"
 	"errors"
 	"log/slog"
-	"net/url"
 
 	"github.com/kolide/launcher/ee/agent/types"
 )
@@ -16,18 +15,6 @@ import (
 func makeTLSConfig(k types.Knapsack, rootPool *x509.CertPool) *tls.Config {
 
 	hostname := k.KolideServerURL()
-	if k.Transport() == "grpc" {
-		// gRPC doesn't use the port for TLS verification. So we strip it here.
-		u, err := url.Parse(k.KolideServerURL())
-		if err != nil {
-			k.Slogger().Log(context.TODO(), slog.LevelError,
-				"failed to parse server URL",
-				"err", err,
-			)
-			return nil
-		}
-		hostname = u.Hostname()
-	}
 
 	conf := &tls.Config{
 		ServerName:         hostname,

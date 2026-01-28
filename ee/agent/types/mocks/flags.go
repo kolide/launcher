@@ -5763,50 +5763,6 @@ func (_c *Flags_TraceSamplingRate_Call) RunAndReturn(run func() float64) *Flags_
 	return _c
 }
 
-// Transport provides a mock function for the type Flags
-func (_mock *Flags) Transport() string {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for Transport")
-	}
-
-	var r0 string
-	if returnFunc, ok := ret.Get(0).(func() string); ok {
-		r0 = returnFunc()
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-	return r0
-}
-
-// Flags_Transport_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Transport'
-type Flags_Transport_Call struct {
-	*mock.Call
-}
-
-// Transport is a helper method to define mock.On call
-func (_e *Flags_Expecter) Transport() *Flags_Transport_Call {
-	return &Flags_Transport_Call{Call: _e.mock.On("Transport")}
-}
-
-func (_c *Flags_Transport_Call) Run(run func()) *Flags_Transport_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *Flags_Transport_Call) Return(s string) *Flags_Transport_Call {
-	_c.Call.Return(s)
-	return _c
-}
-
-func (_c *Flags_Transport_Call) RunAndReturn(run func() string) *Flags_Transport_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // TufServerURL provides a mock function for the type Flags
 func (_mock *Flags) TufServerURL() string {
 	ret := _mock.Called()
