@@ -181,6 +181,7 @@ jobs:
       with:
         path: ./build
         key: ${{ runner.os }}-${{ github.run_id }}
+        fail-on-cache-miss: true # Need launcher build from cache to run it below
         enableCrossOsArchive: true
 
     - id: version
