@@ -46,13 +46,13 @@ jobs:
         echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
 
     - name: Go Build Cache
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ${{ steps.go-cache-paths.outputs.go-build }}
         key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
 
     - name: Go Mod Cache
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ${{ steps.go-cache-paths.outputs.go-mod }}
         key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
@@ -83,7 +83,7 @@ jobs:
       if: ${{ contains(matrix.os, 'macos') }}
 
     - name: Cache build output
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ./build
         key: ${{ runner.os }}-${{ github.run_id }}
@@ -127,16 +127,16 @@ jobs:
         echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
 
     - name: Go Build Cache
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ${{ steps.go-cache-paths.outputs.go-build }}
-        key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
+        key: ${{ runner.os }}-go-build-${{ hashFiles('go.sum') }}
 
     - name: Go Mod Cache
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ${{ steps.go-cache-paths.outputs.go-mod }}
-        key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
+        key: ${{ runner.os }}-go-mod-${{ hashFiles('go.sum') }}
 
     - name: Get dependencies
       run: make deps
@@ -153,7 +153,7 @@ jobs:
       run: make -j2 github-build
 
     - name: Cache build output
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ./build
         key: ${{ runner.os }}-${{ github.run_id }}
@@ -177,10 +177,11 @@ jobs:
         apt-get -y update
         apt-get -y install zstd
     - name: cache restore build output
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: ./build
         key: ${{ runner.os }}-${{ github.run_id }}
+        fail-on-cache-miss: true # Need launcher build from cache to run it below
         enableCrossOsArchive: true
 
     - id: version
@@ -217,7 +218,7 @@ jobs:
         cache: false
 
     - name: cache restore - build
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: ./build
         key: ${{ runner.os }}-${{ github.run_id }}
@@ -230,14 +231,14 @@ jobs:
         echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
 
     - name: cache restore - GOCACHE
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: ${{ steps.go-cache-paths.outputs.go-build }}
         key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
         enableCrossOsArchive: true
 
     - name: cache restore - GOMODCACHE
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: ${{ steps.go-cache-paths.outputs.go-mod }}
         key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
@@ -281,7 +282,7 @@ jobs:
         cache: false
 
     - name: cache restore - build
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: ./build
         key: ${{ runner.os }}-${{ github.run_id }}
@@ -294,14 +295,14 @@ jobs:
         echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
 
     - name: cache restore - GOCACHE
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: ${{ steps.go-cache-paths.outputs.go-build }}
         key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
         enableCrossOsArchive: true
 
     - name: cache restore - GOMODCACHE
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: ${{ steps.go-cache-paths.outputs.go-mod }}
         key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
@@ -394,10 +395,11 @@ jobs:
       - build # need the other builds too
     steps:
     - name: cache restore build output
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: ./build
         key: ${{ runner.os }}-${{ github.run_id }}
+        fail-on-cache-miss: true # If we can't restore the cache, then we won't have a launcher binary to run below
         enableCrossOsArchive: true
 
     - name: Launcher Version
@@ -471,10 +473,11 @@ jobs:
         fi
 
     - name: cache restore build output
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: ./build
         key: ${{ runner.os }}-${{ github.run_id }}
+        fail-on-cache-miss: true # If we can't restore the cache, then we won't have a launcher binary to run below
         enableCrossOsArchive: true
 
     - name: Launcher Version
@@ -519,10 +522,11 @@ jobs:
       - container_exec_testing
     steps:
     - name: cache restore build output
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: ./build
         key: ${{ matrix.artifactos }}-${{ github.run_id }}
+        fail-on-cache-miss: true # If we can't restore the cache, then we won't have anything to upload
         enableCrossOsArchive: true
 
     - name: Upload Build
@@ -561,13 +565,13 @@ jobs:
         echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
 
     - name: Go Build Cache
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ${{ steps.go-cache-paths.outputs.go-build }}
         key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
 
     - name: Go Mod Cache
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ${{ steps.go-cache-paths.outputs.go-mod }}
         key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
