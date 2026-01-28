@@ -667,19 +667,10 @@ func (i *OsqueryInstance) startKolideSaasExtension(ctx context.Context) error {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
-	// create the osquery extension
 	extOpts := launcherosq.ExtensionOpts{
-		LoggingInterval: i.knapsack.LoggingInterval(),
+		LoggingInterval:  i.knapsack.LoggingInterval(),
+		MaxBytesPerBatch: i.knapsack.LogMaxBytesPerBatch(),
 	}
-
-	// Setting MaxBytesPerBatch is a tradeoff. If it's too low, we
-	// can never send a large result. But if it's too high, we may
-	// not be able to send the data over a low bandwidth
-	// connection before the connection is timed out.
-	//
-	// We only support jsonrpc currently, so we set the max bytes per batch
-	// to 5MB, since we don't have to worry about grpc limits.
-	extOpts.MaxBytesPerBatch = 5 << 20
 
 	// Create the extension
 	var err error

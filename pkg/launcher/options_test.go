@@ -338,6 +338,7 @@ func getArgsAndResponse() (map[string]string, *Options) {
 		ExportTraces:                    false,
 		TraceSamplingRate:               0.0,
 		LogIngestServerURL:              "",
+		LogMaxBytesPerBatch:             3 << 20,
 		DisableTraceIngestTLS:           false,
 		KolideServerURL:                 randomHostname,
 		LoggingInterval:                 time.Duration(randomInt) * time.Second,

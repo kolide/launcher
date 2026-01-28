@@ -50,8 +50,7 @@ type Options struct {
 	// (before first schedule interval passes).
 	EnableInitialRunner bool
 	// LogMaxBytesPerBatch sets the maximum bytes allowed in a batch
-	// of log. When blank, launcher will pick a value
-	// appropriate for the transport.
+	// of log. When blank, launcher will default to 3MB.
 	LogMaxBytesPerBatch int
 
 	// Control enables the remote control functionality. It is not in use.
@@ -217,7 +216,7 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		flRootDirectory                   = flagset.String("root_directory", DefaultRootDirectoryPath, "The location of the local database, pidfiles, etc.")
 		flRootPEM                         = flagset.String("root_pem", "", "Path to PEM file including root certificates to verify against")
 		flVersion                         = flagset.Bool("version", false, "Print Launcher version and exit")
-		flLogMaxBytesPerBatch             = flagset.Int("log_max_bytes_per_batch", 0, "Maximum size of a batch of logs. Recommend leaving unset, and launcher will determine")
+		flLogMaxBytesPerBatch             = flagset.Int("log_max_bytes_per_batch", 3<<20, "Maximum size of a batch of logs (default 3MB)")
 		flOsqueryFlags                    ArrayFlags // set below with flagset.Var
 		flConfigFilePath                  = flagset.String("config", DefaultConfigFilePath, "config file to parse options from (optional)")
 		flExportTraces                    = flagset.Bool("export_traces", false, "Whether to export traces")

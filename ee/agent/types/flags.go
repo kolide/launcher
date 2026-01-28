@@ -55,8 +55,7 @@ type Flags interface {
 	EnableInitialRunner() bool
 
 	// LogMaxBytesPerBatch sets the maximum bytes allowed in a batch
-	// of log. When blank, launcher will pick a value
-	// appropriate for the transport.
+	// of log. When blank, launcher will default to 3MB.
 	LogMaxBytesPerBatch() int
 
 	// DesktopEnabled causes the launcher desktop process and GUI to be enabled.
