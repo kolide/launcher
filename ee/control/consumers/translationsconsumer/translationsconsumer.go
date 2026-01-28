@@ -31,8 +31,6 @@ func NewTranslationsConsumer(slogger *slog.Logger, kvStore types.KVStore) (*Tran
 			"error loading translations from store",
 			"err", err,
 		)
-
-		return translations, nil
 	}
 
 	return translations, nil
