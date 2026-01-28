@@ -384,7 +384,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	windowsUpdatesCacher := windowsupdatetable.NewWindowsUpdatesCacher(k, k.WindowsUpdatesCacheStore(), 1*time.Hour, k.Slogger())
 	runGroup.Add("windowsUpdatesCacher", windowsUpdatesCacher.Execute, windowsUpdatesCacher.Interrupt)
 
-	var client service.KolideService = service.NewJSONRPCClient(k, rootPool)
+	client := service.NewJSONRPCClient(k, rootPool)
 
 	// make sure keys exist -- we expect these keys to exist before rungroup starts
 	if err := agent.SetupKeys(ctx, k.Slogger(), k.ConfigStore()); err != nil {
