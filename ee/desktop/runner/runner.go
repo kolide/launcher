@@ -135,9 +135,6 @@ type DesktopUsersProcessesRunner struct {
 	// due to needing to build the binary to test as a result of some test harness weirdness.
 	// See runner_test.go for more details.
 	executablePath string
-	// hostname is the host that launcher is connecting to. It gets passed to the desktop process
-	// and is used to determine which icon to display
-	hostname string
 	// userServerAuthToken is the auth token to use when connecting to the launcher user server
 	userServerAuthToken string
 	// usersFilesRoot is the launcher root dir with will be the parent dir
@@ -184,7 +181,6 @@ func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUser
 		menuRefreshInterval: k.DesktopMenuRefreshInterval(),
 		procsWg:             &sync.WaitGroup{},
 		interruptTimeout:    time.Second * 5,
-		hostname:            k.KolideServerURL(),
 		usersFilesRoot:      agent.TempPath("kolide-desktop"),
 		knapsack:            k,
 		cachedMenuData:      newMenuItemCache(),
@@ -209,6 +205,8 @@ func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUser
 	runner.knapsack.RegisterChangeObserver(runner, keys.DesktopUpdateInterval)
 	// Observe DesktopGoMaxProcs changes to restart processes with new GOMAXPROCS limit
 	runner.knapsack.RegisterChangeObserver(runner, keys.DesktopGoMaxProcs)
+	// Observe KolideServerURL changes to update the hostname displayed in the debug menu
+	runner.knapsack.RegisterChangeObserver(runner, keys.KolideServerURL)
 
 	rs, err := runnerserver.New(runner.slogger, k, messenger)
 	if err != nil {
@@ -585,6 +583,11 @@ func (r *DesktopUsersProcessesRunner) FlagsChanged(ctx context.Context, flagKeys
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
+	// Handle KolideServerURL changes -- update the hostname displayed in the debug menu
+	if slices.Contains(flagKeys, keys.KolideServerURL) {
+		r.refreshMenu()
+	}
+
 	// Handle DesktopUpdateInterval changes
 	if slices.Contains(flagKeys, keys.DesktopUpdateInterval) {
 		r.updateIntervalChanged(ctx, r.knapsack.DesktopUpdateInterval())
@@ -734,7 +737,7 @@ func (r *DesktopUsersProcessesRunner) generateMenuFile() error {
 		menu.LauncherVersion:    v.Version,
 		menu.LauncherRevision:   v.Revision,
 		menu.GoVersion:          v.GoVersion,
-		menu.ServerHostname:     r.hostname,
+		menu.ServerHostname:     r.knapsack.KolideServerURL(),
 		menu.LastMenuUpdateTime: info.ModTime().Unix(),
 		menu.MenuVersion:        menu.CurrentMenuVersion,
 	}
