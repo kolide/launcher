@@ -6,6 +6,7 @@ package service
 import (
 	"context"
 
+	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	"github.com/osquery/osquery-go/plugin/logger"
 )
@@ -26,4 +27,6 @@ type KolideService interface {
 	PublishResults(ctx context.Context, nodeKey string, results []distributed.Result) (string, string, bool, error)
 	// CheckHealth returns the status of the remote API, with 1 indicating OK status.
 	CheckHealth(ctx context.Context) (int32, error)
+	// FlagsChanged responds to change in device server URL
+	FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey)
 }

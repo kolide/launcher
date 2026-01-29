@@ -8,9 +8,11 @@ import (
 	"testing"
 
 	"github.com/go-kit/kit/transport/http/jsonrpc"
+	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/osquery/osquery-go/plugin/logger"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -90,6 +92,7 @@ func TestDeviceDisabled(t *testing.T) {
 			mockKnapsack.On("KolideServerURL").Return(u.Host)
 			mockKnapsack.On("InsecureTransportTLS").Return(true)
 			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.KolideServerURL).Return()
 
 			clients := []KolideService{
 				NewJSONRPCClient(mockKnapsack, nil),
