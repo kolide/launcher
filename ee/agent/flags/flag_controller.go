@@ -279,12 +279,6 @@ func (fc *FlagController) EnableInitialRunner() bool {
 		get(nil)
 }
 
-func (fc *FlagController) Transport() string {
-	return NewStringFlagValue(
-		WithDefaultString(fc.cmdLineOpts.Transport),
-	).get(nil)
-}
-
 func (fc *FlagController) LogMaxBytesPerBatch() int {
 	return fc.cmdLineOpts.LogMaxBytesPerBatch
 }

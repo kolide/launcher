@@ -49,12 +49,8 @@ type Options struct {
 	// EnableInitialRunner enables running scheduled queries immediately
 	// (before first schedule interval passes).
 	EnableInitialRunner bool
-	// Transport the transport that should be used for remote
-	// communication.
-	Transport string
 	// LogMaxBytesPerBatch sets the maximum bytes allowed in a batch
-	// of log. When blank, launcher will pick a value
-	// appropriate for the transport.
+	// of log. When blank, launcher will default to 3MB.
 	LogMaxBytesPerBatch int
 
 	// Control enables the remote control functionality. It is not in use.
@@ -210,7 +206,6 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		flInitialRunner                   = flagset.Bool("with_initial_runner", false, "Run differential queries from config ahead of scheduled interval.")
 		flKolideServerURL                 = flagset.String("hostname", "", "The hostname of the gRPC server")
 		flKolideHosted                    = flagset.Bool("kolide_hosted", false, "Use Kolide SaaS settings for defaults")
-		flTransport                       = flagset.String("transport", "jsonrpc", "The transport protocol that should be used to communicate with remote (default: jsonrpc)")
 		flLoggingInterval                 = flagset.Duration("logging_interval", 60*time.Second, "The interval at which logs should be flushed to the server")
 		flOsquerydPath                    = flagset.String("osqueryd_path", "", "Path to the osqueryd binary to use (Default: find osqueryd in $PATH)")
 		flOsqueryHealthcheckStartupDelay  = flagset.Duration("osquery_healthcheck_startup_delay", 10*time.Minute, "time to wait before beginning osquery healthchecks")
@@ -221,7 +216,7 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		flRootDirectory                   = flagset.String("root_directory", DefaultRootDirectoryPath, "The location of the local database, pidfiles, etc.")
 		flRootPEM                         = flagset.String("root_pem", "", "Path to PEM file including root certificates to verify against")
 		flVersion                         = flagset.Bool("version", false, "Print Launcher version and exit")
-		flLogMaxBytesPerBatch             = flagset.Int("log_max_bytes_per_batch", 0, "Maximum size of a batch of logs. Recommend leaving unset, and launcher will determine")
+		flLogMaxBytesPerBatch             = flagset.Int("log_max_bytes_per_batch", 3<<20, "Maximum size of a batch of logs (default 3MB)")
 		flOsqueryFlags                    ArrayFlags // set below with flagset.Var
 		flConfigFilePath                  = flagset.String("config", DefaultConfigFilePath, "config file to parse options from (optional)")
 		flExportTraces                    = flagset.Bool("export_traces", false, "Whether to export traces")
@@ -267,6 +262,7 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		_ = flagset.String("distributed_tls_read_endpoint", "", "DEPRECATED")
 		_ = flagset.String("distributed_tls_write_endpoint", "", "DEPRECATED")
 		_ = flagset.Int64("compactdb-max-tx", 65536, "DEPRECATED") // moved to new flagset inside compactdb command
+		_ = flagset.String("transport", "jsonrpc", "DEPRECATED")   // we always do jsonrpc
 	)
 
 	flagset.Var(&flOsqueryFlags, "osquery_flag", "Flags to pass to osquery (possibly overriding Launcher defaults)")
@@ -428,7 +424,6 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		RootDirectory:                   *flRootDirectory,
 		RootPEM:                         *flRootPEM,
 		TraceSamplingRate:               *flTraceSamplingRate,
-		Transport:                       *flTransport,
 		UpdateChannel:                   updateChannel,
 		UpdateDirectory:                 *flUpdateDirectory,
 		WatchdogDelaySec:                *flWatchdogDelaySec,
