@@ -19,6 +19,7 @@ import (
 
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/observability"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
@@ -29,6 +30,7 @@ type HTTPClient struct {
 	baseURL     *url.URL
 	baseURLLock *sync.RWMutex
 	client      *http.Client
+	k           types.Knapsack
 	insecure    bool
 	disableTLS  bool
 	token       string
@@ -52,8 +54,8 @@ type configResponse struct {
 	Config json.RawMessage `json:"config"`
 }
 
-func NewControlHTTPClient(addr string, client *http.Client, logger *slog.Logger, opts ...HTTPClientOption) (*HTTPClient, error) {
-	baseURL, err := url.Parse(fmt.Sprintf("https://%s", addr))
+func NewControlHTTPClient(client *http.Client, k types.Knapsack, logger *slog.Logger, opts ...HTTPClientOption) (*HTTPClient, error) {
+	baseURL, err := url.Parse(fmt.Sprintf("https://%s", k.ControlServerURL()))
 	if err != nil {
 		return nil, fmt.Errorf("parsing URL: %w", err)
 	}
@@ -61,7 +63,8 @@ func NewControlHTTPClient(addr string, client *http.Client, logger *slog.Logger,
 		baseURL:     baseURL,
 		baseURLLock: &sync.RWMutex{},
 		client:      client,
-		addr:        addr,
+		k:           k,
+		addr:        k.ControlServerURL(),
 		slogger:     logger,
 	}
 
