@@ -19,14 +19,15 @@ import (
 
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/observability"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"golang.org/x/exp/slices"
 )
 
 // HTTPClient handles retrieving control data via HTTP
 type HTTPClient struct {
-	addr        string
 	baseURL     *url.URL
 	baseURLLock *sync.RWMutex
 	client      *http.Client
@@ -64,7 +65,6 @@ func NewControlHTTPClient(client *http.Client, k types.Knapsack, logger *slog.Lo
 		baseURLLock: &sync.RWMutex{},
 		client:      client,
 		k:           k,
-		addr:        k.ControlServerURL(),
 		slogger:     logger,
 	}
 
@@ -73,6 +73,9 @@ func NewControlHTTPClient(client *http.Client, k types.Knapsack, logger *slog.Lo
 	}
 
 	c.client.Transport = otelhttp.NewTransport(c.client.Transport)
+
+	// The knapsack should notify us if the control server URL changes (e.g. if our region is updated)
+	k.RegisterChangeObserver(c, keys.ControlServerURL)
 
 	return c, nil
 }
@@ -282,6 +285,37 @@ func (c *HTTPClient) url(path string) *url.URL {
 	u := *c.baseURL
 	u.Path = path
 	return &u
+}
+
+// FlagsChanged satisfies the types.FlagsChangeObserver interface -- it handles changes
+// in the control server URL.
+func (c *HTTPClient) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
+	ctx, span := observability.StartSpan(ctx)
+	defer span.End()
+
+	if !slices.Contains(flagKeys, keys.ControlServerURL) {
+		return
+	}
+
+	scheme := "https"
+	if c.disableTLS {
+		scheme = "http"
+	}
+
+	baseURL, err := url.Parse(fmt.Sprintf("%s://%s", scheme, c.k.ControlServerURL()))
+	if err != nil {
+		c.slogger.Log(ctx, slog.LevelError,
+			"could not parse updated control server URL",
+			"err", err,
+			"url", c.k.ControlServerURL(),
+		)
+		return
+	}
+
+	// Update base URL
+	c.baseURLLock.Lock()
+	defer c.baseURLLock.Unlock()
+	c.baseURL = baseURL
 }
 
 func signatureHeaderValue(k crypto.Signer, challenge []byte) (string, error) {
