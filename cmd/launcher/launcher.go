@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/x509"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -387,17 +386,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	windowsUpdatesCacher := windowsupdatetable.NewWindowsUpdatesCacher(k, k.WindowsUpdatesCacheStore(), 1*time.Hour, k.Slogger())
 	runGroup.Add("windowsUpdatesCacher", windowsUpdatesCacher.Execute, windowsUpdatesCacher.Interrupt)
 
-	var client service.KolideService
-	{
-		switch k.Transport() {
-		case "jsonrpc":
-			client = service.NewJSONRPCClient(k, rootPool)
-		case "osquery":
-			client = service.NewNoopClient(logger)
-		default:
-			return errors.New("invalid transport option selected")
-		}
-	}
+	client := service.NewJSONRPCClient(k, rootPool)
 
 	// make sure keys exist -- we expect these keys to exist before rungroup starts
 	if err := agent.SetupKeys(ctx, k.Slogger(), k.ConfigStore()); err != nil {

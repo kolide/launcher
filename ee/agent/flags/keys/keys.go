@@ -12,7 +12,6 @@ type FlagKey string
 const (
 	KolideServerURL                  FlagKey = "hostname"
 	KolideHosted                     FlagKey = "kolide_hosted"
-	Transport                        FlagKey = "transport"
 	LoggingInterval                  FlagKey = "logging_interval"
 	OsquerydPath                     FlagKey = "osqueryd_path"
 	OsqueryHealthcheckStartupDelay   FlagKey = "osquery_healthcheck_startup_delay"
