@@ -56,6 +56,7 @@ type configResponse struct {
 }
 
 func NewControlHTTPClient(client *http.Client, k types.Knapsack, logger *slog.Logger, opts ...HTTPClientOption) (*HTTPClient, error) {
+	// `opts` can override https => http later
 	baseURL, err := url.Parse(fmt.Sprintf("https://%s", k.ControlServerURL()))
 	if err != nil {
 		return nil, fmt.Errorf("parsing URL: %w", err)
