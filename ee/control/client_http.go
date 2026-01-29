@@ -299,7 +299,7 @@ func (c *HTTPClient) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey)
 	}
 
 	scheme := "https"
-	if c.disableTLS {
+	if c.k.DisableControlTLS() {
 		scheme = "http"
 	}
 

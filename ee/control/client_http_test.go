@@ -18,9 +18,10 @@ func TestFlagsChanged(t *testing.T) {
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlServerURL).Return()
 	mockKnapsack.On("ControlServerURL").Return("example.com").Once() // only once, so that we can test updating the URL
+	mockKnapsack.On("DisableControlTLS").Return(false)
 
 	// Set up control client
-	testClient, err := NewControlHTTPClient(http.DefaultClient, mockKnapsack, multislogger.NewNopLogger())
+	testClient, err := NewControlHTTPClient(&http.Client{}, mockKnapsack, multislogger.NewNopLogger())
 	require.NoError(t, err, "initializing control client")
 
 	// Trigger flag change
@@ -44,9 +45,10 @@ func TestFlagsChanged_WithDisableTLS(t *testing.T) {
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlServerURL).Return()
 	mockKnapsack.On("ControlServerURL").Return("example.com").Once() // only once, so that we can test updating the URL
+	mockKnapsack.On("DisableControlTLS").Return(true)
 
 	// Set up control client
-	testClient, err := NewControlHTTPClient(http.DefaultClient, mockKnapsack, multislogger.NewNopLogger(), WithDisableTLS())
+	testClient, err := NewControlHTTPClient(&http.Client{}, mockKnapsack, multislogger.NewNopLogger(), WithDisableTLS())
 	require.NoError(t, err, "initializing control client")
 
 	// Trigger flag change
