@@ -65,7 +65,7 @@ func NewControlHTTPClient(client *http.Client, k types.Knapsack, logger *slog.Lo
 		baseURLLock: &sync.RWMutex{},
 		client:      client,
 		k:           k,
-		slogger:     logger,
+		slogger:     logger.With("component", "control_http_client"),
 	}
 
 	for _, opt := range opts {
