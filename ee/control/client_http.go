@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/kolide/krypto/pkg/echelper"
@@ -24,13 +25,14 @@ import (
 
 // HTTPClient handles retrieving control data via HTTP
 type HTTPClient struct {
-	addr       string
-	baseURL    *url.URL
-	client     *http.Client
-	insecure   bool
-	disableTLS bool
-	token      string
-	slogger    *slog.Logger
+	addr        string
+	baseURL     *url.URL
+	baseURLLock *sync.RWMutex
+	client      *http.Client
+	insecure    bool
+	disableTLS  bool
+	token       string
+	slogger     *slog.Logger
 }
 
 const (
@@ -56,10 +58,11 @@ func NewControlHTTPClient(addr string, client *http.Client, logger *slog.Logger,
 		return nil, fmt.Errorf("parsing URL: %w", err)
 	}
 	c := &HTTPClient{
-		baseURL: baseURL,
-		client:  client,
-		addr:    addr,
-		slogger: logger,
+		baseURL:     baseURL,
+		baseURLLock: &sync.RWMutex{},
+		client:      client,
+		addr:        addr,
+		slogger:     logger,
 	}
 
 	for _, opt := range opts {
@@ -270,6 +273,9 @@ func (c *HTTPClient) do(req *http.Request) ([]byte, error) {
 }
 
 func (c *HTTPClient) url(path string) *url.URL {
+	c.baseURLLock.RLock()
+	defer c.baseURLLock.RUnlock()
+
 	u := *c.baseURL
 	u.Path = path
 	return &u
