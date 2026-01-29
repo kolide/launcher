@@ -17,14 +17,3 @@ type Endpoints struct {
 	PublishResultsEndpoint    endpoint.Endpoint
 	CheckHealthEndpoint       endpoint.Endpoint
 }
-
-func MakeServerEndpoints(svc KolideService) Endpoints {
-	return Endpoints{
-		RequestEnrollmentEndpoint: MakeRequestEnrollmentEndpoint(svc),
-		RequestConfigEndpoint:     MakeRequestConfigEndpoint(svc),
-		PublishLogsEndpoint:       MakePublishLogsEndpoint(svc),
-		RequestQueriesEndpoint:    MakeRequestQueriesEndpoint(svc),
-		PublishResultsEndpoint:    MakePublishResultsEndpoint(svc),
-		CheckHealthEndpoint:       MakeCheckHealthEndpoint(svc),
-	}
-}
