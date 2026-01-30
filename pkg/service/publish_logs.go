@@ -81,7 +81,10 @@ func MakePublishLogsEndpoint(svc KolideService) endpoint.Endpoint {
 }
 
 // PublishLogs implements KolideService.PublishLogs
-func (e Endpoints) PublishLogs(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error) {
+func (e *Endpoints) PublishLogs(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error) {
+	e.endpointsLock.RLock()
+	defer e.endpointsLock.RUnlock()
+
 	newCtx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 	request := logCollection{NodeKey: nodeKey, LogType: logType, Logs: logs}

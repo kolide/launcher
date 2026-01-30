@@ -1,7 +1,11 @@
 package service
 
 import (
+	"net/http"
+	"sync"
+
 	"github.com/go-kit/kit/endpoint"
+	"github.com/kolide/launcher/ee/agent/types"
 )
 
 // KolideClient is an alias for the Endpoints type.
@@ -16,15 +20,7 @@ type Endpoints struct {
 	RequestQueriesEndpoint    endpoint.Endpoint
 	PublishResultsEndpoint    endpoint.Endpoint
 	CheckHealthEndpoint       endpoint.Endpoint
-}
-
-func MakeServerEndpoints(svc KolideService) Endpoints {
-	return Endpoints{
-		RequestEnrollmentEndpoint: MakeRequestEnrollmentEndpoint(svc),
-		RequestConfigEndpoint:     MakeRequestConfigEndpoint(svc),
-		PublishLogsEndpoint:       MakePublishLogsEndpoint(svc),
-		RequestQueriesEndpoint:    MakeRequestQueriesEndpoint(svc),
-		PublishResultsEndpoint:    MakePublishResultsEndpoint(svc),
-		CheckHealthEndpoint:       MakeCheckHealthEndpoint(svc),
-	}
+	endpointsLock             *sync.RWMutex // locks in the rare case that we have to update the underlying endpoint URL
+	client                    *http.Client
+	k                         types.Knapsack
 }
