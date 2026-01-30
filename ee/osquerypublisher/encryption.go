@@ -3,6 +3,7 @@ package osquerypublisher
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -11,8 +12,8 @@ import (
 
 const (
 	// keyDelimiter is used to separate key ID from key material in concatenated strings
-	keyDelimiter = ":"
-	currentEncryptedBlobVersion int = 1
+	keyDelimiter                string = ":"
+	currentEncryptedBlobVersion int    = 1
 )
 
 // KeyData holds a key and it's corresponding identifier.
@@ -43,11 +44,11 @@ func parseKeyData(concatenated string) (*KeyData, error) {
 	keyB64 := parts[1]
 
 	if keyID == "" {
-		return nil, fmt.Errorf("invalid key data format: key ID is empty")
+		return nil, errors.New("invalid key data format: key ID is empty")
 	}
 
 	if keyB64 == "" {
-		return nil, fmt.Errorf("invalid key data format: key data is empty")
+		return nil, errors.New("invalid key data format: key data is empty")
 	}
 
 	key, err := base64.StdEncoding.DecodeString(keyB64)
