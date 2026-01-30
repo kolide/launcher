@@ -2,14 +2,17 @@ package osquerypublisher
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
 
+	"github.com/cloudflare/circl/hpke"
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/osquery/osquery-go/plugin/distributed"
@@ -66,6 +69,17 @@ func TestLogPublisherClient_PublishLogs(t *testing.T) {
 			mockKnapsack.On("OsqueryPublisherPercentEnabled").Return(100)
 			tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 			tokenStore.Set(storage.AgentIngesterAuthTokenKey, []byte("test-token"))
+			require.NoError(t, err)
+			suite := hpke.NewSuite(hpke.KEM_X25519_HKDF_SHA256, hpke.KDF_HKDF_SHA256, hpke.AEAD_AES256GCM)
+			kemID, _, _ := suite.Params()
+			kemScheme := kemID.Scheme()
+			pkR, _, err := kemScheme.GenerateKeyPair()
+			require.NoError(t, err)
+			pkRBytes, err := pkR.MarshalBinary()
+			require.NoError(t, err)
+			err = tokenStore.Set(storage.HPKEPublicKey, []byte("test-hpke-id:"+base64.StdEncoding.EncodeToString(pkRBytes)))
+			require.NoError(t, err)
+			err = tokenStore.Set(storage.HPKEPresharedKey, []byte("test-psk-id:" + base64.StdEncoding.EncodeToString([]byte("test-psk-key-data"))))
 			require.NoError(t, err)
 			mockKnapsack.On("TokenStore").Return(tokenStore).Maybe()
 
@@ -134,6 +148,17 @@ func TestLogPublisherClient_PublishResults(t *testing.T) {
 			mockKnapsack.On("OsqueryPublisherPercentEnabled").Return(100)
 			tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 			tokenStore.Set(storage.AgentIngesterAuthTokenKey, []byte("test-token"))
+			require.NoError(t, err)
+			suite := hpke.NewSuite(hpke.KEM_X25519_HKDF_SHA256, hpke.KDF_HKDF_SHA256, hpke.AEAD_AES256GCM)
+			kemID, _, _ := suite.Params()
+			kemScheme := kemID.Scheme()
+			pkR, _, err := kemScheme.GenerateKeyPair()
+			require.NoError(t, err)
+			pkRBytes, err := pkR.MarshalBinary()
+			require.NoError(t, err)
+			err = tokenStore.Set(storage.HPKEPublicKey, []byte("test-hpke-id:"+base64.StdEncoding.EncodeToString(pkRBytes)))
+			require.NoError(t, err)
+			err = tokenStore.Set(storage.HPKEPresharedKey, []byte("test-psk-id:" + base64.StdEncoding.EncodeToString([]byte("test-psk-key-data"))))
 			require.NoError(t, err)
 			mockKnapsack.On("TokenStore").Return(tokenStore).Maybe()
 
@@ -214,9 +239,9 @@ func TestLogPublisherClient_shouldPublishLogs(t *testing.T) {
 			mockKnapsack.On("OsqueryPublisherPercentEnabled").Return(tt.percentEnabled).Maybe()
 			mockKnapsack.On("OsqueryPublisherURL").Return(tt.url).Maybe()
 			client := &LogPublisherClient{
-				slogger:  slogger.With("component", "osquery_log_publisher"),
-				knapsack: mockKnapsack,
-				tokens:   make(map[string]string),
+				slogger:    slogger.With("component", "osquery_log_publisher"),
+				knapsack:   mockKnapsack,
+				authTokens: make(map[string]string),
 			}
 
 			assert.Equal(t, tt.shouldPublishLogs, client.shouldPublishLogs())
@@ -620,4 +645,54 @@ func TestLogPublisherClient_batchResultsRequest(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestLogPublisherClient_refreshTokenCache_WithHPKEKeys(t *testing.T) {
+	t.Parallel()
+	mockKnapsack := mocks.NewKnapsack(t)
+	slogger := multislogger.NewNopLogger()
+
+	mockKnapsack.On("OsqueryPublisherURL").Return("https://example.com").Maybe()
+	mockKnapsack.On("OsqueryPublisherPercentEnabled").Return(100).Maybe()
+
+	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
+	require.NoError(t, err)
+
+	// Set up test data
+	tokenStore.Set(storage.AgentIngesterAuthTokenKey, []byte("test-token"))
+
+	// Generate a test HPKE keypair for testing
+	suite := hpke.NewSuite(hpke.KEM_X25519_HKDF_SHA256, hpke.KDF_HKDF_SHA256, hpke.AEAD_AES256GCM)
+	kemID, _, _ := suite.Params()
+	kemScheme := kemID.Scheme()
+	_, pkR, err := kemScheme.GenerateKeyPair()
+	require.NoError(t, err, "expected to generate a test HPKE keypair without error")
+	pkRBytes, err := pkR.MarshalBinary()
+	require.NoError(t, err, "expected to marshal the test HPKE public key without error")
+
+	// Create concatenated strings as they would be stored
+	hpkeKeyStr := "test-key-id:" + base64.StdEncoding.EncodeToString(pkRBytes)
+	testPskStr := []byte("test-psk-woooooooooooo!!!!!!!!!")
+	pskStr := "test-psk-id:" + base64.StdEncoding.EncodeToString([]byte(testPskStr))
+
+	tokenStore.Set(storage.HPKEPublicKey, []byte(hpkeKeyStr))
+	tokenStore.Set(storage.HPKEPresharedKey, []byte(pskStr))
+
+	mockKnapsack.On("TokenStore").Return(tokenStore).Maybe()
+
+	clientInterface := NewLogPublisherClient(slogger, mockKnapsack, &mockHTTPClient{})
+	client, ok := clientInterface.(*LogPublisherClient)
+	require.True(t, ok, "expected to be able to cast the client interface to a LogPublisherClient")
+
+	// Verify HPKE key was loaded
+	hpkeKey := client.getHPKEKeyForEnrollment(types.DefaultEnrollmentID)
+	require.NotNil(t, hpkeKey)
+	require.Equal(t, "test-key-id", hpkeKey.KeyID)
+	require.Equal(t, pkRBytes, hpkeKey.Key)
+
+	// Verify PSK was loaded
+	psk := client.getPSKForEnrollment(types.DefaultEnrollmentID)
+	require.NotNil(t, psk)
+	require.Equal(t, "test-psk-id", psk.KeyID)
+	require.Equal(t, []byte(testPskStr), psk.Key)
 }
