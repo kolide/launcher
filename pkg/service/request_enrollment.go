@@ -87,9 +87,12 @@ func MakeRequestEnrollmentEndpoint(svc KolideService) endpoint.Endpoint {
 const requestTimeout = 60 * time.Second
 
 // RequestEnrollment implements KolideService.RequestEnrollment
-func (e Endpoints) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string, details EnrollmentDetails) (string, bool, string, error) {
+func (e *Endpoints) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string, details EnrollmentDetails) (string, bool, string, error) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
+
+	e.endpointsLock.RLock()
+	defer e.endpointsLock.RUnlock()
 
 	newCtx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
