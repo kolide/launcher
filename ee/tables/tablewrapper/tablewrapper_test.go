@@ -260,7 +260,7 @@ func TestPanics(t *testing.T) {
 	mockFlags.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return()
 
 	generate := func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-		panic("In the Disco")
+		panic("In the Disco") //nolint:forbidigo // Fine to use panic in tests
 	}
 
 	w := New(mockFlags, multislogger.NewNopLogger(), expectedName, nil, generate)
@@ -269,6 +269,6 @@ func TestPanics(t *testing.T) {
 
 	require.Equal(t, int32(1), resp.Status.Code)
 	require.NotContains(t, resp.Status.Message, "timed out after")
-	require.Contains(t, resp.Status.Message, "panic")
+	require.Contains(t, resp.Status.Message, "panic in test_table: In the Disco")
 
 }

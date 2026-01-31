@@ -134,11 +134,14 @@ func (wt *wrappedTable) generate(ctx context.Context, queryContext table.QueryCo
 	// To prevent our channel read from blocking, we need to ensure we write something.
 	// (this recovery function is passed to our GoWithRecoveryAction tablewrapper)
 	onPanic := func(r any) {
+		span.AddEvent("panic")
+		wt.workers.Release(1)
+
 		if recoveredErr, ok := r.(error); ok {
 			resultChan <- &generateResult{nil, fmt.Errorf("panic in %s: %w", wt.name, recoveredErr)}
 		} else {
 			// Handle cases where something other than an error was panicked
-			resultChan <- &generateResult{nil, fmt.Errorf("panic in %s: %v", wt.name, recoveredErr)}
+			resultChan <- &generateResult{nil, fmt.Errorf("panic in %s: %v", wt.name, r)}
 		}
 	}
 
