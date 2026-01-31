@@ -128,7 +128,7 @@ func (wt *wrappedTable) generate(ctx context.Context, queryContext table.QueryCo
 	labels := pprof.Labels("table_name", wt.name)
 
 	// channel to hold results
-	resultChan := make(chan *generateResult)
+	resultChan := make(chan *generateResult, 1)
 
 	// Tables call all kinds of external libraries, sometimes they panic.
 	// To prevent our channel read from blocking, we need to ensure we write something.
