@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
@@ -249,4 +250,26 @@ func TestFlagsChanged(t *testing.T) {
 	w.genTimeoutLock.Lock()
 	require.Equal(t, controlServerOverrideTimeout, w.genTimeout)
 	w.genTimeoutLock.Unlock()
+}
+
+func TestPanics(t *testing.T) {
+	t.Parallel()
+
+	expectedName := "test_table"
+	mockFlags := typesmocks.NewFlags(t)
+	mockFlags.On("TableGenerateTimeout").Return(5 * time.Second).Once()
+	mockFlags.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return()
+
+	generate := func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+		panic("In the Disco")
+	}
+
+	w := New(mockFlags, multislogger.NewNopLogger(), expectedName, nil, generate)
+
+	resp := w.Call(t.Context(), map[string]string{"action": "generate", "context": "{}"})
+
+	require.Equal(t, int32(1), resp.Status.Code)
+	require.NotContains(t, resp.Status.Message, "timed out after")
+	require.Contains(t, resp.Status.Message, "panic")
+
 }

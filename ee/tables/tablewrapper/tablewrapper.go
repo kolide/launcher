@@ -127,11 +127,25 @@ func (wt *wrappedTable) generate(ctx context.Context, queryContext table.QueryCo
 	// Prepare pprof labels
 	labels := pprof.Labels("table_name", wt.name)
 
+	// channel to hold results
+	resultChan := make(chan *generateResult)
+
+	// Tables call all kinds of external libraries, sometimes they panic.
+	// To prevent our channel read from blocking, we need to ensure we write something.
+	// (this recovery function is passed to our GoWithRecoveryAction tablewrapper)
+	onPanic := func(r any) {
+		if recoveredErr, ok := r.(error); ok {
+			resultChan <- &generateResult{nil, fmt.Errorf("panic in %s: %w", wt.name, recoveredErr)}
+		} else {
+			// Handle cases where something other than an error was panicked
+			resultChan <- &generateResult{nil, fmt.Errorf("panic in %s: %v", wt.name, recoveredErr)}
+		}
+	}
+
 	// Kick off running the query
 	queryStartTime := time.Now()
-	resultChan := make(chan *generateResult)
 	pprof.Do(ctx, labels, func(ctx context.Context) {
-		gowrapper.Go(ctx, wt.slogger, func() {
+		gowrapper.GoWithRecoveryAction(ctx, wt.slogger, func() {
 			rows, err := wt.gen(ctx, queryContext)
 			wt.workers.Release(1)
 			span.AddEvent("generate_returned")
@@ -139,7 +153,7 @@ func (wt *wrappedTable) generate(ctx context.Context, queryContext table.QueryCo
 				rows: rows,
 				err:  err,
 			}
-		})
+		}, onPanic)
 	})
 
 	// Wait for results up until the timeout
