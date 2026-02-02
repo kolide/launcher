@@ -299,6 +299,63 @@ func TestExtensionEnrollValidNodeEmptyResponse(t *testing.T) {
 	assert.NotNil(t, err)
 }
 
+func TestExtensionEnrollInvalidRegion(t *testing.T) {
+	expectedDeviceServerURL := "device.example.test"
+	expectedControlServerURL := "control.example.test"
+	expectedOsqueryPublisherURL := "pub.example.test"
+
+	m := &mock.KolideService{
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (*service.EnrollmentResponse, error) {
+			return &service.EnrollmentResponse{
+				RegionInvalid: true,
+				RegionURLs: &types.KolideURLs{
+					DeviceServerURL:     expectedDeviceServerURL,
+					ControlServerURL:    expectedControlServerURL,
+					OsqueryPublisherURL: expectedOsqueryPublisherURL,
+				},
+			}, nil
+		},
+	}
+
+	expectedMunemo := "test_fake_munemo_2"
+	expectedEnrollSecret := createTestEnrollSecret(t, expectedMunemo)
+	k := mocks.NewKnapsack(t)
+	k.On("OsquerydPath").Maybe().Return("")
+	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
+	configStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
+	require.NoError(t, err)
+	k.On("ConfigStore").Return(configStore)
+	k.On("Slogger").Return(multislogger.NewNopLogger())
+	k.On("ReadEnrollSecret").Maybe().Return(expectedEnrollSecret, nil)
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
+	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
+	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything).Maybe().Return()
+	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
+	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
+	require.NoError(t, err)
+	k.On("TokenStore").Return(tokenStore).Maybe()
+	lpc := makeTestOsqLogPublisher(k)
+
+	// We should attempt to fetch the node key once during enrollment, and we shouldn't have a node key yet
+	k.On("NodeKey", types.DefaultEnrollmentID).Return("", nil).Once()
+
+	// We should update the regional URLs
+	k.On("SetKolideServerURL", expectedDeviceServerURL).Return(nil)
+	k.On("SetControlServerURL", expectedControlServerURL).Return(nil)
+	k.On("SetOsqueryPublisherURL", expectedOsqueryPublisherURL).Return(nil)
+
+	e, err := NewExtension(t.Context(), m, lpc, settingsstoremock.NewSettingsStoreWriter(t), k, types.DefaultEnrollmentID, ExtensionOpts{})
+	require.Nil(t, err)
+
+	key, invalid, err := e.Enroll(t.Context())
+	assert.True(t, m.RequestEnrollmentFuncInvoked)
+	assert.Equal(t, "", key)
+	assert.False(t, invalid)
+	assert.NotNil(t, err)
+
+	k.AssertExpectations(t)
+}
+
 func TestExtensionEnroll(t *testing.T) {
 	expectedMunemo := "test_fake_munemo"
 	expectedEnrollSecret := createTestEnrollSecret(t, expectedMunemo)

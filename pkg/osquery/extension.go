@@ -402,6 +402,38 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		observability.SetError(span, err)
 		return "", true, err
 	}
+
+	// Handle response indicating we're talking to the wrong region -- update URLs via knapsack,
+	// then return error so we can retry enrollment against the correct server later.
+	if resp != nil && resp.RegionInvalid {
+		if resp.RegionURLs == nil {
+			return "", false, errors.New("region invalid, but did not receive updated region URLs")
+		}
+		if err := e.knapsack.SetKolideServerURL(resp.RegionURLs.DeviceServerURL); err != nil {
+			e.slogger.Log(ctx, slog.LevelError,
+				"could not update kolide server URL to correct region",
+				"kolide_server_url", resp.RegionURLs.DeviceServerURL,
+				"err", err,
+			)
+		}
+		if err := e.knapsack.SetControlServerURL(resp.RegionURLs.ControlServerURL); err != nil {
+			e.slogger.Log(ctx, slog.LevelError,
+				"could not update control server URL to correct region",
+				"control_server_url", resp.RegionURLs.ControlServerURL,
+				"err", err,
+			)
+		}
+		if err := e.knapsack.SetOsqueryPublisherURL(resp.RegionURLs.OsqueryPublisherURL); err != nil {
+			e.slogger.Log(ctx, slog.LevelError,
+				"could not update osquery publisher URL to correct region",
+				"osquery_publisher_url", resp.RegionURLs.OsqueryPublisherURL,
+				"err", err,
+			)
+		}
+
+		return "", false, errors.New("region invalid, updated regional URLs to try again later")
+	}
+
 	if resp == nil || resp.NodeKey == "" {
 		err = errors.New("valid node received empty response")
 		observability.SetError(span, err)
