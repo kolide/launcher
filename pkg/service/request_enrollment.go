@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
 
@@ -68,19 +67,6 @@ func encodeJSONRPCEnrollmentResponse(_ context.Context, obj any) (json.RawMessag
 	}
 
 	return encodeJSONResponse(b, nil)
-}
-
-func MakeRequestEnrollmentEndpoint(svc KolideService) endpoint.Endpoint {
-	return func(ctx context.Context, request any) (response any, err error) {
-		req := request.(enrollmentRequest)
-		nodeKey, valid, token, err := svc.RequestEnrollment(ctx, req.EnrollSecret, req.HostIdentifier, req.EnrollmentDetails)
-		return enrollmentResponse{
-			NodeKey:            nodeKey,
-			NodeInvalid:        valid,
-			Err:                err,
-			AgentIngesterToken: token,
-		}, nil
-	}
 }
 
 // requestTimeout is duration after which the request is cancelled.
