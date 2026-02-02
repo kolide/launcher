@@ -41,7 +41,7 @@ func TestSecretScan(t *testing.T) {
 			minFindingsCount:  2,
 			expectedRuleIDs:   []string{"slack-bot-token", "github-pat"},
 			expectedFileNames: []string{"config.yaml", "github_token.env"},
-			forbiddenFiles:    []string{"clean_file.txt"},
+			forbiddenFiles:    []string{"clean_file.txt", "low_entropy.txt"},
 		},
 		{
 			name:              "scan single file with slack token",
@@ -63,6 +63,11 @@ func TestSecretScan(t *testing.T) {
 			name:       "scan clean file finds no secrets",
 			scanType:   "path",
 			targetPath: "clean_file.txt",
+		},
+		{
+			name:       "scan low entropy AWS example keys finds no secrets",
+			scanType:   "path",
+			targetPath: "low_entropy.txt", // Contains AWS EXAMPLE keys which are low entropy and should be ignored
 		},
 		{
 			name:     "scan raw data with slack token",

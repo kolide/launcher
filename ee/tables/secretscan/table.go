@@ -30,27 +30,28 @@ const (
 	redactPrefixLength = 3
 )
 
-func NewDetectorDefaultConfig() (*detect.Detector, error) {
+func newDefaultConfig() (config.Config, error) {
 	v := viper.New() // init viper here so we don't update a global var
 	v.SetConfigType("toml")
 	err := v.ReadConfig(strings.NewReader(config.DefaultConfig))
 	if err != nil {
-		return nil, err
+		return config.Config{}, err
 	}
 	var vc config.ViperConfig
 	err = v.Unmarshal(&vc)
 	if err != nil {
-		return nil, err
+		return config.Config{}, err
 	}
 	cfg, err := vc.Translate()
 	if err != nil {
-		return nil, err
+		return config.Config{}, err
 	}
-	return detect.NewDetector(cfg), nil
+	return cfg, nil
 }
 
 type Table struct {
-	slogger *slog.Logger
+	slogger       *slog.Logger
+	defaultConfig *config.Config
 }
 
 func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
@@ -74,10 +75,12 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	// Fresh detector per query - gitleaks accumulates findings internally
-	detector, err := NewDetectorDefaultConfig()
-	if err != nil {
-		return nil, fmt.Errorf("creating detector: %w", err)
+	if t.defaultConfig == nil {
+		cfg, err := newDefaultConfig()
+		if err != nil {
+			return nil, fmt.Errorf("creating default config: %w", err)
+		}
+		t.defaultConfig = &cfg
 	}
 
 	var results []map[string]string
@@ -101,7 +104,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		}
 
 		for _, targetPath := range expandedPaths {
-			pathResults, err := t.scanPath(ctx, detector, targetPath)
+			pathResults, err := t.scanPath(ctx, targetPath)
 			if err != nil {
 				t.slogger.Log(ctx, slog.LevelWarn,
 					"failed to scan path",
@@ -115,7 +118,14 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	}
 
 	for _, rawData := range requestedRawDatas {
-		rawResults := t.scanContent(ctx, detector, []byte(rawData))
+		rawResults, err := t.scanContent(ctx, []byte(rawData))
+		if err != nil {
+			t.slogger.Log(ctx, slog.LevelWarn,
+				"failed to scan content",
+				"err", err,
+			)
+			continue
+		}
 		for i := range rawResults {
 			// Return original value so SQLite WHERE clause filtering works correctly
 			rawResults[i]["raw_data"] = rawData
@@ -126,51 +136,53 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	return results, nil
 }
 
-func (t *Table) scanPath(ctx context.Context, detector *detect.Detector, targetPath string) ([]map[string]string, error) {
+func (t *Table) scanPath(ctx context.Context, targetPath string) ([]map[string]string, error) {
 	info, err := os.Stat(targetPath)
 	if err != nil {
 		return nil, fmt.Errorf("stat path: %w", err)
 	}
 
-	var findings []report.Finding
+	// Fresh detector per scan - gitleaks accumulates findings internally
+	detector := detect.NewDetector(*t.defaultConfig)
+
+	var source sources.Source
+	var file *os.File
+	findingsPath := targetPath
 
 	if info.IsDir() {
-		dirSource := &sources.Files{
+		source = &sources.Files{
 			Path:           targetPath,
 			Config:         &detector.Config,
 			FollowSymlinks: false,
 			Sema:           semgroup.NewGroup(ctx, directoryScanConcurrency),
 		}
-
-		findings, err = detector.DetectSource(ctx, dirSource)
+		findingsPath = "" // Directory scans use path from findings
+	} else {
+		file, err = os.Open(targetPath)
 		if err != nil {
-			return nil, fmt.Errorf("scanning directory: %w", err)
+			return nil, fmt.Errorf("opening file: %w", err)
 		}
+		defer file.Close()
 
-		return t.findingsToRows(findings, ""), nil
+		source = &sources.File{
+			Content: file,
+			Path:    targetPath,
+			Config:  &detector.Config,
+		}
 	}
 
-	file, err := os.Open(targetPath)
+	findings, err := detector.DetectSource(ctx, source)
 	if err != nil {
-		return nil, fmt.Errorf("opening file: %w", err)
-	}
-	defer file.Close()
-
-	fileSource := &sources.File{
-		Content: file,
-		Path:    targetPath,
-		Config:  &detector.Config,
+		return nil, fmt.Errorf("scanning path: %w", err)
 	}
 
-	findings, err = detector.DetectSource(ctx, fileSource)
-	if err != nil {
-		return nil, fmt.Errorf("scanning file: %w", err)
-	}
-
-	return t.findingsToRows(findings, targetPath), nil
+	return t.findingsToRows(findings, findingsPath), nil
 }
 
-func (t *Table) scanContent(ctx context.Context, detector *detect.Detector, content []byte) []map[string]string {
+func (t *Table) scanContent(ctx context.Context, content []byte) ([]map[string]string, error) {
+	// Fresh detector per scan - gitleaks accumulates findings internally
+	detector := detect.NewDetector(*t.defaultConfig)
+
 	fileSource := &sources.File{
 		Content: strings.NewReader(string(content)),
 		Path:    "raw_data_input", // Placeholder path required for gitleaks detection
@@ -179,14 +191,10 @@ func (t *Table) scanContent(ctx context.Context, detector *detect.Detector, cont
 
 	findings, err := detector.DetectSource(ctx, fileSource)
 	if err != nil {
-		t.slogger.Log(ctx, slog.LevelWarn,
-			"failed to scan content",
-			"err", err,
-		)
-		return nil
+		return nil, fmt.Errorf("scanning content: %w", err)
 	}
 
-	return t.findingsToRows(findings, "")
+	return t.findingsToRows(findings, ""), nil
 }
 
 func (t *Table) findingsToRows(findings []report.Finding, path string) []map[string]string {
