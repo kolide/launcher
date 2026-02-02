@@ -192,7 +192,6 @@ func (t *Table) scanContent(ctx context.Context, content []byte) ([]map[string]s
 
 	fileSource := &sources.File{
 		Content: strings.NewReader(string(content)),
-		Path:    "raw_data_input", // Placeholder path required for gitleaks detection
 		Config:  &detector.Config,
 	}
 
