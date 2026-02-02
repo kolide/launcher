@@ -211,8 +211,8 @@ func TestGetHostIdentifierCorruptedData(t *testing.T) {
 
 func TestExtensionEnrollTransportError(t *testing.T) {
 	m := &mock.KolideService{
-		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, string, error) {
-			return "", false, "", errors.New("transport")
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (*service.EnrollmentResponse, error) {
+			return nil, errors.New("transport")
 		},
 	}
 
@@ -230,8 +230,10 @@ func TestExtensionEnrollTransportError(t *testing.T) {
 
 func TestExtensionEnrollSecretInvalid(t *testing.T) {
 	m := &mock.KolideService{
-		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, string, error) {
-			return "", true, "", nil
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (*service.EnrollmentResponse, error) {
+			return &service.EnrollmentResponse{
+				NodeInvalid: true,
+			}, nil
 		},
 	}
 	k := makeKnapsackUnenrolled(t)
@@ -280,8 +282,8 @@ func createTestEnrollSecret(t *testing.T, munemo string) string {
 
 func TestExtensionEnrollValidNodeEmptyResponse(t *testing.T) {
 	m := &mock.KolideService{
-		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, string, error) {
-			return "", false, "", nil
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (*service.EnrollmentResponse, error) {
+			return nil, nil
 		},
 	}
 	k := makeKnapsackUnenrolled(t)
@@ -304,9 +306,13 @@ func TestExtensionEnroll(t *testing.T) {
 	var gotEnrollSecret string
 	expectedNodeKey := "node_key"
 	m := &mock.KolideService{
-		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, string, error) {
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (*service.EnrollmentResponse, error) {
 			gotEnrollSecret = enrollSecret
-			return expectedNodeKey, false, "", nil
+			return &service.EnrollmentResponse{
+				NodeKey:            expectedNodeKey,
+				NodeInvalid:        false,
+				AgentIngesterToken: "",
+			}, nil
 		},
 	}
 	s := settingsstoremock.NewSettingsStoreWriter(t)
@@ -445,8 +451,12 @@ func TestExtensionGenerateConfigsEnrollmentInvalid(t *testing.T) {
 			gotNodeKey = nodeKey
 			return "", true, nil // node_invalid
 		},
-		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, string, error) {
-			return expectedNodeKey, false, "", nil
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (*service.EnrollmentResponse, error) {
+			return &service.EnrollmentResponse{
+				NodeKey:            expectedNodeKey,
+				NodeInvalid:        false,
+				AgentIngesterToken: "",
+			}, nil
 		},
 	}
 	// Set up our knapsack
@@ -474,8 +484,12 @@ func TestGenerateConfigs_CannotEnrollYet(t *testing.T) {
 			// Returns node_invalid
 			return "", true, nil
 		},
-		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, string, error) {
-			return expectedNodeKey, false, "", nil
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (*service.EnrollmentResponse, error) {
+			return &service.EnrollmentResponse{
+				NodeKey:            expectedNodeKey,
+				NodeInvalid:        false,
+				AgentIngesterToken: "",
+			}, nil
 		},
 	}
 
@@ -654,8 +668,12 @@ func TestExtensionWriteLogsEnrollmentInvalid(t *testing.T) {
 			gotNodeKey = nodeKey
 			return "", "", true, nil
 		},
-		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, string, error) {
-			return expectedNodeKey, false, "", nil
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (*service.EnrollmentResponse, error) {
+			return &service.EnrollmentResponse{
+				NodeKey:            expectedNodeKey,
+				NodeInvalid:        false,
+				AgentIngesterToken: "",
+			}, nil
 		},
 	}
 	// Set up our knapsack
@@ -909,8 +927,12 @@ func TestExtensionWriteBufferedLogsEnrollmentInvalid(t *testing.T) {
 			return "", "", nodeKey != expectedNodeKey, nil
 
 		},
-		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, string, error) {
-			return expectedNodeKey, false, "", nil
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (*service.EnrollmentResponse, error) {
+			return &service.EnrollmentResponse{
+				NodeKey:            expectedNodeKey,
+				NodeInvalid:        false,
+				AgentIngesterToken: "",
+			}, nil
 		},
 	}
 
@@ -1437,8 +1459,12 @@ func TestExtensionGetQueriesEnrollmentInvalid(t *testing.T) {
 			gotNodeKey = nodeKey
 			return nil, true, nil
 		},
-		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, string, error) {
-			return expectedNodeKey, false, "", nil
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (*service.EnrollmentResponse, error) {
+			return &service.EnrollmentResponse{
+				NodeKey:            expectedNodeKey,
+				NodeInvalid:        false,
+				AgentIngesterToken: "",
+			}, nil
 		},
 	}
 
@@ -1685,8 +1711,12 @@ func TestExtensionWriteResultsEnrollmentInvalid(t *testing.T) {
 			gotNodeKey = nodeKey
 			return "", "", true, nil
 		},
-		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, string, error) {
-			return expectedNodeKey, false, "", nil
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (*service.EnrollmentResponse, error) {
+			return &service.EnrollmentResponse{
+				NodeKey:            expectedNodeKey,
+				NodeInvalid:        false,
+				AgentIngesterToken: "",
+			}, nil
 		},
 	}
 

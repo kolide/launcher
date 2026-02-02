@@ -367,8 +367,9 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	}
 
 	// If no cached node key, enroll for new node key
-	// note that we set invalid two ways. Via the return, _or_ via isNodeInvaliderr
-	keyString, invalid, token, err := e.serviceClient.RequestEnrollment(ctx, enrollSecret, identifier, enrollDetails)
+	// note that we set invalid two ways. Via the return (resp.NodeInvalid), _or_ via isNodeInvalidErr
+	invalid := false
+	resp, err := e.serviceClient.RequestEnrollment(ctx, enrollSecret, identifier, enrollDetails)
 
 	switch {
 	case errors.Is(err, service.ErrDeviceDisabled{}):
@@ -387,6 +388,9 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	case err != nil:
 		return "", true, fmt.Errorf("transport error getting queries: %w", err)
 
+	case resp != nil && resp.NodeInvalid:
+		invalid = true
+
 	default: // pass through no error
 	}
 
@@ -398,7 +402,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		observability.SetError(span, err)
 		return "", true, err
 	}
-	if keyString == "" {
+	if resp == nil || resp.NodeKey == "" {
 		err = errors.New("valid node received empty response")
 		observability.SetError(span, err)
 		return "", false, err
@@ -407,7 +411,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	// Save newly acquired node key if successful -- adding the enrollment
 	// will do this. SaveEnrollment will extract the munemo from the enrollment
 	// secret for us.
-	if err := e.knapsack.SaveEnrollment(e.enrollmentId, "", keyString, enrollSecret); err != nil {
+	if err := e.knapsack.SaveEnrollment(e.enrollmentId, "", resp.NodeKey, enrollSecret); err != nil {
 		e.slogger.Log(ctx, slog.LevelError,
 			"could not save enrollment",
 			"err", err,
@@ -415,7 +419,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	}
 
 	// save the new agent ingester auth token and ping the log publish client to update its token
-	if err := e.knapsack.TokenStore().Set(storage.AgentIngesterAuthTokenKey, []byte(token)); err != nil {
+	if err := e.knapsack.TokenStore().Set(storage.AgentIngesterAuthTokenKey, []byte(resp.AgentIngesterToken)); err != nil {
 		e.slogger.Log(ctx, slog.LevelError,
 			"could not save agent ingester auth token",
 			"err", err,
@@ -430,7 +434,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	)
 	span.AddEvent("completed_enrollment")
 
-	return keyString, false, nil
+	return resp.NodeKey, false, nil
 }
 
 func (e *Extension) enrolled() bool {
