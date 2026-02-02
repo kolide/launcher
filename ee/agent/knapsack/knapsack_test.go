@@ -374,6 +374,7 @@ func TestEnsureEnrollmentStored(t *testing.T) {
 
 			// Set up our knapsack
 			mockFlags := typesmocks.NewFlags(t)
+			mockFlags.On("Identifier").Return("testtesttest").Maybe()
 			testKnapsack := New(map[storage.Store]types.KVStore{
 				storage.ConfigStore:     configStore,
 				storage.EnrollmentStore: enrollmentStore,
@@ -701,6 +702,7 @@ func TestCurrentEnrollmentStatus(t *testing.T) {
 
 			// Set up our knapsack
 			mockFlags := typesmocks.NewFlags(t)
+			mockFlags.On("Identifier").Return("testtesttest").Maybe()
 			testKnapsack := New(map[storage.Store]types.KVStore{
 				storage.ConfigStore:     configStore,
 				storage.EnrollmentStore: enrollmentStore,
@@ -730,26 +732,37 @@ func TestReadEnrollSecret(t *testing.T) {
 	t.Parallel()
 
 	for _, tt := range []struct {
-		testCaseName    string
-		setViaFlags     bool
-		setInFile       bool
-		setInTokenStore bool
-		secretExpected  bool
+		testCaseName               string
+		setViaEnrollSecretFlag     bool
+		setViaEnrollSecretPathFlag bool
+		enrollSecretFileExists     bool
+		setInTokenStore            bool
+		secretExpected             bool
 	}{
 		{
-			testCaseName:   "set via command-line args",
-			setViaFlags:    true,
-			secretExpected: true,
+			testCaseName:           "set via enroll_secret flag",
+			setViaEnrollSecretFlag: true,
+			secretExpected:         true,
 		},
 		{
-			testCaseName:   "set via secret file",
-			setInFile:      true,
-			secretExpected: true,
+			testCaseName:               "set via enroll_secret_path flag",
+			setViaEnrollSecretPathFlag: true,
+			enrollSecretFileExists:     true,
+			secretExpected:             true,
 		},
 		{
-			testCaseName:    "set via launcher enroll subcommand",
-			setInTokenStore: true,
-			secretExpected:  true,
+			testCaseName:               "set via launcher enroll subcommand, enroll_secret_path flag set",
+			setViaEnrollSecretPathFlag: true,
+			enrollSecretFileExists:     false,
+			setInTokenStore:            true,
+			secretExpected:             true,
+		},
+		{
+			testCaseName:               "set via launcher enroll subcommand, enroll_secret_path flag not set",
+			setViaEnrollSecretPathFlag: false,
+			enrollSecretFileExists:     false,
+			setInTokenStore:            true,
+			secretExpected:             true,
 		},
 		{
 			testCaseName:   "not set",
@@ -765,6 +778,7 @@ func TestReadEnrollSecret(t *testing.T) {
 
 			// Set up our knapsack
 			mockFlags := typesmocks.NewFlags(t)
+			mockFlags.On("Identifier").Return("testtesttesttest").Maybe() // ensure test doesn't pick up secret files from actual installations of the agent
 			testKnapsack := New(map[storage.Store]types.KVStore{
 				storage.TokenStore: tokenStore,
 			}, mockFlags, nil, multislogger.New(), multislogger.New())
@@ -773,16 +787,19 @@ func TestReadEnrollSecret(t *testing.T) {
 			testMunemo := ulid.New()
 			testEnrollSecret := createTestEnrollSecret(t, testMunemo)
 
-			if tt.setViaFlags {
+			if tt.setViaEnrollSecretFlag {
 				mockFlags.On("EnrollSecret").Return(testEnrollSecret)
 			} else {
 				mockFlags.On("EnrollSecret").Return("").Maybe()
 			}
 
-			if tt.setInFile {
+			if tt.setViaEnrollSecretPathFlag {
 				tempEnrollSecretDir := t.TempDir()
 				tempEnrollSecretPath := filepath.Join(tempEnrollSecretDir, "secret")
-				require.NoError(t, os.WriteFile(tempEnrollSecretPath, []byte(testEnrollSecret), 0755))
+				if tt.enrollSecretFileExists {
+					require.NoError(t, os.WriteFile(tempEnrollSecretPath, []byte(testEnrollSecret), 0755))
+				}
+
 				mockFlags.On("EnrollSecretPath").Return(tempEnrollSecretPath)
 			} else {
 				mockFlags.On("EnrollSecretPath").Return("").Maybe()

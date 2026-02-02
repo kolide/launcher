@@ -8,12 +8,14 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/tuf"
+	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"go.etcd.io/bbolt"
 )
@@ -447,14 +449,25 @@ func (k *knapsack) LatestOsquerydPath(ctx context.Context) string {
 }
 
 func (k *knapsack) ReadEnrollSecret() (string, error) {
+	// Secret set via flags
 	if k.EnrollSecret() != "" {
 		return k.EnrollSecret(), nil
 	}
 
-	if k.EnrollSecretPath() != "" {
-		content, err := os.ReadFile(k.EnrollSecretPath())
+	// Check for secret set via enroll secret path -- we want to look at the default path if it's not set.
+	enrollSecretPath := k.EnrollSecretPath()
+	if enrollSecretPath == "" {
+		enrollSecretPath = launcher.DefaultPath(launcher.SecretFile)
+		if k.Identifier() != launcher.DefaultLauncherIdentifier {
+			enrollSecretPath = strings.ReplaceAll(enrollSecretPath, launcher.DefaultLauncherIdentifier, k.Identifier())
+		}
+	}
+	// Only attempt to read if the file exists -- if it doesn't exist, we want to fall through
+	// to checking for an enroll secret set via command-line below.
+	if _, err := os.Stat(enrollSecretPath); err == nil {
+		content, err := os.ReadFile(enrollSecretPath)
 		if err != nil {
-			return "", fmt.Errorf("could not read enroll secret path %s: %w", k.EnrollSecretPath(), err)
+			return "", fmt.Errorf("could not read enroll secret path %s: %w", enrollSecretPath, err)
 		}
 		return string(bytes.TrimSpace(content)), nil
 	}
