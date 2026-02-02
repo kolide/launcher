@@ -23,11 +23,13 @@ type EnrollmentDetails = types.EnrollmentDetails
 
 type enrollmentResponse struct {
 	jsonRpcResponse
-	NodeKey            string `json:"node_key"`
-	NodeInvalid        bool   `json:"node_invalid"`
-	ErrorCode          string `json:"error_code,omitempty"`
-	Err                error  `json:"err,omitempty"`
-	AgentIngesterToken string `json:"agent_ingester_auth_token,omitempty"`
+	NodeKey            string            `json:"node_key"`
+	NodeInvalid        bool              `json:"node_invalid"`
+	RegionInvalid      bool              `json:"region_invalid"`
+	RegionURLs         *types.KolideURLs `json:"region_urls,omitempty"`
+	ErrorCode          string            `json:"error_code,omitempty"`
+	Err                error             `json:"err,omitempty"`
+	AgentIngesterToken string            `json:"agent_ingester_auth_token,omitempty"`
 }
 
 func decodeJSONRPCEnrollmentRequest(_ context.Context, msg json.RawMessage) (any, error) {

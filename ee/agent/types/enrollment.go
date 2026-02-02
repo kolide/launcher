@@ -1,5 +1,11 @@
 package types
 
+type KolideURLs struct {
+	DeviceServerURL     string `json:"device_server_url"`
+	ControlServerURL    string `json:"control_server_url"`
+	OsqueryPublisherURL string `json:"osquery_publisher_url"`
+}
+
 type EnrollmentStatus string
 
 const (
