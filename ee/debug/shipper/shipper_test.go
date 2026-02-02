@@ -2,6 +2,7 @@ package shipper
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -32,8 +33,7 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 			name: "no enroll secret, upload request url opt",
 			mockKnapsack: func(t *testing.T) *typesMocks.Knapsack {
 				k := typesMocks.NewKnapsack(t)
-				k.On("EnrollSecret").Return("")
-				k.On("EnrollSecretPath").Return("")
+				k.On("ReadEnrollSecret").Return("", errors.New("test error"))
 				k.On("Enrollments").Return([]types.Enrollment{
 					{
 						EnrollmentID: types.DefaultEnrollmentID,
@@ -53,8 +53,7 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 			name: "no enroll secret, signed url req from knapsack",
 			mockKnapsack: func(t *testing.T) *typesMocks.Knapsack {
 				k := typesMocks.NewKnapsack(t)
-				k.On("EnrollSecret").Return("")
-				k.On("EnrollSecretPath").Return("")
+				k.On("ReadEnrollSecret").Return("", errors.New("test error"))
 				k.On("Enrollments").Return([]types.Enrollment{}, nil)
 				k.On("RootDirectory").Return(t.TempDir())
 				return k
@@ -73,7 +72,7 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 				agent.SetupKeys(t.Context(), multislogger.NewNopLogger(), configStore)
 
 				k := typesMocks.NewKnapsack(t)
-				k.On("EnrollSecret").Return("enroll_secret_value")
+				k.On("ReadEnrollSecret").Return("enroll_secret_value", nil)
 				k.On("Enrollments").Return([]types.Enrollment{
 					{
 						EnrollmentID: types.DefaultEnrollmentID,
@@ -173,7 +172,7 @@ func TestShipToS3(t *testing.T) { //nolint:paralleltest
 			s3StatusCode: http.StatusOK,
 			mockKnapsack: func(t *testing.T) *typesMocks.Knapsack {
 				k := typesMocks.NewKnapsack(t)
-				k.On("EnrollSecret").Return("enroll_secret_value")
+				k.On("ReadEnrollSecret").Return("enroll_secret_value", nil)
 				k.On("Enrollments").Return([]types.Enrollment{
 					{
 						EnrollmentID: types.DefaultEnrollmentID,
@@ -192,7 +191,7 @@ func TestShipToS3(t *testing.T) { //nolint:paralleltest
 			s3StatusCode: http.StatusNoContent,
 			mockKnapsack: func(t *testing.T) *typesMocks.Knapsack {
 				k := typesMocks.NewKnapsack(t)
-				k.On("EnrollSecret").Return("enroll_secret_value")
+				k.On("ReadEnrollSecret").Return("enroll_secret_value", nil)
 				k.On("Enrollments").Return([]types.Enrollment{
 					{
 						EnrollmentID: types.DefaultEnrollmentID,
@@ -211,7 +210,7 @@ func TestShipToS3(t *testing.T) { //nolint:paralleltest
 			s3StatusCode: http.StatusForbidden,
 			mockKnapsack: func(t *testing.T) *typesMocks.Knapsack {
 				k := typesMocks.NewKnapsack(t)
-				k.On("EnrollSecret").Return("enroll_secret_value")
+				k.On("ReadEnrollSecret").Return("enroll_secret_value", nil)
 				k.On("Enrollments").Return([]types.Enrollment{
 					{
 						EnrollmentID: types.DefaultEnrollmentID,
