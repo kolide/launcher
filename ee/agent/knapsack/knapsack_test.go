@@ -374,7 +374,6 @@ func TestEnsureEnrollmentStored(t *testing.T) {
 
 			// Set up our knapsack
 			mockFlags := typesmocks.NewFlags(t)
-			mockFlags.On("Identifier").Return("testtesttest").Maybe()
 			testKnapsack := New(map[storage.Store]types.KVStore{
 				storage.ConfigStore:     configStore,
 				storage.EnrollmentStore: enrollmentStore,
@@ -702,7 +701,6 @@ func TestCurrentEnrollmentStatus(t *testing.T) {
 
 			// Set up our knapsack
 			mockFlags := typesmocks.NewFlags(t)
-			mockFlags.On("Identifier").Return("testtesttest").Maybe()
 			testKnapsack := New(map[storage.Store]types.KVStore{
 				storage.ConfigStore:     configStore,
 				storage.EnrollmentStore: enrollmentStore,
@@ -778,7 +776,6 @@ func TestReadEnrollSecret(t *testing.T) {
 
 			// Set up our knapsack
 			mockFlags := typesmocks.NewFlags(t)
-			mockFlags.On("Identifier").Return("testtesttesttest").Maybe() // ensure test doesn't pick up secret files from actual installations of the agent
 			testKnapsack := New(map[storage.Store]types.KVStore{
 				storage.TokenStore: tokenStore,
 			}, mockFlags, nil, multislogger.New(), multislogger.New())
