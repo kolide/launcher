@@ -271,4 +271,5 @@ func TestPanics(t *testing.T) {
 	require.NotContains(t, resp.Status.Message, "timed out after")
 	require.Contains(t, resp.Status.Message, "panic in test_table: In the Disco")
 
+	mockFlags.AssertExpectations(t)
 }
