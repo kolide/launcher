@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/fatih/semgroup"
 	"github.com/kolide/launcher/ee/agent/types"
@@ -52,6 +53,8 @@ func newDefaultConfig() (config.Config, error) {
 type Table struct {
 	slogger       *slog.Logger
 	defaultConfig *config.Config
+	configOnce    sync.Once
+	configErr     error
 }
 
 func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
@@ -75,12 +78,16 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	if t.defaultConfig == nil {
+	t.configOnce.Do(func() {
 		cfg, err := newDefaultConfig()
 		if err != nil {
-			return nil, fmt.Errorf("creating default config: %w", err)
+			t.configErr = fmt.Errorf("creating default config: %w", err)
+			return
 		}
 		t.defaultConfig = &cfg
+	})
+	if t.configErr != nil {
+		return nil, t.configErr
 	}
 
 	var results []map[string]string
