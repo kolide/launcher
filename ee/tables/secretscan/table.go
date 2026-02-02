@@ -149,6 +149,11 @@ func (t *Table) scanPath(ctx context.Context, targetPath string) ([]map[string]s
 		return nil, fmt.Errorf("stat path: %w", err)
 	}
 
+	// Only allow regular files and directories - reject symlinks, FIFOs, sockets, devices, etc.
+	if !info.IsDir() && !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("unsupported file type: %s", info.Mode().Type())
+	}
+
 	// Fresh detector per scan - gitleaks accumulates findings internally
 	detector := detect.NewDetector(*t.defaultConfig)
 
