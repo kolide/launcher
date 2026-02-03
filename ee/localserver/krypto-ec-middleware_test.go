@@ -873,3 +873,55 @@ func Test_sendCallback_handlesEnrollmentWithAgentIngesterToken(t *testing.T) {
 	// We should have called SaveEnrollment
 	k.AssertExpectations(t)
 }
+
+func Test_sendCallback_handlesRegionURLUpdates(t *testing.T) {
+	t.Parallel()
+
+	// Set up a test server to receive callback requests
+	expectedEnrollmentUrl := "enroll.example.test"
+	expectedControlUrl := "control.example.test"
+	expectedOsqueryPublisherUrl := "pub.example.test"
+	resp := callbackResponse{
+		RegionURLs: &types.KolideURLs{
+			EnrollmentURL:       expectedEnrollmentUrl,
+			ControlServerURL:    expectedControlUrl,
+			OsqueryPublisherURL: expectedOsqueryPublisherUrl,
+		},
+	}
+	respRaw, err := json.Marshal(resp)
+	require.NoError(t, err)
+	testCallbackServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write(respRaw)
+	}))
+
+	// Make sure we close the server at the end of our test
+	t.Cleanup(func() {
+		testCallbackServer.Close()
+	})
+
+	slogger := multislogger.NewNopLogger()
+	k := typesmocks.NewKnapsack(t)
+	k.On("KolideServerURL").Return("old.enroll.example.test")
+	k.On("SetKolideServerURL", expectedEnrollmentUrl).Return(nil)
+	k.On("ControlServerURL").Return("old.control.example.test")
+	k.On("SetControlServerURL", expectedControlUrl).Return(nil)
+	k.On("OsqueryPublisherURL").Return("old.pub.example.test")
+	k.On("SetOsqueryPublisherURL", expectedOsqueryPublisherUrl).Return(nil)
+
+	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
+	require.NoError(t, err)
+	k.On("TokenStore").Return(tokenStore)
+	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+	k.On("OsqueryPublisher").Return(osqPublisher)
+
+	mw := newKryptoEcMiddleware(slogger, k, nil, mustGenEcdsaKey(t).PublicKey, nil, "")
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, testCallbackServer.URL, nil)
+	require.NoError(t, err)
+	mw.sendCallback(req, &callbackDataStruct{})
+
+	time.Sleep(1 * time.Second)
+
+	// We should have set all URLs
+	k.AssertExpectations(t)
+}

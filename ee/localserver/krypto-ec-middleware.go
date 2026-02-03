@@ -89,6 +89,7 @@ type kryptoEcMiddleware struct {
 	enrollmentTracker     types.EnrollmentTracker
 	tokenStore            types.KVStore
 	osqueryPublisher      types.OsqueryPublisher
+	flags                 types.Flags
 
 	// presenceDetectionStatusUpdateInterval is the interval at which the presence detection
 	// callback is sent while waiting on user to complete presence detection
@@ -116,6 +117,7 @@ func newKryptoEcMiddleware(slogger *slog.Logger, knapsack types.Knapsack,
 		enrollmentTracker:                     knapsack,
 		tokenStore:                            knapsack.TokenStore(),
 		osqueryPublisher:                      knapsack.OsqueryPublisher(),
+		flags:                                 knapsack,
 	}
 
 	gowrapper.Go(context.TODO(), slogger.With("subcomponent", "middleware_callback_worker"), func() {
@@ -144,9 +146,10 @@ type (
 	}
 
 	callbackResponse struct {
-		NodeKey            string `json:"node_key"`
-		Munemo             string `json:"munemo"`
-		AgentIngesterToken string `json:"agent_ingester_auth_token"`
+		NodeKey            string            `json:"node_key"`
+		Munemo             string            `json:"munemo"`
+		AgentIngesterToken string            `json:"agent_ingester_auth_token"`
+		RegionURLs         *types.KolideURLs `json:"region_urls,omitempty"`
 	}
 )
 
@@ -195,7 +198,55 @@ func (e *kryptoEcMiddleware) callbackWorker() {
 				return fmt.Errorf("unmarshalling callback response: %w", err)
 			}
 
-			// Nothing to do here -- likely already enrolled
+			// Check to see if we should update any of our region URLs
+			if r.RegionURLs != nil {
+				if r.RegionURLs.EnrollmentURL != "" && r.RegionURLs.EnrollmentURL != e.flags.KolideServerURL() {
+					if err := e.flags.SetKolideServerURL(r.RegionURLs.EnrollmentURL); err != nil {
+						e.slogger.Log(ctx, slog.LevelError,
+							"could not update enrollment URL to correct region",
+							"enrollment_url", r.RegionURLs.EnrollmentURL,
+							"err", err,
+						)
+					} else {
+						e.slogger.Log(ctx, slog.LevelInfo,
+							"updated kolide server URL during callback",
+							"enrollment_url", r.RegionURLs.EnrollmentURL,
+						)
+					}
+				}
+
+				if r.RegionURLs.ControlServerURL != "" && r.RegionURLs.ControlServerURL != e.flags.ControlServerURL() {
+					if err := e.flags.SetControlServerURL(r.RegionURLs.ControlServerURL); err != nil {
+						e.slogger.Log(ctx, slog.LevelError,
+							"could not update control server URL to correct region",
+							"control_server_url", r.RegionURLs.ControlServerURL,
+							"err", err,
+						)
+					} else {
+						e.slogger.Log(ctx, slog.LevelInfo,
+							"updated control server URL during callback",
+							"control_server_url", r.RegionURLs.ControlServerURL,
+						)
+					}
+				}
+
+				if r.RegionURLs.OsqueryPublisherURL != "" && r.RegionURLs.OsqueryPublisherURL != e.flags.OsqueryPublisherURL() {
+					if err := e.flags.SetOsqueryPublisherURL(r.RegionURLs.OsqueryPublisherURL); err != nil {
+						e.slogger.Log(ctx, slog.LevelError,
+							"could not update osquery publisher URL to correct region",
+							"osquery_publisher_url", r.RegionURLs.OsqueryPublisherURL,
+							"err", err,
+						)
+					} else {
+						e.slogger.Log(ctx, slog.LevelInfo,
+							"updated osquery publisher URL during callback",
+							"osquery_publisher_url", r.RegionURLs.OsqueryPublisherURL,
+						)
+					}
+				}
+			}
+
+			// Nothing more to do here -- likely already enrolled
 			if r.NodeKey == "" {
 				return nil
 			}
