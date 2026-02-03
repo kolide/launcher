@@ -14,7 +14,6 @@ import (
 	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/ee/observability"
 	"github.com/osquery/osquery-go/plugin/table"
-	"golang.org/x/sync/semaphore"
 )
 
 const (
@@ -29,7 +28,7 @@ type wrappedTable struct {
 	gen             table.GenerateFunc
 	genTimeout      time.Duration
 	genTimeoutLock  *sync.Mutex
-	workers         *semaphore.Weighted
+	workers         chan struct{} // Buffered channel used as a semaphore to limit concurrent workers
 }
 
 type tablePluginOption func(*wrappedTable)
@@ -57,6 +56,13 @@ func New(flags types.Flags, slogger *slog.Logger, name string, columns []table.C
 // newWrappedTable returns a new `wrappedTable`. We split the constructor out for ease of testing
 // specific wrappedTable functionality around flag changes.
 func newWrappedTable(flags types.Flags, slogger *slog.Logger, name string, gen table.GenerateFunc, opts ...tablePluginOption) *wrappedTable {
+	// Initialize worker semaphore as a buffered channel
+	workers := make(chan struct{}, numWorkers)
+	// Pre-fill the channel to represent available workers
+	for i := 0; i < numWorkers; i++ {
+		workers <- struct{}{}
+	}
+
 	wt := &wrappedTable{
 		flagsController: flags,
 		slogger:         slogger.With("table_name", name),
@@ -64,7 +70,7 @@ func newWrappedTable(flags types.Flags, slogger *slog.Logger, name string, gen t
 		gen:             gen,
 		genTimeout:      flags.TableGenerateTimeout(),
 		genTimeoutLock:  &sync.Mutex{},
-		workers:         semaphore.NewWeighted(numWorkers),
+		workers:         workers,
 	}
 
 	for _, opt := range opts {
@@ -119,7 +125,11 @@ func (wt *wrappedTable) generate(ctx context.Context, queryContext table.QueryCo
 
 	// A worker must be available for us to try to run the generate function --
 	// we don't want too many calls to the same table piling up.
-	if !wt.workers.TryAcquire(1) {
+	// Using a non-blocking select to check if a worker is available.
+	select {
+	case <-wt.workers:
+		// Worker acquired, continue
+	default:
 		span.AddEvent("no_workers_available")
 		return nil, fmt.Errorf("no workers available (limit %d)", numWorkers)
 	}
@@ -130,22 +140,13 @@ func (wt *wrappedTable) generate(ctx context.Context, queryContext table.QueryCo
 	// channel to hold results
 	resultChan := make(chan *generateResult, 1)
 
-	// Use sync.Once to ensure worker is released exactly once, whether we take
-	// the normal path or the panic path
-	var releaseOnce sync.Once
-	releaseWorker := func() {
-		releaseOnce.Do(func() {
-			wt.workers.Release(1)
-		})
-	}
-
 	// Tables call all kinds of external libraries, sometimes they panic.
 	// To prevent our channel read from blocking, we need to ensure we write something.
 	// (this recovery function is passed to our GoWithRecoveryAction tablewrapper)
 	onPanic := func(r any) {
 		span.AddEvent("panic")
-		// Ensure worker is released on panic path
-		releaseWorker()
+		// Note: Worker release is handled by defer in the goroutine, which will execute
+		// even when a panic is recovered.
 
 		if recoveredErr, ok := r.(error); ok {
 			resultChan <- &generateResult{nil, fmt.Errorf("panic in %s: %w", wt.name, recoveredErr)}
@@ -159,7 +160,8 @@ func (wt *wrappedTable) generate(ctx context.Context, queryContext table.QueryCo
 	queryStartTime := time.Now()
 	pprof.Do(ctx, labels, func(ctx context.Context) {
 		gowrapper.GoWithRecoveryAction(ctx, wt.slogger, func() {
-			defer releaseWorker()
+			// Release worker when done - defer ensures this runs even if there's a panic
+			defer func() { wt.workers <- struct{}{} }()
 
 			rows, err := wt.gen(ctx, queryContext)
 			span.AddEvent("generate_returned")
