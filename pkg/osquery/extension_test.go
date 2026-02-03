@@ -340,8 +340,11 @@ func TestExtensionEnrollInvalidRegion(t *testing.T) {
 	k.On("NodeKey", types.DefaultEnrollmentID).Return("", nil).Once()
 
 	// We should update the regional URLs
+	k.On("KolideServerURL").Return("old.device.example.test")
 	k.On("SetKolideServerURL", expectedDeviceServerURL).Return(nil)
+	k.On("ControlServerURL").Return("old.control.example.test")
 	k.On("SetControlServerURL", expectedControlServerURL).Return(nil)
+	k.On("OsqueryPublisherURL").Return("old.pub.example.test")
 	k.On("SetOsqueryPublisherURL", expectedOsqueryPublisherURL).Return(nil)
 
 	e, err := NewExtension(t.Context(), m, lpc, settingsstoremock.NewSettingsStoreWriter(t), k, types.DefaultEnrollmentID, ExtensionOpts{})

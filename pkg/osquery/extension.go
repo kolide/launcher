@@ -403,13 +403,15 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		return "", true, err
 	}
 
-	// Handle response indicating we're talking to the wrong region -- update URLs via knapsack,
-	// then return error so we can retry enrollment against the correct server later.
-	if resp != nil && resp.RegionInvalid {
-		if resp.RegionURLs == nil {
-			return "", false, errors.New("region invalid, but did not receive updated region URLs")
-		}
-		if resp.RegionURLs.EnrollmentURL != "" {
+	if resp == nil {
+		err = errors.New("node received empty response")
+		observability.SetError(span, err)
+		return "", false, err
+	}
+
+	// Update region URLs, if needed
+	if resp.RegionURLs != nil {
+		if resp.RegionURLs.EnrollmentURL != "" && resp.RegionURLs.EnrollmentURL != e.knapsack.KolideServerURL() {
 			if err := e.knapsack.SetKolideServerURL(resp.RegionURLs.EnrollmentURL); err != nil {
 				e.slogger.Log(ctx, slog.LevelError,
 					"could not update enrollment URL to correct region",
@@ -424,7 +426,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 			}
 		}
 
-		if resp.RegionURLs.ControlServerURL != "" {
+		if resp.RegionURLs.ControlServerURL != "" && resp.RegionURLs.ControlServerURL != e.knapsack.ControlServerURL() {
 			if err := e.knapsack.SetControlServerURL(resp.RegionURLs.ControlServerURL); err != nil {
 				e.slogger.Log(ctx, slog.LevelError,
 					"could not update control server URL to correct region",
@@ -439,7 +441,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 			}
 		}
 
-		if resp.RegionURLs.OsqueryPublisherURL != "" {
+		if resp.RegionURLs.OsqueryPublisherURL != "" && resp.RegionURLs.OsqueryPublisherURL != e.knapsack.OsqueryPublisherURL() {
 			if err := e.knapsack.SetOsqueryPublisherURL(resp.RegionURLs.OsqueryPublisherURL); err != nil {
 				e.slogger.Log(ctx, slog.LevelError,
 					"could not update osquery publisher URL to correct region",
@@ -453,11 +455,13 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 				)
 			}
 		}
-
+	}
+	// If our region is invalid, return an error so we can try again later against the URLs updated above.
+	if resp.RegionInvalid {
 		return "", false, errors.New("region invalid, updated regional URLs to try again later")
 	}
 
-	if resp == nil || resp.NodeKey == "" {
+	if resp.NodeKey == "" {
 		err = errors.New("valid node received empty response")
 		observability.SetError(span, err)
 		return "", false, err
