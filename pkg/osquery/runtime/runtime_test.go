@@ -1171,8 +1171,12 @@ func mockServiceClient(t *testing.T) *servicemock.KolideService {
 	require.NoError(t, err)
 
 	return &servicemock.KolideService{
-		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, string, error) {
-			return "testnodekey", false, "", nil
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (*service.EnrollmentResponse, error) {
+			return &service.EnrollmentResponse{
+				NodeKey:            "testnodekey",
+				NodeInvalid:        false,
+				AgentIngesterToken: "",
+			}, nil
 		},
 		RequestConfigFunc: func(ctx context.Context, nodeKey string) (string, bool, error) {
 			return string(testConfigBytes), false, nil
