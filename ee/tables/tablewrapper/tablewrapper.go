@@ -135,7 +135,6 @@ func (wt *wrappedTable) generate(ctx context.Context, queryContext table.QueryCo
 	// (this recovery function is passed to our GoWithRecoveryAction tablewrapper)
 	onPanic := func(r any) {
 		span.AddEvent("panic")
-		wt.workers.Release(1)
 
 		if recoveredErr, ok := r.(error); ok {
 			resultChan <- &generateResult{nil, fmt.Errorf("panic in %s: %w", wt.name, recoveredErr)}
@@ -149,8 +148,9 @@ func (wt *wrappedTable) generate(ctx context.Context, queryContext table.QueryCo
 	queryStartTime := time.Now()
 	pprof.Do(ctx, labels, func(ctx context.Context) {
 		gowrapper.GoWithRecoveryAction(ctx, wt.slogger, func() {
+			defer wt.workers.Release(1)
+
 			rows, err := wt.gen(ctx, queryContext)
-			wt.workers.Release(1)
 			span.AddEvent("generate_returned")
 			resultChan <- &generateResult{
 				rows: rows,
