@@ -1,0 +1,57 @@
+{
+  "ca": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "aproximadament %{count} hora",
+          "other": "aproximadament %{count} hores"
+        },
+        "about_x_months": {
+          "one": "aproximadament %{count} mes",
+          "other": "aproximadament %{count} mesos"
+        },
+        "about_x_years": {
+          "one": "aproximadament %{count} any",
+          "other": "aproximadament %{count} anys"
+        },
+        "almost_x_years": {
+          "one": "quasi %{count} any",
+          "other": "quasi %{count} anys"
+        },
+        "half_a_minute": "mig minut",
+        "less_than_x_seconds": {
+          "one": "menys d'%{count} segon",
+          "other": "menys de %{count} segons"
+        },
+        "less_than_x_minutes": {
+          "one": "menys d'%{count} minut",
+          "other": "menys de %{count} minuts"
+        },
+        "over_x_years": {
+          "one": "més d'%{count} any",
+          "other": "més de %{count} anys"
+        },
+        "x_seconds": {
+          "one": "%{count} segon",
+          "other": "%{count} segons"
+        },
+        "x_minutes": {
+          "one": "%{count} minut",
+          "other": "%{count} minuts"
+        },
+        "x_days": {
+          "one": "%{count} dia",
+          "other": "%{count} dies"
+        },
+        "x_months": {
+          "one": "%{count} mes",
+          "other": "%{count} mesos"
+        },
+        "x_years": {
+          "one": "%{count} year",
+          "other": "%{count} years"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "kn": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "ಸುಮಾರು ಒಂದು ಗಂಟೆ",
+          "other": "ಸುಮಾರು %{count} ಗಂಟೆಗಳು"
+        },
+        "about_x_months": {
+          "one": "ಸುಮಾರು ಒಂದು ತಿಂಗಳು",
+          "other": "ಸುಮಾರು %{count} ತಿಂಗಳುಗಳು"
+        },
+        "about_x_years": {
+          "one": "ಸುಮಾರು ಒಂದು ವರುಷ",
+          "other": "ಸುಮಾರು %{count} ವರುಷಗಳು"
+        },
+        "almost_x_years": {
+          "one": "ಸರಿಸುಮಾರು ಒಂದು ವರುಷ",
+          "other": "ಸರಿಸುಮಾರು %{count} ವರುಷಗಳು"
+        },
+        "half_a_minute": "ಒಂದು ಅರ್ಧ ನಿಮಿಷ",
+        "less_than_x_seconds": {
+          "one": "ಒಂದು ಸೆಕೆಂಡಿಗೂ ಕಡಿಮೆ",
+          "other": "%{count} ಸೆಕೆಂಡಿಗಿಂತ ಕಡಿಮೆ"
+        },
+        "less_than_x_minutes": {
+          "one": "ಒಂದು ನಿಮಿಷಕ್ಕೂ ಕಡಿಮೆ",
+          "other": "%{count} ನಿಮಿಷಕ್ಕಿಂತ ಕಡಿಮೆ"
+        },
+        "over_x_years": {
+          "one": "ಒಂದು ವರುಷಕ್ಕಿಂತ ಹೆಚ್ಚು",
+          "other": "%{count} ವರುಷಗಳಿಗಿಂತ ಹೆಚ್ಚು"
+        },
+        "x_seconds": {
+          "one": "%{count} ಸೆಕೆಂಡ್",
+          "other": "%{count} ಸೆಕೆಂಡುಗಳು"
+        },
+        "x_minutes": {
+          "one": "%{count} ನಿಮಿಷ",
+          "other": "%{count} ನಿಮಿಷಗಳು"
+        },
+        "x_days": {
+          "one": "%{count} ದಿನ",
+          "other": "%{count} ದಿನಗಳು"
+        },
+        "x_months": {
+          "one": "%{count} ತಿಂಗಳು",
+          "other": "%{count} ತಿಂಗಳುಗಳು"
+        }
+      }
+    }
+  }
+}

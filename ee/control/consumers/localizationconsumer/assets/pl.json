@@ -1,0 +1,75 @@
+{
+  "pl": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "około godziny",
+          "few": "około %{count} godziny",
+          "many": "około %{count} godzin",
+          "other": "około %{count} godzin"
+        },
+        "about_x_months": {
+          "one": "około miesiąca",
+          "few": "około %{count} miesiące",
+          "many": "około %{count} miesięcy",
+          "other": "około %{count} miesięcy"
+        },
+        "about_x_years": {
+          "one": "około rok",
+          "few": "około %{count} lata",
+          "many": "około %{count} lat",
+          "other": "około %{count} lat"
+        },
+        "almost_x_years": {
+          "one": "prawie rok",
+          "few": "prawie %{count} lata",
+          "many": "prawie %{count} lat",
+          "other": "prawie %{count} lat"
+        },
+        "half_a_minute": "pół minuty",
+        "less_than_x_seconds": {
+          "one": "mniej niż sekundę",
+          "few": "mniej niż %{count} sekundy",
+          "many": "mniej niż %{count} sekund",
+          "other": "mniej niż %{count} sekund"
+        },
+        "less_than_x_minutes": {
+          "one": "mniej niż minutę",
+          "few": "mniej niż %{count} minuty",
+          "many": "mniej niż %{count} minut",
+          "other": "mniej niż %{count} minut"
+        },
+        "over_x_years": {
+          "one": "ponad rok",
+          "few": "ponad %{count} lata",
+          "many": "ponad %{count} lat",
+          "other": "ponad %{count} lat"
+        },
+        "x_seconds": {
+          "one": "%{count} sekunda",
+          "few": "%{count} sekundy",
+          "many": "%{count} sekund",
+          "other": "%{count} sekund"
+        },
+        "x_minutes": {
+          "one": "%{count} minuta",
+          "few": "%{count} minuty",
+          "many": "%{count} minut",
+          "other": "%{count} minut"
+        },
+        "x_days": {
+          "one": "%{count} dzień",
+          "few": "%{count} dni",
+          "many": "%{count} dni",
+          "other": "%{count} dni"
+        },
+        "x_months": {
+          "one": "%{count} miesiąc",
+          "few": "%{count} miesiące",
+          "many": "%{count} miesięcy",
+          "other": "%{count} miesięcy"
+        }
+      }
+    }
+  }
+}

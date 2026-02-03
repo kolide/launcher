@@ -1,0 +1,53 @@
+{
+  "mr-IN": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "सुमारे एक तास",
+          "other": "सुमारे %{count} तास"
+        },
+        "about_x_months": {
+          "one": "सुमारे %{count} महीना",
+          "other": "सुमारे %{count} महिना"
+        },
+        "about_x_years": {
+          "one": "सुमारे %{count} वर्ष",
+          "other": "सुमारे %{count} वर्ष"
+        },
+        "almost_x_years": {
+          "one": "जवळजवळ एक वर्ष",
+          "other": "जवळजवळ %{count} वर्ष"
+        },
+        "half_a_minute": "अर्धा मिनिट",
+        "less_than_x_seconds": {
+          "one": "एक सेकंद पेक्षा कमी",
+          "other": "%{count} सेकंद पेक्षा कमी"
+        },
+        "less_than_x_minutes": {
+          "one": "एका मिनिटापेक्षा कमी",
+          "other": "%{count} मिनिटापेक्षा कमी"
+        },
+        "over_x_years": {
+          "one": "एका वर्षापेक्षा जास्त काळ",
+          "other": "%{count} वर्षापेक्षा जास्त काळ"
+        },
+        "x_seconds": {
+          "one": "एक सेकंद",
+          "other": "%{count} सेकंद"
+        },
+        "x_minutes": {
+          "one": "एक मिनिट",
+          "other": "%{count} मिनिट"
+        },
+        "x_days": {
+          "one": "एक दिवस",
+          "other": "%{count} दिवस"
+        },
+        "x_months": {
+          "one": "एक महिना",
+          "other": "%{count} महिना"
+        }
+      }
+    }
+  }
+}

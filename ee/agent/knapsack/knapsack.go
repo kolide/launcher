@@ -54,7 +54,7 @@ type knapsack struct {
 
 	osqueryPublisher types.OsqueryPublisher
 
-	translations types.Translations
+	localizer types.Localizer
 	// This struct is a work in progress, and will be iteratively added to as needs arise.
 }
 
@@ -422,8 +422,8 @@ func (k *knapsack) EnrollmentDetailsStore() types.KVStore {
 	return k.getKVStore(storage.EnrollmentDetailsStore)
 }
 
-func (k *knapsack) TranslationsStore() types.KVStore {
-	return k.getKVStore(storage.TranslationsStore)
+func (k *knapsack) LocalizationStore() types.KVStore {
+	return k.getKVStore(storage.LocalizationStore)
 }
 
 func (k *knapsack) SetLauncherWatchdogDisabled(disabled bool) error {
@@ -684,14 +684,14 @@ func (k *knapsack) ServerReleaseTrackerDataStore() types.KVStore {
 	return k.getKVStore(storage.ServerReleaseTrackerDataStore)
 }
 
-func (k *knapsack) Translations() types.TranslationsData {
-	if k.translations == nil {
-		return types.TranslationsData{}
+func (k *knapsack) LocalizationData() types.LocalizationData {
+	if k.localizer == nil {
+		return types.LocalizationData{}
 	}
 
-	return k.translations.Translations()
+	return k.localizer.LocalizationData()
 }
 
-func (k *knapsack) SetTranslations(t types.Translations) {
-	k.translations = t
+func (k *knapsack) SetLocalizer(t types.Localizer) {
+	k.localizer = t
 }

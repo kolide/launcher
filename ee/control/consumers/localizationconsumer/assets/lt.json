@@ -1,0 +1,69 @@
+{
+  "lt": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "apie %{count} valandą",
+          "few": "apie %{count} valandas",
+          "other": "apie %{count} valandų"
+        },
+        "about_x_months": {
+          "one": "apie %{count} mėnesį",
+          "few": "apie %{count} mėnesius",
+          "other": "apie %{count} mėnesių"
+        },
+        "about_x_years": {
+          "one": "apie %{count} metus",
+          "few": "apie %{count} metus",
+          "other": "apie %{count} metų"
+        },
+        "almost_x_years": {
+          "one": "beveik %{count} metai",
+          "few": "beveik %{count} metai",
+          "other": "beveik %{count} metų"
+        },
+        "half_a_minute": "pusė minutės",
+        "less_than_x_seconds": {
+          "one": "mažiau nei %{count} sekundė",
+          "few": "mažiau nei %{count} sekundės",
+          "other": "mažiau nei %{count} sekundžių"
+        },
+        "less_than_x_minutes": {
+          "one": "mažiau nei %{count} minutė",
+          "few": "mažiau nei %{count} minutės",
+          "other": "mažiau nei %{count} minučių"
+        },
+        "over_x_years": {
+          "one": "virš %{count} metų",
+          "few": "virš %{count} metų",
+          "other": "virš %{count} metų"
+        },
+        "x_seconds": {
+          "one": "%{count} sekundė",
+          "few": "%{count} sekundės",
+          "other": "%{count} sekundžių"
+        },
+        "x_minutes": {
+          "one": "%{count} minutė",
+          "few": "%{count} minutės",
+          "other": "%{count} minučių"
+        },
+        "x_days": {
+          "one": "%{count} diena",
+          "few": "%{count} dienos",
+          "other": "%{count} dienų"
+        },
+        "x_months": {
+          "one": "%{count} mėnesis",
+          "few": "%{count} mėnesiai",
+          "other": "%{count} mėnesių"
+        },
+        "x_years": {
+          "one": "%{count} metai",
+          "few": "%{count} metai",
+          "other": "%{count} metai"
+        }
+      }
+    }
+  }
+}

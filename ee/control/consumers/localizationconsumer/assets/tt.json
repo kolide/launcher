@@ -1,0 +1,53 @@
+{
+  "tt": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "бер сәгать чамасы",
+          "other": "%{count} сәгать чамасы"
+        },
+        "about_x_months": {
+          "one": "бер ай чамасы",
+          "other": "%{count} ай чамасы"
+        },
+        "about_x_years": {
+          "one": "бер ел чамасы",
+          "other": "%{count} ел чамасы"
+        },
+        "almost_x_years": {
+          "one": "бер ел диярлек",
+          "other": "%{count} ел диярлек"
+        },
+        "half_a_minute": "минуттан азрак",
+        "less_than_x_seconds": {
+          "one": "бер секундтан азрак",
+          "other": "%{count} секундтан азрак"
+        },
+        "less_than_x_minutes": {
+          "one": "бер минуттан азрак",
+          "other": "%{count} минуттан азрак"
+        },
+        "over_x_years": {
+          "one": "бер ел артык",
+          "other": "%{count} ел артык"
+        },
+        "x_seconds": {
+          "one": "бер секунд",
+          "other": "%{count} секунд"
+        },
+        "x_minutes": {
+          "one": "бер минут",
+          "other": "%{count} минут"
+        },
+        "x_days": {
+          "one": "бер көн",
+          "other": "%{count} көн"
+        },
+        "x_months": {
+          "one": "бер ай",
+          "other": "%{count} ай"
+        }
+      }
+    }
+  }
+}

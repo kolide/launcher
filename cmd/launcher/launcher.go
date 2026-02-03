@@ -36,9 +36,9 @@ import (
 	"github.com/kolide/launcher/ee/control/consumers/acceleratecontrolconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/flareconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/keyvalueconsumer"
+	"github.com/kolide/launcher/ee/control/consumers/localizationconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/notificationconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/remoterestartconsumer"
-	"github.com/kolide/launcher/ee/control/consumers/translationsconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/uninstallconsumer"
 	performancedebug "github.com/kolide/launcher/ee/debug"
 	"github.com/kolide/launcher/ee/debug/checkups"
@@ -81,7 +81,7 @@ const (
 	ztaInfoSubsystemName                  = "zta_info"    // legacy name for dt4aInfo subsystem
 	dt4aInfoSubsystemName                 = "dt4a_info"
 	serverReleaseTrackerDataSubsystemName = "kolide_server_release_tracker_data"
-	translationsSubsystemName             = "translations"
+	localizationsSubsystemName            = "localizations"
 )
 
 // runLauncher is the entry point into running launcher. It creates a
@@ -460,12 +460,12 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		controlService.RegisterSubscriber(katcSubsystemName, startupSettingsWriter)
 		controlService.RegisterConsumer(serverReleaseTrackerDataSubsystemName, keyvalueconsumer.NewConfigConsumer(k.ServerReleaseTrackerDataStore()))
 
-		translationsConsumer, err := translationsconsumer.NewTranslationsConsumer(slogger, k.TranslationsStore())
+		localizationConsumer, err := localizationconsumer.NewLocalizationConsumer(slogger, k.LocalizationStore())
 		if err != nil {
-			return fmt.Errorf("failed to create translations consumer: %w", err)
+			return fmt.Errorf("failed to create localization consumer: %w", err)
 		}
-		k.SetTranslations(translationsConsumer)
-		controlService.RegisterConsumer(translationsSubsystemName, translationsConsumer)
+		k.SetLocalizer(localizationConsumer)
+		controlService.RegisterConsumer(localizationsSubsystemName, localizationConsumer)
 
 		runner, err = desktopRunner.New(
 			k,

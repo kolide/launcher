@@ -1,0 +1,53 @@
+{
+  "ta": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "சுமார் %{count} மணி நேரம்",
+          "other": "சுமார் %{count} மணி"
+        },
+        "about_x_months": {
+          "one": "சுமார் %{count} மாதம்",
+          "other": "சுமார் %{count} மாதங்களுக்கு"
+        },
+        "about_x_years": {
+          "one": "சுமார் %{count}  ஆண்டு",
+          "other": "சுமார் %{count}  ஆண்டுகள்"
+        },
+        "almost_x_years": {
+          "one": "கிட்டத்தட்ட %{count}  ஆண்டு",
+          "other": "கிட்டத்தட்ட %{count}  ஆண்டுகள்"
+        },
+        "half_a_minute": "அரை நிமிடம்",
+        "less_than_x_seconds": {
+          "one": "ஒரு வினாடிக்கும் குறைவாக",
+          "other": "குறைவாக %{count} வினாடிகள்"
+        },
+        "less_than_x_minutes": {
+          "one": "ஒரு நிமிடத்திற்கும் குறைவாக",
+          "other": "குறைவாக %{count} நிமிடங்கள்"
+        },
+        "over_x_years": {
+          "one": "ஒரு  ஆண்டிற்கு மேலாக",
+          "other": "%{count}  ஆண்டிற்கு மேலாக"
+        },
+        "x_seconds": {
+          "one": "%{count} வினாடி",
+          "other": "%{count} விநாடிகள்"
+        },
+        "x_minutes": {
+          "one": "%{count} நிமிடம்",
+          "other": "%{count} நிமிடங்கள்"
+        },
+        "x_days": {
+          "one": "%{count} நாள்",
+          "other": "%{count} நாட்கள்"
+        },
+        "x_months": {
+          "one": "%{count} மாதம்",
+          "other": "%{count} மாதங்கள்"
+        }
+      }
+    }
+  }
+}

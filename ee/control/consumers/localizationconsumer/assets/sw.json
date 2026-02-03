@@ -1,0 +1,53 @@
+{
+  "sw": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "kama saa limoja",
+          "other": "kama masaa %{count}"
+        },
+        "about_x_months": {
+          "one": "kama mwezi %{count}",
+          "other": "kama miezi %{count}"
+        },
+        "about_x_years": {
+          "one": "kama mwaka %{count}",
+          "other": "kama miaka %{count}"
+        },
+        "almost_x_years": {
+          "one": "karibia mwaka",
+          "other": "karibia miaka %{count}"
+        },
+        "half_a_minute": "nusu dakika",
+        "less_than_x_seconds": {
+          "one": "chini ya sekunde %{count}",
+          "other": "chini ya sekunde %{count}"
+        },
+        "less_than_x_minutes": {
+          "one": "chini ya dakika %{count}",
+          "other": "chini ya dakika %{count}"
+        },
+        "over_x_years": {
+          "one": "zaidi ya mwaka %{count}",
+          "other": "zaidi ya miaka %{count}"
+        },
+        "x_seconds": {
+          "one": "sekunde %{count}",
+          "other": "sekunde %{count}"
+        },
+        "x_minutes": {
+          "one": "dakika %{count}",
+          "other": "dakika %{count}"
+        },
+        "x_days": {
+          "one": "siku %{count}",
+          "other": "siku %{count}"
+        },
+        "x_months": {
+          "one": "mwezi %{count}",
+          "other": "miezi %{count}"
+        }
+      }
+    }
+  }
+}

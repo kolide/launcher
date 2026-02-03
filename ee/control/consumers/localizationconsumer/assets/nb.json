@@ -1,0 +1,57 @@
+{
+  "nb": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "rundt %{count} time",
+          "other": "rundt %{count} timer"
+        },
+        "about_x_months": {
+          "one": "rundt %{count} måned",
+          "other": "rundt %{count} måneder"
+        },
+        "about_x_years": {
+          "one": "rundt %{count} år",
+          "other": "rundt %{count} år"
+        },
+        "almost_x_years": {
+          "one": "nesten %{count} år",
+          "other": "nesten %{count} år"
+        },
+        "half_a_minute": "et halvt minutt",
+        "less_than_x_seconds": {
+          "one": "mindre enn %{count} sekund",
+          "other": "mindre enn %{count} sekunder"
+        },
+        "less_than_x_minutes": {
+          "one": "mindre enn %{count} minutt",
+          "other": "mindre enn %{count} minutter"
+        },
+        "over_x_years": {
+          "one": "over %{count} år",
+          "other": "over %{count} år"
+        },
+        "x_seconds": {
+          "one": "%{count} sekund",
+          "other": "%{count} sekunder"
+        },
+        "x_minutes": {
+          "one": "%{count} minutt",
+          "other": "%{count} minutter"
+        },
+        "x_days": {
+          "one": "%{count} dag",
+          "other": "%{count} dager"
+        },
+        "x_months": {
+          "one": "%{count} måned",
+          "other": "%{count} måneder"
+        },
+        "x_years": {
+          "one": "%{count} år",
+          "other": "%{count} år"
+        }
+      }
+    }
+  }
+}

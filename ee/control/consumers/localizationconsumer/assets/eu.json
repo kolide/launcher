@@ -1,0 +1,53 @@
+{
+  "eu": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "ordu bat inguru",
+          "other": "%{count} ordu inguru"
+        },
+        "about_x_months": {
+          "one": "hilabete bat inguru",
+          "other": "%{count} hilabete inguru"
+        },
+        "about_x_years": {
+          "one": "urte bat inguru",
+          "other": "%{count} urte inguru"
+        },
+        "almost_x_years": {
+          "one": "ia urte bat",
+          "other": "ia %{count} urte"
+        },
+        "half_a_minute": "minutu erdi",
+        "less_than_x_seconds": {
+          "one": "segundu bat baino gutxiago",
+          "other": "%{count} segundu baino gutxiago"
+        },
+        "less_than_x_minutes": {
+          "one": "%{count} minutu bat baino gutxiago",
+          "other": "%{count} minutu baino gutxiago"
+        },
+        "over_x_years": {
+          "one": "urte bat baino gehiago",
+          "other": "%{count} urte baino gehiago"
+        },
+        "x_seconds": {
+          "one": "segundu bat",
+          "other": "%{count} segundu"
+        },
+        "x_minutes": {
+          "one": "minutu bat",
+          "other": "%{count} minutu"
+        },
+        "x_days": {
+          "one": "egun bat",
+          "other": "%{count} egun"
+        },
+        "x_months": {
+          "one": "hilabete bat",
+          "other": "%{count} hilabete"
+        }
+      }
+    }
+  }
+}

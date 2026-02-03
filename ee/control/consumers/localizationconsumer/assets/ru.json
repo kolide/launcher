@@ -1,0 +1,81 @@
+{
+  "ru": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "около %{count} часа",
+          "few": "около %{count} часов",
+          "many": "около %{count} часов",
+          "other": "около %{count} часов"
+        },
+        "about_x_months": {
+          "one": "около %{count} месяца",
+          "few": "около %{count} месяцев",
+          "many": "около %{count} месяцев",
+          "other": "около %{count} месяцев"
+        },
+        "about_x_years": {
+          "one": "около %{count} года",
+          "few": "около %{count} лет",
+          "many": "около %{count} лет",
+          "other": "около %{count} лет"
+        },
+        "almost_x_years": {
+          "one": "почти %{count} год",
+          "few": "почти %{count} года",
+          "many": "почти %{count} лет",
+          "other": "почти %{count} лет"
+        },
+        "half_a_minute": "полминуты",
+        "less_than_x_seconds": {
+          "one": "меньше %{count} секунды",
+          "few": "меньше %{count} секунд",
+          "many": "меньше %{count} секунд",
+          "other": "меньше %{count} секунд"
+        },
+        "less_than_x_minutes": {
+          "one": "меньше %{count} минуты",
+          "few": "меньше %{count} минут",
+          "many": "меньше %{count} минут",
+          "other": "меньше %{count} минут"
+        },
+        "over_x_years": {
+          "one": "больше %{count} года",
+          "few": "больше %{count} лет",
+          "many": "больше %{count} лет",
+          "other": "больше %{count} лет"
+        },
+        "x_seconds": {
+          "one": "%{count} секунда",
+          "few": "%{count} секунды",
+          "many": "%{count} секунд",
+          "other": "%{count} секунд"
+        },
+        "x_minutes": {
+          "one": "%{count} минута",
+          "few": "%{count} минуты",
+          "many": "%{count} минут",
+          "other": "%{count} минут"
+        },
+        "x_days": {
+          "one": "%{count} день",
+          "few": "%{count} дня",
+          "many": "%{count} дней",
+          "other": "%{count} дней"
+        },
+        "x_months": {
+          "one": "%{count} месяц",
+          "few": "%{count} месяца",
+          "many": "%{count} месяцев",
+          "other": "%{count} месяцев"
+        },
+        "x_years": {
+          "one": "%{count} год",
+          "few": "%{count} года",
+          "many": "%{count} лет",
+          "other": "%{count} лет"
+        }
+      }
+    }
+  }
+}
