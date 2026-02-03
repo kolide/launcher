@@ -416,6 +416,11 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 					"kolide_server_url", resp.RegionURLs.DeviceServerURL,
 					"err", err,
 				)
+			} else {
+				e.slogger.Log(ctx, slog.LevelInfo,
+					"updated kolide server URL after getting region_invalid response to RequestEnrollment",
+					"kolide_server_url", resp.RegionURLs.DeviceServerURL,
+				)
 			}
 		}
 
@@ -426,6 +431,11 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 					"control_server_url", resp.RegionURLs.ControlServerURL,
 					"err", err,
 				)
+			} else {
+				e.slogger.Log(ctx, slog.LevelInfo,
+					"updated control server URL after getting region_invalid response to RequestEnrollment",
+					"control_server_url", resp.RegionURLs.ControlServerURL,
+				)
 			}
 		}
 
@@ -435,6 +445,11 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 					"could not update osquery publisher URL to correct region",
 					"osquery_publisher_url", resp.RegionURLs.OsqueryPublisherURL,
 					"err", err,
+				)
+			} else {
+				e.slogger.Log(ctx, slog.LevelInfo,
+					"updated osquery publisher URL after getting region_invalid response to RequestEnrollment",
+					"osquery_publisher_url", resp.RegionURLs.OsqueryPublisherURL,
 				)
 			}
 		}
