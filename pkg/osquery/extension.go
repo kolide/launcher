@@ -409,26 +409,34 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		if resp.RegionURLs == nil {
 			return "", false, errors.New("region invalid, but did not receive updated region URLs")
 		}
-		if err := e.knapsack.SetKolideServerURL(resp.RegionURLs.DeviceServerURL); err != nil {
-			e.slogger.Log(ctx, slog.LevelError,
-				"could not update kolide server URL to correct region",
-				"kolide_server_url", resp.RegionURLs.DeviceServerURL,
-				"err", err,
-			)
+		if resp.RegionURLs.DeviceServerURL != "" {
+			if err := e.knapsack.SetKolideServerURL(resp.RegionURLs.DeviceServerURL); err != nil {
+				e.slogger.Log(ctx, slog.LevelError,
+					"could not update kolide server URL to correct region",
+					"kolide_server_url", resp.RegionURLs.DeviceServerURL,
+					"err", err,
+				)
+			}
 		}
-		if err := e.knapsack.SetControlServerURL(resp.RegionURLs.ControlServerURL); err != nil {
-			e.slogger.Log(ctx, slog.LevelError,
-				"could not update control server URL to correct region",
-				"control_server_url", resp.RegionURLs.ControlServerURL,
-				"err", err,
-			)
+
+		if resp.RegionURLs.ControlServerURL != "" {
+			if err := e.knapsack.SetControlServerURL(resp.RegionURLs.ControlServerURL); err != nil {
+				e.slogger.Log(ctx, slog.LevelError,
+					"could not update control server URL to correct region",
+					"control_server_url", resp.RegionURLs.ControlServerURL,
+					"err", err,
+				)
+			}
 		}
-		if err := e.knapsack.SetOsqueryPublisherURL(resp.RegionURLs.OsqueryPublisherURL); err != nil {
-			e.slogger.Log(ctx, slog.LevelError,
-				"could not update osquery publisher URL to correct region",
-				"osquery_publisher_url", resp.RegionURLs.OsqueryPublisherURL,
-				"err", err,
-			)
+
+		if resp.RegionURLs.OsqueryPublisherURL != "" {
+			if err := e.knapsack.SetOsqueryPublisherURL(resp.RegionURLs.OsqueryPublisherURL); err != nil {
+				e.slogger.Log(ctx, slog.LevelError,
+					"could not update osquery publisher URL to correct region",
+					"osquery_publisher_url", resp.RegionURLs.OsqueryPublisherURL,
+					"err", err,
+				)
+			}
 		}
 
 		return "", false, errors.New("region invalid, updated regional URLs to try again later")
