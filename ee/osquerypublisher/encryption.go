@@ -23,7 +23,7 @@ type KeyData struct {
 	KeyID string
 }
 
-// EncryptedBlob represents the encrypted payload format as specified in the RFD
+// EncryptedBlob represents the encrypted payload format
 type EncryptedBlob struct {
 	Version         int    `json:"version"`
 	HPKEKeyID       string `json:"hpke_key_id"`
@@ -57,8 +57,8 @@ func parseKeyData(concatenated string) (*KeyData, error) {
 	}
 
 	return &KeyData{
-		Key:   key,
 		KeyID: keyID,
+		Key:   key,
 	}, nil
 }
 
