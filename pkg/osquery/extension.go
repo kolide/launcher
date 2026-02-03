@@ -409,17 +409,17 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		if resp.RegionURLs == nil {
 			return "", false, errors.New("region invalid, but did not receive updated region URLs")
 		}
-		if resp.RegionURLs.DeviceServerURL != "" {
-			if err := e.knapsack.SetKolideServerURL(resp.RegionURLs.DeviceServerURL); err != nil {
+		if resp.RegionURLs.EnrollmentURL != "" {
+			if err := e.knapsack.SetKolideServerURL(resp.RegionURLs.EnrollmentURL); err != nil {
 				e.slogger.Log(ctx, slog.LevelError,
-					"could not update kolide server URL to correct region",
-					"kolide_server_url", resp.RegionURLs.DeviceServerURL,
+					"could not update enrollment URL to correct region",
+					"enrollment_url", resp.RegionURLs.EnrollmentURL,
 					"err", err,
 				)
 			} else {
 				e.slogger.Log(ctx, slog.LevelInfo,
 					"updated kolide server URL after getting region_invalid response to RequestEnrollment",
-					"kolide_server_url", resp.RegionURLs.DeviceServerURL,
+					"enrollment_url", resp.RegionURLs.EnrollmentURL,
 				)
 			}
 		}

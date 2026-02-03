@@ -309,7 +309,7 @@ func TestExtensionEnrollInvalidRegion(t *testing.T) {
 			return &service.EnrollmentResponse{
 				RegionInvalid: true,
 				RegionURLs: &types.KolideURLs{
-					DeviceServerURL:     expectedDeviceServerURL,
+					EnrollmentURL:       expectedDeviceServerURL,
 					ControlServerURL:    expectedControlServerURL,
 					OsqueryPublisherURL: expectedOsqueryPublisherURL,
 				},
@@ -362,7 +362,7 @@ func TestExtensionEnrollInvalidRegion_DoesNotSetMissingUrls(t *testing.T) {
 			return &service.EnrollmentResponse{
 				RegionInvalid: true,
 				RegionURLs: &types.KolideURLs{
-					DeviceServerURL:     "",
+					EnrollmentURL:       "",
 					ControlServerURL:    "",
 					OsqueryPublisherURL: "",
 				},
