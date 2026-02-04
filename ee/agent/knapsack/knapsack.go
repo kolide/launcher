@@ -453,14 +453,18 @@ func (k *knapsack) LatestOsquerydPath(ctx context.Context) string {
 }
 
 func (k *knapsack) ReadEnrollSecret() (string, error) {
+	// Secret set via flags
 	if k.EnrollSecret() != "" {
 		return k.EnrollSecret(), nil
 	}
 
-	if k.EnrollSecretPath() != "" {
-		content, err := os.ReadFile(k.EnrollSecretPath())
+	// Check for secret set via enroll secret path. Only attempt to read if the file exists --
+	// if it doesn't exist, we want to fall through to checking for an enroll secret set via command-line below.
+	enrollSecretPath := k.EnrollSecretPath()
+	if _, err := os.Stat(enrollSecretPath); err == nil {
+		content, err := os.ReadFile(enrollSecretPath)
 		if err != nil {
-			return "", fmt.Errorf("could not read enroll secret path %s: %w", k.EnrollSecretPath(), err)
+			return "", fmt.Errorf("could not read enroll secret path %s: %w", enrollSecretPath, err)
 		}
 		return string(bytes.TrimSpace(content)), nil
 	}

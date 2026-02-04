@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
 )
@@ -50,17 +49,10 @@ func decodeJSONRPCHealthCheckResponse(_ context.Context, res jsonrpc.Response) (
 	return result, nil
 }
 
-func MakeCheckHealthEndpoint(svc KolideService) endpoint.Endpoint {
-	return func(ctx context.Context, request any) (response any, err error) {
-		status, err := svc.CheckHealth(ctx)
-		return healthcheckResponse{
-			Status: status,
-			Err:    err,
-		}, nil
-	}
-}
+func (e *Endpoints) CheckHealth(ctx context.Context) (int32, error) {
+	e.endpointsLock.RLock()
+	defer e.endpointsLock.RUnlock()
 
-func (e Endpoints) CheckHealth(ctx context.Context) (int32, error) {
 	newCtx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 	request := healthcheckRequest{}

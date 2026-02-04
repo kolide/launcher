@@ -58,15 +58,13 @@ type menuBuilder interface {
 // menu handles common functionality like retrieving menu data, and allows menu builders to provide their implementations
 type menu struct {
 	slogger  *slog.Logger
-	hostname string
 	filePath string
 	urlInput chan string
 }
 
-func New(slogger *slog.Logger, hostname, filePath string, urlInput chan string) *menu {
+func New(slogger *slog.Logger, filePath string, urlInput chan string) *menu {
 	m := &menu{
 		slogger:  slogger.With("component", "desktop_menu"),
-		hostname: hostname,
 		filePath: filePath,
 		urlInput: urlInput,
 	}

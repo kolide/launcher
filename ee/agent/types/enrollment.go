@@ -1,5 +1,11 @@
 package types
 
+type KolideURLs struct {
+	EnrollmentURL       string `json:"enrollment_url"` // This corresponds to `KolideServerURL` in the knapsack
+	ControlServerURL    string `json:"control_server_url"`
+	OsqueryPublisherURL string `json:"osquery_publisher_url"`
+}
+
 type EnrollmentStatus string
 
 const (

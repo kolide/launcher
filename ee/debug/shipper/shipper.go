@@ -268,8 +268,10 @@ func launcherData(k types.Knapsack, note string) ([]byte, error) {
 		runningUsername = runningUser.Username
 	}
 
+	enrollSecret, _ := k.ReadEnrollSecret()
+
 	b, err := json.Marshal(map[string]string{
-		"enroll_secret":    enrollSecret(k),
+		"enroll_secret":    enrollSecret,
 		"munemo":           munemo(k),
 		"console_users":    consoleUsers,
 		"running_user":     runningUsername,
@@ -283,32 +285,6 @@ func launcherData(k types.Knapsack, note string) ([]byte, error) {
 	}
 
 	return b, nil
-}
-
-func enrollSecret(k types.Knapsack) string {
-	// we may be running as launcher daemon or we may be calling this directly in an
-	// independent process that is not set up with knapsack
-	if k != nil && k.EnrollSecret() != "" {
-		return k.EnrollSecret()
-	}
-
-	if k != nil && k.EnrollSecretPath() != "" {
-		secret, err := os.ReadFile(k.EnrollSecretPath())
-		if err != nil {
-			return ""
-		}
-
-		return string(secret)
-	}
-
-	// TODO this will need to respect the identifier when determining the secret file location for dual-launcher installations
-	// this will specifically be an issue when flare is triggered standalone (without config path specified)
-	b, err := os.ReadFile(launcher.DefaultPath(launcher.SecretFile))
-	if err != nil {
-		return ""
-	}
-
-	return string(b)
 }
 
 // munemo fetches the enrollment's munemo from the knapsack. If that is not available,

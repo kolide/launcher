@@ -235,9 +235,20 @@ func (fc *FlagController) EnrollSecret() string {
 }
 
 func (fc *FlagController) EnrollSecretPath() string {
-	return NewStringFlagValue(
+	enrollSecretPath := NewStringFlagValue(
 		WithDefaultString(fc.cmdLineOpts.EnrollSecretPath),
 	).get(nil)
+	if enrollSecretPath != "" {
+		return enrollSecretPath
+	}
+
+	// If not set via flags already, then return the default location
+	defaultPath := launcher.DefaultPath(launcher.SecretFile)
+	if fc.Identifier() != launcher.DefaultLauncherIdentifier {
+		defaultPath = strings.ReplaceAll(defaultPath, launcher.DefaultLauncherIdentifier, fc.Identifier())
+	}
+
+	return defaultPath
 }
 
 func (fc *FlagController) RootDirectory() string {

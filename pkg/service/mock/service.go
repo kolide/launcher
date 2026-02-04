@@ -6,6 +6,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	"github.com/osquery/osquery-go/plugin/logger"
@@ -13,7 +14,7 @@ import (
 
 var _ service.KolideService = (*KolideService)(nil)
 
-type RequestEnrollmentFunc func(ctx context.Context, enrollSecret string, hostIdentifier string, enrollDetails service.EnrollmentDetails) (string, bool, string, error)
+type RequestEnrollmentFunc func(ctx context.Context, enrollSecret string, hostIdentifier string, enrollDetails service.EnrollmentDetails) (*service.EnrollmentResponse, error)
 
 type RequestConfigFunc func(ctx context.Context, nodeKey string) (string, bool, error)
 
@@ -47,7 +48,7 @@ type KolideService struct {
 	invokedLock sync.Mutex
 }
 
-func (s *KolideService) RequestEnrollment(ctx context.Context, enrollSecret string, hostIdentifier string, enrollDetails service.EnrollmentDetails) (string, bool, string, error) {
+func (s *KolideService) RequestEnrollment(ctx context.Context, enrollSecret string, hostIdentifier string, enrollDetails service.EnrollmentDetails) (*service.EnrollmentResponse, error) {
 	s.invokedLock.Lock()
 	defer s.invokedLock.Unlock()
 	s.RequestEnrollmentFuncInvoked = true
@@ -88,3 +89,5 @@ func (s *KolideService) CheckHealth(ctx context.Context) (int32, error) {
 	s.CheckHealthFuncInvoked = true
 	return s.CheckHealthFunc(ctx)
 }
+
+func (s *KolideService) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {}

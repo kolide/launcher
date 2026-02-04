@@ -166,6 +166,51 @@ func TestExecute_launcherUpdate(t *testing.T) {
 	mockKnapsack.AssertExpectations(t)
 }
 
+// TestExecute_GO20264348 confirms that GO-2026-4348 does not apply to our current version of go-tuf.
+func TestExecute_GO20264348(t *testing.T) {
+	t.Parallel()
+
+	invalidMetadatas := []string{
+		`{}`,            // missing top-level "signed" key
+		`{"signed":{}}`, // signed missing "_type" key
+	}
+
+	for _, invalidMetadata := range invalidMetadatas {
+		t.Run(invalidMetadata, func(t *testing.T) {
+			t.Parallel()
+
+			// Set up a metadata server that will serve malformed data
+			testMetadataServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Write([]byte(invalidMetadata))
+			}))
+
+			testRootDir := t.TempDir()
+			mockKnapsack := typesmocks.NewKnapsack(t)
+			mockKnapsack.On("RootDirectory").Return(testRootDir)
+			mockKnapsack.On("UpdateChannel").Return("nightly")
+			mockKnapsack.On("PinnedLauncherVersion").Return("")
+			mockKnapsack.On("PinnedOsquerydVersion").Return("")
+			mockKnapsack.On("AutoupdateInterval").Return(500 * time.Millisecond).Maybe()
+			mockKnapsack.On("AutoupdateInitialDelay").Return(0 * time.Second)
+			mockKnapsack.On("TufServerURL").Return(testMetadataServer.URL)
+			mockKnapsack.On("UpdateDirectory").Return("")
+			mockKnapsack.On("MirrorServerURL").Return("https://example.com")
+			mockKnapsack.On("LocalDevelopmentPath").Return("").Maybe()
+			mockKnapsack.On("InModernStandby").Return(false).Maybe()
+			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay, keys.AutoupdateInterval, keys.AutoupdateInitialDelay).Return()
+			mockKnapsack.On("AutoupdateDownloadSplay").Return(0 * time.Second).Maybe()
+			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+
+			// Set up autoupdater
+			autoupdater, err := NewTufAutoupdater(t.Context(), mockKnapsack, http.DefaultClient, http.DefaultClient)
+			require.NoError(t, err, "could not initialize new TUF autoupdater")
+
+			_, err = autoupdater.metadataClient.Update()
+			require.Error(t, err) // we expect an error, but NOT a panic
+		})
+	}
+}
+
 func TestExecute_osquerydUpdate(t *testing.T) {
 	t.Parallel()
 

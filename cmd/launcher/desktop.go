@@ -31,11 +31,11 @@ import (
 
 func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 	var (
-		flagset    = flag.NewFlagSet("kolide desktop", flag.ExitOnError)
-		flhostname = flagset.String(
+		flagset = flag.NewFlagSet("kolide desktop", flag.ExitOnError)
+		_       = flagset.String(
 			"hostname",
 			"",
-			"hostname launcher is connected to",
+			"hostname launcher is connected to (deprecated)",
 		)
 		flUserServerAuthToken = flagset.String(
 			"user_server_auth_token",
@@ -163,7 +163,7 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 	universalLinkHandler, urlInput := universallink.NewUniversalLinkHandler(slogger)
 	runGroup.Add("universalLinkHandler", universalLinkHandler.Execute, universalLinkHandler.Interrupt)
 	// Pass through channel so that systray can alert the link handler when it receives a universal link request
-	m := menu.New(slogger, *flhostname, *flmenupath, urlInput)
+	m := menu.New(slogger, *flmenupath, urlInput)
 	refreshMenu := func() {
 		m.Build()
 	}

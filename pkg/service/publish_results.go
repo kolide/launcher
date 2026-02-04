@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
 	"github.com/kolide/launcher/ee/observability"
@@ -62,23 +61,13 @@ func encodeJSONRPCPublishResultsResponse(_ context.Context, obj any) (json.RawMe
 	return encodeJSONResponse(b, fmt.Errorf("marshal json response: %w", err))
 }
 
-func MakePublishResultsEndpoint(svc KolideService) endpoint.Endpoint {
-	return func(ctx context.Context, request any) (response any, err error) {
-		req := request.(resultCollection)
-		message, errcode, valid, err := svc.PublishResults(ctx, req.NodeKey, req.Results)
-		return publishResultsResponse{
-			Message:     message,
-			ErrorCode:   errcode,
-			NodeInvalid: valid,
-			Err:         err,
-		}, nil
-	}
-}
-
 // PublishResults implements KolideService.PublishResults
-func (e Endpoints) PublishResults(ctx context.Context, nodeKey string, results []distributed.Result) (string, string, bool, error) {
+func (e *Endpoints) PublishResults(ctx context.Context, nodeKey string, results []distributed.Result) (string, string, bool, error) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
+
+	e.endpointsLock.RLock()
+	defer e.endpointsLock.RUnlock()
 
 	newCtx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()

@@ -121,7 +121,7 @@ func TestControllerStringFlags(t *testing.T) {
 				value = fc.EnrollSecret()
 				assert.Equal(t, expectedValue, value)
 				value = fc.EnrollSecretPath()
-				assert.Equal(t, expectedValue, value)
+				assert.Equal(t, launcher.DefaultPath(launcher.SecretFile), value) // When empty, we provide a path default
 				value = fc.RootDirectory()
 				assert.Equal(t, expectedValue, value)
 				value = fc.OsquerydPath()
