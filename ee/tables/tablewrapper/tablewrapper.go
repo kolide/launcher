@@ -130,23 +130,11 @@ func (wt *wrappedTable) generate(ctx context.Context, queryContext table.QueryCo
 	// channel to hold results
 	resultChan := make(chan *generateResult, 1)
 
-	// Use sync.Once to ensure worker is released exactly once, whether we take
-	// the normal path or the panic path
-	var releaseOnce sync.Once
-	releaseWorker := func() {
-		releaseOnce.Do(func() {
-			wt.workers.Release(1)
-		})
-	}
-
 	// Tables call all kinds of external libraries, sometimes they panic.
 	// To prevent our channel read from blocking, we need to ensure we write something.
 	// (this recovery function is passed to our GoWithRecoveryAction tablewrapper)
 	onPanic := func(r any) {
 		span.AddEvent("panic")
-		// Ensure worker is released on panic path
-		releaseWorker()
-
 		if recoveredErr, ok := r.(error); ok {
 			resultChan <- &generateResult{nil, fmt.Errorf("panic in %s: %w", wt.name, recoveredErr)}
 		} else {
@@ -159,7 +147,7 @@ func (wt *wrappedTable) generate(ctx context.Context, queryContext table.QueryCo
 	queryStartTime := time.Now()
 	pprof.Do(ctx, labels, func(ctx context.Context) {
 		gowrapper.GoWithRecoveryAction(ctx, wt.slogger, func() {
-			defer releaseWorker()
+			defer wt.workers.Release(1)
 
 			rows, err := wt.gen(ctx, queryContext)
 			span.AddEvent("generate_returned")
