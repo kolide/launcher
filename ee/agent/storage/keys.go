@@ -5,10 +5,11 @@ import "bytes"
 var (
 	// Well-known keys
 	ObservabilityIngestAuthTokenKey = []byte("observability_ingest_auth_token")
-	AgentIngesterAuthTokenKey       = []byte("agent_ingester_auth_token")
 	EnrollmentSecretTokenKey        = []byte("enrollment_secret") // Enrollment secret set via `launcher enroll`
-	HPKEPublicKey                   = []byte("hpke_public_key")   // HPKE key ID + : + public key
-	HPKEPresharedKey                = []byte("hpke_psk")          // PSK ID + : + PSK
+	// Agent-Ingester keys
+	AgentIngesterAuthTokenKey = []byte("agent_ingester_auth_token")
+	HPKEPublicKey             = []byte("agent_ingester_hpke_public_key") // HPKE key ID + : + public key
+	HPKEPresharedKey          = []byte("agent_ingester_hpke_psk")        // PSK ID + : + PSK
 
 	// Identifier types in complex keys
 	IdentifierTypeEnrollment = []byte("registration") // stored under "registration" for legacy/backwards compatibility reasons
