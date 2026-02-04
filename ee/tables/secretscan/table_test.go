@@ -27,8 +27,9 @@ func TestSecretScan(t *testing.T) {
 	for _, tt := range []struct {
 		name string
 		// Input configuration
-		scanType          string // "path" or "raw_data"
-		targetPath        string // relative path within test_data (for file/directory) or raw content
+		scanType          string                    // "path" or "raw_data"
+		targetPath        string                    // relative path within test_data (for file/directory) or raw content
+		setupFunc         func(t *testing.T) string // optional setup that returns absolute path to scan
 		minFindingsCount  int
 		expectedRuleIDs   []string // rule IDs we expect to find (at least one)
 		expectedFileNames []string // file names we expect in findings (at least one)
@@ -41,7 +42,7 @@ func TestSecretScan(t *testing.T) {
 			minFindingsCount:  2,
 			expectedRuleIDs:   []string{"slack-bot-token", "github-pat"},
 			expectedFileNames: []string{"config.yaml", "github_token.env"},
-			forbiddenFiles:    []string{"clean_file.txt"},
+			forbiddenFiles:    []string{"clean_file.txt", "low_entropy.txt"},
 		},
 		{
 			name:              "scan single file with slack token",
@@ -65,6 +66,11 @@ func TestSecretScan(t *testing.T) {
 			targetPath: "clean_file.txt",
 		},
 		{
+			name:       "scan low entropy AWS example keys finds no secrets",
+			scanType:   "path",
+			targetPath: "low_entropy.txt", // Contains AWS EXAMPLE keys which are low entropy and should be ignored
+		},
+		{
 			name:     "scan raw data with slack token",
 			scanType: "raw_data",
 			targetPath: `config:
@@ -83,6 +89,35 @@ func TestSecretScan(t *testing.T) {
 			scanType:   "path",
 			targetPath: "nonexistent_file_that_does_not_exist.txt", // Relative path that won't exist
 		},
+		{
+			name:     "symlink to file with secret is scanned",
+			scanType: "path",
+			setupFunc: func(t *testing.T) string {
+				tempDir := t.TempDir()
+				secretFile := filepath.Join(tempDir, "secret.txt")
+				err := os.WriteFile(secretFile, []byte(`slack_token: xoxb-9876543210-9876543210-zyxwvutsrqponmlk`), 0644)
+				require.NoError(t, err)
+				symlinkPath := filepath.Join(tempDir, "secret_link")
+				err = os.Symlink(secretFile, symlinkPath)
+				require.NoError(t, err)
+				return symlinkPath
+			},
+			minFindingsCount:  1,
+			expectedRuleIDs:   []string{"slack-bot-token"},
+			expectedFileNames: []string{"secret_link"},
+		},
+		{
+			name:     "broken symlink returns empty",
+			scanType: "path",
+			setupFunc: func(t *testing.T) string {
+				tempDir := t.TempDir()
+				brokenLink := filepath.Join(tempDir, "broken_link")
+				err := os.Symlink(filepath.Join(tempDir, "nonexistent"), brokenLink)
+				require.NoError(t, err)
+				return brokenLink
+			},
+			// Broken symlink causes stat error, which is logged and skipped (returns empty)
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -95,12 +130,17 @@ func TestSecretScan(t *testing.T) {
 
 			switch tt.scanType {
 			case "path":
-				fullPath := tt.targetPath
-				if tt.targetPath == "" {
+				var fullPath string
+				if tt.setupFunc != nil {
+					// Use custom setup function to create test fixtures
+					fullPath = tt.setupFunc(t)
+				} else if tt.targetPath == "" {
 					fullPath = projectDir
 				} else if !filepath.IsAbs(tt.targetPath) {
 					// Convert forward slashes to OS-specific separator
 					fullPath = filepath.Join(projectDir, filepath.FromSlash(tt.targetPath))
+				} else {
+					fullPath = tt.targetPath
 				}
 				queryContext = map[string][]string{"path": {fullPath}}
 			case "raw_data":
