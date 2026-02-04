@@ -62,7 +62,6 @@ require (
 	go.opentelemetry.io/otel/exporters/stdout/stdoutmetric v1.35.0
 	go.opentelemetry.io/otel/sdk/metric v1.35.0
 	go.uber.org/atomic v1.9.0
-	gopkg.in/yaml.v2 v2.4.0
 	modernc.org/sqlite v1.37.1
 )
 
@@ -168,7 +167,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.35.0
 	google.golang.org/protobuf v1.36.5 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
 go 1.25.6

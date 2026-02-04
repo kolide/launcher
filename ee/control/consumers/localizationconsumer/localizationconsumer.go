@@ -37,7 +37,7 @@ func NewLocalizationConsumer(slogger *slog.Logger, kvStore types.KVStore) (*Loca
 	// first load all the default translations form assets
 	assetEntries, err := fs.ReadDir(assets, "assets")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read assets: %w", err)
 	}
 
 	for _, asset := range assetEntries {
@@ -47,13 +47,13 @@ func NewLocalizationConsumer(slogger *slog.Logger, kvStore types.KVStore) (*Loca
 
 		content, err := fs.ReadFile(assets, path.Join("assets", asset.Name()))
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to read asset %s: %w", asset.Name(), err)
 		}
 
 		// Each JSON file is { "localeKey": { "datetime": {...} } }
 		var fileTranslations map[string]types.Translations
 		if err := json.Unmarshal(content, &fileTranslations); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to unmarshal asset %s: %w", asset.Name(), err)
 		}
 
 		maps.Copy(t.localizationData.Translations, fileTranslations)
@@ -62,7 +62,7 @@ func NewLocalizationConsumer(slogger *slog.Logger, kvStore types.KVStore) (*Loca
 	// now load localization data from the store
 	localizationDataRaw, err := t.store.Get([]byte(localizationsDataKey))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get localization data from store: %w", err)
 	}
 
 	if len(localizationDataRaw) == 0 {
@@ -71,7 +71,7 @@ func NewLocalizationConsumer(slogger *slog.Logger, kvStore types.KVStore) (*Loca
 
 	var localizationFromStore types.LocalizationData
 	if err := json.Unmarshal(localizationDataRaw, &localizationFromStore); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal localization data from store: %w", err)
 	}
 
 	maps.Copy(t.localizationData.Translations, localizationFromStore.Translations)
@@ -86,7 +86,7 @@ func (t *LocalizationConsumer) Update(data io.Reader) error {
 	// parse the data into a types.LocalizationData
 	var updatedLocalizationData types.LocalizationData
 	if err := json.NewDecoder(data).Decode(&updatedLocalizationData); err != nil {
-		return fmt.Errorf("failed to decode localization json: %w", err)
+		return fmt.Errorf("failed to decode localization update: %w", err)
 	}
 
 	maps.Copy(t.localizationData.Translations, updatedLocalizationData.Translations)
@@ -95,12 +95,12 @@ func (t *LocalizationConsumer) Update(data io.Reader) error {
 	// marshal updated localization data into a byte slice
 	updatedLocalizationDataBytes, err := json.Marshal(t.localizationData)
 	if err != nil {
-		return fmt.Errorf("failed to marshal localization data: %w", err)
+		return fmt.Errorf("failed to marshal localization update: %w", err)
 	}
 
 	// save to the store
 	if err := t.store.Set([]byte(localizationsDataKey), updatedLocalizationDataBytes); err != nil {
-		return fmt.Errorf("failed to save localization to store: %w", err)
+		return fmt.Errorf("failed to save localization update to store: %w", err)
 	}
 
 	return nil
