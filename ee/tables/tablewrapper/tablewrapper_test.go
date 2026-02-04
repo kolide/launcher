@@ -250,3 +250,26 @@ func TestFlagsChanged(t *testing.T) {
 	require.Equal(t, controlServerOverrideTimeout, w.genTimeout)
 	w.genTimeoutLock.Unlock()
 }
+
+func TestPanics(t *testing.T) {
+	t.Parallel()
+
+	expectedName := "test_table"
+	mockFlags := typesmocks.NewFlags(t)
+	mockFlags.On("TableGenerateTimeout").Return(5 * time.Second).Once()
+	mockFlags.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return()
+
+	generate := func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+		panic("In the Disco") //nolint:forbidigo // Fine to use panic in tests
+	}
+
+	w := New(mockFlags, multislogger.NewNopLogger(), expectedName, nil, generate)
+
+	resp := w.Call(t.Context(), map[string]string{"action": "generate", "context": "{}"})
+
+	require.Equal(t, int32(1), resp.Status.Code)
+	require.NotContains(t, resp.Status.Message, "timed out after")
+	require.Contains(t, resp.Status.Message, "panic in test_table: In the Disco")
+
+	mockFlags.AssertExpectations(t)
+}
