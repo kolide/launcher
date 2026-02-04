@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
 
@@ -22,13 +21,25 @@ type enrollmentRequest struct {
 
 type EnrollmentDetails = types.EnrollmentDetails
 
+// enrollmentResponse is the raw response received from the cloud
 type enrollmentResponse struct {
 	jsonRpcResponse
-	NodeKey            string `json:"node_key"`
-	NodeInvalid        bool   `json:"node_invalid"`
-	ErrorCode          string `json:"error_code,omitempty"`
-	Err                error  `json:"err,omitempty"`
-	AgentIngesterToken string `json:"agent_ingester_auth_token,omitempty"`
+	NodeKey            string            `json:"node_key"`
+	NodeInvalid        bool              `json:"node_invalid"`
+	RegionInvalid      bool              `json:"region_invalid"`
+	RegionURLs         *types.KolideURLs `json:"region_urls,omitempty"`
+	ErrorCode          string            `json:"error_code,omitempty"`
+	Err                error             `json:"err,omitempty"`
+	AgentIngesterToken string            `json:"agent_ingester_auth_token,omitempty"`
+}
+
+// EnrollmentResponse is the subset of data from enrollmentResponse that we expose to consumers
+type EnrollmentResponse struct {
+	NodeKey            string
+	NodeInvalid        bool
+	RegionInvalid      bool
+	RegionURLs         *types.KolideURLs
+	AgentIngesterToken string
 }
 
 func decodeJSONRPCEnrollmentRequest(_ context.Context, msg json.RawMessage) (any, error) {
@@ -70,24 +81,11 @@ func encodeJSONRPCEnrollmentResponse(_ context.Context, obj any) (json.RawMessag
 	return encodeJSONResponse(b, nil)
 }
 
-func MakeRequestEnrollmentEndpoint(svc KolideService) endpoint.Endpoint {
-	return func(ctx context.Context, request any) (response any, err error) {
-		req := request.(enrollmentRequest)
-		nodeKey, valid, token, err := svc.RequestEnrollment(ctx, req.EnrollSecret, req.HostIdentifier, req.EnrollmentDetails)
-		return enrollmentResponse{
-			NodeKey:            nodeKey,
-			NodeInvalid:        valid,
-			Err:                err,
-			AgentIngesterToken: token,
-		}, nil
-	}
-}
-
 // requestTimeout is duration after which the request is cancelled.
 const requestTimeout = 60 * time.Second
 
 // RequestEnrollment implements KolideService.RequestEnrollment
-func (e *Endpoints) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string, details EnrollmentDetails) (string, bool, string, error) {
+func (e *Endpoints) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string, details EnrollmentDetails) (*EnrollmentResponse, error) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -101,18 +99,24 @@ func (e *Endpoints) RequestEnrollment(ctx context.Context, enrollSecret, hostIde
 	response, err := e.RequestEnrollmentEndpoint(newCtx, request)
 
 	if err != nil {
-		return "", false, "", err
+		return nil, err
 	}
 	resp := response.(enrollmentResponse)
 
 	if resp.DisableDevice {
-		return "", false, "", ErrDeviceDisabled{}
+		return nil, ErrDeviceDisabled{}
 	}
 
-	return resp.NodeKey, resp.NodeInvalid, resp.AgentIngesterToken, resp.Err
+	return &EnrollmentResponse{
+		NodeKey:            resp.NodeKey,
+		NodeInvalid:        resp.NodeInvalid,
+		RegionInvalid:      resp.RegionInvalid,
+		RegionURLs:         resp.RegionURLs,
+		AgentIngesterToken: resp.AgentIngesterToken,
+	}, resp.Err
 }
 
-func (mw logmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string, details EnrollmentDetails) (nodekey string, reauth bool, token string, err error) {
+func (mw logmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string, details EnrollmentDetails) (resp *EnrollmentResponse, err error) {
 	defer func(begin time.Time) {
 		uuid, _ := uuid.FromContext(ctx)
 
@@ -132,26 +136,25 @@ func (mw logmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentif
 			"method", "RequestEnrollment",
 			"uuid", uuid,
 			"hostIdentifier", hostIdentifier,
-			"reauth", reauth,
 			"err", err,
 			"took", took,
 		}
 
-		if err != nil {
+		if resp != nil {
 			keyvals = append(keyvals,
-				"enrollSecret", enrollSecret,
-				"nodekey", nodekey,
+				"reauth", resp.NodeInvalid,
+				"region_invalid", resp.RegionInvalid,
 			)
 		}
 
 		mw.knapsack.Slogger().Log(ctx, levelForError(err), message, keyvals...) // nolint:sloglint // it's fine to not have a constant or literal here
 	}(time.Now())
 
-	nodekey, reauth, token, err = mw.next.RequestEnrollment(ctx, enrollSecret, hostIdentifier, details)
-	return nodekey, reauth, token, err
+	resp, err = mw.next.RequestEnrollment(ctx, enrollSecret, hostIdentifier, details)
+	return resp, err
 }
 
-func (mw uuidmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string, details EnrollmentDetails) (errcode string, reauth bool, token string, err error) {
+func (mw uuidmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string, details EnrollmentDetails) (resp *EnrollmentResponse, err error) {
 	ctx = uuid.NewContext(ctx, uuid.NewForRequest())
 	return mw.next.RequestEnrollment(ctx, enrollSecret, hostIdentifier, details)
 }

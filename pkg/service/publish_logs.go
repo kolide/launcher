@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
 	"github.com/osquery/osquery-go/plugin/logger"
@@ -65,19 +64,6 @@ func decodeJSONRPCPublishLogsResponse(_ context.Context, res jsonrpc.Response) (
 	}
 
 	return result, nil
-}
-
-func MakePublishLogsEndpoint(svc KolideService) endpoint.Endpoint {
-	return func(ctx context.Context, request any) (response any, err error) {
-		req := request.(logCollection)
-		message, errcode, valid, err := svc.PublishLogs(ctx, req.NodeKey, req.LogType, req.Logs)
-		return publishLogsResponse{
-			Message:     message,
-			ErrorCode:   errcode,
-			NodeInvalid: valid,
-			Err:         err,
-		}, nil
-	}
 }
 
 // PublishLogs implements KolideService.PublishLogs

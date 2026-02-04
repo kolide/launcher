@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
 
@@ -62,18 +61,6 @@ func decodeJSONRPCConfigResponse(_ context.Context, res jsonrpc.Response) (any, 
 		return nil, fmt.Errorf("unmarshalling RequestConfig response: %w", err)
 	}
 	return result, nil
-}
-
-func MakeRequestConfigEndpoint(svc KolideService) endpoint.Endpoint {
-	return func(ctx context.Context, request any) (response any, err error) {
-		req := request.(configRequest)
-		config, valid, err := svc.RequestConfig(ctx, req.NodeKey)
-		return configResponse{
-			ConfigJSONBlob: config,
-			NodeInvalid:    valid,
-			Err:            err,
-		}, nil
-	}
 }
 
 // RequestConfig implements KolideService.RequestConfig.

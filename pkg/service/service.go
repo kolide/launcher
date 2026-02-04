@@ -15,7 +15,7 @@ import (
 type KolideService interface {
 	// RequestEnrollment requests a node key for the host, authenticating
 	// with the given enroll secret.
-	RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string, details EnrollmentDetails) (string, bool, string, error)
+	RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string, details EnrollmentDetails) (*EnrollmentResponse, error)
 	// RequestConfig requests the osquery config for the host.
 	RequestConfig(ctx context.Context, nodeKey string) (string, bool, error)
 	// PublishLogs publishes logs from the osquery process. These may be

@@ -211,8 +211,8 @@ func TestGetHostIdentifierCorruptedData(t *testing.T) {
 
 func TestExtensionEnrollTransportError(t *testing.T) {
 	m := &mock.KolideService{
-		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, string, error) {
-			return "", false, "", errors.New("transport")
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (*service.EnrollmentResponse, error) {
+			return nil, errors.New("transport")
 		},
 	}
 
@@ -230,8 +230,10 @@ func TestExtensionEnrollTransportError(t *testing.T) {
 
 func TestExtensionEnrollSecretInvalid(t *testing.T) {
 	m := &mock.KolideService{
-		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, string, error) {
-			return "", true, "", nil
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (*service.EnrollmentResponse, error) {
+			return &service.EnrollmentResponse{
+				NodeInvalid: true,
+			}, nil
 		},
 	}
 	k := makeKnapsackUnenrolled(t)
@@ -280,8 +282,8 @@ func createTestEnrollSecret(t *testing.T, munemo string) string {
 
 func TestExtensionEnrollValidNodeEmptyResponse(t *testing.T) {
 	m := &mock.KolideService{
-		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, string, error) {
-			return "", false, "", nil
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (*service.EnrollmentResponse, error) {
+			return nil, nil
 		},
 	}
 	k := makeKnapsackUnenrolled(t)
@@ -297,6 +299,114 @@ func TestExtensionEnrollValidNodeEmptyResponse(t *testing.T) {
 	assert.NotNil(t, err)
 }
 
+func TestExtensionEnrollInvalidRegion(t *testing.T) {
+	expectedDeviceServerURL := "device.example.test"
+	expectedControlServerURL := "control.example.test"
+	expectedOsqueryPublisherURL := "pub.example.test"
+
+	m := &mock.KolideService{
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (*service.EnrollmentResponse, error) {
+			return &service.EnrollmentResponse{
+				RegionInvalid: true,
+				RegionURLs: &types.KolideURLs{
+					EnrollmentURL:       expectedDeviceServerURL,
+					ControlServerURL:    expectedControlServerURL,
+					OsqueryPublisherURL: expectedOsqueryPublisherURL,
+				},
+			}, nil
+		},
+	}
+
+	expectedMunemo := "test_fake_munemo_2"
+	expectedEnrollSecret := createTestEnrollSecret(t, expectedMunemo)
+	k := mocks.NewKnapsack(t)
+	k.On("OsquerydPath").Maybe().Return("")
+	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
+	configStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
+	require.NoError(t, err)
+	k.On("ConfigStore").Return(configStore)
+	k.On("Slogger").Return(multislogger.NewNopLogger())
+	k.On("ReadEnrollSecret").Maybe().Return(expectedEnrollSecret, nil)
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
+	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
+	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything).Maybe().Return()
+	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
+	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
+	require.NoError(t, err)
+	k.On("TokenStore").Return(tokenStore).Maybe()
+	lpc := makeTestOsqLogPublisher(k)
+
+	// We should attempt to fetch the node key once during enrollment, and we shouldn't have a node key yet
+	k.On("NodeKey", types.DefaultEnrollmentID).Return("", nil).Once()
+
+	// We should update the regional URLs
+	k.On("KolideServerURL").Return("old.device.example.test")
+	k.On("SetKolideServerURL", expectedDeviceServerURL).Return(nil)
+	k.On("ControlServerURL").Return("old.control.example.test")
+	k.On("SetControlServerURL", expectedControlServerURL).Return(nil)
+	k.On("OsqueryPublisherURL").Return("old.pub.example.test")
+	k.On("SetOsqueryPublisherURL", expectedOsqueryPublisherURL).Return(nil)
+
+	e, err := NewExtension(t.Context(), m, lpc, settingsstoremock.NewSettingsStoreWriter(t), k, types.DefaultEnrollmentID, ExtensionOpts{})
+	require.Nil(t, err)
+
+	key, invalid, err := e.Enroll(t.Context())
+	assert.True(t, m.RequestEnrollmentFuncInvoked)
+	assert.Equal(t, "", key)
+	assert.False(t, invalid)
+	assert.NotNil(t, err)
+
+	k.AssertExpectations(t)
+}
+
+func TestExtensionEnrollInvalidRegion_DoesNotSetMissingUrls(t *testing.T) {
+	m := &mock.KolideService{
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (*service.EnrollmentResponse, error) {
+			return &service.EnrollmentResponse{
+				RegionInvalid: true,
+				RegionURLs: &types.KolideURLs{
+					EnrollmentURL:       "",
+					ControlServerURL:    "",
+					OsqueryPublisherURL: "",
+				},
+			}, nil
+		},
+	}
+
+	expectedMunemo := "test_fake_munemo_2"
+	expectedEnrollSecret := createTestEnrollSecret(t, expectedMunemo)
+	k := mocks.NewKnapsack(t)
+	k.On("OsquerydPath").Maybe().Return("")
+	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
+	configStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
+	require.NoError(t, err)
+	k.On("ConfigStore").Return(configStore)
+	k.On("Slogger").Return(multislogger.NewNopLogger())
+	k.On("ReadEnrollSecret").Maybe().Return(expectedEnrollSecret, nil)
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
+	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
+	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything).Maybe().Return()
+	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
+	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
+	require.NoError(t, err)
+	k.On("TokenStore").Return(tokenStore).Maybe()
+	lpc := makeTestOsqLogPublisher(k)
+
+	// We should attempt to fetch the node key once during enrollment, and we shouldn't have a node key yet
+	k.On("NodeKey", types.DefaultEnrollmentID).Return("", nil).Once()
+
+	e, err := NewExtension(t.Context(), m, lpc, settingsstoremock.NewSettingsStoreWriter(t), k, types.DefaultEnrollmentID, ExtensionOpts{})
+	require.Nil(t, err)
+
+	key, invalid, err := e.Enroll(t.Context())
+	assert.True(t, m.RequestEnrollmentFuncInvoked)
+	assert.Equal(t, "", key)
+	assert.False(t, invalid)
+	assert.NotNil(t, err)
+
+	k.AssertExpectations(t)
+}
+
 func TestExtensionEnroll(t *testing.T) {
 	expectedMunemo := "test_fake_munemo"
 	expectedEnrollSecret := createTestEnrollSecret(t, expectedMunemo)
@@ -304,9 +414,13 @@ func TestExtensionEnroll(t *testing.T) {
 	var gotEnrollSecret string
 	expectedNodeKey := "node_key"
 	m := &mock.KolideService{
-		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, string, error) {
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (*service.EnrollmentResponse, error) {
 			gotEnrollSecret = enrollSecret
-			return expectedNodeKey, false, "", nil
+			return &service.EnrollmentResponse{
+				NodeKey:            expectedNodeKey,
+				NodeInvalid:        false,
+				AgentIngesterToken: "",
+			}, nil
 		},
 	}
 	s := settingsstoremock.NewSettingsStoreWriter(t)
@@ -445,8 +559,12 @@ func TestExtensionGenerateConfigsEnrollmentInvalid(t *testing.T) {
 			gotNodeKey = nodeKey
 			return "", true, nil // node_invalid
 		},
-		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, string, error) {
-			return expectedNodeKey, false, "", nil
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (*service.EnrollmentResponse, error) {
+			return &service.EnrollmentResponse{
+				NodeKey:            expectedNodeKey,
+				NodeInvalid:        false,
+				AgentIngesterToken: "",
+			}, nil
 		},
 	}
 	// Set up our knapsack
@@ -474,8 +592,12 @@ func TestGenerateConfigs_CannotEnrollYet(t *testing.T) {
 			// Returns node_invalid
 			return "", true, nil
 		},
-		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, string, error) {
-			return expectedNodeKey, false, "", nil
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (*service.EnrollmentResponse, error) {
+			return &service.EnrollmentResponse{
+				NodeKey:            expectedNodeKey,
+				NodeInvalid:        false,
+				AgentIngesterToken: "",
+			}, nil
 		},
 	}
 
@@ -654,8 +776,12 @@ func TestExtensionWriteLogsEnrollmentInvalid(t *testing.T) {
 			gotNodeKey = nodeKey
 			return "", "", true, nil
 		},
-		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, string, error) {
-			return expectedNodeKey, false, "", nil
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (*service.EnrollmentResponse, error) {
+			return &service.EnrollmentResponse{
+				NodeKey:            expectedNodeKey,
+				NodeInvalid:        false,
+				AgentIngesterToken: "",
+			}, nil
 		},
 	}
 	// Set up our knapsack
@@ -909,8 +1035,12 @@ func TestExtensionWriteBufferedLogsEnrollmentInvalid(t *testing.T) {
 			return "", "", nodeKey != expectedNodeKey, nil
 
 		},
-		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, string, error) {
-			return expectedNodeKey, false, "", nil
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (*service.EnrollmentResponse, error) {
+			return &service.EnrollmentResponse{
+				NodeKey:            expectedNodeKey,
+				NodeInvalid:        false,
+				AgentIngesterToken: "",
+			}, nil
 		},
 	}
 
@@ -1437,8 +1567,12 @@ func TestExtensionGetQueriesEnrollmentInvalid(t *testing.T) {
 			gotNodeKey = nodeKey
 			return nil, true, nil
 		},
-		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, string, error) {
-			return expectedNodeKey, false, "", nil
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (*service.EnrollmentResponse, error) {
+			return &service.EnrollmentResponse{
+				NodeKey:            expectedNodeKey,
+				NodeInvalid:        false,
+				AgentIngesterToken: "",
+			}, nil
 		},
 	}
 
@@ -1685,8 +1819,12 @@ func TestExtensionWriteResultsEnrollmentInvalid(t *testing.T) {
 			gotNodeKey = nodeKey
 			return "", "", true, nil
 		},
-		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, string, error) {
-			return expectedNodeKey, false, "", nil
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (*service.EnrollmentResponse, error) {
+			return &service.EnrollmentResponse{
+				NodeKey:            expectedNodeKey,
+				NodeInvalid:        false,
+				AgentIngesterToken: "",
+			}, nil
 		},
 	}
 
