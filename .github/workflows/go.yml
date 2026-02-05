@@ -312,6 +312,7 @@ jobs:
       run: make test-bench-tables > benchmark.txt
 
     - name: Display results
+      if: always()
       shell: bash
       run: cat ./benchmark.txt
 
