@@ -1,0 +1,57 @@
+{
+  "ka": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "დაახლოებით %{count} საათი",
+          "other": "დაახლოებით %{count} საათი"
+        },
+        "about_x_months": {
+          "one": "დაახლოებით %{count} თვე",
+          "other": "დაახლოებით %{count} თვე"
+        },
+        "about_x_years": {
+          "one": "დაახლოებით %{count} წელი",
+          "other": "დაახლოებით %{count} წელი"
+        },
+        "almost_x_years": {
+          "one": "თითქმის %{count} წელი",
+          "other": "თითქმის %{count} წელი"
+        },
+        "half_a_minute": "ნახევარი წუთი",
+        "less_than_x_seconds": {
+          "one": "%{count} წამზე ნაკლები",
+          "other": "%{count} წამზე ნაკლები"
+        },
+        "less_than_x_minutes": {
+          "one": "%{count} წუთზე ნაკლები",
+          "other": "%{count} წუთზე ნაკლები"
+        },
+        "over_x_years": {
+          "one": "%{count} წელზე მეტი",
+          "other": "%{count} წელზე მეტი"
+        },
+        "x_seconds": {
+          "one": "%{count} წამი",
+          "other": "%{count} წამი"
+        },
+        "x_minutes": {
+          "one": "%{count} წუთი",
+          "other": "%{count} წუთი"
+        },
+        "x_days": {
+          "one": "%{count} დღე",
+          "other": "%{count} დღე"
+        },
+        "x_months": {
+          "one": "%{count} თვე",
+          "other": "%{count} თვე"
+        },
+        "x_years": {
+          "one": "%{count} წელი",
+          "other": "%{count} წელი"
+        }
+      }
+    }
+  }
+}

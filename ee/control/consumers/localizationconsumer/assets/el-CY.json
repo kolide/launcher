@@ -1,0 +1,57 @@
+{
+  "el-CY": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "περίπου μία ώρα",
+          "other": "περίπου %{count} ώρες"
+        },
+        "about_x_months": {
+          "one": "περίπου ένα μήνα",
+          "other": "περίπου %{count} μήνες"
+        },
+        "about_x_years": {
+          "one": "περίπου ένα χρόνο",
+          "other": "περίπου %{count} χρόνια"
+        },
+        "almost_x_years": {
+          "one": "σχεδόν ένα χρόνο",
+          "other": "σχεδόν %{count} χρόνια"
+        },
+        "half_a_minute": "μισό λεπτό",
+        "less_than_x_seconds": {
+          "one": "λιγότερο από ένα δευτερόλεπτο",
+          "other": "λιγότερο από %{count} δευτερόλεπτα"
+        },
+        "less_than_x_minutes": {
+          "one": "λιγότερο από ένα λεπτό",
+          "other": "λιγότερο από %{count} λεπτά"
+        },
+        "over_x_years": {
+          "one": "πάνω από ένα χρόνο",
+          "other": "πάνω από %{count} χρόνια"
+        },
+        "x_seconds": {
+          "one": "%{count} δευτερόλεπτο",
+          "other": "%{count} δευτερόλεπτα"
+        },
+        "x_minutes": {
+          "one": "%{count} λεπτό",
+          "other": "%{count} λεπτά"
+        },
+        "x_days": {
+          "one": "%{count} μέρα",
+          "other": "%{count} ημέρες"
+        },
+        "x_months": {
+          "one": "%{count} μήνα",
+          "other": "%{count} μήνες"
+        },
+        "x_years": {
+          "one": "%{count} χρόνος",
+          "other": "%{count} χρόνια"
+        }
+      }
+    }
+  }
+}

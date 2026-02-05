@@ -2666,6 +2666,50 @@ func (_c *Knapsack_LocalDevelopmentPath_Call) RunAndReturn(run func() string) *K
 	return _c
 }
 
+// LocalizationData provides a mock function for the type Knapsack
+func (_mock *Knapsack) LocalizationData() types.LocalizationData {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for LocalizationData")
+	}
+
+	var r0 types.LocalizationData
+	if returnFunc, ok := ret.Get(0).(func() types.LocalizationData); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(types.LocalizationData)
+	}
+	return r0
+}
+
+// Knapsack_LocalizationData_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LocalizationData'
+type Knapsack_LocalizationData_Call struct {
+	*mock.Call
+}
+
+// LocalizationData is a helper method to define mock.On call
+func (_e *Knapsack_Expecter) LocalizationData() *Knapsack_LocalizationData_Call {
+	return &Knapsack_LocalizationData_Call{Call: _e.mock.On("LocalizationData")}
+}
+
+func (_c *Knapsack_LocalizationData_Call) Run(run func()) *Knapsack_LocalizationData_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Knapsack_LocalizationData_Call) Return(localizationData types.LocalizationData) *Knapsack_LocalizationData_Call {
+	_c.Call.Return(localizationData)
+	return _c
+}
+
+func (_c *Knapsack_LocalizationData_Call) RunAndReturn(run func() types.LocalizationData) *Knapsack_LocalizationData_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // LogIngestServerURL provides a mock function for the type Knapsack
 func (_mock *Knapsack) LogIngestServerURL() string {
 	ret := _mock.Called()
@@ -5868,6 +5912,46 @@ func (_c *Knapsack_SetLauncherWatchdogDisabled_Call) Return(err error) *Knapsack
 
 func (_c *Knapsack_SetLauncherWatchdogDisabled_Call) RunAndReturn(run func(disabled bool) error) *Knapsack_SetLauncherWatchdogDisabled_Call {
 	_c.Call.Return(run)
+	return _c
+}
+
+// SetLocalizer provides a mock function for the type Knapsack
+func (_mock *Knapsack) SetLocalizer(localizer types.Localizer) {
+	_mock.Called(localizer)
+	return
+}
+
+// Knapsack_SetLocalizer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetLocalizer'
+type Knapsack_SetLocalizer_Call struct {
+	*mock.Call
+}
+
+// SetLocalizer is a helper method to define mock.On call
+//   - localizer types.Localizer
+func (_e *Knapsack_Expecter) SetLocalizer(localizer interface{}) *Knapsack_SetLocalizer_Call {
+	return &Knapsack_SetLocalizer_Call{Call: _e.mock.On("SetLocalizer", localizer)}
+}
+
+func (_c *Knapsack_SetLocalizer_Call) Run(run func(localizer types.Localizer)) *Knapsack_SetLocalizer_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 types.Localizer
+		if args[0] != nil {
+			arg0 = args[0].(types.Localizer)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *Knapsack_SetLocalizer_Call) Return() *Knapsack_SetLocalizer_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *Knapsack_SetLocalizer_Call) RunAndReturn(run func(localizer types.Localizer)) *Knapsack_SetLocalizer_Call {
+	_c.Run(run)
 	return _c
 }
 

@@ -1,0 +1,57 @@
+{
+  "et": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "umbes %{count} tund",
+          "other": "umbes %{count} tundi"
+        },
+        "about_x_months": {
+          "one": "umbes %{count} kuu",
+          "other": "umbes %{count} kuud"
+        },
+        "about_x_years": {
+          "one": "umbes %{count} aasta",
+          "other": "umbes %{count} aastat"
+        },
+        "almost_x_years": {
+          "one": "peaaegu üks aasta",
+          "other": "peaaegu %{count} aastat"
+        },
+        "half_a_minute": "pool minutit",
+        "less_than_x_seconds": {
+          "one": "vähem kui %{count} sekund",
+          "other": "vähem kui %{count} sekundit"
+        },
+        "less_than_x_minutes": {
+          "one": "vähem kui %{count} minut",
+          "other": "vähem kui %{count} minutit"
+        },
+        "over_x_years": {
+          "one": "üle %{count} aasta",
+          "other": "üle %{count} aasta"
+        },
+        "x_seconds": {
+          "one": "%{count} sekund",
+          "other": "%{count} sekundit"
+        },
+        "x_minutes": {
+          "one": "%{count} minut",
+          "other": "%{count} minutit"
+        },
+        "x_days": {
+          "one": "%{count} päev",
+          "other": "%{count} päeva"
+        },
+        "x_months": {
+          "one": "%{count} kuu",
+          "other": "%{count} kuud"
+        },
+        "x_years": {
+          "one": "%{count} aasta",
+          "other": "%{count} aastat"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "st": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "ekaba hora e le ٰngoe",
+          "other": "ekaba hora tse %{count}"
+        },
+        "about_x_months": {
+          "one": "ekaba khoeli e le ٰngoe",
+          "other": "ekaba likhoeli tse %{count}"
+        },
+        "about_x_years": {
+          "one": "ekaba selemo se le seng",
+          "other": "ekaba lilemo tse %{count}"
+        },
+        "almost_x_years": {
+          "one": "e tlo ba selemo se le seng",
+          "other": "e tlo ba lilemo tse %{count}"
+        },
+        "half_a_minute": "halofo ea motsotso",
+        "less_than_x_seconds": {
+          "one": "ka tlase ho motsotsoana",
+          "other": "ka tlase ho metsotsoana e %{count}"
+        },
+        "less_than_x_minutes": {
+          "one": "ka tlase ho motsotso",
+          "other": "ka tlase ho metsotso e %{count}"
+        },
+        "over_x_years": {
+          "one": "ka holimo ho selemo",
+          "other": "ka holimo ho lilemo tse %{count}"
+        },
+        "x_seconds": {
+          "one": "motsotsoana o le mong",
+          "other": "metsotsoana e %{count}"
+        },
+        "x_minutes": {
+          "one": "motsotso o le mong",
+          "other": "metsotso e %{count}"
+        },
+        "x_days": {
+          "one": "letsatsi le le leng",
+          "other": "matsatsi a %{count}"
+        },
+        "x_months": {
+          "one": "khoeli e le \\'ngoe",
+          "other": "likhoeli tse %{count}"
+        },
+        "x_years": {
+          "one": "selemo se le seng",
+          "other": "lilemo tse %{count}"
+        }
+      }
+    }
+  }
+}

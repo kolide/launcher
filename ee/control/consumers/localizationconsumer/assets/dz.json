@@ -1,0 +1,57 @@
+{
+  "dz": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "ཆུ་ཚོད་ ༡ ་དེ་ཅིག",
+          "other": "ཆུ་ཚོད་ %{count} དེ་ཅིག"
+        },
+        "about_x_months": {
+          "one": "ཟླཝ་ ༡ ་དེ་ཅིག",
+          "other": "ཟླཝ་ %{count} དེ་ཅིག"
+        },
+        "about_x_years": {
+          "one": "ལོ་ ༡ ་དེ་ཅིག",
+          "other": "ལོ་ %{count} དེ་ཅིག"
+        },
+        "almost_x_years": {
+          "one": "ལོ %{count} མ་ལྷགཔ་ཅིག",
+          "other": "ལོ %{count} མ་ལྷགཔ་ཅིག"
+        },
+        "half_a_minute": "སྐར་མ་ཕྱེད་ཀ",
+        "less_than_x_seconds": {
+          "one": "སྐར་ཆ་ ༡ ་ལས་ཉུངམ",
+          "other": "སྐར་ཆ %{count} ལས་ཉུངམ"
+        },
+        "less_than_x_minutes": {
+          "one": "སྐར་མ་ ༡ ་ལས་ཉུངམ",
+          "other": "སྐར་མ %{count} ལས་ཉུངམ"
+        },
+        "over_x_years": {
+          "one": "ལོ་ ༡ ་ལྷག",
+          "other": "ལོ་%{count}ལས་ལྷག"
+        },
+        "x_seconds": {
+          "one": "སྐར་ཆ་གཅིག",
+          "other": "སྐར་ཆ %{count}"
+        },
+        "x_minutes": {
+          "one": "སྐར་མ་གཅིག",
+          "other": "སྐར་མ %{count}"
+        },
+        "x_days": {
+          "one": "ཉིནམ་གཅིག",
+          "other": "ཉིནམ %{count}"
+        },
+        "x_months": {
+          "one": "ཟླཝ་གཅིག",
+          "other": "ཟླཝ %{count}"
+        },
+        "x_years": {
+          "one": "ལོ་གཅིག",
+          "other": "ལོ %{count}"
+        }
+      }
+    }
+  }
+}
