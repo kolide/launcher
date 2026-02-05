@@ -9,7 +9,7 @@ import (
 func BenchmarkFilewalk(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
-		results, err := Filewalk(b.Context(), "/Users/")
+		results, err := Filewalk(b.Context(), "/etc/")
 		require.NoError(b, err)
 		require.LessOrEqual(b, 1470000, len(results))
 	}
@@ -18,7 +18,7 @@ func BenchmarkFilewalk(b *testing.B) {
 func BenchmarkFastwalkWithChannel(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
-		results, err := FastwalkWithChannel(b.Context(), "/Users/")
+		results, err := FastwalkWithChannel(b.Context(), "/etc/")
 		require.NoError(b, err)
 		require.LessOrEqual(b, 1470000, len(results))
 	}
@@ -27,7 +27,7 @@ func BenchmarkFastwalkWithChannel(b *testing.B) {
 func BenchmarkFastwalkWithLock(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
-		results, err := FastwalkWithLock(b.Context(), "/Users/")
+		results, err := FastwalkWithLock(b.Context(), "/etc/")
 		require.NoError(b, err)
 		require.LessOrEqual(b, 1470000, len(results))
 	}
