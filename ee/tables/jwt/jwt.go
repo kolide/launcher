@@ -101,6 +101,12 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 						data["verified"] = Valid
 					}
 
+					if token == nil {
+						// error will have been logged above, but if there is no token
+						// at all (not just a verification issue) there is nothing else we can do
+						continue
+					}
+
 					claims, ok := token.Claims.(jwt.MapClaims)
 					if !ok {
 						t.slogger.Log(ctx, slog.LevelInfo, "error parsing JWT claims")
