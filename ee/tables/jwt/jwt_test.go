@@ -160,3 +160,15 @@ func TestTransformOutput(t *testing.T) {
 		})
 	}
 }
+
+func TestGenerateDoesNotPanicWithoutToken(t *testing.T) {
+	t.Parallel()
+	jwtTable := &Table{slogger: multislogger.NewNopLogger()}
+	mockQC := tablehelpers.MockQueryContext(map[string][]string{
+		"path": {"testdata/sdf"},
+	})
+
+	rows, err := jwtTable.generate(t.Context(), mockQC)
+	require.NoError(t, err)
+	require.Empty(t, rows, "the result should be empty for a non-parseable token")
+}
