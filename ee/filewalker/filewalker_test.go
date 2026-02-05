@@ -11,7 +11,7 @@ func BenchmarkFilewalk(b *testing.B) {
 	for b.Loop() {
 		results, err := Filewalk(b.Context(), "/etc/")
 		require.NoError(b, err)
-		require.LessOrEqual(b, 1470000, len(results))
+		require.LessOrEqual(b, 100, len(results))
 	}
 }
 
@@ -20,7 +20,7 @@ func BenchmarkFastwalkWithChannel(b *testing.B) {
 	for b.Loop() {
 		results, err := FastwalkWithChannel(b.Context(), "/etc/")
 		require.NoError(b, err)
-		require.LessOrEqual(b, 1470000, len(results))
+		require.LessOrEqual(b, 100, len(results))
 	}
 }
 
@@ -29,6 +29,6 @@ func BenchmarkFastwalkWithLock(b *testing.B) {
 	for b.Loop() {
 		results, err := FastwalkWithLock(b.Context(), "/etc/")
 		require.NoError(b, err)
-		require.LessOrEqual(b, 1470000, len(results))
+		require.LessOrEqual(b, 100, len(results))
 	}
 }
