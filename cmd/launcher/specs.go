@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -18,10 +19,21 @@ import (
 	osquerytable "github.com/osquery/osquery-go/plugin/table"
 )
 
+// requiredFields accumulates -required flag values (can be specified multiple times).
+type requiredFields []string
+
+func (r *requiredFields) String() string { return fmt.Sprintf("%v", *r) }
+
+func (r *requiredFields) Set(value string) error {
+	*r = append(*r, value)
+	return nil
+}
+
 func runSpecs(systemMultiSlogger *multislogger.MultiSlogger, args []string) error {
-	flagset := flag.NewFlagSet("kolide specs", flag.ExitOnError)
+	flagset := flag.NewFlagSet("launcher specs", flag.ExitOnError)
 	flDebug := flagset.Bool("debug", false, "enable debug logging")
-	flErrorOnMissing := flagset.Bool("error-on-missing", false, "for usage later")
+	var flRequired requiredFields
+	flagset.Var(&flRequired, "required", "field name that must be present in the spec (repeatable); warns if missing")
 
 	if err := ff.Parse(flagset, args, ff.WithEnvVarNoPrefix()); err != nil {
 		return fmt.Errorf("parsing flags: %w", err)
@@ -36,8 +48,6 @@ func runSpecs(systemMultiSlogger *multislogger.MultiSlogger, args []string) erro
 		Level:     slogLevel,
 		AddSource: true,
 	}))
-
-	_ = flErrorOnMissing // reserved for future use
 
 	launcher.SetDefaultPaths()
 	opts := &launcher.Options{
@@ -69,6 +79,30 @@ func runSpecs(systemMultiSlogger *multislogger.MultiSlogger, args []string) erro
 				"err", err,
 			)
 			continue
+		}
+
+		// Validate spec is valid JSON; also used for required-field checks.
+		var specMap map[string]interface{}
+		if err := json.Unmarshal(spec, &specMap); err != nil {
+			slogger.Log(ctx, slog.LevelWarn,
+				"spec is not valid JSON, skipping",
+				"name", tbl.Name(),
+				"err", err,
+			)
+			continue
+		}
+		for _, field := range flRequired {
+			if _, ok := specMap[field]; !ok {
+				slogger.Log(ctx, slog.LevelWarn,
+					"spec missing required field",
+					"name", tbl.Name(),
+					"field", field,
+				)
+			}
+		}
+
+		if *flDebug {
+			slogger.Log(ctx, slog.LevelDebug, "printing spec", "table", tbl.Name())
 		}
 		fmt.Println(string(spec))
 	}
