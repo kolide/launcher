@@ -259,6 +259,8 @@ func runSubcommands(systemMultiSlogger *multislogger.MultiSlogger) error {
 		run = disclaim.RunDisclaimed
 	case "enroll":
 		run = runEnroll
+	case "specs":
+		run = runSpecs
 	default:
 		return fmt.Errorf("unknown subcommand %s", os.Args[1])
 	}
