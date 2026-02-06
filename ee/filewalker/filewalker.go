@@ -59,6 +59,11 @@ func (f *filewalker) Work() {
 	}
 }
 
+func (f *filewalker) Delete() {
+	// TODO RM: remove results from data store
+	f.Stop()
+}
+
 func (f *filewalker) Stop() {
 	f.interrupt <- struct{}{}
 }
