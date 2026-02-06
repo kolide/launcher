@@ -1,0 +1,75 @@
+{
+  "uz": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "chamasi %{count} soat",
+          "few": "chamasi %{count} soat",
+          "many": "chamasi %{count} soat",
+          "other": "chamasi %{count} soat"
+        },
+        "about_x_months": {
+          "one": "chamasi %{count} oy",
+          "few": "chamasi %{count} oy",
+          "many": "chamasi %{count} oy",
+          "other": "chamasi %{count} oy"
+        },
+        "about_x_years": {
+          "one": "chamasi %{count} yil",
+          "few": "chamasi %{count} yil",
+          "many": "chamasi %{count} yil",
+          "other": "chamasi %{count} yil"
+        },
+        "almost_x_years": {
+          "one": "deyarli %{count} yil",
+          "few": "deyarli %{count} yil",
+          "many": "deyarli %{count} yil",
+          "other": "deyarli %{count} yil"
+        },
+        "half_a_minute": "bir daqiqadan kam",
+        "less_than_x_seconds": {
+          "one": "%{count} soniyadan kam",
+          "few": "%{count} soniyadan kam",
+          "many": "%{count} soniyadan kam",
+          "other": "%{count} soniyadan kam"
+        },
+        "less_than_x_minutes": {
+          "one": "%{count} daqiqadan kam",
+          "few": "%{count} daqiqadan kam",
+          "many": "%{count} daqiqadan kam",
+          "other": "%{count} daqiqadan kam"
+        },
+        "over_x_years": {
+          "one": "%{count} yildan ziyod",
+          "few": "%{count} yildan ziyod",
+          "many": "%{count} yildan ziyod",
+          "other": "%{count} yildan ziyod"
+        },
+        "x_seconds": {
+          "one": "%{count} soniya",
+          "few": "%{count} soniya",
+          "many": "%{count} soniya",
+          "other": "%{count} soniya"
+        },
+        "x_minutes": {
+          "one": "%{count} daqiqa",
+          "few": "%{count} daqiqa",
+          "many": "%{count} daqiqa",
+          "other": "%{count} daqiqa"
+        },
+        "x_days": {
+          "one": "%{count} kun",
+          "few": "%{count} kun",
+          "many": "%{count} kun",
+          "other": "%{count} kun"
+        },
+        "x_months": {
+          "one": "%{count} oy",
+          "few": "%{count} oy",
+          "many": "%{count} oy",
+          "other": "%{count} oy"
+        }
+      }
+    }
+  }
+}

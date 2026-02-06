@@ -1,0 +1,53 @@
+{
+  "or": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "ପାଖାପାଖି %{count} ଘଣ୍ତ",
+          "other": "ପାଖାପାଖି %{count} ଘଣ୍ତ"
+        },
+        "about_x_months": {
+          "one": "ପାଖାପାଖି %{count} ମାସ",
+          "other": "ପାଖାପାଖି %{count} ମାସ"
+        },
+        "about_x_years": {
+          "one": "ପାଖାପାଖି %{count} year",
+          "other": "ପାଖାପାଖି %{count} years"
+        },
+        "almost_x_years": {
+          "one": "ଅଳ୍ପ ଉଣ %{count} ବର୍ଷ",
+          "other": "ଅଳ୍ପ ଉଣ %{count} ବର୍ଷ"
+        },
+        "half_a_minute": "ଦେଢ ମିନଟ୍",
+        "less_than_x_seconds": {
+          "one": "%{count} ସେକଣ୍ଢ ବାକ",
+          "other": "%{count} ସେକଣ୍ଢ ବାକ"
+        },
+        "less_than_x_minutes": {
+          "one": "%{count} ମିନଟ ବାକ",
+          "other": "%{count} ମିନଟ ବାକ"
+        },
+        "over_x_years": {
+          "one": "%{count} ବର୍ଷରୁ ଅଧିକ",
+          "other": "%{count} ବର୍ଷରୁ ଅଧିକ"
+        },
+        "x_seconds": {
+          "one": "%{count} ସେକଣ୍ଢ",
+          "other": "%{count} ସେକଣ୍ଢ"
+        },
+        "x_minutes": {
+          "one": "%{count} ମିନଟ",
+          "other": "%{count} ମିନଟ"
+        },
+        "x_days": {
+          "one": "%{count}  ଦିନ",
+          "other": "%{count} ଦିନ"
+        },
+        "x_months": {
+          "one": "%{count} ମାସ",
+          "other": "%{count} ମାସ"
+        }
+      }
+    }
+  }
+}

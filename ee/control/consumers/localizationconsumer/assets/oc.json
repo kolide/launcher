@@ -1,0 +1,57 @@
+{
+  "oc": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "Fa una ora",
+          "other": "Fa %{count} oras"
+        },
+        "about_x_months": {
+          "one": "Fa un mes",
+          "other": "Fa %{count} meses"
+        },
+        "about_x_years": {
+          "one": "Fa un an",
+          "other": "Fa %{count} ans"
+        },
+        "almost_x_years": {
+          "one": "quasi un an",
+          "other": "quasi %{count} ans"
+        },
+        "half_a_minute": "mièja minuta",
+        "less_than_x_seconds": {
+          "one": "mens d’una segonda",
+          "other": "mens de %{count} segondas"
+        },
+        "less_than_x_minutes": {
+          "one": "mens d’una minuta",
+          "other": "mens de %{count} minutas"
+        },
+        "over_x_years": {
+          "one": "mai d’un an",
+          "other": "mai de %{count} ans"
+        },
+        "x_seconds": {
+          "one": "una segonda",
+          "other": "%{count} segondas"
+        },
+        "x_minutes": {
+          "one": "una minuta",
+          "other": "%{count} minutas"
+        },
+        "x_days": {
+          "one": "un jorn",
+          "other": "%{count} jorns"
+        },
+        "x_months": {
+          "one": "un mes",
+          "other": "%{count} meses"
+        },
+        "x_years": {
+          "one": "un an",
+          "other": "%{count} ans"
+        }
+      }
+    }
+  }
+}

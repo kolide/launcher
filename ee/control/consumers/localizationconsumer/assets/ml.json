@@ -1,0 +1,57 @@
+{
+  "ml": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "എകദേശം %{count} മണിക്കൂർ",
+          "other": "എകദേശം %{count} മണിക്കൂർ"
+        },
+        "about_x_months": {
+          "one": "എകദേശം %{count} മാസം",
+          "other": "എകദേശം %{count} മാസം"
+        },
+        "about_x_years": {
+          "one": "എകദേശം %{count} വർഷം",
+          "other": "എകദേശം %{count} വർഷം"
+        },
+        "almost_x_years": {
+          "one": "ഏതാണ്ട്  %{count} വർഷം",
+          "other": "ഏതാണ്ട്  %{count} വർഷം"
+        },
+        "half_a_minute": "അര സൂക്ഷ്മ",
+        "less_than_x_seconds": {
+          "one": "ഒരു നിമിഷത്തിനു ഉള്ളിൽ",
+          "other": "%{count} നിമിഷത്തിനു ഉള്ളിൽ"
+        },
+        "less_than_x_minutes": {
+          "one": "ഒരു മിനുറ്റിനു ഉള്ളിൽ",
+          "other": "%{count} മിനുറ്റിനു ഉള്ളിൽ"
+        },
+        "over_x_years": {
+          "one": "ഒരു വര്ഷത്തിനു മേലെ",
+          "other": "%{count} വര്ഷത്തിനു മേലെ"
+        },
+        "x_seconds": {
+          "one": "%{count} നിമിഷം",
+          "other": "%{count} നിമിഷം"
+        },
+        "x_minutes": {
+          "one": "%{count} മിനിറ്റ്",
+          "other": "%{count} മിനിറ്റ്"
+        },
+        "x_days": {
+          "one": "%{count} ദിവസം",
+          "other": "%{count} ദിവസങ്ങൾ"
+        },
+        "x_months": {
+          "one": "%{count} മാസം",
+          "other": "%{count} മാസം"
+        },
+        "x_years": {
+          "one": "%{count} വർഷം",
+          "other": "%{count} വർഷങ്ങൾ"
+        }
+      }
+    }
+  }
+}

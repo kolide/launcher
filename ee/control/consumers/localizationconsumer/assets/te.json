@@ -1,0 +1,57 @@
+{
+  "te": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "సుమారు ఒక గంట",
+          "other": "సుమారు %{count} గంటలు"
+        },
+        "about_x_months": {
+          "one": "సుమారు ఒక నెల",
+          "other": "సుమారు %{count} నెలలు"
+        },
+        "about_x_years": {
+          "one": "సుమారు ఒక సంవత్సరం",
+          "other": "సుమారు %{count} సంవత్సరాలు"
+        },
+        "almost_x_years": {
+          "one": "దాదాపు ఒక సంవత్సరం",
+          "other": "దాదాపు %{count} సంవత్సరాలు"
+        },
+        "half_a_minute": "అర నిమిషం",
+        "less_than_x_seconds": {
+          "one": "ఒక క్షణం కన్నా తక్కువ",
+          "other": "%{count} క్షణాలు కన్నా తక్కువ"
+        },
+        "less_than_x_minutes": {
+          "one": "ఒక నిమిషం కన్నా తక్కువ",
+          "other": "%{count} నిమిషాల కన్నా తక్కువ"
+        },
+        "over_x_years": {
+          "one": "ఒక సంవత్సరం పైగా",
+          "other": "%{count} సంవత్సరాల పైగా"
+        },
+        "x_seconds": {
+          "one": "ఒక క్షణం",
+          "other": "%{count} క్షణాలు"
+        },
+        "x_minutes": {
+          "one": "ఒక నిమిషం",
+          "other": "%{count} నిమిషాలు"
+        },
+        "x_days": {
+          "one": "ఒక రోజు",
+          "other": "%{count} రోజులు"
+        },
+        "x_months": {
+          "one": "ఒక నెల",
+          "other": "%{count} నెలలు"
+        },
+        "x_years": {
+          "one": "ఒక సంవత్సరం",
+          "other": "%{count} సంవత్సరాలు"
+        }
+      }
+    }
+  }
+}

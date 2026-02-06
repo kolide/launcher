@@ -1,0 +1,57 @@
+{
+  "pap-CW": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "mas o ménos %{count} ora",
+          "other": "mas o ménos %{count} ora"
+        },
+        "about_x_months": {
+          "one": "mas o ménos %{count} luna",
+          "other": "mas o ménos %{count} luna"
+        },
+        "about_x_years": {
+          "one": "mas o ménos %{count} aña",
+          "other": "mas o ménos %{count} aña"
+        },
+        "almost_x_years": {
+          "one": "kasi %{count} aña",
+          "other": "kasi %{count} aña"
+        },
+        "half_a_minute": "mei minüt",
+        "less_than_x_minutes": {
+          "one": "ménos ku %{count} minüt",
+          "other": "ménos ku %{count} minüt"
+        },
+        "less_than_x_seconds": {
+          "one": "ménos ku %{count} sekònde",
+          "other": "ménos ku %{count} sekònde"
+        },
+        "over_x_years": {
+          "one": "mas ku %{count} aña",
+          "other": "mas ku %{count} aña"
+        },
+        "x_days": {
+          "one": "%{count} dia",
+          "other": "%{count} dia"
+        },
+        "x_minutes": {
+          "one": "%{count} minüt",
+          "other": "%{count} minüt"
+        },
+        "x_months": {
+          "one": "%{count} luna",
+          "other": "%{count} luna"
+        },
+        "x_years": {
+          "one": "%{count} year",
+          "other": "%{count} years"
+        },
+        "x_seconds": {
+          "one": "%{count} sekònde",
+          "other": "%{count} sekònde"
+        }
+      }
+    }
+  }
+}

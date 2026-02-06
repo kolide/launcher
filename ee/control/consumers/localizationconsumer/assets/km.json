@@ -1,0 +1,53 @@
+{
+  "km": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "ប្រមាណ %{count} ម៉ោង",
+          "other": "ប្រមាណ %{count} ម៉ោង"
+        },
+        "about_x_months": {
+          "one": "ប្រមាណ %{count} ខែ",
+          "other": "ប្រមាណ %{count} ខែ"
+        },
+        "about_x_years": {
+          "one": "ប្រមាណ %{count} ឆ្នាំ",
+          "other": "ប្រមាណ %{count} ឆ្នាំ"
+        },
+        "almost_x_years": {
+          "one": "ជិត %{count} ឆ្នាំ",
+          "other": "ជិត %{count} ឆ្នាំ"
+        },
+        "half_a_minute": "កន្លះនាទី",
+        "less_than_x_seconds": {
+          "one": "តិចជាង %{count} វិនាទី",
+          "other": "តិចជាង %{count} វិនាទី"
+        },
+        "less_than_x_minutes": {
+          "one": "តិចជាង %{count} នាទី",
+          "other": "តិចជាង %{count} នាទី"
+        },
+        "over_x_years": {
+          "one": "លើសពី %{count} ឆ្នាំ",
+          "other": "លើសពី %{count} ឆ្នាំ"
+        },
+        "x_seconds": {
+          "one": "%{count} វិនាទី",
+          "other": "%{count} វិនាទី"
+        },
+        "x_minutes": {
+          "one": "%{count} នាទី",
+          "other": "%{count} នាទី"
+        },
+        "x_days": {
+          "one": "%{count} ថ្ងៃ",
+          "other": "%{count} ថ្ងៃ"
+        },
+        "x_months": {
+          "one": "%{count} ខែ",
+          "other": "%{count} ខែ"
+        }
+      }
+    }
+  }
+}

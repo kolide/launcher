@@ -1,0 +1,53 @@
+{
+  "ur": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "تقریبا ایک گھنٹہ",
+          "other": "تقریبا %{count} گھنٹے"
+        },
+        "about_x_months": {
+          "one": "تقریبا ایک مہینہ",
+          "other": "تقریبا %{count} مہینہ"
+        },
+        "about_x_years": {
+          "one": "تقریبا ایک سال",
+          "other": "تقریبا %{count} سال"
+        },
+        "almost_x_years": {
+          "one": "تقریبا ایک سال",
+          "other": "تقریبا %{count} سال"
+        },
+        "half_a_minute": "آدھا منٹ",
+        "less_than_x_seconds": {
+          "one": "ایک سیکنڈ سے کم",
+          "other": "%{count} سیکنڈوں سے کم"
+        },
+        "less_than_x_minutes": {
+          "one": "ایک مںٹ سے کم",
+          "other": "%{count} مںٹوں سے کم"
+        },
+        "over_x_years": {
+          "one": "ایک سال سے زیادہ",
+          "other": "%{count} سالوں سے زیادہ"
+        },
+        "x_seconds": {
+          "one": "ایک سیکنڈ",
+          "other": "%{count} سیکنڈ"
+        },
+        "x_minutes": {
+          "one": "ایک منٹ",
+          "other": "%{count} منٹ"
+        },
+        "x_days": {
+          "one": "ایک دن",
+          "other": "%{count} دن"
+        },
+        "x_months": {
+          "one": "ایک ماہ",
+          "other": "%{count} ماہ"
+        }
+      }
+    }
+  }
+}

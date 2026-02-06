@@ -1,0 +1,53 @@
+{
+  "ug": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "تەخمىنەن بىر سائەت",
+          "other": "تەخمىنەن %{count} سائەت"
+        },
+        "about_x_months": {
+          "one": "تەخمىنەن بىر ئاي",
+          "other": "تەخمىنەن %{count} ئاي"
+        },
+        "about_x_years": {
+          "one": "تەخمىنەن بىر يىل",
+          "other": "تەخمىنەن %{count} يىل"
+        },
+        "almost_x_years": {
+          "one": "بىر يىلغا يېقىن",
+          "other": "%{count} يىلغا يېقىن"
+        },
+        "half_a_minute": "يېرىم مىنۇت",
+        "less_than_x_seconds": {
+          "one": "بىر سىكۇنتقا يەتمىگەن",
+          "other": "%{count} سىكنۇتقا"
+        },
+        "less_than_x_minutes": {
+          "one": "بىر مىنۇتقا يەتمىگەن",
+          "other": "%{count} مىنۇتقا يەتمىگەن"
+        },
+        "over_x_years": {
+          "one": "بىر يىلدىن ئارتۇق",
+          "other": "%{count} يىلدىن ئارتۇق"
+        },
+        "x_seconds": {
+          "one": "بىر سىكنۇت",
+          "other": "%{count} سىكنۇت"
+        },
+        "x_minutes": {
+          "one": "بىر مىنۇت",
+          "other": "%{count} مىنۇت"
+        },
+        "x_days": {
+          "one": "بىر كۈن",
+          "other": "%{count} كۈن"
+        },
+        "x_months": {
+          "one": "بىر ئاي",
+          "other": "%{count} ئاي"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "kk": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "шамамен %{count} сағат",
+          "other": "шамамен %{count} сағат"
+        },
+        "about_x_months": {
+          "one": "шамамен %{count} ай",
+          "other": "шамамен %{count} ай"
+        },
+        "about_x_years": {
+          "one": "шамамен %{count} жыл",
+          "other": "шамамен %{count} жыл"
+        },
+        "almost_x_years": {
+          "one": "%{count} жылға жуық",
+          "other": "%{count} жылға жуық"
+        },
+        "half_a_minute": "жарты минут",
+        "less_than_x_seconds": {
+          "one": "%{count} секундтан аз",
+          "other": "%{count} секундтан аз"
+        },
+        "less_than_x_minutes": {
+          "one": "%{count} минуттан аз",
+          "other": "%{count} минуттан аз"
+        },
+        "over_x_years": {
+          "one": "%{count} жылдан астам",
+          "other": "%{count} жылдан астам"
+        },
+        "x_seconds": {
+          "one": "%{count} секунд",
+          "other": "%{count} секунд"
+        },
+        "x_minutes": {
+          "one": "%{count} минут",
+          "other": "%{count} минут"
+        },
+        "x_days": {
+          "one": "%{count} күн",
+          "other": "%{count} күн"
+        },
+        "x_months": {
+          "one": "%{count} ай",
+          "other": "%{count} ай"
+        },
+        "x_years": {
+          "one": "%{count} жыл",
+          "other": "%{count} жыл"
+        }
+      }
+    }
+  }
+}

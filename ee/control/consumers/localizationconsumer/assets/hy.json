@@ -1,0 +1,57 @@
+{
+  "hy": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "մոտ %{count} ժամ",
+          "other": "մոտ %{count} ժամ"
+        },
+        "about_x_months": {
+          "one": "մոտ %{count} ամիս",
+          "other": "մոտ %{count} ամիս"
+        },
+        "about_x_years": {
+          "one": "մոտ %{count} տարի",
+          "other": "մոտ %{count} տարի"
+        },
+        "almost_x_years": {
+          "one": "գրեթե %{count} տարի",
+          "other": "գրեթե %{count} տարի"
+        },
+        "half_a_minute": "կես րոպե",
+        "less_than_x_seconds": {
+          "one": "քիչ քան %{count} վայրկյան",
+          "other": "քիչ քան %{count} վայրկյան"
+        },
+        "less_than_x_minutes": {
+          "one": "քիչ քան մեկ րոպե",
+          "other": "քիչ քան %{count} րոպե"
+        },
+        "over_x_years": {
+          "one": "ավելի քան %{count} տարի",
+          "other": "ավելի քան %{count} տարի"
+        },
+        "x_seconds": {
+          "one": "%{count} վայրկյան",
+          "other": "%{count} վայրկյան"
+        },
+        "x_minutes": {
+          "one": "%{count} րոպե",
+          "other": "%{count} րոպե"
+        },
+        "x_days": {
+          "one": "%{count} օր",
+          "other": "%{count} օր"
+        },
+        "x_months": {
+          "one": "%{count} ամիս",
+          "other": "%{count} ամիս"
+        },
+        "x_years": {
+          "one": "%{count} տարի",
+          "other": "%{count} տարի"
+        }
+      }
+    }
+  }
+}

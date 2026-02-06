@@ -53,6 +53,8 @@ type knapsack struct {
 	desktopRunner types.DesktopRunner
 
 	osqueryPublisher types.OsqueryPublisher
+
+	localizer types.Localizer
 	// This struct is a work in progress, and will be iteratively added to as needs arise.
 }
 
@@ -420,6 +422,10 @@ func (k *knapsack) EnrollmentDetailsStore() types.KVStore {
 	return k.getKVStore(storage.EnrollmentDetailsStore)
 }
 
+func (k *knapsack) LocalizationStore() types.KVStore {
+	return k.getKVStore(storage.LocalizationStore)
+}
+
 func (k *knapsack) SetLauncherWatchdogDisabled(disabled bool) error {
 	return k.flags.SetLauncherWatchdogDisabled(disabled)
 }
@@ -680,4 +686,16 @@ func (k *knapsack) SetDesktopRunner(runner types.DesktopRunner) {
 
 func (k *knapsack) ServerReleaseTrackerDataStore() types.KVStore {
 	return k.getKVStore(storage.ServerReleaseTrackerDataStore)
+}
+
+func (k *knapsack) LocalizationData() types.LocalizationData {
+	if k.localizer == nil {
+		return types.LocalizationData{}
+	}
+
+	return k.localizer.LocalizationData()
+}
+
+func (k *knapsack) SetLocalizer(t types.Localizer) {
+	k.localizer = t
 }

@@ -1,0 +1,53 @@
+{
+  "ms": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "lebih kurang %{count} jam",
+          "other": "lebih kurang %{count} jam"
+        },
+        "about_x_months": {
+          "one": "lebih kurang %{count} bulan",
+          "other": "lebih kurang %{count} bulan"
+        },
+        "about_x_years": {
+          "one": "lebih kurang %{count} tahun",
+          "other": "lebih kurang %{count} tahun"
+        },
+        "almost_x_years": {
+          "one": "hampir %{count} tahun",
+          "other": "hampir %{count} tahun"
+        },
+        "half_a_minute": "setengah minit",
+        "less_than_x_seconds": {
+          "one": "kurang dari satu saat",
+          "other": "kurang dari %{count} saat"
+        },
+        "less_than_x_minutes": {
+          "one": "kurang dari satu minit",
+          "other": "kurang dari %{count} minit"
+        },
+        "over_x_years": {
+          "one": "lebih %{count} tahun",
+          "other": "lebih %{count} tahun"
+        },
+        "x_seconds": {
+          "one": "%{count} saat",
+          "other": "%{count} saat"
+        },
+        "x_minutes": {
+          "one": "%{count} minit",
+          "other": "%{count} minit"
+        },
+        "x_days": {
+          "one": "%{count} hari",
+          "other": "%{count} hari"
+        },
+        "x_months": {
+          "one": "%{count} bulan",
+          "other": "%{count} bulan"
+        }
+      }
+    }
+  }
+}

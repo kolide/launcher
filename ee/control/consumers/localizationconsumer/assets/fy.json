@@ -1,0 +1,57 @@
+{
+  "fy": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "likernôch 1 oere",
+          "other": "likernôch %{count} oeren"
+        },
+        "about_x_months": {
+          "one": "likernôch 1 moanne",
+          "other": "likernôch %{count} moannen"
+        },
+        "about_x_years": {
+          "one": "likernôch 1 jier",
+          "other": "likernôch %{count} jier"
+        },
+        "almost_x_years": {
+          "one": "hast 1 jier",
+          "other": "hast %{count} jier"
+        },
+        "half_a_minute": "in heale minút",
+        "less_than_x_seconds": {
+          "one": "minder as 1 sekonde",
+          "other": "minder as %{count} sekonden"
+        },
+        "less_than_x_minutes": {
+          "one": "minder as in minút",
+          "other": "minder as %{count} minuten"
+        },
+        "over_x_years": {
+          "one": "mear as 1 jier",
+          "other": "mear as %{count} jier"
+        },
+        "x_seconds": {
+          "one": "1 sekonde",
+          "other": "%{count} sekonden"
+        },
+        "x_minutes": {
+          "one": "1 minút",
+          "other": "%{count} minuten"
+        },
+        "x_days": {
+          "one": "1 dei",
+          "other": "%{count} dagen"
+        },
+        "x_months": {
+          "one": "1 moanne",
+          "other": "%{count} moannen"
+        },
+        "x_years": {
+          "one": "1 jier",
+          "other": "%{count} jier"
+        }
+      }
+    }
+  }
+}

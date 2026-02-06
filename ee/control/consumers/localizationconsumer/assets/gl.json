@@ -1,0 +1,52 @@
+{
+  "gl": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "aproximadamente unha hora",
+          "other": "%{count} horas"
+        },
+        "about_x_months": {
+          "one": "aproximadamente %{count} mes",
+          "other": "%{count} meses"
+        },
+        "about_x_years": {
+          "one": "aproximadamente %{count} ano",
+          "other": "%{count} anos"
+        },
+        "half_a_minute": "medio minuto",
+        "less_than_x_seconds": {
+          "zero": "menos dun segundo",
+          "one": "%{count} segundo",
+          "few": "poucos segundos",
+          "other": "%{count} segundos"
+        },
+        "less_than_x_minutes": {
+          "zero": "menos dun minuto",
+          "one": "%{count} minuto",
+          "other": "%{count} minutos"
+        },
+        "over_x_years": {
+          "one": "máis dun ano",
+          "other": "%{count} anos"
+        },
+        "x_seconds": {
+          "one": "%{count} segundo",
+          "other": "%{count} segundos"
+        },
+        "x_minutes": {
+          "one": "%{count} minuto",
+          "other": "%{count} minuto"
+        },
+        "x_days": {
+          "one": "%{count} día",
+          "other": "%{count} días"
+        },
+        "x_months": {
+          "one": "%{count} mes",
+          "other": "%{count} meses"
+        }
+      }
+    }
+  }
+}
