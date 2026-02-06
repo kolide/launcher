@@ -80,6 +80,7 @@ const (
 
 // Package-level metrics for dedup observability. These use the global OTEL
 // meter provider and fall back to noop implementations on error.
+// this is to avoid circular dependencies with the ee/observability package
 var (
 	dedupSuppressedCounter    metric.Int64Counter
 	dedupPassedCounter        metric.Int64Counter
