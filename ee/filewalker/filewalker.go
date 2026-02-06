@@ -15,6 +15,7 @@ import (
 	"github.com/kolide/launcher/ee/gowrapper"
 )
 
+// TODO RM: maybe overlays?
 type filewalkConfig struct {
 	Name          string         `json:"name"`
 	WalkInterval  time.Duration  `json:"walk_interval"`
