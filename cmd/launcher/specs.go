@@ -29,6 +29,23 @@ func (r *requiredFields) Set(value string) error {
 	return nil
 }
 
+// specFieldBlank returns true if the field is missing, nil, or empty (e.g. "" or []).
+func specFieldBlank(v interface{}) bool {
+	if v == nil {
+		return true
+	}
+	switch x := v.(type) {
+	case string:
+		return len(x) < 1
+	case []interface{}:
+		return len(x) < 1
+	case map[string]interface{}:
+		return len(x) < 1
+	default:
+		return false
+	}
+}
+
 func runSpecs(systemMultiSlogger *multislogger.MultiSlogger, args []string) error {
 	flagset := flag.NewFlagSet("launcher specs", flag.ExitOnError)
 	flDebug := flagset.Bool("debug", false, "enable debug logging")
@@ -92,9 +109,9 @@ func runSpecs(systemMultiSlogger *multislogger.MultiSlogger, args []string) erro
 			continue
 		}
 		for _, field := range flRequired {
-			if _, ok := specMap[field]; !ok {
+			if specFieldBlank(specMap[field]) {
 				slogger.Log(ctx, slog.LevelWarn,
-					"spec missing required field",
+					"spec missing or blank required field",
 					"name", tbl.Name(),
 					"field", field,
 				)
