@@ -43,6 +43,7 @@ import (
 	performancedebug "github.com/kolide/launcher/ee/debug"
 	"github.com/kolide/launcher/ee/debug/checkups"
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
+	"github.com/kolide/launcher/ee/filewalker"
 	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/ee/observability"
@@ -78,7 +79,8 @@ const (
 	desktopMenuSubsystemName              = "kolide_desktop_menu"
 	authTokensSubsystemName               = "auth_tokens"
 	katcSubsystemName                     = "katc_config" // Kolide ATC
-	ztaInfoSubsystemName                  = "zta_info"    // legacy name for dt4aInfo subsystem
+	filewalkSubsystemName                 = "filewalk_config"
+	ztaInfoSubsystemName                  = "zta_info" // legacy name for dt4aInfo subsystem
 	dt4aInfoSubsystemName                 = "dt4a_info"
 	serverReleaseTrackerDataSubsystemName = "kolide_server_release_tracker_data"
 	localizationsSubsystemName            = "localizations"
@@ -459,6 +461,12 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		controlService.RegisterSubscriber(katcSubsystemName, osqueryRunner)
 		controlService.RegisterSubscriber(katcSubsystemName, startupSettingsWriter)
 		controlService.RegisterConsumer(serverReleaseTrackerDataSubsystemName, keyvalueconsumer.NewConfigConsumer(k.ServerReleaseTrackerDataStore()))
+
+		// Manage filewalkers and handle updates to filewalk configs
+		filewalkManager := filewalker.New(k, slogger)
+		runGroup.Add("filewalkManager", filewalkManager.Execute, filewalkManager.Interrupt)
+		controlService.RegisterConsumer(filewalkSubsystemName, keyvalueconsumer.NewConfigConsumer(k.FilewalkConfigStore()))
+		controlService.RegisterSubscriber(filewalkSubsystemName, filewalkManager)
 
 		localizationConsumer, err := localizationconsumer.NewLocalizationConsumer(slogger, k.LocalizationStore())
 		if err != nil {
