@@ -5,14 +5,11 @@ import (
 	"testing"
 	"time"
 
-	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 )
 
 func BenchmarkFilewalk(b *testing.B) {
-	testFilewalker := NewFilewalker(typesmocks.NewKnapsack(b), multislogger.NewNopLogger(), 1*time.Minute)
-
 	var testDir string
 	switch runtime.GOOS {
 	case "windows":
@@ -23,10 +20,17 @@ func BenchmarkFilewalk(b *testing.B) {
 		testDir = "/home/"
 	}
 
+	testFilewalker := newFilewalker(filewalkConfig{
+		name:          "benchtest",
+		walkInterval:  1 * time.Minute,
+		rootDir:       testDir,
+		fileNameRegex: nil,
+	}, multislogger.NewNopLogger())
+
 	b.ReportAllocs()
 	for b.Loop() {
-		results, err := testFilewalker.filewalk(b.Context(), testDir, nil)
-		require.NoError(b, err)
+		testFilewalker.filewalk(b.Context())
+		results := testFilewalker.Paths()
 		require.LessOrEqual(b, 100, len(results))
 	}
 }

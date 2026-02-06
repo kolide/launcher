@@ -2,100 +2,95 @@ package filewalker
 
 import (
 	"context"
-	"fmt"
 	"io/fs"
 	"log/slog"
 	"path/filepath"
 	"regexp"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/charlievieth/fastwalk"
-	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/gowrapper"
 )
 
 type filewalkConfig struct {
+	name          string
+	walkInterval  time.Duration
 	rootDir       string
 	fileNameRegex *regexp.Regexp
 	// fileType      fs.FileMode
 }
 
-type Filewalker struct {
-	walkInterval  time.Duration
-	walkTicker    *time.Ticker
-	configs       map[string]filewalkConfig // map table name to config
-	filewalksLock *sync.Mutex
-	filewalks     map[string][]string // map table name to filepaths
-
-	// Internals
-	k       types.Knapsack
-	slogger *slog.Logger
-
-	// Handle actor shutdown
-	interrupt   chan struct{}
-	interrupted *atomic.Bool
+type filewalker struct {
+	cfg       filewalkConfig
+	slogger   *slog.Logger
+	ticker    *time.Ticker
+	walkLock  *sync.Mutex
+	results   []string
+	interrupt chan struct{}
 }
 
-func NewFilewalker(k types.Knapsack, slogger *slog.Logger, walkInterval time.Duration) *Filewalker {
-	return &Filewalker{
-		walkInterval:  walkInterval,
-		filewalksLock: &sync.Mutex{},
-		k:             k,
-		slogger:       slogger.With("component", "filewalker"),
-		interrupt:     make(chan struct{}, 10), // We have a buffer so we don't block on sending to this channel
-		interrupted:   &atomic.Bool{},
+func newFilewalker(cfg filewalkConfig, slogger *slog.Logger) *filewalker {
+	return &filewalker{
+		cfg:       cfg,
+		slogger:   slogger.With("filewalker_name", cfg.name),
+		walkLock:  &sync.Mutex{},
+		results:   make([]string, 0),       // TODO RM: init from storage
+		interrupt: make(chan struct{}, 10), // We have a buffer so we don't block on sending to this channel
 	}
 }
 
-func (f *Filewalker) Execute() error {
-	f.walkTicker = time.NewTicker(f.walkInterval)
-	defer f.walkTicker.Stop()
+func (f *filewalker) Work() {
+	f.ticker = time.NewTicker(f.cfg.walkInterval)
+	defer f.ticker.Stop()
 
 	for {
-		for tableName, config := range f.configs {
-			// fastwalk already has an optimized number of workers, so we want to perform filewalks
-			// for each table in sequence, rather than in parallel.
-			results, err := f.filewalk(context.TODO(), config.rootDir, config.fileNameRegex)
-			if err != nil {
-				f.slogger.Log(context.TODO(), slog.LevelError,
-					"could not filewalk",
-					"table_name", tableName,
-					"err", err,
-				)
-				continue
-			}
-			f.filewalksLock.Lock()
-			f.filewalks[tableName] = results
-			f.filewalksLock.Unlock()
-		}
+		f.filewalk(context.TODO())
 
 		select {
 		case <-f.interrupt:
 			f.slogger.Log(context.TODO(), slog.LevelDebug,
 				"received external interrupt, stopping",
 			)
-			return nil
-		case <-f.walkTicker.C:
+			return
+		case <-f.ticker.C:
 			continue
 		}
 	}
 }
 
-func (f *Filewalker) Interrupt(_ error) {
-	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if f.interrupted.Swap(true) {
-		return
-	}
-
+func (f *filewalker) Stop() {
 	f.interrupt <- struct{}{}
 }
 
-func (f *Filewalker) filewalk(ctx context.Context, startDir string, fileNameRegex *regexp.Regexp) ([]string, error) {
-	var wg sync.WaitGroup
+func (f *filewalker) Paths() []string {
+	f.walkLock.Lock()
+	defer f.walkLock.Unlock()
+
+	return f.results
+}
+
+func (f *filewalker) UpdateConfig(newCfg filewalkConfig) {
+	f.walkLock.Lock()
+	defer f.walkLock.Unlock()
+
+	if newCfg.walkInterval != f.cfg.walkInterval && f.ticker != nil {
+		f.ticker.Reset(newCfg.walkInterval)
+	}
+
+	f.cfg = newCfg
+}
+
+func (f *filewalker) filewalk(ctx context.Context) {
+	f.walkLock.Lock()
+	defer f.walkLock.Unlock()
+
 	fileNames := make([]string, 0)
 	filenamesChan := make(chan string, 1000)
-	wg.Go(func() {
+	var wg sync.WaitGroup
+	wg.Add(1)
+	gowrapper.Go(ctx, f.slogger, func() {
+		defer wg.Done()
 		for {
 			filename, ok := <-filenamesChan
 			if !ok {
@@ -105,11 +100,11 @@ func (f *Filewalker) filewalk(ctx context.Context, startDir string, fileNameRege
 		}
 	})
 
-	if err := fastwalk.Walk(&fastwalk.DefaultConfig, startDir, func(path string, d fs.DirEntry, err error) error {
+	if err := fastwalk.Walk(&fastwalk.DefaultConfig, f.cfg.rootDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			f.slogger.Log(ctx, slog.LevelWarn,
 				"error while filewalking",
-				"start_dir", startDir,
+				"start_dir", f.cfg.rootDir,
 				"path", path,
 				"err", err,
 			)
@@ -119,17 +114,22 @@ func (f *Filewalker) filewalk(ctx context.Context, startDir string, fileNameRege
 			return nil
 		}
 
-		if fileNameRegex == nil || fileNameRegex.MatchString(filepath.Base(path)) {
+		if f.cfg.fileNameRegex == nil || f.cfg.fileNameRegex.MatchString(filepath.Base(path)) {
 			filenamesChan <- path
 		}
 
 		return nil
 	}); err != nil {
-		return nil, fmt.Errorf("walking %s: %w", startDir, err)
+		f.slogger.Log(ctx, slog.LevelError,
+			"could not complete filewalk",
+			"err", err,
+		)
+		close(filenamesChan)
+		return
 	}
 
 	close(filenamesChan)
 	wg.Wait()
 
-	return fileNames, nil
+	f.results = fileNames
 }
