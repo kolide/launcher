@@ -16,10 +16,10 @@ import (
 )
 
 type filewalkConfig struct {
-	name          string
-	walkInterval  time.Duration
-	rootDir       string
-	fileNameRegex *regexp.Regexp
+	Name          string         `json:"name"`
+	WalkInterval  time.Duration  `json:"walk_interval"`
+	RootDir       string         `json:"root_dir"`
+	FileNameRegex *regexp.Regexp `json:"file_name_regex"`
 	// fileType      fs.FileMode
 }
 
@@ -35,7 +35,7 @@ type filewalker struct {
 func newFilewalker(cfg filewalkConfig, resultsStore types.GetterSetterDeleter, slogger *slog.Logger) *filewalker {
 	return &filewalker{
 		cfg:          cfg,
-		slogger:      slogger.With("filewalker_name", cfg.name),
+		slogger:      slogger.With("filewalker_name", cfg.Name),
 		walkLock:     &sync.Mutex{},
 		resultsStore: resultsStore,
 		interrupt:    make(chan struct{}, 10), // We have a buffer so we don't block on sending to this channel
@@ -43,7 +43,7 @@ func newFilewalker(cfg filewalkConfig, resultsStore types.GetterSetterDeleter, s
 }
 
 func (f *filewalker) Work() {
-	f.ticker = time.NewTicker(f.cfg.walkInterval)
+	f.ticker = time.NewTicker(f.cfg.WalkInterval)
 	defer f.ticker.Stop()
 
 	for {
@@ -62,7 +62,7 @@ func (f *filewalker) Work() {
 }
 
 func (f *filewalker) Delete() {
-	if err := f.resultsStore.Delete([]byte(f.cfg.name)); err != nil {
+	if err := f.resultsStore.Delete([]byte(f.cfg.Name)); err != nil {
 		f.slogger.Log(context.TODO(), slog.LevelWarn,
 			"could not remove stored results for filewalk during delete",
 			"err", err,
@@ -79,8 +79,8 @@ func (f *filewalker) UpdateConfig(newCfg filewalkConfig) {
 	f.walkLock.Lock()
 	defer f.walkLock.Unlock()
 
-	if newCfg.walkInterval != f.cfg.walkInterval && f.ticker != nil {
-		f.ticker.Reset(newCfg.walkInterval)
+	if newCfg.WalkInterval != f.cfg.WalkInterval && f.ticker != nil {
+		f.ticker.Reset(newCfg.WalkInterval)
 	}
 
 	f.cfg = newCfg
@@ -105,11 +105,11 @@ func (f *filewalker) filewalk(ctx context.Context) {
 		}
 	})
 
-	if err := fastwalk.Walk(&fastwalk.DefaultConfig, f.cfg.rootDir, func(path string, d fs.DirEntry, err error) error {
+	if err := fastwalk.Walk(&fastwalk.DefaultConfig, f.cfg.RootDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			f.slogger.Log(ctx, slog.LevelWarn,
 				"error while filewalking",
-				"start_dir", f.cfg.rootDir,
+				"start_dir", f.cfg.RootDir,
 				"path", path,
 				"err", err,
 			)
@@ -119,7 +119,7 @@ func (f *filewalker) filewalk(ctx context.Context) {
 			return nil
 		}
 
-		if f.cfg.fileNameRegex == nil || f.cfg.fileNameRegex.MatchString(filepath.Base(path)) {
+		if f.cfg.FileNameRegex == nil || f.cfg.FileNameRegex.MatchString(filepath.Base(path)) {
 			filenamesChan <- path
 		}
 
@@ -144,7 +144,7 @@ func (f *filewalker) filewalk(ctx context.Context) {
 		)
 		return
 	}
-	if err := f.resultsStore.Set([]byte(f.cfg.name), resultsRaw); err != nil {
+	if err := f.resultsStore.Set([]byte(f.cfg.Name), resultsRaw); err != nil {
 		f.slogger.Log(ctx, slog.LevelError,
 			"could not set filewalk results in storage",
 			"err", err,

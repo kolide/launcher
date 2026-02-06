@@ -26,10 +26,10 @@ func BenchmarkFilewalk(b *testing.B) {
 	require.NoError(b, err)
 
 	testFilewalker := newFilewalker(filewalkConfig{
-		name:          "benchtest",
-		walkInterval:  1 * time.Minute,
-		rootDir:       testDir,
-		fileNameRegex: nil,
+		Name:          "benchtest",
+		WalkInterval:  1 * time.Minute,
+		RootDir:       testDir,
+		FileNameRegex: nil,
 	}, store, multislogger.NewNopLogger())
 
 	b.ReportAllocs()
