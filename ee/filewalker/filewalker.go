@@ -28,7 +28,6 @@ type filewalker struct {
 	slogger      *slog.Logger
 	ticker       *time.Ticker
 	walkLock     *sync.Mutex
-	results      []string
 	resultsStore types.GetterSetterDeleter
 	interrupt    chan struct{}
 }
@@ -38,28 +37,12 @@ func newFilewalker(cfg filewalkConfig, resultsStore types.GetterSetterDeleter, s
 		cfg:          cfg,
 		slogger:      slogger.With("filewalker_name", cfg.name),
 		walkLock:     &sync.Mutex{},
-		results:      make([]string, 0),
 		resultsStore: resultsStore,
 		interrupt:    make(chan struct{}, 10), // We have a buffer so we don't block on sending to this channel
 	}
 }
 
 func (f *filewalker) Work() {
-	// Load results from storage, if available
-	if rawResults, err := f.resultsStore.Get([]byte(f.cfg.name)); err != nil {
-		f.slogger.Log(context.TODO(), slog.LevelWarn,
-			"could not pull previous results from store",
-			"err", err,
-		)
-	} else {
-		if err := json.Unmarshal(rawResults, &f.results); err != nil {
-			f.slogger.Log(context.TODO(), slog.LevelWarn,
-				"could not unmarshal previous results from store",
-				"err", err,
-			)
-		}
-	}
-
 	f.ticker = time.NewTicker(f.cfg.walkInterval)
 	defer f.ticker.Stop()
 
@@ -90,13 +73,6 @@ func (f *filewalker) Delete() {
 
 func (f *filewalker) Stop() {
 	f.interrupt <- struct{}{}
-}
-
-func (f *filewalker) Paths() []string {
-	f.walkLock.Lock()
-	defer f.walkLock.Unlock()
-
-	return f.results
 }
 
 func (f *filewalker) UpdateConfig(newCfg filewalkConfig) {
@@ -160,9 +136,7 @@ func (f *filewalker) filewalk(ctx context.Context) {
 	close(filenamesChan)
 	wg.Wait()
 
-	f.results = fileNames
-
-	resultsRaw, err := json.Marshal(f.results)
+	resultsRaw, err := json.Marshal(fileNames)
 	if err != nil {
 		f.slogger.Log(ctx, slog.LevelError,
 			"could not marshal filewalk results for storage",

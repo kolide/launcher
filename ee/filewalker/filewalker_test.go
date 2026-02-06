@@ -35,7 +35,5 @@ func BenchmarkFilewalk(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
 		testFilewalker.filewalk(b.Context())
-		results := testFilewalker.Paths()
-		require.LessOrEqual(b, 100, len(results))
 	}
 }
