@@ -62,7 +62,7 @@ func runSpecs(systemMultiSlogger *multislogger.MultiSlogger, args []string) erro
 		slogLevel = slog.LevelDebug
 	}
 
-	systemMultiSlogger.AddHandler(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+	systemMultiSlogger.AddHandler(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		Level:     slogLevel,
 		AddSource: true,
 	}))
@@ -84,27 +84,31 @@ func runSpecs(systemMultiSlogger *multislogger.MultiSlogger, args []string) erro
 	plugins = append(plugins, platformTables...)
 
 	ctx := context.Background()
-	var hadMissingOrBlank bool
+	var hadMissingOrBlank, hadValidationFailure bool
 	for _, plugin := range plugins {
 		tbl, ok := plugin.(*osquerytable.Plugin)
 		if !ok {
 			continue
 		}
-		spec, err := tbl.Spec()
+		spec := tbl.Spec()
+
+		specBytes, err := json.Marshal(spec)
 		if err != nil {
+			hadValidationFailure = true
 			slogger.Log(ctx, slog.LevelWarn,
-				"table Spec() failed, skipping",
+				"failed to marshal spec",
 				"name", tbl.Name(),
 				"err", err,
 			)
 			continue
 		}
 
-		// Validate spec is valid JSON; also used for required-field checks.
+		// Required-field checks use the marshaled map (same field names as JSON).
 		var specMap map[string]interface{}
-		if err := json.Unmarshal(spec, &specMap); err != nil {
+		if err := json.Unmarshal(specBytes, &specMap); err != nil {
+			hadValidationFailure = true
 			slogger.Log(ctx, slog.LevelWarn,
-				"spec is not valid JSON, skipping",
+				"failed to unmarshal spec for required check",
 				"name", tbl.Name(),
 				"err", err,
 			)
@@ -124,9 +128,12 @@ func runSpecs(systemMultiSlogger *multislogger.MultiSlogger, args []string) erro
 		if *flDebug {
 			slogger.Log(ctx, slog.LevelDebug, "printing spec", "table", tbl.Name())
 		}
-		fmt.Println(string(spec))
+		fmt.Println(string(specBytes))
 	}
 
+	if hadValidationFailure {
+		return fmt.Errorf("one or more specs failed validation")
+	}
 	if hadMissingOrBlank && !*flMissingOk {
 		return fmt.Errorf("one or more required fields were missing or blank")
 	}
