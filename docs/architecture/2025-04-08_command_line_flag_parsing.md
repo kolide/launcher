@@ -38,6 +38,7 @@ Subcommands in this category:
 * `download-osquery`
 * `uninstall`
 * `query-windowsupdates`
+* `specs`
 
 Note that the options used for `uninstall` do actually have overlap with `launcher.Options`, unlike the other three.
 
