@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kolide/launcher/ee/agent/storage"
+	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 )
@@ -20,12 +22,15 @@ func BenchmarkFilewalk(b *testing.B) {
 		testDir = "/home/"
 	}
 
+	store, err := storageci.NewStore(b, multislogger.NewNopLogger(), storage.FilewalkResultsStore.String())
+	require.NoError(b, err)
+
 	testFilewalker := newFilewalker(filewalkConfig{
 		name:          "benchtest",
 		walkInterval:  1 * time.Minute,
 		rootDir:       testDir,
 		fileNameRegex: nil,
-	}, multislogger.NewNopLogger())
+	}, store, multislogger.NewNopLogger())
 
 	b.ReportAllocs()
 	for b.Loop() {

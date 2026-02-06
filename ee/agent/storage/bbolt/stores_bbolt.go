@@ -22,6 +22,7 @@ func MakeStores(ctx context.Context, slogger *slog.Logger, db *bbolt.DB) (map[st
 		storage.AgentFlagsStore,
 		storage.KatcConfigStore,
 		storage.FilewalkConfigStore,
+		storage.FilewalkResultsStore,
 		storage.ConfigStore,
 		storage.ControlStore,
 		storage.PersistentHostDataStore,

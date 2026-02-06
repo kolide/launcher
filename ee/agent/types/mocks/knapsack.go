@@ -1861,6 +1861,52 @@ func (_c *Knapsack_FilewalkConfigStore_Call) RunAndReturn(run func() types.KVSto
 	return _c
 }
 
+// FilewalkResultsStore provides a mock function for the type Knapsack
+func (_mock *Knapsack) FilewalkResultsStore() types.KVStore {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for FilewalkResultsStore")
+	}
+
+	var r0 types.KVStore
+	if returnFunc, ok := ret.Get(0).(func() types.KVStore); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(types.KVStore)
+		}
+	}
+	return r0
+}
+
+// Knapsack_FilewalkResultsStore_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FilewalkResultsStore'
+type Knapsack_FilewalkResultsStore_Call struct {
+	*mock.Call
+}
+
+// FilewalkResultsStore is a helper method to define mock.On call
+func (_e *Knapsack_Expecter) FilewalkResultsStore() *Knapsack_FilewalkResultsStore_Call {
+	return &Knapsack_FilewalkResultsStore_Call{Call: _e.mock.On("FilewalkResultsStore")}
+}
+
+func (_c *Knapsack_FilewalkResultsStore_Call) Run(run func()) *Knapsack_FilewalkResultsStore_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Knapsack_FilewalkResultsStore_Call) Return(v types.KVStore) *Knapsack_FilewalkResultsStore_Call {
+	_c.Call.Return(v)
+	return _c
+}
+
+func (_c *Knapsack_FilewalkResultsStore_Call) RunAndReturn(run func() types.KVStore) *Knapsack_FilewalkResultsStore_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ForceControlSubsystems provides a mock function for the type Knapsack
 func (_mock *Knapsack) ForceControlSubsystems() bool {
 	ret := _mock.Called()

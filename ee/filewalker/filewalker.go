@@ -2,6 +2,7 @@ package filewalker
 
 import (
 	"context"
+	"encoding/json"
 	"io/fs"
 	"log/slog"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/charlievieth/fastwalk"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/gowrapper"
 )
 
@@ -22,25 +24,42 @@ type filewalkConfig struct {
 }
 
 type filewalker struct {
-	cfg       filewalkConfig
-	slogger   *slog.Logger
-	ticker    *time.Ticker
-	walkLock  *sync.Mutex
-	results   []string
-	interrupt chan struct{}
+	cfg          filewalkConfig
+	slogger      *slog.Logger
+	ticker       *time.Ticker
+	walkLock     *sync.Mutex
+	results      []string
+	resultsStore types.GetterSetterDeleter
+	interrupt    chan struct{}
 }
 
-func newFilewalker(cfg filewalkConfig, slogger *slog.Logger) *filewalker {
+func newFilewalker(cfg filewalkConfig, resultsStore types.GetterSetterDeleter, slogger *slog.Logger) *filewalker {
 	return &filewalker{
-		cfg:       cfg,
-		slogger:   slogger.With("filewalker_name", cfg.name),
-		walkLock:  &sync.Mutex{},
-		results:   make([]string, 0),       // TODO RM: init from storage
-		interrupt: make(chan struct{}, 10), // We have a buffer so we don't block on sending to this channel
+		cfg:          cfg,
+		slogger:      slogger.With("filewalker_name", cfg.name),
+		walkLock:     &sync.Mutex{},
+		results:      make([]string, 0),
+		resultsStore: resultsStore,
+		interrupt:    make(chan struct{}, 10), // We have a buffer so we don't block on sending to this channel
 	}
 }
 
 func (f *filewalker) Work() {
+	// Load results from storage, if available
+	if rawResults, err := f.resultsStore.Get([]byte(f.cfg.name)); err != nil {
+		f.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not pull previous results from store",
+			"err", err,
+		)
+	} else {
+		if err := json.Unmarshal(rawResults, &f.results); err != nil {
+			f.slogger.Log(context.TODO(), slog.LevelWarn,
+				"could not unmarshal previous results from store",
+				"err", err,
+			)
+		}
+	}
+
 	f.ticker = time.NewTicker(f.cfg.walkInterval)
 	defer f.ticker.Stop()
 
@@ -60,7 +79,12 @@ func (f *filewalker) Work() {
 }
 
 func (f *filewalker) Delete() {
-	// TODO RM: remove results from data store
+	if err := f.resultsStore.Delete([]byte(f.cfg.name)); err != nil {
+		f.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not remove stored results for filewalk during delete",
+			"err", err,
+		)
+	}
 	f.Stop()
 }
 
@@ -137,4 +161,19 @@ func (f *filewalker) filewalk(ctx context.Context) {
 	wg.Wait()
 
 	f.results = fileNames
+
+	resultsRaw, err := json.Marshal(f.results)
+	if err != nil {
+		f.slogger.Log(ctx, slog.LevelError,
+			"could not marshal filewalk results for storage",
+			"err", err,
+		)
+		return
+	}
+	if err := f.resultsStore.Set([]byte(f.cfg.name), resultsRaw); err != nil {
+		f.slogger.Log(ctx, slog.LevelError,
+			"could not set filewalk results in storage",
+			"err", err,
+		)
+	}
 }

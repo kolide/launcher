@@ -49,7 +49,7 @@ func (fm *FilewalkManager) Execute() error {
 	}
 	fm.filewalkersLock.Lock()
 	for _, cfg := range cfgs {
-		fm.filewalkers[cfg.name] = newFilewalker(cfg, fm.slogger)
+		fm.filewalkers[cfg.name] = newFilewalker(cfg, fm.k.FilewalkResultsStore(), fm.slogger)
 		gowrapper.Go(context.TODO(), fm.slogger, fm.filewalkers[cfg.name].Work)
 	}
 	fm.filewalkersLock.Unlock()
@@ -112,7 +112,7 @@ func (fm *FilewalkManager) Ping() {
 			fw.UpdateConfig(cfg)
 		} else {
 			// Add the new filewalker
-			fm.filewalkers[cfg.name] = newFilewalker(cfg, fm.slogger)
+			fm.filewalkers[cfg.name] = newFilewalker(cfg, fm.k.FilewalkResultsStore(), fm.slogger)
 			gowrapper.Go(context.TODO(), fm.slogger, fm.filewalkers[cfg.name].Work)
 		}
 	}
