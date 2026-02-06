@@ -49,6 +49,7 @@ func specFieldBlank(v interface{}) bool {
 func runSpecs(systemMultiSlogger *multislogger.MultiSlogger, args []string) error {
 	flagset := flag.NewFlagSet("launcher specs", flag.ExitOnError)
 	flDebug := flagset.Bool("debug", false, "enable debug logging")
+	flMissingOk := flagset.Bool("missing-ok", false, "do not exit with error when required fields are missing or blank")
 	var flRequired requiredFields
 	flagset.Var(&flRequired, "required", "field name that must be present in the spec (repeatable); warns if missing")
 
@@ -83,6 +84,7 @@ func runSpecs(systemMultiSlogger *multislogger.MultiSlogger, args []string) erro
 	plugins = append(plugins, platformTables...)
 
 	ctx := context.Background()
+	var hadMissingOrBlank bool
 	for _, plugin := range plugins {
 		tbl, ok := plugin.(*osquerytable.Plugin)
 		if !ok {
@@ -110,6 +112,7 @@ func runSpecs(systemMultiSlogger *multislogger.MultiSlogger, args []string) erro
 		}
 		for _, field := range flRequired {
 			if specFieldBlank(specMap[field]) {
+				hadMissingOrBlank = true
 				slogger.Log(ctx, slog.LevelWarn,
 					"spec missing or blank required field",
 					"name", tbl.Name(),
@@ -124,5 +127,8 @@ func runSpecs(systemMultiSlogger *multislogger.MultiSlogger, args []string) erro
 		fmt.Println(string(spec))
 	}
 
+	if hadMissingOrBlank && !*flMissingOk {
+		return fmt.Errorf("one or more required fields were missing or blank")
+	}
 	return nil
 }
