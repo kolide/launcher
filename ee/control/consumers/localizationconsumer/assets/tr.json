@@ -1,0 +1,57 @@
+{
+  "tr": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "yaklaşık %{count} saat",
+          "other": "yaklaşık %{count} saat"
+        },
+        "about_x_months": {
+          "one": "yaklaşık %{count} ay",
+          "other": "yaklaşık %{count} ay"
+        },
+        "about_x_years": {
+          "one": "yaklaşık %{count} yıl",
+          "other": "yaklaşık %{count} yıl"
+        },
+        "almost_x_years": {
+          "one": "neredeyse %{count} yıl",
+          "other": "neredeyse %{count} yıl"
+        },
+        "half_a_minute": "yarım dakika",
+        "less_than_x_seconds": {
+          "one": "%{count} saniyeden az",
+          "other": "%{count} saniyeden az"
+        },
+        "less_than_x_minutes": {
+          "one": "%{count} dakikadan az",
+          "other": "%{count} dakikadan az"
+        },
+        "over_x_years": {
+          "one": "%{count} yıldan fazla",
+          "other": "%{count} yıldan fazla"
+        },
+        "x_seconds": {
+          "one": "%{count} saniye",
+          "other": "%{count} saniye"
+        },
+        "x_minutes": {
+          "one": "%{count} dakika",
+          "other": "%{count} dakika"
+        },
+        "x_days": {
+          "one": "%{count} gün",
+          "other": "%{count} gün"
+        },
+        "x_months": {
+          "one": "%{count} ay",
+          "other": "%{count} ay"
+        },
+        "x_years": {
+          "one": "%{count} yıl",
+          "other": "%{count} yıl"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "sq": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "rreth %{count} orë",
+          "other": "rreth %{count} orë"
+        },
+        "about_x_months": {
+          "one": "rreth %{count} muaj",
+          "other": "rreth %{count} muaj"
+        },
+        "about_x_years": {
+          "one": "rreth %{count} vit",
+          "other": "rreth %{count} vjet"
+        },
+        "almost_x_years": {
+          "one": "gati %{count} vit",
+          "other": "gati %{count} vjet"
+        },
+        "half_a_minute": "gjysmë minute",
+        "less_than_x_seconds": {
+          "one": "më pak se %{count} sekondë",
+          "other": "më pak se %{count} sekonda"
+        },
+        "less_than_x_minutes": {
+          "one": "më pak se një minutë",
+          "other": "më pak se %{count} minuta"
+        },
+        "over_x_years": {
+          "one": "mbi %{count} vit",
+          "other": "mbi %{count} vjet"
+        },
+        "x_minutes": {
+          "one": "%{count} minutë",
+          "other": "%{count} minuta"
+        },
+        "x_days": {
+          "one": "%{count} ditë",
+          "other": "%{count} ditë"
+        },
+        "x_months": {
+          "one": "%{count} muaj",
+          "other": "%{count} muaj"
+        },
+        "x_years": {
+          "one": "%{count} vit",
+          "other": "%{count} vjet"
+        }
+      }
+    }
+  }
+}

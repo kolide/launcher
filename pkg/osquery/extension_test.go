@@ -1751,7 +1751,7 @@ func TestGetQueries_WorksWithSecretlessEnrollment(t *testing.T) {
 
 	// First request to generate configs -- we shouldn't be able to get anything yet,
 	// since we haven't enrolled.
-	k.On("NodeKey", testifymock.Anything).Return("", nil).Times(2) // called once when making the GetQueries call, once at the top of Enroll
+	nodekeyMockCall := k.On("NodeKey", testifymock.Anything).Return("", nil)
 	_, err = e.GetQueries(t.Context())
 	require.Error(t, err, "should not have been able to get queries while unenrolled")
 
@@ -1771,6 +1771,7 @@ func TestGetQueries_WorksWithSecretlessEnrollment(t *testing.T) {
 	}()
 
 	// Now, set the node key, to simulate secretless enrollment completing in a different thread.
+	nodekeyMockCall.Unset()
 	k.On("NodeKey", testifymock.Anything).Return(nodeKeyFromSecretlessEnrollment, nil)
 
 	// Wait for our previous queries to complete

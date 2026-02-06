@@ -1,0 +1,64 @@
+{
+  "sk": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "asi hodinou",
+          "few": "asi %{count} hodinami",
+          "other": "asi %{count} hodinami"
+        },
+        "about_x_months": {
+          "one": "asi mesiacom",
+          "few": "asi %{count} mesiacmi",
+          "other": "asi %{count} mesiacmi"
+        },
+        "about_x_years": {
+          "one": "asi rokom",
+          "few": "asi %{count} rokmi",
+          "other": "asi %{count} rokmi"
+        },
+        "almost_x_years": {
+          "one": "takmer rokom",
+          "few": "takmer %{count} rokmi",
+          "other": "takmer %{count} rokmi"
+        },
+        "half_a_minute": "pol minútou",
+        "less_than_x_seconds": {
+          "one": "necelou sekundou",
+          "few": "necelými %{count} sekundami",
+          "other": "necelými %{count} sekundami"
+        },
+        "less_than_x_minutes": {
+          "one": "necelou minútou",
+          "few": "necelými %{count} minútami",
+          "other": "necelými %{count} minútami"
+        },
+        "over_x_years": {
+          "one": "viac ako rokom",
+          "few": "viac ako %{count} rokmi",
+          "other": "viac ako %{count} rokmi"
+        },
+        "x_seconds": {
+          "one": "sekundou",
+          "few": "%{count} sekundami",
+          "other": "%{count} sekundami"
+        },
+        "x_minutes": {
+          "one": "minútou",
+          "few": "%{count} minútami",
+          "other": "%{count} minútami"
+        },
+        "x_days": {
+          "one": "dňom",
+          "few": "%{count} dňami",
+          "other": "%{count} dňami"
+        },
+        "x_months": {
+          "one": "mesiacom",
+          "few": "%{count} mesiacmi",
+          "other": "%{count} mesiacmi"
+        }
+      }
+    }
+  }
+}

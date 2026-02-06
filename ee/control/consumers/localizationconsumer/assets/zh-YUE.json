@@ -1,0 +1,57 @@
+{
+  "zh-YUE": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "大概%{count}個鐘",
+          "other": "大概%{count}個鐘"
+        },
+        "about_x_months": {
+          "one": "大概%{count}個月",
+          "other": "大概%{count}個月"
+        },
+        "about_x_years": {
+          "one": "大概%{count}年",
+          "other": "大概%{count}年"
+        },
+        "almost_x_years": {
+          "one": "差唔多%{count}年",
+          "other": "差唔多%{count}年"
+        },
+        "half_a_minute": "半分鐘",
+        "less_than_x_seconds": {
+          "one": "唔夠%{count}秒",
+          "other": "唔夠%{count}秒"
+        },
+        "less_than_x_minutes": {
+          "one": "唔夠%{count}分鐘",
+          "other": "唔夠%{count}分鐘"
+        },
+        "over_x_years": {
+          "one": "超過%{count}年",
+          "other": "超過%{count}年"
+        },
+        "x_seconds": {
+          "one": "%{count}秒",
+          "other": "%{count}秒"
+        },
+        "x_minutes": {
+          "one": "%{count}分鐘",
+          "other": "%{count}分鐘"
+        },
+        "x_days": {
+          "one": "%{count}日",
+          "other": "%{count}日"
+        },
+        "x_months": {
+          "one": "%{count}個月",
+          "other": "%{count}個月"
+        },
+        "x_years": {
+          "one": "%{count}年",
+          "other": "%{count}年"
+        }
+      }
+    }
+  }
+}

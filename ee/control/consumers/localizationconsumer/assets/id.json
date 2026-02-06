@@ -1,0 +1,55 @@
+{
+  "id": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "sekitar satu jam",
+          "other": "sekitar %{count} jam"
+        },
+        "about_x_months": {
+          "one": "sekitar sebulan",
+          "other": "sekitar %{count} bulan"
+        },
+        "about_x_years": {
+          "one": "sekitar setahun",
+          "other": "sekitar %{count} tahun"
+        },
+        "almost_x_years": {
+          "one": "hampir setahun",
+          "other": "hampir %{count} tahun"
+        },
+        "half_a_minute": "setengah menit",
+        "less_than_x_seconds": {
+          "zero": "kurang dari 1 detik",
+          "one": "kurang dari %{count} detik",
+          "other": "kurang dari %{count} detik"
+        },
+        "less_than_x_minutes": {
+          "zero": "kurang dari 1 menit",
+          "one": "kurang dari %{count} menit",
+          "other": "kurang dari %{count} menit"
+        },
+        "over_x_years": {
+          "one": "lebih dari setahun",
+          "other": "lebih dari %{count} tahun"
+        },
+        "x_seconds": {
+          "one": "satu detik",
+          "other": "%{count} detik"
+        },
+        "x_minutes": {
+          "one": "satu menit",
+          "other": "%{count} menit"
+        },
+        "x_days": {
+          "one": "sehari",
+          "other": "%{count} hari"
+        },
+        "x_months": {
+          "one": "sebulan",
+          "other": "%{count} bulan"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "th": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "ประมาณ %{count} ชั่วโมง",
+          "other": "ประมาณ %{count} ชั่วโมง"
+        },
+        "about_x_months": {
+          "one": "ประมาณ %{count} เดือน",
+          "other": "ประมาณ %{count} เดือน"
+        },
+        "about_x_years": {
+          "one": "ประมาณ %{count} ปี",
+          "other": "ประมาณ %{count} ปี"
+        },
+        "almost_x_years": {
+          "one": "เกือบ %{count} ปี",
+          "other": "เกือบ %{count} ปี"
+        },
+        "half_a_minute": "ครึ่งนาที",
+        "less_than_x_seconds": {
+          "one": "น้อยกว่า %{count} วินาที",
+          "other": "น้อยกว่า %{count} วินาที"
+        },
+        "less_than_x_minutes": {
+          "one": "น้อยกว่า %{count} นาที",
+          "other": "น้อยกว่า %{count} นาที"
+        },
+        "over_x_years": {
+          "one": "มากกว่า %{count} ปี",
+          "other": "มากกว่า %{count} ปี"
+        },
+        "x_seconds": {
+          "one": "%{count} วินาที",
+          "other": "%{count} วินาที"
+        },
+        "x_minutes": {
+          "one": "%{count} นาที",
+          "other": "%{count} นาที"
+        },
+        "x_days": {
+          "one": "%{count} วัน",
+          "other": "%{count} วัน"
+        },
+        "x_months": {
+          "one": "%{count} เดือน",
+          "other": "%{count} เดือน"
+        }
+      }
+    }
+  }
+}

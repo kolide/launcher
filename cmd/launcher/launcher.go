@@ -36,6 +36,7 @@ import (
 	"github.com/kolide/launcher/ee/control/consumers/acceleratecontrolconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/flareconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/keyvalueconsumer"
+	"github.com/kolide/launcher/ee/control/consumers/localizationconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/notificationconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/remoterestartconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/uninstallconsumer"
@@ -80,6 +81,7 @@ const (
 	ztaInfoSubsystemName                  = "zta_info"    // legacy name for dt4aInfo subsystem
 	dt4aInfoSubsystemName                 = "dt4a_info"
 	serverReleaseTrackerDataSubsystemName = "kolide_server_release_tracker_data"
+	localizationsSubsystemName            = "localizations"
 )
 
 // runLauncher is the entry point into running launcher. It creates a
@@ -457,6 +459,13 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		controlService.RegisterSubscriber(katcSubsystemName, osqueryRunner)
 		controlService.RegisterSubscriber(katcSubsystemName, startupSettingsWriter)
 		controlService.RegisterConsumer(serverReleaseTrackerDataSubsystemName, keyvalueconsumer.NewConfigConsumer(k.ServerReleaseTrackerDataStore()))
+
+		localizationConsumer, err := localizationconsumer.NewLocalizationConsumer(slogger, k.LocalizationStore())
+		if err != nil {
+			return fmt.Errorf("failed to create localization consumer: %w", err)
+		}
+		k.SetLocalizer(localizationConsumer)
+		controlService.RegisterConsumer(localizationsSubsystemName, localizationConsumer)
 
 		runner, err = desktopRunner.New(
 			k,

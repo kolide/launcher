@@ -1,0 +1,53 @@
+{
+  "pa": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "ਲਗਭਗ %{count} ਘੰਟਾ",
+          "other": "ਲਗਭਗ %{count} ਘੰਟੇ"
+        },
+        "about_x_months": {
+          "one": "ਲਗਭਗ %{count} ਮਹੀਨਾ",
+          "other": "ਲਗਭਗ %{count} ਮਹੀਨੇ"
+        },
+        "about_x_years": {
+          "one": "ਲਗਭਗ %{count} ਸਾਲ",
+          "other": "ਲਗਭਗ %{count} ਸਾਲ"
+        },
+        "almost_x_years": {
+          "one": "ਤਕਰੀਬਨ %{count} ਸਾਲ",
+          "other": "ਤਕਰੀਬਨ %{count} ਸਾਲ"
+        },
+        "half_a_minute": "ਅੱਧਾ ਮਿੰਟ",
+        "less_than_x_seconds": {
+          "one": "%{count} ਸਕਿੰਟ ਤੋਂ ਘੱਟ",
+          "other": "%{count} ਸਕਿੰਟਾਂ ਤੋਂ ਘੱਟ"
+        },
+        "less_than_x_minutes": {
+          "one": "%{count} ਮਿੰਟ ਤੋਂ ਘੱਟ",
+          "other": "%{count} ਮਿੰਟਾਂ ਤੋਂ ਘੱਟ"
+        },
+        "over_x_years": {
+          "one": "%{count} ਸਾਲ ਤੋਂ ਵੱਧ",
+          "other": "%{count} ਸਾਲਾਂ ਤੋਂ ਵੱਧ"
+        },
+        "x_seconds": {
+          "one": "%{count} ਸਕਿੰਟ",
+          "other": "%{count} ਸਕਿੰਟ"
+        },
+        "x_minutes": {
+          "one": "%{count} ਮਿੰਟ",
+          "other": "%{count} ਮਿੰਟ"
+        },
+        "x_days": {
+          "one": "%{count} ਦਿਨ",
+          "other": "%{count} ਦਿਨ"
+        },
+        "x_months": {
+          "one": "%{count} ਮਹੀਨਾ",
+          "other": "%{count} ਮਹੀਨੇ"
+        }
+      }
+    }
+  }
+}

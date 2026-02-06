@@ -1,0 +1,53 @@
+{
+  "az": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "təxminən %{count} saat",
+          "other": "təxminən %{count} saat"
+        },
+        "about_x_months": {
+          "one": "təxminən %{count} ay",
+          "other": "təxminən %{count} ay"
+        },
+        "about_x_years": {
+          "one": "təxminən %{count} il",
+          "other": "təxminən %{count} il"
+        },
+        "almost_x_years": {
+          "one": "təqribən %{count} il",
+          "other": "təqribən %{count} il"
+        },
+        "half_a_minute": "yarım dəqiqə",
+        "less_than_x_seconds": {
+          "one": "%{count} saniyədən az",
+          "other": "%{count} saniyədən az"
+        },
+        "less_than_x_minutes": {
+          "one": "%{count} dəqiqədən az",
+          "other": "%{count} dəqiqədən az"
+        },
+        "over_x_years": {
+          "one": "%{count} ildən çox",
+          "other": "%{count} ildən çox"
+        },
+        "x_seconds": {
+          "one": "%{count} saniyə",
+          "other": "%{count} saniyə"
+        },
+        "x_minutes": {
+          "one": "%{count} dəqiqə",
+          "other": "%{count} dəqiqə"
+        },
+        "x_days": {
+          "one": "%{count} gün",
+          "other": "%{count} gün"
+        },
+        "x_months": {
+          "one": "%{count} ay",
+          "other": "%{count} ay"
+        }
+      }
+    }
+  }
+}

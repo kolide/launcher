@@ -1,0 +1,53 @@
+{
+  "tl": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "humigit-kumulang isang oras",
+          "other": "humigit-kumulang %{count} oras"
+        },
+        "about_x_months": {
+          "one": "humigit-kumulang isang buwan",
+          "other": "humigit-kumulang %{count} buwan"
+        },
+        "about_x_years": {
+          "one": "humigit-kumulang isang taon",
+          "other": "humigit-kumulang %{count} taon"
+        },
+        "almost_x_years": {
+          "one": "halos isang taon",
+          "other": "halos %{count} taon"
+        },
+        "half_a_minute": "kalahating minuto",
+        "less_than_x_seconds": {
+          "one": "mas mababa sa isang segundo",
+          "other": "mas mababa sa %{count} segundo"
+        },
+        "less_than_x_minutes": {
+          "one": "mas mababa sa isang minuto",
+          "other": "mas mababa sa %{count} minuto"
+        },
+        "over_x_years": {
+          "one": "higit sa isang taon",
+          "other": "higit %{count} taon"
+        },
+        "x_seconds": {
+          "one": "isang segundo",
+          "other": "%{count} segundo"
+        },
+        "x_minutes": {
+          "one": "isang minuto",
+          "other": "%{count} minuto"
+        },
+        "x_days": {
+          "one": "isang araw",
+          "other": "%{count} araw"
+        },
+        "x_months": {
+          "one": "isang buwan",
+          "other": "%{count} buwan"
+        }
+      }
+    }
+  }
+}

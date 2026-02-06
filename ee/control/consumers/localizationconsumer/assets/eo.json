@@ -1,0 +1,55 @@
+{
+  "eo": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "ĉirkaŭ unu horo",
+          "other": "ĉirkaŭ %{count} horoj"
+        },
+        "about_x_months": {
+          "one": "ĉirkaŭ unu monato",
+          "other": "ĉirkaŭ %{count} monatoj"
+        },
+        "about_x_years": {
+          "one": "ĉirkaŭ uno jaro",
+          "other": "ĉirkaŭ %{count} jaroj"
+        },
+        "almost_x_years": {
+          "one": "preskaŭ unu jaro",
+          "other": "preskaŭ %{count} jaroj"
+        },
+        "half_a_minute": "duona minuto",
+        "less_than_x_seconds": {
+          "zero": "malpli ol unu sekundo",
+          "one": "malpli ol unu sekundo",
+          "other": "malpli ol %{count} sekundoj"
+        },
+        "less_than_x_minutes": {
+          "zero": "malpli ol unu minuto",
+          "one": "malpli ol unu minuto",
+          "other": "malpli ol %{count} minutoj"
+        },
+        "over_x_years": {
+          "one": "pli ol unu jaro",
+          "other": "pli ol %{count} jaroj"
+        },
+        "x_seconds": {
+          "one": "%{count} sekundo",
+          "other": "%{count} sekundoj"
+        },
+        "x_minutes": {
+          "one": "%{count} minuto",
+          "other": "%{count} minutoj"
+        },
+        "x_days": {
+          "one": "%{count} tago",
+          "other": "%{count} tagoj"
+        },
+        "x_months": {
+          "one": "%{count} monato",
+          "other": "%{count} monatoj"
+        }
+      }
+    }
+  }
+}

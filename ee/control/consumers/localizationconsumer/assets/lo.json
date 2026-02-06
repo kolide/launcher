@@ -1,0 +1,53 @@
+{
+  "lo": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "ປະມານ %{count} ຊົ່ວໂມງ",
+          "other": "ປະມານ %{count} ຊົ່ວໂມງ"
+        },
+        "about_x_months": {
+          "one": "ປະມານ %{count} ເດືອນ",
+          "other": "ປະມານ %{count} ເດືອນ"
+        },
+        "about_x_years": {
+          "one": "ປະມານ %{count} ປີ",
+          "other": "ປະມານ %{count} ປີ"
+        },
+        "almost_x_years": {
+          "one": "ເກືອບ %{count} ປີ",
+          "other": "ເກືອບ %{count} ປີ"
+        },
+        "half_a_minute": "ເຄິ່ງນາທີ",
+        "less_than_x_seconds": {
+          "one": "ນ້ອຍກວ່າ %{count} ວິນາທີ",
+          "other": "ນ້ອຍກວ່າ %{count} ວິນາທີ"
+        },
+        "less_than_x_minutes": {
+          "one": "ນ້ອຍກວ່າ %{count} ນາທີ",
+          "other": "ນ້ອຍກວ່າ %{count} ນາທີ"
+        },
+        "over_x_years": {
+          "one": "ຫຼາຍກວ່າ %{count} ປີ",
+          "other": "ຫຼາຍກວ່າ %{count} ປີ"
+        },
+        "x_seconds": {
+          "one": "%{count} ວິນາທີ",
+          "other": "%{count} ວິນາທີ"
+        },
+        "x_minutes": {
+          "one": "%{count} ນາທີ",
+          "other": "%{count} ນາທີ"
+        },
+        "x_days": {
+          "one": "%{count} ມື້",
+          "other": "%{count} ມື້"
+        },
+        "x_months": {
+          "one": "%{count} ເດືອນ",
+          "other": "%{count} ເດືອນ"
+        }
+      }
+    }
+  }
+}

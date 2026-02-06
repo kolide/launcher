@@ -1,0 +1,53 @@
+{
+  "vi": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "khoảng %{count} giờ",
+          "other": "khoảng %{count} giờ"
+        },
+        "about_x_months": {
+          "one": "khoảng %{count} tháng",
+          "other": "khoảng %{count} tháng"
+        },
+        "about_x_years": {
+          "one": "khoảng %{count} năm",
+          "other": "khoảng %{count} năm"
+        },
+        "almost_x_years": {
+          "one": "gần %{count} năm",
+          "other": "gần %{count} năm"
+        },
+        "half_a_minute": "30 giây",
+        "less_than_x_seconds": {
+          "one": "chưa tới %{count} giây",
+          "other": "chưa tới %{count} giây"
+        },
+        "less_than_x_minutes": {
+          "one": "chưa tới %{count} phút",
+          "other": "chưa tới %{count} phút"
+        },
+        "over_x_years": {
+          "one": "hơn %{count} năm",
+          "other": "hơn %{count} năm"
+        },
+        "x_seconds": {
+          "one": "%{count} giây",
+          "other": "%{count} giây"
+        },
+        "x_minutes": {
+          "one": "%{count} phút",
+          "other": "%{count} phút"
+        },
+        "x_days": {
+          "one": "%{count} ngày",
+          "other": "%{count} ngày"
+        },
+        "x_months": {
+          "one": "%{count} tháng",
+          "other": "%{count} tháng"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "ja": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "約%{count}時間",
+          "other": "約%{count}時間"
+        },
+        "about_x_months": {
+          "one": "約%{count}ヶ月",
+          "other": "約%{count}ヶ月"
+        },
+        "about_x_years": {
+          "one": "約%{count}年",
+          "other": "約%{count}年"
+        },
+        "almost_x_years": {
+          "one": "%{count}年弱",
+          "other": "%{count}年弱"
+        },
+        "half_a_minute": "30秒前後",
+        "less_than_x_seconds": {
+          "one": "%{count}秒未満",
+          "other": "%{count}秒未満"
+        },
+        "less_than_x_minutes": {
+          "one": "%{count}分未満",
+          "other": "%{count}分未満"
+        },
+        "over_x_years": {
+          "one": "%{count}年以上",
+          "other": "%{count}年以上"
+        },
+        "x_seconds": {
+          "one": "%{count}秒",
+          "other": "%{count}秒"
+        },
+        "x_minutes": {
+          "one": "%{count}分",
+          "other": "%{count}分"
+        },
+        "x_days": {
+          "one": "%{count}日",
+          "other": "%{count}日"
+        },
+        "x_months": {
+          "one": "%{count}ヶ月",
+          "other": "%{count}ヶ月"
+        },
+        "x_years": {
+          "one": "%{count}年",
+          "other": "%{count}年"
+        }
+      }
+    }
+  }
+}

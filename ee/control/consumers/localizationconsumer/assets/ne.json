@@ -1,0 +1,53 @@
+{
+  "ne": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "one": "लगभग %{count} घण्टा",
+          "other": "लगभग %{count} घण्टा"
+        },
+        "about_x_months": {
+          "one": "लगभग %{count} महिना",
+          "other": "लगभग %{count} महिना"
+        },
+        "about_x_years": {
+          "one": "लगभग %{count} बर्ष",
+          "other": "लगभग %{count} बर्ष"
+        },
+        "almost_x_years": {
+          "one": "झण्डै %{count} बर्ष",
+          "other": "झण्डै %{count} बर्ष"
+        },
+        "half_a_minute": "आधा मिनेट",
+        "less_than_x_seconds": {
+          "one": "%{count} सेकेण्डभन्दा कम्ति",
+          "other": "%{count} सेकेण्डभन्दा कम्ति"
+        },
+        "less_than_x_minutes": {
+          "one": "%{count} मिनेटभन्दा कम्ति",
+          "other": "%{count} मिनेटभन्दा कम्ति"
+        },
+        "over_x_years": {
+          "one": "%{count} बर्षभन्दा बढी",
+          "other": "%{count} बर्षभन्दा बेसी"
+        },
+        "x_seconds": {
+          "one": "%{count} सेकेण्ड",
+          "other": "%{count} सेकेण्ड"
+        },
+        "x_minutes": {
+          "one": "%{count} मिनेट",
+          "other": "%{count} मिनेट"
+        },
+        "x_days": {
+          "one": "%{count} दिन",
+          "other": "%{count} दिन"
+        },
+        "x_months": {
+          "one": "%{count} महिना",
+          "other": "%{count} महिना"
+        }
+      }
+    }
+  }
+}

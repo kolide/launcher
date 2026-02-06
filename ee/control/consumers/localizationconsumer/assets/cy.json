@@ -1,0 +1,105 @@
+{
+  "cy": {
+    "datetime": {
+      "distance_in_words": {
+        "about_x_hours": {
+          "zero": "tua %{count} awr",
+          "one": "tuag awr",
+          "two": "tua %{count} awr",
+          "few": "tua %{count} awr",
+          "many": "tua %{count} awr",
+          "other": "tua %{count} awr"
+        },
+        "about_x_months": {
+          "zero": "tua %{count} mis",
+          "one": "tua mis",
+          "two": "tua %{count} mis",
+          "few": "tua %{count} mis",
+          "many": "tua %{count} mis",
+          "other": "tua %{count} mis"
+        },
+        "about_x_years": {
+          "zero": "tua %{count} blynedd",
+          "one": "tua blwyddyn",
+          "two": "tua %{count} blynedd",
+          "few": "tua %{count} blynedd",
+          "many": "tua %{count} blynedd",
+          "other": "tua %{count} blynedd"
+        },
+        "almost_x_years": {
+          "zero": "bron yn %{count} blynedd",
+          "one": "bron yn flwyddyn",
+          "two": "bron yn %{count} blynedd",
+          "few": "bron yn %{count} blynedd",
+          "many": "bron yn %{count} blynedd",
+          "other": "bron yn %{count} blynedd"
+        },
+        "half_a_minute": "hanner munud",
+        "less_than_x_seconds": {
+          "zero": "llai na %{count} eiliad",
+          "one": "llai nag eiliad",
+          "two": "llai na %{count} eiliad",
+          "few": "llai na %{count} eiliad",
+          "many": "llai na %{count} eiliad",
+          "other": "llai na %{count} eiliad"
+        },
+        "less_than_x_minutes": {
+          "zero": "llai na %{count} munud",
+          "one": "llai na munud",
+          "two": "llai na %{count} munud",
+          "few": "llai na %{count} munud",
+          "many": "llai na %{count} munud",
+          "other": "llai na %{count} munud"
+        },
+        "over_x_years": {
+          "zero": "dros %{count} blynedd",
+          "one": "dros flwyddyn",
+          "two": "dros %{count} blynedd",
+          "few": "dros %{count} blynedd",
+          "many": "dros %{count} blynedd",
+          "other": "dros %{count} blynedd"
+        },
+        "x_seconds": {
+          "zero": "%{count} o eiliadau",
+          "one": "1 eiliad",
+          "two": "%{count} o eiliadau",
+          "few": "%{count} o eiliadau",
+          "many": "%{count} o eiliadau",
+          "other": "%{count} o eiliadau"
+        },
+        "x_minutes": {
+          "zero": "%{count} o funudau",
+          "one": "1 munud",
+          "two": "%{count} o funudau",
+          "few": "%{count} o funudau",
+          "many": "%{count} o funudau",
+          "other": "%{count} o funudau"
+        },
+        "x_days": {
+          "zero": "%{count} diwrnod",
+          "one": "1 diwrnod",
+          "two": "%{count} diwrnod",
+          "few": "%{count} diwrnod",
+          "many": "%{count} diwrnod",
+          "other": "%{count} diwrnod"
+        },
+        "x_months": {
+          "zero": "%{count} mis",
+          "one": "1 mis",
+          "two": "%{count} mis",
+          "few": "%{count} mis",
+          "many": "%{count} mis",
+          "other": "%{count} mis"
+        },
+        "x_years": {
+          "zero": "%{count} blwyddyn",
+          "one": "1 flwyddyn",
+          "two": "%{count} blwyddyn",
+          "few": "%{count} blwyddyn",
+          "many": "%{count} blwyddyn",
+          "other": "%{count} blwyddyn"
+        }
+      }
+    }
+  }
+}
