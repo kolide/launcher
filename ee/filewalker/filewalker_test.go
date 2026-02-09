@@ -12,6 +12,7 @@ import (
 )
 
 func BenchmarkFilewalk(b *testing.B) {
+	// Pick a directory guaranteed to exist on GH runners
 	var testDir string
 	switch runtime.GOOS {
 	case "windows":
