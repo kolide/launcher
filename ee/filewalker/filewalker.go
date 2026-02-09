@@ -17,7 +17,6 @@ import (
 
 // TODO RM: maybe overlays?
 type filewalkConfig struct {
-	Name          string         `json:"name"`
 	WalkInterval  time.Duration  `json:"walk_interval"`
 	RootDirs      []string       `json:"root_dirs"`
 	FileNameRegex *regexp.Regexp `json:"file_name_regex"`
@@ -25,6 +24,7 @@ type filewalkConfig struct {
 }
 
 type filewalker struct {
+	name         string
 	cfg          filewalkConfig
 	slogger      *slog.Logger
 	ticker       *time.Ticker
@@ -33,10 +33,11 @@ type filewalker struct {
 	interrupt    chan struct{}
 }
 
-func newFilewalker(cfg filewalkConfig, resultsStore types.GetterSetterDeleter, slogger *slog.Logger) *filewalker {
+func newFilewalker(name string, cfg filewalkConfig, resultsStore types.GetterSetterDeleter, slogger *slog.Logger) *filewalker {
 	return &filewalker{
+		name:         name,
 		cfg:          cfg,
-		slogger:      slogger.With("filewalker_name", cfg.Name),
+		slogger:      slogger.With("filewalker_name", name),
 		walkLock:     &sync.Mutex{},
 		resultsStore: resultsStore,
 		interrupt:    make(chan struct{}, 10), // We have a buffer so we don't block on sending to this channel
@@ -63,7 +64,7 @@ func (f *filewalker) Work() {
 }
 
 func (f *filewalker) Delete() {
-	if err := f.resultsStore.Delete([]byte(f.cfg.Name)); err != nil {
+	if err := f.resultsStore.Delete([]byte(f.name)); err != nil {
 		f.slogger.Log(context.TODO(), slog.LevelWarn,
 			"could not remove stored results for filewalk during delete",
 			"err", err,
@@ -147,7 +148,7 @@ func (f *filewalker) filewalk(ctx context.Context) {
 		)
 		return
 	}
-	if err := f.resultsStore.Set([]byte(f.cfg.Name), resultsRaw); err != nil {
+	if err := f.resultsStore.Set([]byte(f.name), resultsRaw); err != nil {
 		f.slogger.Log(ctx, slog.LevelError,
 			"could not set filewalk results in storage",
 			"err", err,

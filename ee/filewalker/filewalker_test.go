@@ -25,8 +25,7 @@ func BenchmarkFilewalk(b *testing.B) {
 	store, err := storageci.NewStore(b, multislogger.NewNopLogger(), storage.FilewalkResultsStore.String())
 	require.NoError(b, err)
 
-	testFilewalker := newFilewalker(filewalkConfig{
-		Name:          "benchtest",
+	testFilewalker := newFilewalker("benchtest", filewalkConfig{
 		WalkInterval:  1 * time.Minute,
 		RootDirs:      []string{testDir},
 		FileNameRegex: nil,
