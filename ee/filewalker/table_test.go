@@ -44,7 +44,10 @@ func TestFilewalkTable(t *testing.T) {
 	// Set up our filewalker
 	cfg := filewalkConfig{
 		WalkInterval: 1 * time.Second,
-		RootDirs:     []string{testRootDir},
+		filewalkDefinition: filewalkDefinition{
+			RootDirs:      &[]string{testRootDir},
+			FileNameRegex: nil,
+		},
 	}
 	testFilewalker := newFilewalker(tableName, cfg, store, multislogger.NewNopLogger())
 	go testFilewalker.Work()

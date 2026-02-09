@@ -243,8 +243,10 @@ func generateCfgWithSeeding(t *testing.T, walkInterval time.Duration, numDirs in
 	}
 
 	return filewalkConfig{
-		WalkInterval:  walkInterval,
-		RootDirs:      rootDirs,
-		FileNameRegex: filenameRegex,
+		WalkInterval: walkInterval,
+		filewalkDefinition: filewalkDefinition{
+			RootDirs:      &rootDirs,
+			FileNameRegex: filenameRegex,
+		},
 	}
 }

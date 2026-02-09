@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sync"
 	"time"
 
@@ -15,37 +16,60 @@ import (
 	"github.com/kolide/launcher/ee/gowrapper"
 )
 
-// TODO RM: maybe overlays?
-type filewalkConfig struct {
-	WalkInterval  time.Duration  `json:"walk_interval"`
-	RootDirs      []string       `json:"root_dirs"`
-	FileNameRegex *regexp.Regexp `json:"file_name_regex"`
-	// fileType      fs.FileMode
-}
+type (
+	filewalkConfig struct {
+		WalkInterval time.Duration `json:"walk_interval"`
+		filewalkDefinition
+		Overlays []filewalkConfigOverlay `json:"overlays"`
+	}
+
+	filewalkConfigOverlay struct {
+		Filters map[string]string `json:"filters"` // determines if this overlay is applicable to this launcher installation
+		filewalkDefinition
+	}
+
+	filewalkDefinition struct {
+		RootDirs      *[]string      `json:"root_dirs,omitempty"`
+		FileNameRegex *regexp.Regexp `json:"file_name_regex,omitempty"`
+		// fileType      fs.FileMode
+	}
+)
 
 type filewalker struct {
-	name         string
-	cfg          filewalkConfig
+	// Configuration
+	name          string
+	walkInterval  time.Duration
+	rootDirs      []string
+	fileNameRegex *regexp.Regexp
+
+	// Internals
 	slogger      *slog.Logger
 	ticker       *time.Ticker
 	walkLock     *sync.Mutex
 	resultsStore types.GetterSetterDeleter
-	interrupt    chan struct{}
+
+	// Handle shutdown
+	interrupt chan struct{}
 }
 
 func newFilewalker(name string, cfg filewalkConfig, resultsStore types.GetterSetterDeleter, slogger *slog.Logger) *filewalker {
-	return &filewalker{
+	fw := &filewalker{
 		name:         name,
-		cfg:          cfg,
+		walkInterval: cfg.WalkInterval,
 		slogger:      slogger.With("filewalker_name", name),
 		walkLock:     &sync.Mutex{},
 		resultsStore: resultsStore,
 		interrupt:    make(chan struct{}, 10), // We have a buffer so we don't block on sending to this channel
 	}
+
+	// Set config options from cfg
+	fw.UpdateConfig(cfg)
+
+	return fw
 }
 
 func (f *filewalker) Work() {
-	f.ticker = time.NewTicker(f.cfg.WalkInterval)
+	f.ticker = time.NewTicker(f.walkInterval)
 	defer f.ticker.Stop()
 
 	for {
@@ -81,11 +105,38 @@ func (f *filewalker) UpdateConfig(newCfg filewalkConfig) {
 	f.walkLock.Lock()
 	defer f.walkLock.Unlock()
 
-	if newCfg.WalkInterval != f.cfg.WalkInterval && f.ticker != nil {
+	// Update walk interval first, updating ticker if it exists
+	if newCfg.WalkInterval != f.walkInterval && f.ticker != nil {
 		f.ticker.Reset(newCfg.WalkInterval)
 	}
+	f.walkInterval = newCfg.WalkInterval
 
-	f.cfg = newCfg
+	// Extract root dirs and filename regex from cfg -- applying base options first, and then overlays
+	if newCfg.RootDirs != nil {
+		f.rootDirs = *newCfg.RootDirs
+	}
+	if newCfg.FileNameRegex != nil {
+		f.fileNameRegex = newCfg.FileNameRegex
+	}
+	for _, overlay := range newCfg.Overlays {
+		if !filtersMatch(overlay.Filters) {
+			continue
+		}
+		if overlay.RootDirs != nil {
+			f.rootDirs = *overlay.RootDirs
+		}
+		if overlay.FileNameRegex != nil {
+			f.fileNameRegex = overlay.FileNameRegex
+		}
+	}
+}
+
+func filtersMatch(filters map[string]string) bool {
+	// Currently, the only filter we expect is for OS.
+	if goos, goosFound := filters["goos"]; goosFound {
+		return goos == runtime.GOOS
+	}
+	return false
 }
 
 func (f *filewalker) filewalk(ctx context.Context) {
@@ -107,7 +158,7 @@ func (f *filewalker) filewalk(ctx context.Context) {
 		}
 	})
 
-	for _, rootDir := range f.cfg.RootDirs {
+	for _, rootDir := range f.rootDirs {
 		if err := fastwalk.Walk(&fastwalk.DefaultConfig, rootDir, func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
 				f.slogger.Log(ctx, slog.LevelWarn,
@@ -122,7 +173,7 @@ func (f *filewalker) filewalk(ctx context.Context) {
 				return nil
 			}
 
-			if f.cfg.FileNameRegex == nil || f.cfg.FileNameRegex.MatchString(filepath.Base(path)) {
+			if f.fileNameRegex == nil || f.fileNameRegex.MatchString(filepath.Base(path)) {
 				filenamesChan <- path
 			}
 
