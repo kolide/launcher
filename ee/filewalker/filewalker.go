@@ -159,32 +159,44 @@ func (f *filewalker) filewalk(ctx context.Context) {
 	})
 
 	for _, rootDir := range f.rootDirs {
-		if err := fastwalk.Walk(&fastwalk.DefaultConfig, rootDir, func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				f.slogger.Log(ctx, slog.LevelWarn,
-					"error while filewalking",
-					"start_dir", rootDir,
-					"path", path,
-					"err", err,
-				)
-				return nil
-			}
-			if d.IsDir() {
-				return nil
-			}
-
-			if f.fileNameRegex == nil || f.fileNameRegex.MatchString(filepath.Base(path)) {
-				filenamesChan <- path
-			}
-
-			return nil
-		}); err != nil {
-			// Log error, but continue on to process other root dirs
-			f.slogger.Log(ctx, slog.LevelError,
-				"could not complete filewalk in directory",
-				"start_dir", rootDir,
+		// rootDir may be a directory, or a glob for a directory.
+		matches, err := filepath.Glob(rootDir)
+		if err != nil {
+			f.slogger.Log(ctx, slog.LevelWarn,
+				"error globbing for directories",
+				"root_dir", rootDir,
 				"err", err,
 			)
+			continue
+		}
+		for _, match := range matches {
+			if err := fastwalk.Walk(&fastwalk.DefaultConfig, match, func(path string, d fs.DirEntry, err error) error {
+				if err != nil {
+					f.slogger.Log(ctx, slog.LevelWarn,
+						"error while filewalking",
+						"start_dir", match,
+						"path", path,
+						"err", err,
+					)
+					return nil
+				}
+				if d.IsDir() {
+					return nil
+				}
+
+				if f.fileNameRegex == nil || f.fileNameRegex.MatchString(filepath.Base(path)) {
+					filenamesChan <- path
+				}
+
+				return nil
+			}); err != nil {
+				// Log error, but continue on to process other root dirs
+				f.slogger.Log(ctx, slog.LevelError,
+					"could not complete filewalk in directory",
+					"start_dir", match,
+					"err", err,
+				)
+			}
 		}
 	}
 
