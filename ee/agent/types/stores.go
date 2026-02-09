@@ -24,4 +24,5 @@ type Stores interface {
 	EnrollmentStore() KVStore
 	EnrollmentDetailsStore() KVStore
 	ServerReleaseTrackerDataStore() KVStore
+	LocalizationStore() KVStore
 }
