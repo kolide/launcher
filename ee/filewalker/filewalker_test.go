@@ -28,7 +28,7 @@ func BenchmarkFilewalk(b *testing.B) {
 	testFilewalker := newFilewalker(filewalkConfig{
 		Name:          "benchtest",
 		WalkInterval:  1 * time.Minute,
-		RootDir:       testDir,
+		RootDirs:      []string{testDir},
 		FileNameRegex: nil,
 	}, store, multislogger.NewNopLogger())
 

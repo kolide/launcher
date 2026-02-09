@@ -19,7 +19,7 @@ import (
 type filewalkConfig struct {
 	Name          string         `json:"name"`
 	WalkInterval  time.Duration  `json:"walk_interval"`
-	RootDir       string         `json:"root_dir"`
+	RootDirs      []string       `json:"root_dirs"`
 	FileNameRegex *regexp.Regexp `json:"file_name_regex"`
 	// fileType      fs.FileMode
 }
@@ -106,32 +106,34 @@ func (f *filewalker) filewalk(ctx context.Context) {
 		}
 	})
 
-	if err := fastwalk.Walk(&fastwalk.DefaultConfig, f.cfg.RootDir, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			f.slogger.Log(ctx, slog.LevelWarn,
-				"error while filewalking",
-				"start_dir", f.cfg.RootDir,
-				"path", path,
+	for _, rootDir := range f.cfg.RootDirs {
+		if err := fastwalk.Walk(&fastwalk.DefaultConfig, rootDir, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				f.slogger.Log(ctx, slog.LevelWarn,
+					"error while filewalking",
+					"start_dir", rootDir,
+					"path", path,
+					"err", err,
+				)
+				return nil
+			}
+			if d.IsDir() {
+				return nil
+			}
+
+			if f.cfg.FileNameRegex == nil || f.cfg.FileNameRegex.MatchString(filepath.Base(path)) {
+				filenamesChan <- path
+			}
+
+			return nil
+		}); err != nil {
+			// Log error, but continue on to process other root dirs
+			f.slogger.Log(ctx, slog.LevelError,
+				"could not complete filewalk in directory",
+				"start_dir", rootDir,
 				"err", err,
 			)
-			return nil
 		}
-		if d.IsDir() {
-			return nil
-		}
-
-		if f.cfg.FileNameRegex == nil || f.cfg.FileNameRegex.MatchString(filepath.Base(path)) {
-			filenamesChan <- path
-		}
-
-		return nil
-	}); err != nil {
-		f.slogger.Log(ctx, slog.LevelError,
-			"could not complete filewalk",
-			"err", err,
-		)
-		close(filenamesChan)
-		return
 	}
 
 	close(filenamesChan)
