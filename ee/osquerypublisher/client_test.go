@@ -77,9 +77,9 @@ func TestLogPublisherClient_PublishLogs(t *testing.T) {
 			require.NoError(t, err)
 			pkRBytes, err := pkR.MarshalBinary()
 			require.NoError(t, err)
-			err = tokenStore.Set(storage.HPKEPublicKey, []byte("test-hpke-id:"+base64.StdEncoding.EncodeToString(pkRBytes)))
+			err = tokenStore.Set(storage.AgentIngesterHPKEPublicKey, []byte("test-hpke-id:"+base64.StdEncoding.EncodeToString(pkRBytes)))
 			require.NoError(t, err)
-			err = tokenStore.Set(storage.HPKEPresharedKey, []byte("test-psk-id:"+base64.StdEncoding.EncodeToString([]byte("test-psk-key-data"))))
+			err = tokenStore.Set(storage.AgentIngesterHPKEPresharedKey, []byte("test-psk-id:"+base64.StdEncoding.EncodeToString([]byte("test-psk-key-data"))))
 			require.NoError(t, err)
 			mockKnapsack.On("TokenStore").Return(tokenStore).Maybe()
 
@@ -156,9 +156,9 @@ func TestLogPublisherClient_PublishResults(t *testing.T) {
 			require.NoError(t, err)
 			pkRBytes, err := pkR.MarshalBinary()
 			require.NoError(t, err)
-			err = tokenStore.Set(storage.HPKEPublicKey, []byte("test-hpke-id:"+base64.StdEncoding.EncodeToString(pkRBytes)))
+			err = tokenStore.Set(storage.AgentIngesterHPKEPublicKey, []byte("test-hpke-id:"+base64.StdEncoding.EncodeToString(pkRBytes)))
 			require.NoError(t, err)
-			err = tokenStore.Set(storage.HPKEPresharedKey, []byte("test-psk-id:"+base64.StdEncoding.EncodeToString([]byte("test-psk-key-data"))))
+			err = tokenStore.Set(storage.AgentIngesterHPKEPresharedKey, []byte("test-psk-id:"+base64.StdEncoding.EncodeToString([]byte("test-psk-key-data"))))
 			require.NoError(t, err)
 			mockKnapsack.On("TokenStore").Return(tokenStore).Maybe()
 
@@ -675,8 +675,8 @@ func TestLogPublisherClient_refreshTokenCache_WithHPKEKeys(t *testing.T) {
 	testPskStr := []byte("test-psk-woooooooooooo!!!!!!!!!")
 	pskStr := "test-psk-id:" + base64.StdEncoding.EncodeToString(testPskStr)
 
-	tokenStore.Set(storage.HPKEPublicKey, []byte(hpkeKeyStr))
-	tokenStore.Set(storage.HPKEPresharedKey, []byte(pskStr))
+	tokenStore.Set(storage.AgentIngesterHPKEPublicKey, []byte(hpkeKeyStr))
+	tokenStore.Set(storage.AgentIngesterHPKEPresharedKey, []byte(pskStr))
 
 	mockKnapsack.On("TokenStore").Return(tokenStore).Maybe()
 

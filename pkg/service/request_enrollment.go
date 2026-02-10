@@ -24,22 +24,26 @@ type EnrollmentDetails = types.EnrollmentDetails
 // enrollmentResponse is the raw response received from the cloud
 type enrollmentResponse struct {
 	jsonRpcResponse
-	NodeKey            string            `json:"node_key"`
-	NodeInvalid        bool              `json:"node_invalid"`
-	RegionInvalid      bool              `json:"region_invalid"`
-	RegionURLs         *types.KolideURLs `json:"region_urls,omitempty"`
-	ErrorCode          string            `json:"error_code,omitempty"`
-	Err                error             `json:"err,omitempty"`
-	AgentIngesterToken string            `json:"agent_ingester_auth_token,omitempty"`
+	NodeKey                       string            `json:"node_key"`
+	NodeInvalid                   bool              `json:"node_invalid"`
+	RegionInvalid                 bool              `json:"region_invalid"`
+	RegionURLs                    *types.KolideURLs `json:"region_urls,omitempty"`
+	ErrorCode                     string            `json:"error_code,omitempty"`
+	Err                           error             `json:"err,omitempty"`
+	AgentIngesterToken            string            `json:"agent_ingester_auth_token,omitempty"`
+	AgentIngesterHPKEPublicKey    string            `json:"agent_ingester_hpke_public_key,omitempty"`
+	AgentIngesterHPKEPresharedKey string            `json:"agent_ingester_hpke_psk,omitempty"`
 }
 
 // EnrollmentResponse is the subset of data from enrollmentResponse that we expose to consumers
 type EnrollmentResponse struct {
-	NodeKey            string
-	NodeInvalid        bool
-	RegionInvalid      bool
-	RegionURLs         *types.KolideURLs
-	AgentIngesterToken string
+	NodeKey                       string
+	NodeInvalid                   bool
+	RegionInvalid                 bool
+	RegionURLs                    *types.KolideURLs
+	AgentIngesterToken            string
+	AgentIngesterHPKEPublicKey    string
+	AgentIngesterHPKEPresharedKey string
 }
 
 func decodeJSONRPCEnrollmentRequest(_ context.Context, msg json.RawMessage) (any, error) {
@@ -108,11 +112,13 @@ func (e *Endpoints) RequestEnrollment(ctx context.Context, enrollSecret, hostIde
 	}
 
 	return &EnrollmentResponse{
-		NodeKey:            resp.NodeKey,
-		NodeInvalid:        resp.NodeInvalid,
-		RegionInvalid:      resp.RegionInvalid,
-		RegionURLs:         resp.RegionURLs,
-		AgentIngesterToken: resp.AgentIngesterToken,
+		NodeKey:                       resp.NodeKey,
+		NodeInvalid:                   resp.NodeInvalid,
+		RegionInvalid:                 resp.RegionInvalid,
+		RegionURLs:                    resp.RegionURLs,
+		AgentIngesterToken:            resp.AgentIngesterToken,
+		AgentIngesterHPKEPublicKey:    resp.AgentIngesterHPKEPublicKey,
+		AgentIngesterHPKEPresharedKey: resp.AgentIngesterHPKEPresharedKey,
 	}, resp.Err
 }
 

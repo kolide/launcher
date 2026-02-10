@@ -264,7 +264,7 @@ func (lpc *LogPublisherClient) refreshTokenCache() {
 	}
 
 	// Load HPKE public key
-	hpkeKeyData, err := lpc.knapsack.TokenStore().Get(storage.HPKEPublicKey)
+	hpkeKeyData, err := lpc.knapsack.TokenStore().Get(storage.AgentIngesterHPKEPublicKey)
 	// nothing we can do if we haven't set the HPKE key yet, just log a warning and continue
 	if err != nil || len(hpkeKeyData) == 0 {
 		lpc.slogger.Log(context.TODO(), slog.LevelWarn,
@@ -284,7 +284,7 @@ func (lpc *LogPublisherClient) refreshTokenCache() {
 	}
 
 	// Load PSK
-	pskData, err := lpc.knapsack.TokenStore().Get(storage.HPKEPresharedKey)
+	pskData, err := lpc.knapsack.TokenStore().Get(storage.AgentIngesterHPKEPresharedKey)
 	if err != nil || len(pskData) == 0 {
 		lpc.slogger.Log(context.TODO(), slog.LevelWarn,
 			"failed to fetch PSK from TokenStore, may not be set yet",
