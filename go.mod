@@ -43,8 +43,8 @@ require (
 
 require (
 	github.com/apache/thrift v0.20.0
-	github.com/fatih/semgroup v1.2.0
 	github.com/cloudflare/circl v1.6.3
+	github.com/fatih/semgroup v1.2.0
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/golang-migrate/migrate/v4 v4.16.2
 	github.com/golang/snappy v0.0.4
