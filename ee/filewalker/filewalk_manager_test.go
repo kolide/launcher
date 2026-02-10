@@ -108,7 +108,8 @@ func TestPing(t *testing.T) {
 	require.Equal(t, 3, len(results)) // 1 directory, 3 files per directory
 
 	// Prepare an update: update the config for the existing filewalker
-	newCfg := generateCfgWithSeeding(t, 500*time.Millisecond, 2, nil, 3)
+	testRegexp := regexp.MustCompile(`.*\.doc`)
+	newCfg := generateCfgWithSeeding(t, 500*time.Millisecond, 2, testRegexp, 3)
 	newCfgRaw, err := json.Marshal(newCfg)
 	require.NoError(t, err)
 	cfgStore.Set([]byte(firstTestTableName), newCfgRaw)
@@ -232,7 +233,7 @@ func generateCfgWithSeeding(t *testing.T, walkInterval time.Duration, numDirs in
 			newFilename := fmt.Sprintf("temp-%d.txt", j)
 			if filenameRegex != nil {
 				// Try to generate a filename that will match
-				newFilename := strings.ReplaceAll(filenameRegex.String(), `\`, "")    // Remove escape characters
+				newFilename = strings.ReplaceAll(filenameRegex.String(), `\`, "")     // Remove escape characters
 				newFilename = strings.ReplaceAll(newFilename, ".*", uuid.NewString()) // Replace wildcard
 				require.True(t, filenameRegex.MatchString(newFilename), "could not generate matching filename")
 			}
@@ -248,7 +249,7 @@ func generateCfgWithSeeding(t *testing.T, walkInterval time.Duration, numDirs in
 		skipFileName := "skipme.txt"
 		if filenameRegex != nil {
 			// Try to generate a filename that will match (so we can confirm the directory is skipped due to skipDirs and not to a regex mismatch)
-			skipFileName := strings.ReplaceAll(filenameRegex.String(), `\`, "")     // Remove escape characters
+			skipFileName = strings.ReplaceAll(filenameRegex.String(), `\`, "")      // Remove escape characters
 			skipFileName = strings.ReplaceAll(skipFileName, ".*", uuid.NewString()) // Replace wildcard
 			require.True(t, filenameRegex.MatchString(skipFileName), "could not generate matching filename")
 		}
