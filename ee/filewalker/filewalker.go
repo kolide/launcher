@@ -29,8 +29,9 @@ type (
 	}
 
 	filewalkDefinition struct {
-		RootDirs      *[]string      `json:"root_dirs,omitempty"`
-		FileNameRegex *regexp.Regexp `json:"file_name_regex,omitempty"`
+		RootDirs      *[]string         `json:"root_dirs,omitempty"`
+		FileNameRegex *regexp.Regexp    `json:"file_name_regex,omitempty"`
+		SkipDirs      *[]*regexp.Regexp `json:"skipdirs,omitempty"`
 		// fileType      fs.FileMode
 	}
 )
@@ -41,6 +42,7 @@ type filewalker struct {
 	walkInterval  time.Duration
 	rootDirs      []string
 	fileNameRegex *regexp.Regexp
+	skipDirs      []*regexp.Regexp
 
 	// Internals
 	slogger      *slog.Logger
@@ -118,6 +120,9 @@ func (f *filewalker) UpdateConfig(newCfg filewalkConfig) {
 	if newCfg.FileNameRegex != nil {
 		f.fileNameRegex = newCfg.FileNameRegex
 	}
+	if newCfg.SkipDirs != nil {
+		f.skipDirs = *newCfg.SkipDirs
+	}
 	for _, overlay := range newCfg.Overlays {
 		if !filtersMatch(overlay.Filters) {
 			continue
@@ -127,6 +132,9 @@ func (f *filewalker) UpdateConfig(newCfg filewalkConfig) {
 		}
 		if overlay.FileNameRegex != nil {
 			f.fileNameRegex = overlay.FileNameRegex
+		}
+		if overlay.SkipDirs != nil {
+			f.skipDirs = *overlay.SkipDirs
 		}
 	}
 }
@@ -180,6 +188,13 @@ func (f *filewalker) filewalk(ctx context.Context) {
 					)
 					return nil
 				}
+
+				// Check to see if we're in a directory that should be skipped
+				if f.shouldSkip(path) {
+					return fastwalk.SkipDir
+				}
+
+				// Only need to list files, not directories
 				if d.IsDir() {
 					return nil
 				}
@@ -217,4 +232,13 @@ func (f *filewalker) filewalk(ctx context.Context) {
 			"err", err,
 		)
 	}
+}
+
+func (f *filewalker) shouldSkip(dir string) bool {
+	for _, skipDirRegex := range f.skipDirs {
+		if skipDirRegex.MatchString(dir) {
+			return true
+		}
+	}
+	return false
 }

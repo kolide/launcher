@@ -16,6 +16,7 @@ func TestUpdateConfig(t *testing.T) {
 	t.Parallel()
 
 	testRegex := regexp.MustCompile(".*")
+	testSkipDir := regexp.MustCompile(`\/tmp\/\.git`)
 
 	nonMatchingGoos := ""
 	switch runtime.GOOS {
@@ -33,9 +34,10 @@ func TestUpdateConfig(t *testing.T) {
 		expectedWalkInterval  time.Duration
 		expectedRootDirs      []string
 		expectedFileNameRegex *regexp.Regexp
+		expectedSkipDirs      []*regexp.Regexp
 	}{
 		{
-			testCaseName: "no overlays, no filename regex",
+			testCaseName: "no overlays, no filename regex, no skip dirs",
 			cfg: filewalkConfig{
 				WalkInterval: 1 * time.Minute,
 				filewalkDefinition: filewalkDefinition{
@@ -46,19 +48,22 @@ func TestUpdateConfig(t *testing.T) {
 			expectedWalkInterval:  1 * time.Minute,
 			expectedRootDirs:      []string{"test-1"},
 			expectedFileNameRegex: nil,
+			expectedSkipDirs:      nil,
 		},
 		{
-			testCaseName: "no overlays, filename regex",
+			testCaseName: "no overlays, filename regex, skip dirs",
 			cfg: filewalkConfig{
 				WalkInterval: 2 * time.Minute,
 				filewalkDefinition: filewalkDefinition{
 					RootDirs:      &[]string{"test-2"},
 					FileNameRegex: testRegex,
+					SkipDirs:      &[]*regexp.Regexp{testSkipDir},
 				},
 			},
 			expectedWalkInterval:  2 * time.Minute,
 			expectedRootDirs:      []string{"test-2"},
 			expectedFileNameRegex: testRegex,
+			expectedSkipDirs:      []*regexp.Regexp{testSkipDir},
 		},
 		{
 			testCaseName: "overlay exists but doesn't apply",
@@ -76,6 +81,7 @@ func TestUpdateConfig(t *testing.T) {
 						filewalkDefinition: filewalkDefinition{
 							RootDirs:      &[]string{"test-other"},
 							FileNameRegex: testRegex,
+							SkipDirs:      &[]*regexp.Regexp{testSkipDir},
 						},
 					},
 				},
@@ -83,6 +89,7 @@ func TestUpdateConfig(t *testing.T) {
 			expectedWalkInterval:  3 * time.Minute,
 			expectedRootDirs:      []string{"test-3"},
 			expectedFileNameRegex: nil,
+			expectedSkipDirs:      nil,
 		},
 		{
 			testCaseName: "overlay, still no filename regex",
@@ -107,9 +114,10 @@ func TestUpdateConfig(t *testing.T) {
 			expectedWalkInterval:  4 * time.Minute,
 			expectedRootDirs:      []string{"test-4"},
 			expectedFileNameRegex: nil,
+			expectedSkipDirs:      nil,
 		},
 		{
-			testCaseName: "overlay, filename regex",
+			testCaseName: "overlay, filename regex, skipdirs",
 			cfg: filewalkConfig{
 				WalkInterval: 5 * time.Minute,
 				filewalkDefinition: filewalkDefinition{
@@ -124,6 +132,7 @@ func TestUpdateConfig(t *testing.T) {
 						filewalkDefinition: filewalkDefinition{
 							RootDirs:      &[]string{"test-5"},
 							FileNameRegex: testRegex,
+							SkipDirs:      &[]*regexp.Regexp{testSkipDir},
 						},
 					},
 				},
@@ -131,6 +140,7 @@ func TestUpdateConfig(t *testing.T) {
 			expectedWalkInterval:  5 * time.Minute,
 			expectedRootDirs:      []string{"test-5"},
 			expectedFileNameRegex: testRegex,
+			expectedSkipDirs:      []*regexp.Regexp{testSkipDir},
 		},
 	} {
 		t.Run(tt.testCaseName, func(t *testing.T) {
@@ -145,6 +155,7 @@ func TestUpdateConfig(t *testing.T) {
 		require.Equal(t, tt.expectedWalkInterval, testFw.walkInterval)
 		require.Equal(t, tt.expectedRootDirs, testFw.rootDirs)
 		require.Equal(t, tt.expectedFileNameRegex, testFw.fileNameRegex)
+		require.Equal(t, tt.expectedSkipDirs, testFw.skipDirs)
 	}
 }
 

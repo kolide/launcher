@@ -222,6 +222,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 // `.*` to be replaced with a random string. The function will fail if it is unable to generate a matching filename.
 func generateCfgWithSeeding(t *testing.T, walkInterval time.Duration, numDirs int, filenameRegex *regexp.Regexp, numFilesPerDir int) filewalkConfig {
 	rootDirs := make([]string, numDirs)
+	skipDirs := make([]*regexp.Regexp, numDirs)
 
 	for i := range rootDirs {
 		currentRootDir := t.TempDir()
@@ -234,12 +235,26 @@ func generateCfgWithSeeding(t *testing.T, walkInterval time.Duration, numDirs in
 				newFilename := strings.ReplaceAll(filenameRegex.String(), `\`, "")    // Remove escape characters
 				newFilename = strings.ReplaceAll(newFilename, ".*", uuid.NewString()) // Replace wildcard
 				require.True(t, filenameRegex.MatchString(newFilename), "could not generate matching filename")
-				continue
 			}
 
 			expectedFile := filepath.Join(currentRootDir, newFilename)
 			require.NoError(t, os.WriteFile(expectedFile, []byte("test"), 0755))
 		}
+
+		skipDir := filepath.Join(currentRootDir, uuid.NewString())
+		require.NoError(t, os.Mkdir(skipDir, 0755))
+		skipDirRegexp := regexp.MustCompile(strings.ReplaceAll(skipDir, `/`, `\/`))
+		require.True(t, skipDirRegexp.MatchString(skipDir))
+		skipFileName := "skipme.txt"
+		if filenameRegex != nil {
+			// Try to generate a filename that will match (so we can confirm the directory is skipped due to skipDirs and not to a regex mismatch)
+			skipFileName := strings.ReplaceAll(filenameRegex.String(), `\`, "")     // Remove escape characters
+			skipFileName = strings.ReplaceAll(skipFileName, ".*", uuid.NewString()) // Replace wildcard
+			require.True(t, filenameRegex.MatchString(skipFileName), "could not generate matching filename")
+		}
+		skipFile := filepath.Join(skipDir, skipFileName)
+		require.NoError(t, os.WriteFile(skipFile, []byte("test"), 0755))
+		skipDirs[i] = skipDirRegexp
 	}
 
 	return filewalkConfig{
@@ -247,6 +262,7 @@ func generateCfgWithSeeding(t *testing.T, walkInterval time.Duration, numDirs in
 		filewalkDefinition: filewalkDefinition{
 			RootDirs:      &rootDirs,
 			FileNameRegex: filenameRegex,
+			SkipDirs:      &skipDirs,
 		},
 	}
 }
