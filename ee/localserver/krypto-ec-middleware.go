@@ -146,10 +146,12 @@ type (
 	}
 
 	callbackResponse struct {
-		NodeKey            string            `json:"node_key"`
-		Munemo             string            `json:"munemo"`
-		AgentIngesterToken string            `json:"agent_ingester_auth_token"`
-		RegionURLs         *types.KolideURLs `json:"region_urls,omitempty"`
+		NodeKey                       string            `json:"node_key"`
+		Munemo                        string            `json:"munemo"`
+		AgentIngesterToken            string            `json:"agent_ingester_auth_token"`
+		AgentIngesterHPKEPublicKey    string            `json:"agent_ingester_hpke_public_key"`
+		AgentIngesterHPKEPresharedKey string            `json:"agent_ingester_hpke_psk"`
+		RegionURLs                    *types.KolideURLs `json:"region_urls,omitempty"`
 	}
 )
 
@@ -265,18 +267,7 @@ func (e *kryptoEcMiddleware) callbackWorker() {
 				return fmt.Errorf("saving enrollment: %w", err)
 			}
 
-			// if we receive an agent ingester token, save it to the token store and ping the osquery publisher to update its token cache.
-			// osqueryPublisher and tokenStore are always expected to be set at this point, but sanity check in case
-			if r.AgentIngesterToken != "" && e.osqueryPublisher != nil && e.tokenStore != nil {
-				if err := e.tokenStore.Set(storage.AgentIngesterAuthTokenKey, []byte(r.AgentIngesterToken)); err != nil {
-					return fmt.Errorf("saving agent ingester token: %w", err)
-				} else {
-					e.osqueryPublisher.Ping()
-					e.slogger.Log(req.Context(), slog.LevelInfo,
-						"agent ingester token set from secretless enrollment flow",
-					)
-				}
-			}
+			e.persistAgentIngesterKeys(req.Context(), &r)
 
 			e.slogger.Log(req.Context(), slog.LevelInfo,
 				"launcher performed secretless enrollment",
@@ -295,6 +286,68 @@ func (e *kryptoEcMiddleware) callbackWorker() {
 	e.slogger.Log(context.TODO(), slog.LevelInfo,
 		"callback worker shut down",
 	)
+}
+
+// persistAgentIngesterKeys persists the agent ingester keys from an enrollment response to the token store
+// and pings the osquery publisher to update its token cache if any updates were made.
+// Any errors here are logged but this is all a best effort approach to avoid interrupting the enrollment flow-
+// this data is also returned via control server, so we can retry if needed later.
+func (e *kryptoEcMiddleware) persistAgentIngesterKeys(ctx context.Context, resp *callbackResponse) {
+	// osqueryPublisher and tokenStore are always expected to be set at this point, but sanity check here in case
+	if e.osqueryPublisher == nil || e.tokenStore == nil {
+		e.slogger.Log(ctx, slog.LevelError,
+			"osquery publisher and token store are required to persist agent ingester keys",
+		)
+		return
+	}
+
+	// track any changes made to the token store so we can ping the osquery publisher to update its token cache
+	updatesMade := false
+	if resp.AgentIngesterToken != "" {
+		if err := e.tokenStore.Set(storage.AgentIngesterAuthTokenKey, []byte(resp.AgentIngesterToken)); err != nil {
+			e.slogger.Log(ctx, slog.LevelError,
+				"could not save agent ingester auth token",
+				"err", err,
+			)
+		} else {
+			updatesMade = true
+			e.slogger.Log(ctx, slog.LevelInfo,
+				"agent ingester token set from secretless enrollment flow",
+			)
+		}
+	}
+
+	if resp.AgentIngesterHPKEPublicKey != "" {
+		if err := e.tokenStore.Set(storage.AgentIngesterHPKEPublicKey, []byte(resp.AgentIngesterHPKEPublicKey)); err != nil {
+			e.slogger.Log(ctx, slog.LevelError,
+				"unable to save agent ingester HPKE public key",
+				"err", err,
+			)
+		} else {
+			updatesMade = true
+			e.slogger.Log(ctx, slog.LevelInfo,
+				"agent ingester HPKE public key set from secretless enrollment flow",
+			)
+		}
+	}
+
+	if resp.AgentIngesterHPKEPresharedKey != "" {
+		if err := e.tokenStore.Set(storage.AgentIngesterHPKEPresharedKey, []byte(resp.AgentIngesterHPKEPresharedKey)); err != nil {
+			e.slogger.Log(ctx, slog.LevelError,
+				"unable to save agent ingester HPKE preshared key",
+				"err", err,
+			)
+		} else {
+			updatesMade = true
+			e.slogger.Log(ctx, slog.LevelInfo,
+				"agent ingester HPKE preshared key set from secretless enrollment flow",
+			)
+		}
+	}
+
+	if updatesMade {
+		e.osqueryPublisher.Ping()
+	}
 }
 
 // sendCallback is a command to allow launcher to callback to the SaaS side with krypto responses. As the URL it inside
