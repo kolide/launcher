@@ -6,6 +6,8 @@ type Stores interface {
 	Stores() map[storage.Store]KVStore
 	AgentFlagsStore() KVStore
 	KatcConfigStore() KVStore
+	FilewalkConfigStore() KVStore
+	FilewalkResultsStore() KVStore
 	ConfigStore() KVStore
 	ControlStore() KVStore
 	PersistentHostDataStore() KVStore
