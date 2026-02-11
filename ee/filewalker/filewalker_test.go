@@ -156,6 +156,7 @@ func TestUpdateConfig(t *testing.T) {
 		require.Equal(t, tt.expectedRootDirs, testFw.rootDirs)
 		require.Equal(t, tt.expectedFileNameRegex, testFw.fileNameRegex)
 		require.Equal(t, tt.expectedSkipDirs, testFw.skipDirs)
+		require.Nil(t, testFw.fileTypeFilter)
 	}
 }
 

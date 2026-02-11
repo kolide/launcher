@@ -1,6 +1,7 @@
 package filewalker
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -47,6 +48,7 @@ func TestExecute(t *testing.T) {
 	filewalkManager := New(mockKnapsack, slogger)
 
 	// Run the manager and let it spin up filewalkers
+	walkStart := time.Now().Unix()
 	go filewalkManager.Execute()
 	time.Sleep(3 * cfg.WalkInterval)
 
@@ -61,7 +63,11 @@ func TestExecute(t *testing.T) {
 	require.NoError(t, err)
 	results := make([]string, 0)
 	require.NoError(t, json.Unmarshal(rawResults, &results))
-	require.Equal(t, 2, len(results)) // 2 directories, 1 file per directory
+	require.Equal(t, 4, len(results)) // 2 directories, 1 file per directory -- 4 total results, 2 for the directories and 2 for the files
+	lastWalkTimeRaw, err := resultsStore.Get(LastWalkTimeKey(testTableName))
+	require.NoError(t, err)
+	lastWalkTime := int64(binary.NativeEndian.Uint64(lastWalkTimeRaw))
+	require.LessOrEqual(t, walkStart, lastWalkTime)
 }
 
 func TestPing(t *testing.T) {
@@ -105,7 +111,7 @@ func TestPing(t *testing.T) {
 	require.NoError(t, err)
 	results := make([]string, 0)
 	require.NoError(t, json.Unmarshal(rawResults, &results))
-	require.Equal(t, 3, len(results)) // 1 directory, 3 files per directory
+	require.Equal(t, 4, len(results)) // 1 directory, 3 files per directory -- 4 total results, 1 for the directory and 3 for the files
 
 	// Prepare an update: update the config for the existing filewalker
 	testRegexp := regexp.MustCompile(`.*\.doc`)
@@ -129,7 +135,7 @@ func TestPing(t *testing.T) {
 	require.NoError(t, err)
 	updatedResults := make([]string, 0)
 	require.NoError(t, json.Unmarshal(updatedRawResults, &updatedResults))
-	require.Equal(t, 6, len(updatedResults)) // 2 directories, 3 files per directory
+	require.Equal(t, 6, len(updatedResults)) // 2 directories, 3 files per directory -- 6 results (directories don't count because they don't match the regex)
 
 	// Prepare an update: add a new filewalker
 	secondFilewalkerCfg := generateCfgWithSeeding(t, 500*time.Millisecond, 2, nil, 2)
@@ -154,7 +160,7 @@ func TestPing(t *testing.T) {
 	require.NoError(t, err)
 	secondTableResults := make([]string, 0)
 	require.NoError(t, json.Unmarshal(secondTableRawResults, &secondTableResults))
-	require.Equal(t, 4, len(secondTableResults)) // 2 directories, 2 files per directory
+	require.Equal(t, 6, len(secondTableResults)) // 2 directories, 2 files per directory -- 6 total results, 2 for the directories and 4 for the files
 
 	// Prepare an update: delete the new filewalker
 	require.NoError(t, cfgStore.Delete([]byte(secondTestTableName)))

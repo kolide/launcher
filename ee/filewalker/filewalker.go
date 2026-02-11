@@ -1,8 +1,11 @@
 package filewalker
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"log/slog"
 	"path/filepath"
@@ -29,19 +32,21 @@ type (
 	}
 
 	filewalkDefinition struct {
-		RootDirs      *[]string         `json:"root_dirs,omitempty"`
-		FileNameRegex *regexp.Regexp    `json:"file_name_regex,omitempty"`
-		SkipDirs      *[]*regexp.Regexp `json:"skip_dirs,omitempty"`
+		RootDirs       *[]string         `json:"root_dirs,omitempty"`
+		FileNameRegex  *regexp.Regexp    `json:"file_name_regex,omitempty"`
+		SkipDirs       *[]*regexp.Regexp `json:"skip_dirs,omitempty"`
+		FileTypeFilter *fileTypeFilter   `json:"file_type_filter,omitempty"`
 	}
 )
 
 type filewalker struct {
 	// Configuration
-	name          string
-	walkInterval  time.Duration
-	rootDirs      []string
-	fileNameRegex *regexp.Regexp
-	skipDirs      []*regexp.Regexp
+	name           string
+	walkInterval   time.Duration
+	rootDirs       []string
+	fileNameRegex  *regexp.Regexp
+	fileTypeFilter *fileTypeFilter
+	skipDirs       []*regexp.Regexp
 
 	// Internals
 	slogger      *slog.Logger
@@ -122,6 +127,9 @@ func (f *filewalker) UpdateConfig(newCfg filewalkConfig) {
 	if newCfg.SkipDirs != nil {
 		f.skipDirs = *newCfg.SkipDirs
 	}
+	if newCfg.FileTypeFilter != nil {
+		f.fileTypeFilter = newCfg.FileTypeFilter
+	}
 	for _, overlay := range newCfg.Overlays {
 		if !filtersMatch(overlay.Filters) {
 			continue
@@ -134,6 +142,9 @@ func (f *filewalker) UpdateConfig(newCfg filewalkConfig) {
 		}
 		if overlay.SkipDirs != nil {
 			f.skipDirs = *overlay.SkipDirs
+		}
+		if overlay.FileTypeFilter != nil {
+			f.fileTypeFilter = overlay.FileTypeFilter
 		}
 	}
 }
@@ -193,15 +204,18 @@ func (f *filewalker) filewalk(ctx context.Context) {
 					return fastwalk.SkipDir
 				}
 
-				// Only need to list files, not directories
-				if d.IsDir() {
+				// If our config restricts file type, check that
+				if f.fileTypeFilter != nil && !f.fileTypeFilter.matches(d.Type()) {
 					return nil
 				}
 
-				if f.fileNameRegex == nil || f.fileNameRegex.MatchString(filepath.Base(path)) {
-					filenamesChan <- path
+				// Finally, check for the file name regex
+				if f.fileNameRegex != nil && !f.fileNameRegex.MatchString(filepath.Base(path)) {
+					return nil
 				}
 
+				// Add this file to our results
+				filenamesChan <- path
 				return nil
 			}); err != nil {
 				// Log error, but continue on to process other root dirs
@@ -230,7 +244,28 @@ func (f *filewalker) filewalk(ctx context.Context) {
 			"could not set filewalk results in storage",
 			"err", err,
 		)
+		return
 	}
+
+	// Since we've successfully walked and stored the results, store the last walk time
+	lastWalkTimeBuffer := &bytes.Buffer{}
+	if err := binary.Write(lastWalkTimeBuffer, binary.NativeEndian, time.Now().Unix()); err != nil {
+		f.slogger.Log(ctx, slog.LevelError,
+			"could not convert last walk timestamp to bytes",
+			"err", err,
+		)
+		return
+	}
+	if err := f.resultsStore.Set(LastWalkTimeKey(f.name), lastWalkTimeBuffer.Bytes()); err != nil {
+		f.slogger.Log(ctx, slog.LevelError,
+			"could not set last walk time in storage",
+			"err", err,
+		)
+	}
+}
+
+func LastWalkTimeKey(filewalkName string) []byte {
+	return fmt.Appendf(nil, "%s_last_walk", filewalkName)
 }
 
 func (f *filewalker) shouldSkip(dir string) bool {
