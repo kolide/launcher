@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -74,7 +75,7 @@ func runSpecs(systemMultiSlogger *multislogger.MultiSlogger, args []string) erro
 	}
 	flagController := flags.NewFlagController(systemMultiSlogger.Logger, nil, flags.WithCmdLineOpts(opts))
 	k := knapsack.New(nil, flagController, nil, nil, nil)
-	slogger := systemMultiSlogger.Logger.With("subprocess", "specs")
+	slogger := systemMultiSlogger.With("subprocess", "specs")
 
 	launcherTables := table.LauncherTables(k, slogger)
 	platformTables := table.PlatformTables(k, "", slogger, "")
@@ -132,10 +133,10 @@ func runSpecs(systemMultiSlogger *multislogger.MultiSlogger, args []string) erro
 	}
 
 	if hadValidationFailure {
-		return fmt.Errorf("one or more specs failed validation")
+		return errors.New("one or more specs failed validation")
 	}
 	if hadMissingOrBlank && !*flMissingOk {
-		return fmt.Errorf("one or more required fields were missing or blank")
+		return errors.New("one or more required fields were missing or blank")
 	}
 	return nil
 }
