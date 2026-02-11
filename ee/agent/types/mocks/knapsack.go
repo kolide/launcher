@@ -1815,6 +1815,98 @@ func (_c *Knapsack_ExportTraces_Call) RunAndReturn(run func() bool) *Knapsack_Ex
 	return _c
 }
 
+// FilewalkConfigStore provides a mock function for the type Knapsack
+func (_mock *Knapsack) FilewalkConfigStore() types.KVStore {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for FilewalkConfigStore")
+	}
+
+	var r0 types.KVStore
+	if returnFunc, ok := ret.Get(0).(func() types.KVStore); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(types.KVStore)
+		}
+	}
+	return r0
+}
+
+// Knapsack_FilewalkConfigStore_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FilewalkConfigStore'
+type Knapsack_FilewalkConfigStore_Call struct {
+	*mock.Call
+}
+
+// FilewalkConfigStore is a helper method to define mock.On call
+func (_e *Knapsack_Expecter) FilewalkConfigStore() *Knapsack_FilewalkConfigStore_Call {
+	return &Knapsack_FilewalkConfigStore_Call{Call: _e.mock.On("FilewalkConfigStore")}
+}
+
+func (_c *Knapsack_FilewalkConfigStore_Call) Run(run func()) *Knapsack_FilewalkConfigStore_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Knapsack_FilewalkConfigStore_Call) Return(v types.KVStore) *Knapsack_FilewalkConfigStore_Call {
+	_c.Call.Return(v)
+	return _c
+}
+
+func (_c *Knapsack_FilewalkConfigStore_Call) RunAndReturn(run func() types.KVStore) *Knapsack_FilewalkConfigStore_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// FilewalkResultsStore provides a mock function for the type Knapsack
+func (_mock *Knapsack) FilewalkResultsStore() types.KVStore {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for FilewalkResultsStore")
+	}
+
+	var r0 types.KVStore
+	if returnFunc, ok := ret.Get(0).(func() types.KVStore); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(types.KVStore)
+		}
+	}
+	return r0
+}
+
+// Knapsack_FilewalkResultsStore_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FilewalkResultsStore'
+type Knapsack_FilewalkResultsStore_Call struct {
+	*mock.Call
+}
+
+// FilewalkResultsStore is a helper method to define mock.On call
+func (_e *Knapsack_Expecter) FilewalkResultsStore() *Knapsack_FilewalkResultsStore_Call {
+	return &Knapsack_FilewalkResultsStore_Call{Call: _e.mock.On("FilewalkResultsStore")}
+}
+
+func (_c *Knapsack_FilewalkResultsStore_Call) Run(run func()) *Knapsack_FilewalkResultsStore_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Knapsack_FilewalkResultsStore_Call) Return(v types.KVStore) *Knapsack_FilewalkResultsStore_Call {
+	_c.Call.Return(v)
+	return _c
+}
+
+func (_c *Knapsack_FilewalkResultsStore_Call) RunAndReturn(run func() types.KVStore) *Knapsack_FilewalkResultsStore_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ForceControlSubsystems provides a mock function for the type Knapsack
 func (_mock *Knapsack) ForceControlSubsystems() bool {
 	ret := _mock.Called()
@@ -2706,6 +2798,52 @@ func (_c *Knapsack_LocalizationData_Call) Return(localizationData types.Localiza
 }
 
 func (_c *Knapsack_LocalizationData_Call) RunAndReturn(run func() types.LocalizationData) *Knapsack_LocalizationData_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// LocalizationStore provides a mock function for the type Knapsack
+func (_mock *Knapsack) LocalizationStore() types.KVStore {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for LocalizationStore")
+	}
+
+	var r0 types.KVStore
+	if returnFunc, ok := ret.Get(0).(func() types.KVStore); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(types.KVStore)
+		}
+	}
+	return r0
+}
+
+// Knapsack_LocalizationStore_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LocalizationStore'
+type Knapsack_LocalizationStore_Call struct {
+	*mock.Call
+}
+
+// LocalizationStore is a helper method to define mock.On call
+func (_e *Knapsack_Expecter) LocalizationStore() *Knapsack_LocalizationStore_Call {
+	return &Knapsack_LocalizationStore_Call{Call: _e.mock.On("LocalizationStore")}
+}
+
+func (_c *Knapsack_LocalizationStore_Call) Run(run func()) *Knapsack_LocalizationStore_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Knapsack_LocalizationStore_Call) Return(v types.KVStore) *Knapsack_LocalizationStore_Call {
+	_c.Call.Return(v)
+	return _c
+}
+
+func (_c *Knapsack_LocalizationStore_Call) RunAndReturn(run func() types.KVStore) *Knapsack_LocalizationStore_Call {
 	_c.Call.Return(run)
 	return _c
 }

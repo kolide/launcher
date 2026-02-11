@@ -58,6 +58,10 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/metric/noop"
 )
 
 // nextFunc represents the downstream slog-multi inline middleware function
@@ -70,7 +74,57 @@ const (
 	DefaultMaxCacheSize       = 2000
 	DefaultCleanupInterval    = 1 * time.Minute
 	DefaultDuplicateLogWindow = 0
+
+	meterName = "github.com/kolide/launcher/pkg/log/dedup"
 )
+
+// Package-level metrics for dedup observability. These use the global OTEL
+// meter provider and fall back to noop implementations on error.
+// this is to avoid circular dependencies with the ee/observability package
+var (
+	dedupSuppressedCounter    metric.Int64Counter
+	dedupPassedCounter        metric.Int64Counter
+	dedupCacheEntryCountGauge metric.Int64Gauge
+	dedupEnabledGauge         metric.Int64Gauge
+)
+
+func init() {
+	initMetrics()
+}
+
+func initMetrics() {
+	m := otel.Meter(meterName)
+
+	var err error
+
+	dedupSuppressedCounter, err = m.Int64Counter("launcher.dedup.suppressed",
+		metric.WithDescription("The number of log records suppressed by deduplication"),
+		metric.WithUnit("{log}"))
+	if err != nil {
+		dedupSuppressedCounter = noop.Int64Counter{}
+	}
+
+	dedupPassedCounter, err = m.Int64Counter("launcher.dedup.passed",
+		metric.WithDescription("The number of log records passed through deduplication"),
+		metric.WithUnit("{log}"))
+	if err != nil {
+		dedupPassedCounter = noop.Int64Counter{}
+	}
+
+	dedupCacheEntryCountGauge, err = m.Int64Gauge("launcher.dedup.cache_entry_count",
+		metric.WithDescription("Current number of unique log entries in the dedup cache"),
+		metric.WithUnit("{entry}"))
+	if err != nil {
+		dedupCacheEntryCountGauge = noop.Int64Gauge{}
+	}
+
+	dedupEnabledGauge, err = m.Int64Gauge("launcher.dedup.enabled",
+		metric.WithDescription("Whether log deduplication is enabled"),
+		metric.WithUnit("1"))
+	if err != nil {
+		dedupEnabledGauge = noop.Int64Gauge{}
+	}
+}
 
 // excludedHashFields are the attribute keys that should not affect the content hash.
 var excludedHashFields = map[string]bool{
@@ -240,8 +294,12 @@ func (d *Engine) Middleware(ctx context.Context, record slog.Record, next func(c
 	}()
 
 	if !shouldPass {
+		dedupSuppressedCounter.Add(ctx, 1)
 		return nil
 	}
+
+	dedupPassedCounter.Add(ctx, 1)
+
 	if addDuplicateMeta {
 		record.Add("duplicate_count", slog.IntValue(duplicateCount))
 		record.Add("first_seen", slog.TimeValue(firstSeen))
@@ -284,6 +342,16 @@ func (d *Engine) SetDuplicateLogWindow(window time.Duration) {
 		return
 	}
 	d.duplicateLogWindow.Store(window)
+	d.recordEnabledGauge()
+}
+
+// recordEnabledGauge records whether deduplication is currently active.
+func (d *Engine) recordEnabledGauge() {
+	var enabled int64
+	if d.started.Load() && d.getDuplicateLogWindow() > 0 {
+		enabled = 1
+	}
+	dedupEnabledGauge.Record(context.Background(), enabled)
 }
 
 // startBackgroundCleanup launches the periodic cleanup worker.
@@ -304,6 +372,7 @@ func (d *Engine) Start(ctx context.Context) {
 	d.lifecycleLock.Unlock()
 
 	d.started.Store(true)
+	d.recordEnabledGauge()
 	d.backGroundCleanUpWorkerGroup.Add(1)
 	go d.periodicCleanupLoop(runCtx)
 }
@@ -396,7 +465,10 @@ func (d *Engine) performCleanup() {
 		}
 	}
 
+	cacheSize := int64(len(d.cache))
 	d.cacheLock.Unlock()
+
+	dedupCacheEntryCountGauge.Record(context.Background(), cacheSize)
 
 	// Emit outside the lock to avoid re-entrancy deadlocks
 	for _, e := range toEmit {

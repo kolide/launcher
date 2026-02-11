@@ -6,6 +6,8 @@ type Store string
 const (
 	AgentFlagsStore               Store = "agent_flags"                        // The store used for agent control flags.
 	KatcConfigStore               Store = "katc_config"                        // The store used for Kolide custom ATC configuration
+	FilewalkConfigStore           Store = "filewalk_config"                    // The store used for filewalk configurations
+	FilewalkResultsStore          Store = "filewalk_results"                   // The store used to hold results from filewalks
 	ConfigStore                   Store = "config"                             // The store used for launcher configuration.
 	ControlStore                  Store = "control_service_data"               // The store used for control service caching data.
 	PersistentHostDataStore       Store = "persistent_host_data"               // The store used for data about this host.
