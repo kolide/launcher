@@ -34,6 +34,16 @@ func Test_runSpecs_requiredFlag(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func Test_runSpecs_requiredFlag_unknownField(t *testing.T) {
+	t.Parallel()
+
+	ms := multislogger.New()
+	err := runSpecs(ms, []string{"-quiet", "-required", "nope"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unknown required field")
+	require.Contains(t, err.Error(), "nope")
+}
+
 func Test_runSpecs_outputFlag(t *testing.T) {
 	t.Parallel()
 

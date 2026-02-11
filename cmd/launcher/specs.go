@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"runtime"
+	"maps"
 
 	"github.com/kolide/launcher/ee/agent/flags"
 	"github.com/kolide/launcher/ee/agent/knapsack"
@@ -32,21 +33,16 @@ func (r *requiredFields) Set(value string) error {
 	return nil
 }
 
-// specFieldBlank returns true if the field is missing, nil, or empty (e.g. "" or []).
-func specFieldBlank(v interface{}) bool {
-	if v == nil {
-		return true
-	}
-	switch x := v.(type) {
-	case string:
-		return len(x) < 1
-	case []interface{}:
-		return len(x) < 1
-	case map[string]interface{}:
-		return len(x) < 1
-	default:
-		return false
-	}
+// specRequiredFieldValidators maps -required flag values to functions that return true
+// when the field is present and non-empty.
+type requiredFieldValidator func(osquerytable.OsqueryTableSpec) bool
+var specRequiredFieldValidators = map[string]func(osquerytable.OsqueryTableSpec) bool{
+	"name":        func(s osquerytable.OsqueryTableSpec) bool { return len(s.Name) > 0 },
+	"description": func(s osquerytable.OsqueryTableSpec) bool { return len(s.Description) > 0 },
+	"url":         func(s osquerytable.OsqueryTableSpec) bool { return len(s.Url) > 0 },
+	"notes":       func(s osquerytable.OsqueryTableSpec) bool { return len(s.Notes) > 0 },
+	"columns":     func(s osquerytable.OsqueryTableSpec) bool { return len(s.Columns) > 0 },
+	"examples":    func(s osquerytable.OsqueryTableSpec) bool { return len(s.Examples) > 0 },
 }
 
 func runSpecs(systemMultiSlogger *multislogger.MultiSlogger, args []string) error {
@@ -60,6 +56,16 @@ func runSpecs(systemMultiSlogger *multislogger.MultiSlogger, args []string) erro
 
 	if err := ff.Parse(flagset, args, ff.WithEnvVarNoPrefix()); err != nil {
 		return fmt.Errorf("parsing flags: %w", err)
+	}
+
+	// Reject unknown -required field names so the user gets a clear error.
+	requiredFieldValidators:= make(map[string]requiredFieldValidator)
+	for _, field := range flRequired {
+		if validator, ok := specRequiredFieldValidators[field]; !ok {
+			return fmt.Errorf("unknown field to equire: %s. Must be %v+", field, maps.Keys(specRequiredFieldValidators))
+		} else {
+		requiredFieldValidators[field] = validator
+		}
 	}
 
 	slogLevel := slog.LevelInfo
@@ -119,19 +125,8 @@ func runSpecs(systemMultiSlogger *multislogger.MultiSlogger, args []string) erro
 			continue
 		}
 
-		// Required-field checks use the marshaled map (same field names as JSON).
-		var specMap map[string]interface{}
-		if err := json.Unmarshal(specBytes, &specMap); err != nil {
-			hadValidationFailure = true
-			slogger.Log(ctx, slog.LevelWarn,
-				"failed to unmarshal spec for required check",
-				"name", tbl.Name(),
-				"err", err,
-			)
-			continue
-		}
-		for _, field := range flRequired {
-			if specFieldBlank(specMap[field]) {
+		for field, validator := range requiredFieldValidators {
+			if !validator(spec) {
 				hadMissingOrBlank = true
 				slogger.Log(ctx, slog.LevelWarn,
 					"spec missing or blank required field",
