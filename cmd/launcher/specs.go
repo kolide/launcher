@@ -6,8 +6,10 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
+	"runtime"
 
 	"github.com/kolide/launcher/ee/agent/flags"
 	"github.com/kolide/launcher/ee/agent/knapsack"
@@ -51,6 +53,7 @@ func runSpecs(systemMultiSlogger *multislogger.MultiSlogger, args []string) erro
 	flagset := flag.NewFlagSet("launcher specs", flag.ExitOnError)
 	flDebug := flagset.Bool("debug", false, "enable debug logging")
 	flQuiet := flagset.Bool("quiet", false, "don't print specs. Used in testing")
+	flOutput := flagset.String("output", "", "write specs to file (default: stdout)")
 	flMissingOk := flagset.Bool("missing-ok", false, "do not exit with error when required fields are missing or blank")
 	var flRequired requiredFields
 	flagset.Var(&flRequired, "required", "field name that must be present in the spec (repeatable); warns if missing")
@@ -64,7 +67,12 @@ func runSpecs(systemMultiSlogger *multislogger.MultiSlogger, args []string) erro
 		slogLevel = slog.LevelDebug
 	}
 
-	systemMultiSlogger.AddHandler(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+	// On Windows, use stdout for log output because stderr is not available.
+	logOut := os.Stderr
+	if runtime.GOOS == "windows" {
+		logOut = os.Stdout
+	}
+	systemMultiSlogger.AddHandler(slog.NewTextHandler(logOut, &slog.HandlerOptions{
 		Level:     slogLevel,
 		AddSource: true,
 	}))
@@ -79,6 +87,16 @@ func runSpecs(systemMultiSlogger *multislogger.MultiSlogger, args []string) erro
 	plugins := make([]osquery.OsqueryPlugin, 0, len(launcherTables)+len(platformTables))
 	plugins = append(plugins, launcherTables...)
 	plugins = append(plugins, platformTables...)
+
+	var out io.Writer = os.Stdout
+	if *flOutput != "" {
+		f, err := os.Create(*flOutput)
+		if err != nil {
+			return fmt.Errorf("creating output file: %w", err)
+		}
+		defer f.Close()
+		out = f
+	}
 
 	ctx := context.Background()
 	var hadMissingOrBlank, hadValidationFailure bool
@@ -127,7 +145,7 @@ func runSpecs(systemMultiSlogger *multislogger.MultiSlogger, args []string) erro
 		}
 
 		if !*flQuiet {
-			fmt.Println(string(specBytes))
+			fmt.Fprintln(out, string(specBytes))
 		}
 	}
 
