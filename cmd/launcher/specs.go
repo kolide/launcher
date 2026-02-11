@@ -50,6 +50,7 @@ func specFieldBlank(v interface{}) bool {
 func runSpecs(systemMultiSlogger *multislogger.MultiSlogger, args []string) error {
 	flagset := flag.NewFlagSet("launcher specs", flag.ExitOnError)
 	flDebug := flagset.Bool("debug", false, "enable debug logging")
+	flQuiet := flagset.Bool("quiet", false, "don't print specs. Used in testing")
 	flMissingOk := flagset.Bool("missing-ok", false, "do not exit with error when required fields are missing or blank")
 	var flRequired requiredFields
 	flagset.Var(&flRequired, "required", "field name that must be present in the spec (repeatable); warns if missing")
@@ -129,7 +130,10 @@ func runSpecs(systemMultiSlogger *multislogger.MultiSlogger, args []string) erro
 		if *flDebug {
 			slogger.Log(ctx, slog.LevelDebug, "printing spec", "table", tbl.Name())
 		}
-		fmt.Println(string(specBytes))
+
+		if !*flQuiet {
+			fmt.Println(string(specBytes))
+		}
 	}
 
 	if hadValidationFailure {
