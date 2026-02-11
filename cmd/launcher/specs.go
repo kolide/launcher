@@ -8,9 +8,10 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"os"
 	"runtime"
-	"maps"
+	"slices"
 
 	"github.com/kolide/launcher/ee/agent/flags"
 	"github.com/kolide/launcher/ee/agent/knapsack"
@@ -36,6 +37,7 @@ func (r *requiredFields) Set(value string) error {
 // specRequiredFieldValidators maps -required flag values to functions that return true
 // when the field is present and non-empty.
 type requiredFieldValidator func(osquerytable.OsqueryTableSpec) bool
+
 var specRequiredFieldValidators = map[string]func(osquerytable.OsqueryTableSpec) bool{
 	"name":        func(s osquerytable.OsqueryTableSpec) bool { return len(s.Name) > 0 },
 	"description": func(s osquerytable.OsqueryTableSpec) bool { return len(s.Description) > 0 },
@@ -59,12 +61,12 @@ func runSpecs(systemMultiSlogger *multislogger.MultiSlogger, args []string) erro
 	}
 
 	// Reject unknown -required field names so the user gets a clear error.
-	requiredFieldValidators:= make(map[string]requiredFieldValidator)
+	requiredFieldValidators := make(map[string]requiredFieldValidator)
 	for _, field := range flRequired {
 		if validator, ok := specRequiredFieldValidators[field]; !ok {
-			return fmt.Errorf("unknown field to equire: %s. Must be %v+", field, maps.Keys(specRequiredFieldValidators))
+			return fmt.Errorf("unknown field to equire: %s. Must be %v", field, slices.Collect(maps.Keys(specRequiredFieldValidators)))
 		} else {
-		requiredFieldValidators[field] = validator
+			requiredFieldValidators[field] = validator
 		}
 	}
 
