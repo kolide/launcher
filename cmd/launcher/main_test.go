@@ -93,6 +93,14 @@ func Test_commandExpectedToExit(t *testing.T) {
 			},
 			expectedExit: true,
 		},
+		{
+			testCaseName: "launcher subcommand specs",
+			osArgs: []string{
+				"/some/path/to/launcher",
+				"specs",
+			},
+			expectedExit: true,
+		},
 	} {
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
