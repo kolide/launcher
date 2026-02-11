@@ -66,6 +66,7 @@ func Test_fileTypeFilter_matches(t *testing.T) {
 	tempFile := filepath.Join(tempDir, uuid.NewString())
 	require.NoError(t, os.WriteFile(tempFile, []byte("test"), 0755))
 	fileInfo, err := os.Stat(tempFile)
+	require.NoError(t, err)
 
 	// Test fileTypeFile first
 	var ftFile fileTypeFilter
