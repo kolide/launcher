@@ -15,7 +15,7 @@ func disableAutoStart(ctx context.Context, k types.Knapsack) error {
 
 	launchctlCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	cmd, err := allowedcmd.Launchctl(launchctlCtx, launchCtlArgs...)
+	cmd, err := allowedcmd.Launchctl.Cmd(launchctlCtx, launchCtlArgs...)
 	if err != nil {
 		return fmt.Errorf("could create launchctl cmd: %w", err)
 	}

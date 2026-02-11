@@ -15,7 +15,7 @@ import (
 // our rundisclaimed subcommand
 func Disclaimed(ctx context.Context, disclaimCmdName string) ExecOps {
 	return func(cmd *exec.Cmd) error {
-		launcherCmd, err := allowedcmd.Launcher(ctx, "rundisclaimed", disclaimCmdName)
+		launcherCmd, err := allowedcmd.Launcher.Cmd(ctx, "rundisclaimed", disclaimCmdName)
 		if err != nil {
 			return fmt.Errorf("generating launcher command for disclaim: %w", err)
 		}

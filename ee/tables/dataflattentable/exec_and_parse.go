@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"text/template"
 
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
@@ -94,10 +95,24 @@ func NewExecAndParseTable(flags types.Flags, slogger *slog.Logger, tableName str
 	return tablewrapper.New(flags, slogger, tbl.tableName, Columns(), tbl.generate, tablewrapper.WithDescription(tbl.Description()))
 }
 
-// Description returns a string description suitable for inclusion in osquery spec files
-func (tbl *execTableV2) Description() (string) {
-	return ""
+// execTableV2DescriptionTmpl uses text/template to interpolate the table name ({{.TableName}}) into the description.
+const templateString = "{{.TableName}} will exec the command `{{.Command}} {{.CommandArgs}}` and return the output.\n\nThis is an EAV style table. Output is flattened."
 
+var execTableV2DescriptionTmpl = template.Must(template.New("execTableV2").Parse(templateString))
+
+// Description returns a string description suitable for inclusion in osquery spec files.
+func (tbl *execTableV2) Description() string {
+	templateVars := map[string]string{
+		"TableName":   tbl.tableName,
+		"Command":     tbl.cmd.Name(),
+		"CommandArgs": strings.Join(tbl.execArgs, " "),
+	}
+
+	var buf bytes.Buffer
+	if err := execTableV2DescriptionTmpl.Execute(&buf, templateVars); err != nil {
+		return ""
+	}
+	return buf.String()
 }
 
 func (tbl *execTableV2) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
