@@ -68,6 +68,7 @@ func runSpecs(systemMultiSlogger *multislogger.MultiSlogger, args []string) erro
 	}
 
 	// On Windows, use stdout for log output because stderr is not available.
+	// See details in https://github.com/kolide/launcher/pull/2541
 	logOut := os.Stderr
 	if runtime.GOOS == "windows" {
 		logOut = os.Stdout
