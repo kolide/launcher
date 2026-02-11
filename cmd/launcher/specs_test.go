@@ -27,6 +27,6 @@ func Test_runSpecs_requiredFlag(t *testing.T) {
 	t.Parallel()
 
 	ms := multislogger.New()
-	err := runSpecs(ms, []string{"-required", "description", "-required", "columns"})
+	err := runSpecs(ms, []string{"-required", "name", "-required", "columns"})
 	require.NoError(t, err)
 }
