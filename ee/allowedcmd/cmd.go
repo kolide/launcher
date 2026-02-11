@@ -63,23 +63,31 @@ func (t *TracedCmd) CombinedOutput() ([]byte, error) {
 
 var ErrCommandNotFound = errors.New("command not found")
 
-type AllowedCommand struct {
+type AllowedCommand interface {
+	//Cmd returns a exec.CommandContext suitable for subsequent usage
+	Cmd(ctx context.Context, args ...string) (*TracedCmd, error)
+	// Name returns the name of this allowed command
+	Name() string
+}
+
+// allowedCommand is an internal struct that conforms to the AllowedCommand interface
+type allowedCommand struct {
 	knownPaths []string
 	env        []string
 }
 
-func newAllowedCommand(knownPaths ...string) AllowedCommand {
-	return AllowedCommand{
+func newAllowedCommand(knownPaths ...string) allowedCommand {
+	return allowedCommand{
 		knownPaths: knownPaths,
 	}
 }
 
-func (ac AllowedCommand) WithEnv(env string) AllowedCommand {
+func (ac allowedCommand) WithEnv(env string) allowedCommand {
 	ac.env = append(ac.env, env)
 	return ac
 }
 
-func (ac AllowedCommand) Name() string {
+func (ac allowedCommand) Name() string {
 	if len(ac.knownPaths) == 0 {
 		return "~unknown~"
 	}
@@ -87,12 +95,12 @@ func (ac AllowedCommand) Name() string {
 	return ac.knownPaths[0]
 }
 
-func (ac AllowedCommand) Cmd(ctx context.Context, arg ...string) (*TracedCmd, error) {
+func (ac allowedCommand) Cmd(ctx context.Context, arg ...string) (*TracedCmd, error) {
 	for _, knownPath := range ac.knownPaths {
 		knownPath = filepath.Clean(knownPath)
 
 		if _, err := os.Stat(knownPath); err == nil {
-			return ac.newCmd(ctx, knownPath, arg...), nil
+			return newCmd(ctx, ac.env, knownPath, arg...), nil
 		}
 	}
 
@@ -106,17 +114,17 @@ func (ac AllowedCommand) Cmd(ctx context.Context, arg ...string) (*TracedCmd, er
 	for _, knownPath := range ac.knownPaths {
 		cmdName := filepath.Base(knownPath)
 		if foundPath, err := exec.LookPath(cmdName); err == nil {
-			return ac.newCmd(ctx, foundPath, arg...), nil
+			return newCmd(ctx, ac.env, foundPath, arg...), nil
 		}
 	}
 
 	return nil, fmt.Errorf("%w: not found at %s and could not be located elsewhere", ErrCommandNotFound, ac.Name())
 }
 
-func (ac AllowedCommand) newCmd(ctx context.Context, fullPathToCmd string, arg ...string) *TracedCmd {
+func newCmd(ctx context.Context, env []string, fullPathToCmd string, arg ...string) *TracedCmd {
 	cmd := exec.CommandContext(ctx, fullPathToCmd, arg...) //nolint:forbidigo // This is our approved usage of exec.CommandContext
 	cmd.Env = append(cmd.Environ(), fmt.Sprintf("GOMAXPROCS=%d", cmdGoMaxProcs))
-	cmd.Env = append(cmd.Env, ac.env...)
+	cmd.Env = append(cmd.Env, env...)
 	return &TracedCmd{
 		Ctx: ctx,
 		Cmd: cmd,
@@ -147,16 +155,28 @@ func IsNixOS() bool {
 	return isNixOS.Load()
 }
 
-var Launcher = func() AllowedCommand {
+// LauncherCommand is a special struct that conforms to the AllowedCommand interface. It needs it's own implementation because instead of `knownPaths`
+// it uses os.Executable and resolves at call time. This handles the launcher updates.
+type launcherCommand struct{}
+
+func (_ launcherCommand) Name() string {
+	return "launcher"
+}
+
+func (_ launcherCommand)  Cmd(ctx context.Context, args ...string) (*TracedCmd, error) {
 	// Try to get our current running path, this skips future path lookups
-	//
-	// But, not sure what we should do in the face of an error. This is an initializer,
-	// so there's not a great way to pass it along
 	selfPath, err := os.Executable()
 	if err != nil {
-		//return nil, fmt.Errorf("getting path to launcher: %w", err)
-		selfPath = ""
+		return nil, fmt.Errorf("getting path to launcher: %w", err)
 	}
 
-	return newAllowedCommand(selfPath).WithEnv("LAUNCHER_SKIP_UPDATES=TRUE")
-}()
+// FIXME: Should we check that selfPath still exists
+
+	envAdditions := []string{
+		"LAUNCHER_SKIP_UPDATES=TRUE",
+	}
+
+	return newCmd(ctx, envAdditions, selfPath, args...), nil
+}
+
+var Launcher = launcherCommand{}
