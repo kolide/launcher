@@ -19,7 +19,7 @@ func Test_runSpecs_debugFlag(t *testing.T) {
 	t.Parallel()
 
 	ms := multislogger.New()
-	err := runSpecs(ms, []string{"-debug"})
+	err := runSpecs(ms, []string{"-quiet", "-debug"})
 	require.NoError(t, err)
 }
 

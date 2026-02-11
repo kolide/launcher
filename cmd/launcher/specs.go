@@ -69,12 +69,7 @@ func runSpecs(systemMultiSlogger *multislogger.MultiSlogger, args []string) erro
 		AddSource: true,
 	}))
 
-	launcher.SetDefaultPaths()
-	opts := &launcher.Options{
-		RootDirectory: launcher.DefaultPath(launcher.RootDirectory),
-		OsquerydPath:  "",
-	}
-	flagController := flags.NewFlagController(systemMultiSlogger.Logger, nil, flags.WithCmdLineOpts(opts))
+	flagController := flags.NewFlagController(systemMultiSlogger.Logger, nil, flags.WithCmdLineOpts(&launcher.Options{}))
 	k := knapsack.New(nil, flagController, nil, nil, nil)
 	slogger := systemMultiSlogger.With("subprocess", "specs")
 
