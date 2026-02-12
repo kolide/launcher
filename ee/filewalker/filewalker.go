@@ -19,6 +19,7 @@ import (
 	"github.com/kolide/launcher/ee/gowrapper"
 )
 
+// filewalker performs filewalks at the configured interval, storing results in its resultsStore.
 type filewalker struct {
 	// Configuration
 	name           string
@@ -54,6 +55,7 @@ func newFilewalker(name string, cfg filewalkConfig, resultsStore types.GetterSet
 	return fw
 }
 
+// Work executes filewalks on the given interval, until interrupted via Stop.
 func (f *filewalker) Work() {
 	f.ticker = time.NewTicker(f.walkInterval)
 	defer f.ticker.Stop()
@@ -73,6 +75,7 @@ func (f *filewalker) Work() {
 	}
 }
 
+// Delete removes all results for a given filewalker from the resultsStore, and then stops the filewalker.
 func (f *filewalker) Delete() {
 	if err := f.resultsStore.Delete([]byte(f.name)); err != nil {
 		f.slogger.Log(context.TODO(), slog.LevelWarn,
@@ -137,6 +140,7 @@ func overlayFiltersMatch(overlayFilters map[string]string) bool {
 	return false
 }
 
+// filewalk executes a filewalk with the configured settings, and then stores the results and walk time.
 func (f *filewalker) filewalk(ctx context.Context) {
 	f.walkLock.Lock()
 	defer f.walkLock.Unlock()
@@ -244,6 +248,7 @@ func (f *filewalker) filewalk(ctx context.Context) {
 	}
 }
 
+// LastWalkTimeKey gives the key to query the results store to retrieve the last walk time for the given filewalker.
 func LastWalkTimeKey(filewalkName string) []byte {
 	return fmt.Appendf(nil, "%s_last_walk", filewalkName)
 }

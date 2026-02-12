@@ -72,17 +72,23 @@ func (ft *fileTypeFilter) UnmarshalJSON(data []byte) error {
 }
 
 type (
+	// filewalkConfig is the configuration for an individual filewalker.
 	filewalkConfig struct {
 		WalkInterval duration `json:"walk_interval"`
 		filewalkDefinition
 		Overlays []filewalkConfigOverlay `json:"overlays"`
 	}
 
+	// filewalkConfigOverlay will override any settings in filewalkConfig, if its Filters
+	// apply to this launcher installation. (This allows the cloud to provide one filewalkConfig with
+	// an overlay for each individual OS, allowing for setting OS-specific paths, etc.)
 	filewalkConfigOverlay struct {
 		Filters map[string]string `json:"filters"` // determines if this overlay is applicable to this launcher installation
 		filewalkDefinition
 	}
 
+	// filewalkDefinition is the configuration shared between the base filewalkConfig and the overlays --
+	// these are the settings that can be overridden via overlay.
 	filewalkDefinition struct {
 		RootDirs       *[]string         `json:"root_dirs,omitempty"`
 		FileNameRegex  *regexp.Regexp    `json:"file_name_regex,omitempty"`

@@ -12,6 +12,8 @@ import (
 	"github.com/kolide/launcher/ee/gowrapper"
 )
 
+// FilewalkManager creates and starts all configured filewalkers, and handles
+// updates to the filewalker configs.
 type FilewalkManager struct {
 	filewalkers     map[string]*filewalker
 	filewalkersLock *sync.Mutex
@@ -73,6 +75,7 @@ func (fm *FilewalkManager) Interrupt(_ error) {
 	fm.interrupt <- struct{}{}
 }
 
+// pullConfigs gets the filewalk configs from the config store.
 func (fm *FilewalkManager) pullConfigs() (map[string]filewalkConfig, error) {
 	cfgs := make(map[string]filewalkConfig, 0)
 	if err := fm.cfgStore.ForEach(func(k, v []byte) error {
