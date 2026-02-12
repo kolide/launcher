@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/kolide/kit/ulid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -17,6 +18,22 @@ func TestEcho(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, tracedCmd.Path, "echo")
 	require.Contains(t, tracedCmd.Args, "hello")
+}
+
+func TestWithEnvt(t *testing.T) {
+	t.Parallel()
+
+	random := ulid.New()
+
+	testcmd := newAllowedCommand("/usr/bin/printenv").WithEnv("CI_TEST_COMMANDS=" + random)
+	tracedCmd, err := testcmd.Cmd(t.Context(), "CI_TEST_COMMANDS")
+	require.NoError(t, err)
+
+	require.Contains(t, tracedCmd.Env, "CI_TEST_COMMANDS="+random)
+
+	output, err := tracedCmd.Output()
+	require.NoError(t, err)
+	require.Contains(t, string(output), random)
 }
 
 func TestIsNixOS(t *testing.T) { // nolint:paralleltest
@@ -45,16 +62,7 @@ func Test_newCmd(t *testing.T) {
 	require.Equal(t, cmdPath, tracedCmd.Path)
 }
 
-func Test_validatedCommand(t *testing.T) {
-	t.Parallel()
-
-	// Echo is available on all platforms
-	tracedCmd, err := Echo.Cmd(t.Context(), "hello")
-	require.NoError(t, err)
-	require.NotEmpty(t, tracedCmd.Path)
-}
-
-func Test_validatedCommand_doesNotSearchPathOnNonNixOS(t *testing.T) {
+func Test_findExecutable_doesNotSearchPathOnNonNixOS(t *testing.T) {
 	t.Parallel()
 
 	if runtime.GOOS != "linux" {
@@ -62,8 +70,8 @@ func Test_validatedCommand_doesNotSearchPathOnNonNixOS(t *testing.T) {
 	}
 
 	// Use a command that has a single path that doesn't exist
-	nonexistent := newAllowedCommand("/not/the/real/path/to/bash")
-	_, err := nonexistent.Cmd(t.Context())
-
+	nonexistent, err := findExecutable([]string{"/not/the/real/path/to/bash"})
 	require.Error(t, err)
+	require.ErrorIs(t, ErrCommandNotFound, err)
+	require.Empty(t, nonexistent)
 }
