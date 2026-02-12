@@ -37,7 +37,7 @@ func TestRunDisclaimedDoesNotErr(t *testing.T) { // nolint:paralleltest // write
 		allowedOpts: map[string]struct{}{
 			"hello": {},
 		},
-		generate: allowedcmd.Echo,
+		generate: allowedcmd.Echo.Cmd,
 	}
 
 	slogger := multislogger.New()

@@ -61,7 +61,7 @@ func WithNotes(notes string) tablePluginOption {
 func WithExample(example string) tablePluginOption {
 	return func(w *wrappedTable) {
 		w.tableOpts = append(w.tableOpts, table.WithExample(example))
-    }
+	}
 }
 
 type generateResult struct {

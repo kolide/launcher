@@ -45,7 +45,7 @@ var Zscli = newAllowedCommand(filepath.Join(os.Getenv("PROGRAMFILES"), "Zscaler"
 type zerotierCli struct{}
 
 func (zerotierCli) Name() string { return "ZerotierCli" }
-func (zerotierCli) Cmd(ctx context.Context, arg ...string) (*TracedCmd, error) {
+func (ac zerotierCli) Cmd(ctx context.Context, arg ...string) (*TracedCmd, error) {
 	knownPaths := []string{
 		filepath.Join(os.Getenv("SYSTEMROOT"), "ProgramData", "ZeroTier", "One", "zerotier-one_x64.exe"),
 	}
