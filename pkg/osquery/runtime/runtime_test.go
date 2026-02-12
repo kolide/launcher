@@ -361,6 +361,16 @@ func TestPing(t *testing.T) {
 	katcConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
 	require.NoError(t, err)
 	k.On("KatcConfigStore").Return(katcConfigStore).Maybe()
+	filewalkConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.FilewalkConfigStore.String())
+	require.NoError(t, err)
+	k.On("FilewalkConfigStore").Return(filewalkConfigStore).Maybe()
+	k.On("Stores").Return(map[storage.Store]types.KVStore{
+		storage.KatcConfigStore:     katcConfigStore,
+		storage.FilewalkConfigStore: filewalkConfigStore,
+	}).Maybe()
+	filewalkResultsStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.FilewalkResultsStore.String())
+	require.NoError(t, err)
+	k.On("FilewalkResultsStore").Return(filewalkResultsStore).Maybe()
 	k.On("ConfigStore").Return(inmemory.NewStore()).Maybe()
 	k.On("EnrollmentStore").Return(inmemory.NewStore()).Maybe()
 	k.On("LauncherHistoryStore").Return(inmemory.NewStore()).Maybe()
@@ -1132,9 +1142,13 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 
 // setUpMockStores creates test stores in the test knapsack
 func setUpMockStores(t *testing.T, k *typesMocks.Knapsack) {
-	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
+	db := storageci.SetupDB(t)
+	stores, err := storageci.MakeStores(t, multislogger.NewNopLogger(), db)
 	require.NoError(t, err)
-	k.On("KatcConfigStore").Return(store).Maybe()
+	k.On("Stores").Return(stores).Maybe()
+	k.On("KatcConfigStore").Return(stores[storage.KatcConfigStore]).Maybe()
+	k.On("FilewalkConfigStore").Return(stores[storage.FilewalkConfigStore]).Maybe()
+	k.On("FilewalkResultsStore").Return(stores[storage.FilewalkResultsStore]).Maybe()
 	k.On("ConfigStore").Return(inmemory.NewStore()).Maybe()
 	k.On("EnrollmentStore").Return(inmemory.NewStore()).Maybe()
 	k.On("LauncherHistoryStore").Return(inmemory.NewStore()).Maybe()

@@ -11,6 +11,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
+	"github.com/kolide/launcher/ee/filewalker"
 	"github.com/kolide/launcher/ee/katc"
 	"github.com/kolide/launcher/ee/tables/cryptoinfotable"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
@@ -82,14 +83,14 @@ func PlatformTables(k types.Knapsack, enrollmentId string, slogger *slog.Logger,
 // then constructs the tables.
 func KolideCustomAtcTables(k types.Knapsack, enrollmentId string, slogger *slog.Logger) []osquery.OsqueryPlugin {
 	// Fetch tables from KVStore or from startup settings
-	config, err := katcFromDb(k, enrollmentId)
+	config, err := tableConfigsFromDb(k, storage.KatcConfigStore, enrollmentId)
 	if err != nil {
 		slogger.Log(context.TODO(), slog.LevelDebug,
 			"could not retrieve KATC config from store, may not have access -- falling back to startup settings",
 			"err", err,
 		)
 
-		config, err = katcFromStartupSettings(k, enrollmentId)
+		config, err = tableConfigsFromStartupSettings(k, enrollmentId, "katc_config")
 		if err != nil {
 			slogger.Log(context.TODO(), slog.LevelWarn,
 				"could not retrieve KATC config from startup settings",
@@ -102,42 +103,77 @@ func KolideCustomAtcTables(k types.Knapsack, enrollmentId string, slogger *slog.
 	return katc.ConstructKATCTables(config, k, slogger)
 }
 
-func katcFromDb(k types.Knapsack, enrollmentId string) (map[string]string, error) {
-	if k == nil || k.KatcConfigStore() == nil {
+// KolideFilewalkTables retrieves filewalk config from the appropriate data store(s),
+// then constructs the tables.
+func KolideFilewalkTables(k types.Knapsack, enrollmentId string, slogger *slog.Logger) []osquery.OsqueryPlugin {
+	// Fetch tables from KVStore or from startup settings
+	config, err := tableConfigsFromDb(k, storage.FilewalkConfigStore, enrollmentId)
+	if err != nil {
+		slogger.Log(context.TODO(), slog.LevelDebug,
+			"could not retrieve filewalk config from store, may not have access -- falling back to startup settings",
+			"err", err,
+		)
+
+		config, err = tableConfigsFromStartupSettings(k, enrollmentId, "filewalk_config")
+		if err != nil {
+			slogger.Log(context.TODO(), slog.LevelWarn,
+				"could not retrieve filewalk config from startup settings",
+				"err", err,
+			)
+			return nil
+		}
+	}
+
+	filewalkTables := make([]osquery.OsqueryPlugin, 0)
+	filewalkStore := k.FilewalkResultsStore()
+	for tableName := range config {
+		filewalkTables = append(filewalkTables, filewalker.NewFilewalkTable(tableName, k, filewalkStore, slogger))
+	}
+
+	return filewalkTables
+}
+
+func tableConfigsFromDb(k types.Knapsack, storeName storage.Store, enrollmentId string) (map[string]string, error) {
+	if k == nil {
 		return nil, errors.New("stores in knapsack not available")
 	}
-	katcCfg := make(map[string]string)
-	if err := k.KatcConfigStore().ForEach(func(k []byte, v []byte) error {
+	dbStore, ok := k.Stores()[storeName]
+	if !ok {
+		return nil, fmt.Errorf("store %s not available in knapsack", storeName.String())
+	}
+
+	cfg := make(map[string]string)
+	if err := dbStore.ForEach(func(k []byte, v []byte) error {
 		key, _, identifier := storage.SplitKey(k)
 		if string(identifier) == enrollmentId {
-			katcCfg[string(key)] = string(v)
+			cfg[string(key)] = string(v)
 		}
 
 		return nil
 	}); err != nil {
-		return nil, fmt.Errorf("retrieving contents of Kolide ATC config store: %w", err)
+		return nil, fmt.Errorf("retrieving contents of cloud-controlled config from config store: %w", err)
 	}
 
-	return katcCfg, nil
+	return cfg, nil
 }
 
-func katcFromStartupSettings(k types.Knapsack, enrollmentId string) (map[string]string, error) {
+func tableConfigsFromStartupSettings(k types.Knapsack, enrollmentId string, configName string) (map[string]string, error) {
 	r, err := startupsettings.OpenReader(context.TODO(), k.Slogger(), k.RootDirectory())
 	if err != nil {
 		return nil, fmt.Errorf("error opening startup settings reader: %w", err)
 	}
 	defer r.Close()
 
-	katcConfigKey := storage.KeyByIdentifier([]byte("katc_config"), storage.IdentifierTypeEnrollment, []byte(enrollmentId))
-	katcConfig, err := r.Get(string(katcConfigKey))
+	configKey := storage.KeyByIdentifier([]byte(configName), storage.IdentifierTypeEnrollment, []byte(enrollmentId))
+	configRaw, err := r.Get(string(configKey))
 	if err != nil {
-		return nil, fmt.Errorf("error getting katc_config from startup settings: %w", err)
+		return nil, fmt.Errorf("error getting %s from startup settings: %w", configName, err)
 	}
 
-	var katcCfg map[string]string
-	if err := json.Unmarshal([]byte(katcConfig), &katcCfg); err != nil {
-		return nil, fmt.Errorf("unmarshalling katc_config: %w", err)
+	var cfg map[string]string
+	if err := json.Unmarshal([]byte(configRaw), &cfg); err != nil {
+		return nil, fmt.Errorf("unmarshalling %s: %w", configName, err)
 	}
 
-	return katcCfg, nil
+	return cfg, nil
 }

@@ -323,7 +323,7 @@ func (r *Runner) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
 }
 
 // Ping satisfies the control.subscriber interface -- the runner subscribes to changes to
-// the katc_config subsystem.
+// the katc_config subsystem and the filewalk_config subsystem.
 func (r *Runner) Ping() {
 	ctx, span := observability.StartSpan(context.TODO())
 	defer span.End()
@@ -331,9 +331,9 @@ func (r *Runner) Ping() {
 	r.instanceLock.Lock()
 	updatedInPlace := true
 	for _, instance := range r.instances {
-		if err := instance.ReloadKatcExtension(ctx); err != nil {
+		if err := instance.ReloadCloudConfiguredTablesExtension(ctx); err != nil {
 			r.slogger.Log(ctx, slog.LevelInfo,
-				"could not update KATC info in-place -- must restart instances to apply",
+				"could not update KATC/filewalk info in-place -- must restart instances to apply",
 				"err", err,
 			)
 			updatedInPlace = false
@@ -344,18 +344,18 @@ func (r *Runner) Ping() {
 
 	if updatedInPlace {
 		r.slogger.Log(ctx, slog.LevelDebug,
-			"KATC configuration changed, successfully updated in-place without restarting instances",
+			"KATC/filewalk configuration changed, successfully updated in-place without restarting instances",
 		)
 		return
 	}
 
 	r.slogger.Log(ctx, slog.LevelDebug,
-		"KATC configuration changed, restarting instance to apply",
+		"KATC/filewalk configuration changed, restarting instance to apply",
 	)
 
 	if err := r.Restart(ctx); err != nil {
 		r.slogger.Log(ctx, slog.LevelError,
-			"could not restart osquery instance after KATC configuration changed",
+			"could not restart osquery instance after KATC/filewalk configuration changed",
 			"err", err,
 		)
 	}
