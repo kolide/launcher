@@ -42,6 +42,10 @@ const (
 	fileTypeDir  = "dir"
 )
 
+func (ft fileTypeFilter) MarshalJSON() ([]byte, error) {
+	return json.Marshal(ft.name)
+}
+
 func (ft *fileTypeFilter) UnmarshalJSON(data []byte) error {
 	var s string
 	err := json.Unmarshal(data, &s)

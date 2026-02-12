@@ -5,12 +5,59 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
-func TestUnmarshalJSON(t *testing.T) {
+func Test_duration_UnmarshalJSON(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		testCaseName     string
+		rawDuration      []byte
+		expectedDuration time.Duration
+		expectedError    bool
+	}{
+		{
+			testCaseName:     "hours",
+			rawDuration:      []byte(`"1h"`),
+			expectedDuration: 1 * time.Hour,
+		},
+		{
+			testCaseName:     "minutes",
+			rawDuration:      []byte(`"30m"`),
+			expectedDuration: 30 * time.Minute,
+		},
+		{
+			testCaseName:     "compound",
+			rawDuration:      []byte(`"1h30m"`),
+			expectedDuration: 90 * time.Minute,
+		},
+		{
+			testCaseName:  "invalid",
+			rawDuration:   []byte(`"notaduration"`),
+			expectedError: true,
+		},
+	} {
+		t.Run(tt.testCaseName, func(t *testing.T) {
+			t.Parallel()
+
+			var d duration
+			err := json.Unmarshal(tt.rawDuration, &d)
+			if tt.expectedError {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, tt.expectedDuration, time.Duration(d))
+		})
+	}
+}
+
+func Test_fileTypeFilter_UnmarshalJSON(t *testing.T) {
 	t.Parallel()
 
 	for _, tt := range []struct {
