@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sync/atomic"
 )
 
@@ -61,7 +62,7 @@ func (ac allowedCommand) Cmd(ctx context.Context, arg ...string) (*TracedCmd, er
 	return newCmd(ctx, ac.env, cmdpath, arg...), nil
 }
 
-// findExecutable handles the logic of finding an executable. It searchs the shared paths,
+// findExecutable handles the logic of finding an executable. It searches the shared paths,
 // and if allowed, the system path.
 func findExecutable(knownPaths []string) (string, error) {
 	for _, knownPath := range knownPaths {
@@ -72,7 +73,8 @@ func findExecutable(knownPaths []string) (string, error) {
 		}
 	}
 
-	// If search the path is disallowed, return an error.
+	// If search the path is disallowed, return an error. We only allow searching on nix,
+	// because paths are indeterminate there.
 	if !allowSearchPath() {
 		return "", fmt.Errorf("not found in expected locations: %w", ErrCommandNotFound)
 	}
@@ -109,6 +111,10 @@ var (
 )
 
 func IsNixOS() bool {
+	if runtime.GOOS != "linux" {
+		return false
+	}
+
 	if checkedIsNixOS.Load() {
 		return isNixOS.Load()
 	}
@@ -125,9 +131,9 @@ func IsNixOS() bool {
 // it uses os.Executable and resolves at call time. This handles the launcher updates.
 type launcherCommand struct{}
 
-func (_ launcherCommand) Name() string { return "launcher" }
+func (launcherCommand) Name() string { return "launcher" }
 
-func (_ launcherCommand) Cmd(ctx context.Context, args ...string) (*TracedCmd, error) {
+func (launcherCommand) Cmd(ctx context.Context, args ...string) (*TracedCmd, error) {
 	// Try to get our current running path, this skips future path lookups
 	selfPath, err := os.Executable()
 	if err != nil {
