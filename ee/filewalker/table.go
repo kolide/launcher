@@ -9,7 +9,6 @@ import (
 	"strconv"
 
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -29,10 +28,10 @@ func NewFilewalkTable(tableName string, flags types.Flags, resultsStore types.Ge
 		resultsStore:    resultsStore,
 		slogger:         slogger.With("table", tableName),
 	}
-	columns := dataflattentable.Columns(
+	columns := []table.ColumnDefinition{
 		table.TextColumn("path"),
 		table.IntegerColumn("last_walk_timestamp"),
-	)
+	}
 
 	return tablewrapper.New(flags, slogger, tableName, columns, ft.generate)
 }
