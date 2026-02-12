@@ -19,47 +19,6 @@ import (
 	"github.com/kolide/launcher/ee/gowrapper"
 )
 
-// duration is a thin wrapper around time.Duration allowing for marshalling/unmarshalling
-// durations as strings, rather than the default of nanoseconds.
-type duration time.Duration
-
-func (d duration) MarshalJSON() ([]byte, error) {
-	return json.Marshal(time.Duration(d).String())
-}
-
-func (d *duration) UnmarshalJSON(b []byte) error {
-	var s string
-	if err := json.Unmarshal(b, &s); err != nil {
-		return fmt.Errorf("unmarshalling duration: %w", err)
-	}
-	parsedDuration, err := time.ParseDuration(s)
-	if err != nil {
-		return fmt.Errorf("parsing duration: %w", err)
-	}
-	*d = duration(parsedDuration)
-	return nil
-}
-
-type (
-	filewalkConfig struct {
-		WalkInterval duration `json:"walk_interval"`
-		filewalkDefinition
-		Overlays []filewalkConfigOverlay `json:"overlays"`
-	}
-
-	filewalkConfigOverlay struct {
-		Filters map[string]string `json:"filters"` // determines if this overlay is applicable to this launcher installation
-		filewalkDefinition
-	}
-
-	filewalkDefinition struct {
-		RootDirs       *[]string         `json:"root_dirs,omitempty"`
-		FileNameRegex  *regexp.Regexp    `json:"file_name_regex,omitempty"`
-		SkipDirs       *[]*regexp.Regexp `json:"skip_dirs,omitempty"`
-		FileTypeFilter *fileTypeFilter   `json:"file_type_filter,omitempty"`
-	}
-)
-
 type filewalker struct {
 	// Configuration
 	name           string
