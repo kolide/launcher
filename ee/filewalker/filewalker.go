@@ -60,6 +60,11 @@ func (f *filewalker) Work() {
 	f.ticker = time.NewTicker(f.walkInterval)
 	defer f.ticker.Stop()
 
+	f.slogger.Log(context.TODO(), slog.LevelDebug,
+		"starting up",
+		"walk_interval", f.walkInterval.String(),
+	)
+
 	for {
 		f.filewalk(context.TODO())
 
@@ -246,6 +251,10 @@ func (f *filewalker) filewalk(ctx context.Context) {
 			"err", err,
 		)
 	}
+
+	f.slogger.Log(ctx, slog.LevelDebug,
+		"completed filewalk",
+	)
 }
 
 // LastWalkTimeKey gives the key to query the results store to retrieve the last walk time for the given filewalker.

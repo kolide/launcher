@@ -19,7 +19,9 @@ import (
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	"github.com/kolide/launcher/ee/agent/storage/inmemory"
 	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/agent/types/mocks"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/osquery/testutil"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/mock"
@@ -130,7 +132,12 @@ func TestProc(t *testing.T) {
 			mockSack.On("RootDirectory").Maybe().Return(rootDir)
 			store, err := storageci.NewStore(t, slogger, storage.KatcConfigStore.String())
 			require.NoError(t, err)
-			mockSack.On("KatcConfigStore").Return(store)
+			filewalkConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.FilewalkConfigStore.String())
+			require.NoError(t, err)
+			mockSack.On("Stores").Return(map[storage.Store]types.KVStore{
+				storage.KatcConfigStore:     store,
+				storage.FilewalkConfigStore: filewalkConfigStore,
+			}).Maybe()
 			mockSack.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 			mockSack.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 			mockSack.On("WindowsUpdatesCacheStore").Return(inmemory.NewStore()).Maybe()
