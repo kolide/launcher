@@ -111,7 +111,7 @@ func (f *filewalker) UpdateConfig(newCfg filewalkConfig) {
 		f.fileTypeFilter = newCfg.FileTypeFilter
 	}
 	for _, overlay := range newCfg.Overlays {
-		if !filtersMatch(overlay.Filters) {
+		if !overlayFiltersMatch(overlay.Filters) {
 			continue
 		}
 		if overlay.RootDirs != nil {
@@ -129,9 +129,9 @@ func (f *filewalker) UpdateConfig(newCfg filewalkConfig) {
 	}
 }
 
-func filtersMatch(filters map[string]string) bool {
+func overlayFiltersMatch(overlayFilters map[string]string) bool {
 	// Currently, the only filter we expect is for OS.
-	if goos, goosFound := filters["goos"]; goosFound {
+	if goos, goosFound := overlayFilters["goos"]; goosFound {
 		return goos == runtime.GOOS
 	}
 	return false
