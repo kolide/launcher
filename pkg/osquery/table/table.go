@@ -106,22 +106,15 @@ func KolideCustomAtcTables(k types.Knapsack, enrollmentId string, slogger *slog.
 // KolideFilewalkTables retrieves filewalk config from the appropriate data store(s),
 // then constructs the tables.
 func KolideFilewalkTables(k types.Knapsack, enrollmentId string, slogger *slog.Logger) []osquery.OsqueryPlugin {
-	// Fetch tables from KVStore or from startup settings
+	// Fetch tables from KVStore -- since that's where the results are, we must have access
+	// to the database and cannot rely on startup settings.
 	config, err := tableConfigsFromDb(k, storage.FilewalkConfigStore, enrollmentId)
 	if err != nil {
 		slogger.Log(context.TODO(), slog.LevelDebug,
-			"could not retrieve filewalk config from store, may not have access -- falling back to startup settings",
+			"could not retrieve filewalk config from store",
 			"err", err,
 		)
-
-		config, err = tableConfigsFromStartupSettings(k, enrollmentId, "filewalk_config")
-		if err != nil {
-			slogger.Log(context.TODO(), slog.LevelWarn,
-				"could not retrieve filewalk config from startup settings",
-				"err", err,
-			)
-			return nil
-		}
+		return nil
 	}
 
 	filewalkTables := make([]osquery.OsqueryPlugin, 0)
