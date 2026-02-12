@@ -26,7 +26,7 @@ type enrollmentResponse struct {
 	jsonRpcResponse
 	NodeKey            string            `json:"node_key"`
 	NodeInvalid        bool              `json:"node_invalid"`
-	RegionInvalid      bool              `json:"region_invalid"`
+	WrongRegion        bool              `json:"wrong_region"`
 	DeploymentURLs     *types.KolideURLs `json:"deployment_urls,omitempty"`
 	ErrorCode          string            `json:"error_code,omitempty"`
 	Err                error             `json:"err,omitempty"`
@@ -37,7 +37,7 @@ type enrollmentResponse struct {
 type EnrollmentResponse struct {
 	NodeKey            string
 	NodeInvalid        bool
-	RegionInvalid      bool
+	WrongRegion        bool
 	DeploymentURLs     *types.KolideURLs
 	AgentIngesterToken string
 }
@@ -110,7 +110,7 @@ func (e *Endpoints) RequestEnrollment(ctx context.Context, enrollSecret, hostIde
 	return &EnrollmentResponse{
 		NodeKey:            resp.NodeKey,
 		NodeInvalid:        resp.NodeInvalid,
-		RegionInvalid:      resp.RegionInvalid,
+		WrongRegion:        resp.WrongRegion,
 		DeploymentURLs:     resp.DeploymentURLs,
 		AgentIngesterToken: resp.AgentIngesterToken,
 	}, resp.Err
@@ -143,7 +143,7 @@ func (mw logmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentif
 		if resp != nil {
 			keyvals = append(keyvals,
 				"reauth", resp.NodeInvalid,
-				"region_invalid", resp.RegionInvalid,
+				"wrong_region", resp.WrongRegion,
 			)
 		}
 

@@ -420,7 +420,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 				)
 			} else {
 				e.slogger.Log(ctx, slog.LevelInfo,
-					"updated kolide server URL after getting region_invalid response to RequestEnrollment",
+					"updated kolide server URL after getting wrong_region response to RequestEnrollment",
 					"enrollment_url", resp.DeploymentURLs.EnrollmentURL,
 				)
 			}
@@ -435,7 +435,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 				)
 			} else {
 				e.slogger.Log(ctx, slog.LevelInfo,
-					"updated control server URL after getting region_invalid response to RequestEnrollment",
+					"updated control server URL after getting wrong_region response to RequestEnrollment",
 					"control_server_url", resp.DeploymentURLs.ControlServerURL,
 				)
 			}
@@ -450,15 +450,15 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 				)
 			} else {
 				e.slogger.Log(ctx, slog.LevelInfo,
-					"updated osquery publisher URL after getting region_invalid response to RequestEnrollment",
+					"updated osquery publisher URL after getting wrong_region response to RequestEnrollment",
 					"osquery_publisher_url", resp.DeploymentURLs.OsqueryPublisherURL,
 				)
 			}
 		}
 	}
 	// If our region is invalid, return an error so we can try again later against the URLs updated above.
-	if resp.RegionInvalid {
-		return "", false, errors.New("region invalid, updated regional URLs to try again later")
+	if resp.WrongRegion {
+		return "", false, errors.New("wrong region, updated deployment URLs to try again later")
 	}
 
 	if resp.NodeKey == "" {
