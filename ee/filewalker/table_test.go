@@ -3,6 +3,7 @@ package filewalker
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -50,6 +51,7 @@ func TestFilewalkTable(t *testing.T) {
 		},
 	}
 	testFilewalker := newFilewalker(tableName, cfg, store, multislogger.NewNopLogger())
+	startTime := time.Now().Unix()
 	go testFilewalker.Work()
 	t.Cleanup(testFilewalker.Stop)
 
@@ -63,6 +65,9 @@ func TestFilewalkTable(t *testing.T) {
 	})
 	require.Equal(t, int32(0), updatedResponse.Status.Code, updatedResponse.Status.Message) // 0 means success
 	require.Equal(t, 2, len(updatedResponse.Response))                                      // One file, one directory => 2 total rows
-	require.Equal(t, updatedResponse.Response[0]["path"], testRootDir)                      // We can't always guarantee ordering with filewalk results, but we can for this one
-	require.Equal(t, updatedResponse.Response[1]["path"], expectedFile)
+	require.Equal(t, testRootDir, updatedResponse.Response[0]["path"])                      // We can't always guarantee ordering with filewalk results, but we can for this one
+	require.Equal(t, expectedFile, updatedResponse.Response[1]["path"])
+	lastWalkTimestamp, err := strconv.Atoi(updatedResponse.Response[0]["last_walk_timestamp"])
+	require.NoError(t, err)
+	require.Less(t, startTime, int64(lastWalkTimestamp))
 }

@@ -2,9 +2,11 @@ package filewalker
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strconv"
 
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
@@ -14,26 +16,38 @@ import (
 )
 
 type filewalkTable struct {
-	storeKey     []byte
-	resultsStore types.Getter
-	slogger      *slog.Logger
+	resultsKey      []byte
+	lastWalkTimeKey []byte
+	resultsStore    types.Getter
+	slogger         *slog.Logger
 }
 
 func NewFilewalkTable(tableName string, flags types.Flags, resultsStore types.Getter, slogger *slog.Logger) osquery.OsqueryPlugin {
 	ft := &filewalkTable{
-		storeKey:     []byte(tableName),
-		resultsStore: resultsStore,
-		slogger:      slogger.With("table", tableName),
+		resultsKey:      []byte(tableName),
+		lastWalkTimeKey: LastWalkTimeKey(tableName),
+		resultsStore:    resultsStore,
+		slogger:         slogger.With("table", tableName),
 	}
 	columns := dataflattentable.Columns(
 		table.TextColumn("path"),
+		table.IntegerColumn("last_walk_timestamp"),
 	)
 
 	return tablewrapper.New(flags, slogger, tableName, columns, ft.generate)
 }
 
 func (ft *filewalkTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	rawResults, err := ft.resultsStore.Get(ft.storeKey)
+	lastWalkTimeRaw, err := ft.resultsStore.Get(ft.lastWalkTimeKey)
+	if err != nil {
+		return nil, fmt.Errorf("retrieving last walk time from store: %w", err)
+	}
+	lastWalkTime := "0"
+	if lastWalkTimeRaw != nil {
+		lastWalkTime = strconv.FormatInt(int64(binary.NativeEndian.Uint64(lastWalkTimeRaw)), 10)
+	}
+
+	rawResults, err := ft.resultsStore.Get(ft.resultsKey)
 	if err != nil {
 		return nil, fmt.Errorf("retrieving rows from store: %w", err)
 	}
@@ -51,7 +65,8 @@ func (ft *filewalkTable) generate(ctx context.Context, queryContext table.QueryC
 	rows := make([]map[string]string, len(paths))
 	for i, path := range paths {
 		rows[i] = map[string]string{
-			"path": path,
+			"path":                path,
+			"last_walk_timestamp": lastWalkTime,
 		}
 	}
 
