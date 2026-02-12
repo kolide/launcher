@@ -882,7 +882,7 @@ func Test_sendCallback_handlesRegionURLUpdates(t *testing.T) {
 	expectedControlUrl := "control.example.test"
 	expectedOsqueryPublisherUrl := "pub.example.test"
 	resp := callbackResponse{
-		RegionURLs: &types.KolideURLs{
+		DeploymentURLs: &types.KolideURLs{
 			EnrollmentURL:       expectedEnrollmentUrl,
 			ControlServerURL:    expectedControlUrl,
 			OsqueryPublisherURL: expectedOsqueryPublisherUrl,
