@@ -53,29 +53,38 @@ func (ac allowedCommand) Name() string {
 }
 
 func (ac allowedCommand) Cmd(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	for _, knownPath := range ac.knownPaths {
+	cmdpath, err := findExecutable(ac.knownPaths)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", ac.Name(), err)
+	}
+
+	return newCmd(ctx, ac.env, cmdpath, arg...), nil
+}
+
+// findExecutable handles the logic of finding an executable. It searchs the shared paths,
+// and if allowed, the system path.
+func findExecutable(knownPaths []string) (string, error) {
+	for _, knownPath := range knownPaths {
 		knownPath = filepath.Clean(knownPath)
 
 		if _, err := os.Stat(knownPath); err == nil {
-			return newCmd(ctx, ac.env, knownPath, arg...), nil
+			return knownPath, nil
 		}
 	}
 
-	// Not found at known location -- return error for darwin and windows.
-	// We expect to know the exact location for allowlisted commands on all
-	// OSes except for a few Linux distros.
+	// If search the path is disallowed, return an error.
 	if !allowSearchPath() {
-		return nil, fmt.Errorf("%w: %s", ErrCommandNotFound, ac.Name())
+		return nil, fmt.Errorf("not found in expected locations: %w", ErrCommandNotFound)
 	}
 
-	for _, knownPath := range ac.knownPaths {
+	for _, knownPath := range knownPaths {
 		cmdName := filepath.Base(knownPath)
 		if foundPath, err := exec.LookPath(cmdName); err == nil {
-			return newCmd(ctx, ac.env, foundPath, arg...), nil
+			return foundPath, nil
 		}
 	}
 
-	return nil, fmt.Errorf("%w: not found at %s and could not be located elsewhere", ErrCommandNotFound, ac.Name())
+	return nil, fmt.Errorf("not found and could not be located elsewhere: %w", ErrCommandNotFound)
 }
 
 func newCmd(ctx context.Context, env []string, fullPathToCmd string, arg ...string) *TracedCmd {

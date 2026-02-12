@@ -4,6 +4,7 @@ package allowedcmd
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -39,9 +40,23 @@ var Taskkill = newAllowedCommand(filepath.Join(os.Getenv("WINDIR"), "System32", 
 
 var Zscli = newAllowedCommand(filepath.Join(os.Getenv("PROGRAMFILES"), "Zscaler", "ZSACli", "ZSACli.exe"))
 
-var zerotierCliPath = newAllowedCommand(filepath.Join(os.Getenv("SYSTEMROOT"), "ProgramData", "ZeroTier", "One", "zerotier-one_x64.exe"))
+// type zerotierCli implements AllowedCommand. It uses a custom function because
+// on windows, "-q" should be prepended before all other args
+type zerotierCli struct{}
 
-func ZerotierCli(ctx context.Context, arg ...string) (*TracedCmd, error) {
+func (zerotierCli) Name() string { return "ZerotierCli" }
+func (zerotierCli) Cmd(ctx context.Context, arg ...string) (*TracedCmd, error) {
+	knownPaths := []string{
+		filepath.Join(os.Getenv("SYSTEMROOT"), "ProgramData", "ZeroTier", "One", "zerotier-one_x64.exe"),
+	}
+
+	cmdpath, err := findExecutable(knownPaths)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", ac.Name(), err)
+	}
+
 	// For windows, "-q" should be prepended before all other args
-	return zerotierCliPath.Cmd(ctx, append([]string{"-q"}, arg...)...)
+	return newCmd(ctx, nil, cmdpath, append([]string{"-q"}, arg...)...), nil
 }
+
+var ZerotierCli = zerotierCli{}
