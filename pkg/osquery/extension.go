@@ -414,7 +414,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		if resp.DeploymentURLs.EnrollmentURL != "" && resp.DeploymentURLs.EnrollmentURL != e.knapsack.KolideServerURL() {
 			if err := e.knapsack.SetKolideServerURL(resp.DeploymentURLs.EnrollmentURL); err != nil {
 				e.slogger.Log(ctx, slog.LevelError,
-					"could not update enrollment URL to correct region",
+					"could not update enrollment URL to correct deployment",
 					"enrollment_url", resp.DeploymentURLs.EnrollmentURL,
 					"err", err,
 				)
@@ -429,7 +429,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		if resp.DeploymentURLs.ControlServerURL != "" && resp.DeploymentURLs.ControlServerURL != e.knapsack.ControlServerURL() {
 			if err := e.knapsack.SetControlServerURL(resp.DeploymentURLs.ControlServerURL); err != nil {
 				e.slogger.Log(ctx, slog.LevelError,
-					"could not update control server URL to correct region",
+					"could not update control server URL to correct deployment",
 					"control_server_url", resp.DeploymentURLs.ControlServerURL,
 					"err", err,
 				)
@@ -444,7 +444,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		if resp.DeploymentURLs.OsqueryPublisherURL != "" && resp.DeploymentURLs.OsqueryPublisherURL != e.knapsack.OsqueryPublisherURL() {
 			if err := e.knapsack.SetOsqueryPublisherURL(resp.DeploymentURLs.OsqueryPublisherURL); err != nil {
 				e.slogger.Log(ctx, slog.LevelError,
-					"could not update osquery publisher URL to correct region",
+					"could not update osquery publisher URL to correct deployment",
 					"osquery_publisher_url", resp.DeploymentURLs.OsqueryPublisherURL,
 					"err", err,
 				)

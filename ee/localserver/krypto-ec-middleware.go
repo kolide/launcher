@@ -203,7 +203,7 @@ func (e *kryptoEcMiddleware) callbackWorker() {
 				if r.DeploymentURLs.EnrollmentURL != "" && r.DeploymentURLs.EnrollmentURL != e.flags.KolideServerURL() {
 					if err := e.flags.SetKolideServerURL(r.DeploymentURLs.EnrollmentURL); err != nil {
 						e.slogger.Log(ctx, slog.LevelError,
-							"could not update enrollment URL to correct region",
+							"could not update enrollment URL to correct deployment",
 							"enrollment_url", r.DeploymentURLs.EnrollmentURL,
 							"err", err,
 						)
@@ -218,7 +218,7 @@ func (e *kryptoEcMiddleware) callbackWorker() {
 				if r.DeploymentURLs.ControlServerURL != "" && r.DeploymentURLs.ControlServerURL != e.flags.ControlServerURL() {
 					if err := e.flags.SetControlServerURL(r.DeploymentURLs.ControlServerURL); err != nil {
 						e.slogger.Log(ctx, slog.LevelError,
-							"could not update control server URL to correct region",
+							"could not update control server URL to correct deployment",
 							"control_server_url", r.DeploymentURLs.ControlServerURL,
 							"err", err,
 						)
@@ -233,7 +233,7 @@ func (e *kryptoEcMiddleware) callbackWorker() {
 				if r.DeploymentURLs.OsqueryPublisherURL != "" && r.DeploymentURLs.OsqueryPublisherURL != e.flags.OsqueryPublisherURL() {
 					if err := e.flags.SetOsqueryPublisherURL(r.DeploymentURLs.OsqueryPublisherURL); err != nil {
 						e.slogger.Log(ctx, slog.LevelError,
-							"could not update osquery publisher URL to correct region",
+							"could not update osquery publisher URL to correct deployment",
 							"osquery_publisher_url", r.DeploymentURLs.OsqueryPublisherURL,
 							"err", err,
 						)
