@@ -39,7 +39,7 @@ func TestUpdateConfig(t *testing.T) {
 		{
 			testCaseName: "no overlays, no filename regex, no skip dirs",
 			cfg: filewalkConfig{
-				WalkInterval: 1 * time.Minute,
+				WalkInterval: duration(1 * time.Minute),
 				filewalkDefinition: filewalkDefinition{
 					RootDirs:      &[]string{"test-1"},
 					FileNameRegex: nil,
@@ -53,7 +53,7 @@ func TestUpdateConfig(t *testing.T) {
 		{
 			testCaseName: "no overlays, filename regex, skip dirs",
 			cfg: filewalkConfig{
-				WalkInterval: 2 * time.Minute,
+				WalkInterval: duration(2 * time.Minute),
 				filewalkDefinition: filewalkDefinition{
 					RootDirs:      &[]string{"test-2"},
 					FileNameRegex: testRegex,
@@ -68,7 +68,7 @@ func TestUpdateConfig(t *testing.T) {
 		{
 			testCaseName: "overlay exists but doesn't apply",
 			cfg: filewalkConfig{
-				WalkInterval: 3 * time.Minute,
+				WalkInterval: duration(3 * time.Minute),
 				filewalkDefinition: filewalkDefinition{
 					RootDirs:      &[]string{"test-3"},
 					FileNameRegex: nil,
@@ -94,7 +94,7 @@ func TestUpdateConfig(t *testing.T) {
 		{
 			testCaseName: "overlay, still no filename regex",
 			cfg: filewalkConfig{
-				WalkInterval: 4 * time.Minute,
+				WalkInterval: duration(4 * time.Minute),
 				filewalkDefinition: filewalkDefinition{
 					RootDirs:      nil,
 					FileNameRegex: nil,
@@ -119,7 +119,7 @@ func TestUpdateConfig(t *testing.T) {
 		{
 			testCaseName: "overlay, filename regex, skipdirs",
 			cfg: filewalkConfig{
-				WalkInterval: 5 * time.Minute,
+				WalkInterval: duration(5 * time.Minute),
 				filewalkDefinition: filewalkDefinition{
 					RootDirs:      nil,
 					FileNameRegex: nil,
@@ -176,7 +176,7 @@ func BenchmarkFilewalk(b *testing.B) {
 	require.NoError(b, err)
 
 	testFilewalker := newFilewalker("benchtest", filewalkConfig{
-		WalkInterval: 1 * time.Minute,
+		WalkInterval: duration(1 * time.Minute),
 		filewalkDefinition: filewalkDefinition{
 			RootDirs:      &[]string{testDir},
 			FileNameRegex: nil,

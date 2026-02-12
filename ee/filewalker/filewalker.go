@@ -19,9 +19,30 @@ import (
 	"github.com/kolide/launcher/ee/gowrapper"
 )
 
+// duration is a thin wrapper around time.Duration allowing for marshalling/unmarshalling
+// durations as strings, rather than the default of nanoseconds.
+type duration time.Duration
+
+func (d duration) MarshalJSON() ([]byte, error) {
+	return json.Marshal(time.Duration(d).String())
+}
+
+func (d *duration) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return fmt.Errorf("unmarshalling duration: %w", err)
+	}
+	parsedDuration, err := time.ParseDuration(s)
+	if err != nil {
+		return fmt.Errorf("parsing duration: %w", err)
+	}
+	*d = duration(parsedDuration)
+	return nil
+}
+
 type (
 	filewalkConfig struct {
-		WalkInterval time.Duration `json:"walk_interval"`
+		WalkInterval duration `json:"walk_interval"`
 		filewalkDefinition
 		Overlays []filewalkConfigOverlay `json:"overlays"`
 	}
@@ -61,7 +82,7 @@ type filewalker struct {
 func newFilewalker(name string, cfg filewalkConfig, resultsStore types.GetterSetterDeleter, slogger *slog.Logger) *filewalker {
 	fw := &filewalker{
 		name:         name,
-		walkInterval: cfg.WalkInterval,
+		walkInterval: time.Duration(cfg.WalkInterval),
 		slogger:      slogger.With("filewalker_name", name),
 		walkLock:     &sync.Mutex{},
 		resultsStore: resultsStore,
@@ -112,10 +133,10 @@ func (f *filewalker) UpdateConfig(newCfg filewalkConfig) {
 	defer f.walkLock.Unlock()
 
 	// Update walk interval first, updating ticker if it exists
-	if newCfg.WalkInterval != f.walkInterval && f.ticker != nil {
-		f.ticker.Reset(newCfg.WalkInterval)
+	if time.Duration(newCfg.WalkInterval) != f.walkInterval && f.ticker != nil {
+		f.ticker.Reset(time.Duration(newCfg.WalkInterval))
 	}
-	f.walkInterval = newCfg.WalkInterval
+	f.walkInterval = time.Duration(newCfg.WalkInterval)
 
 	// Extract root dirs and filename regex from cfg -- applying base options first, and then overlays
 	if newCfg.RootDirs != nil {

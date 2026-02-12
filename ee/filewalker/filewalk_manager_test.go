@@ -50,7 +50,7 @@ func TestExecute(t *testing.T) {
 	// Run the manager and let it spin up filewalkers
 	walkStart := time.Now().Unix()
 	go filewalkManager.Execute()
-	time.Sleep(3 * cfg.WalkInterval)
+	time.Sleep(time.Duration(3 * cfg.WalkInterval))
 
 	// Confirm we have one filewalker
 	filewalkManager.filewalkersLock.Lock()
@@ -98,7 +98,7 @@ func TestPing(t *testing.T) {
 
 	// Run the manager and let it spin up filewalkers
 	go filewalkManager.Execute()
-	time.Sleep(3 * cfg.WalkInterval)
+	time.Sleep(time.Duration(3 * cfg.WalkInterval))
 
 	// Confirm we have one filewalker
 	filewalkManager.filewalkersLock.Lock()
@@ -122,7 +122,7 @@ func TestPing(t *testing.T) {
 
 	// Call Ping
 	filewalkManager.Ping()
-	time.Sleep(3 * cfg.WalkInterval)
+	time.Sleep(time.Duration(3 * cfg.WalkInterval))
 
 	// Confirm we still have one filewalker
 	filewalkManager.filewalkersLock.Lock()
@@ -146,7 +146,7 @@ func TestPing(t *testing.T) {
 
 	// Call Ping
 	filewalkManager.Ping()
-	time.Sleep(3 * cfg.WalkInterval)
+	time.Sleep(time.Duration(3 * cfg.WalkInterval))
 
 	// Confirm we now have two filewalkers
 	filewalkManager.filewalkersLock.Lock()
@@ -167,7 +167,7 @@ func TestPing(t *testing.T) {
 
 	// Call Ping
 	filewalkManager.Ping()
-	time.Sleep(3 * cfg.WalkInterval)
+	time.Sleep(time.Duration(3 * cfg.WalkInterval))
 
 	// Confirm we're back to one filewalker
 	filewalkManager.filewalkersLock.Lock()
@@ -267,7 +267,7 @@ func generateCfgWithSeeding(t *testing.T, walkInterval time.Duration, numDirs in
 	}
 
 	return filewalkConfig{
-		WalkInterval: walkInterval,
+		WalkInterval: duration(walkInterval),
 		filewalkDefinition: filewalkDefinition{
 			RootDirs:      &rootDirs,
 			FileNameRegex: filenameRegex,
