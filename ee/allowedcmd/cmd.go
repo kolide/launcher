@@ -74,7 +74,7 @@ func findExecutable(knownPaths []string) (string, error) {
 
 	// If search the path is disallowed, return an error.
 	if !allowSearchPath() {
-		return nil, fmt.Errorf("not found in expected locations: %w", ErrCommandNotFound)
+		return "", fmt.Errorf("not found in expected locations: %w", ErrCommandNotFound)
 	}
 
 	for _, knownPath := range knownPaths {
@@ -84,7 +84,7 @@ func findExecutable(knownPaths []string) (string, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("not found and could not be located elsewhere: %w", ErrCommandNotFound)
+	return "", fmt.Errorf("not found and could not be located elsewhere: %w", ErrCommandNotFound)
 }
 
 func newCmd(ctx context.Context, env []string, fullPathToCmd string, arg ...string) *TracedCmd {
@@ -127,14 +127,14 @@ type launcherCommand struct{}
 
 func (_ launcherCommand) Name() string { return "launcher" }
 
-func (_ launcherCommand)  Cmd(ctx context.Context, args ...string) (*TracedCmd, error) {
+func (_ launcherCommand) Cmd(ctx context.Context, args ...string) (*TracedCmd, error) {
 	// Try to get our current running path, this skips future path lookups
 	selfPath, err := os.Executable()
 	if err != nil {
 		return nil, fmt.Errorf("getting path to launcher: %w", err)
 	}
 
-// FIXME: Should we check that selfPath still exists
+	// FIXME: Should we check that selfPath still exists
 
 	envAdditions := []string{
 		"LAUNCHER_SKIP_UPDATES=TRUE",
