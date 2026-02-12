@@ -26,8 +26,8 @@ type enrollmentResponse struct {
 	jsonRpcResponse
 	NodeKey                       string            `json:"node_key"`
 	NodeInvalid                   bool              `json:"node_invalid"`
-	RegionInvalid                 bool              `json:"region_invalid"`
-	RegionURLs                    *types.KolideURLs `json:"region_urls,omitempty"`
+	WrongRegion                   bool              `json:"wrong_region"`
+	DeploymentURLs                *types.KolideURLs `json:"deployment_urls,omitempty"`
 	ErrorCode                     string            `json:"error_code,omitempty"`
 	Err                           error             `json:"err,omitempty"`
 	AgentIngesterToken            string            `json:"agent_ingester_auth_token,omitempty"`
@@ -39,8 +39,8 @@ type enrollmentResponse struct {
 type EnrollmentResponse struct {
 	NodeKey                       string
 	NodeInvalid                   bool
-	RegionInvalid                 bool
-	RegionURLs                    *types.KolideURLs
+	WrongRegion                   bool
+	DeploymentURLs                *types.KolideURLs
 	AgentIngesterToken            string
 	AgentIngesterHPKEPublicKey    string
 	AgentIngesterHPKEPresharedKey string
@@ -114,8 +114,8 @@ func (e *Endpoints) RequestEnrollment(ctx context.Context, enrollSecret, hostIde
 	return &EnrollmentResponse{
 		NodeKey:                       resp.NodeKey,
 		NodeInvalid:                   resp.NodeInvalid,
-		RegionInvalid:                 resp.RegionInvalid,
-		RegionURLs:                    resp.RegionURLs,
+		WrongRegion:                   resp.WrongRegion,
+		DeploymentURLs:                resp.DeploymentURLs,
 		AgentIngesterToken:            resp.AgentIngesterToken,
 		AgentIngesterHPKEPublicKey:    resp.AgentIngesterHPKEPublicKey,
 		AgentIngesterHPKEPresharedKey: resp.AgentIngesterHPKEPresharedKey,
@@ -149,7 +149,7 @@ func (mw logmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentif
 		if resp != nil {
 			keyvals = append(keyvals,
 				"reauth", resp.NodeInvalid,
-				"region_invalid", resp.RegionInvalid,
+				"wrong_region", resp.WrongRegion,
 			)
 		}
 
