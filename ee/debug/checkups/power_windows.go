@@ -27,7 +27,7 @@ func (p *powerCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 	defer os.Remove(tmpFilePath)
 
 	// See: https://learn.microsoft.com/en-us/windows-hardware/design/device-experiences/powercfg-command-line-options#option_systempowerreport
-	powerCfgCmd, err := allowedcmd.Powercfg(ctx, "/systempowerreport", "/output", tmpFilePath)
+	powerCfgCmd, err := allowedcmd.Powercfg.Cmd(ctx, "/systempowerreport", "/output", tmpFilePath)
 	if err != nil {
 		return fmt.Errorf("creating powercfg command: %w", err)
 	}
@@ -45,7 +45,7 @@ func (p *powerCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 	}
 
 	// Get available sleep states
-	powerCfgSleepStatesCmd, err := allowedcmd.Powercfg(ctx, "/availablesleepstates")
+	powerCfgSleepStatesCmd, err := allowedcmd.Powercfg.Cmd(ctx, "/availablesleepstates")
 	if err != nil {
 		return fmt.Errorf("creating powercfg sleep states command: %w", err)
 	}
@@ -63,7 +63,7 @@ func (p *powerCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 
 	// Get power events
 	eventFilter := `Get-Winevent -FilterHashtable @{LogName='System'; ProviderName='Microsoft-Windows-Power-Troubleshooter','Microsoft-Windows-Kernel-Power'} -MaxEvents 500 | Select-Object @{name='Time'; expression={$_.TimeCreated.ToString("O")}},Id,LogName,ProviderName,Message,TimeCreated | ConvertTo-Json`
-	getWinEventCmd, err := allowedcmd.Powershell(ctx, eventFilter)
+	getWinEventCmd, err := allowedcmd.Powershell.Cmd(ctx, eventFilter)
 	if err != nil {
 		return fmt.Errorf("creating powershell get-winevent command: %w", err)
 	}

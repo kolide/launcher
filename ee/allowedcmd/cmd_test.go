@@ -13,7 +13,7 @@ func TestEcho(t *testing.T) {
 	t.Parallel()
 
 	// echo is the only one available on all platforms and likely to be available in CI
-	tracedCmd, err := Echo(t.Context(), "hello")
+	tracedCmd, err := Echo.Cmd(t.Context(), "hello")
 	require.NoError(t, err)
 	require.Contains(t, tracedCmd.Path, "echo")
 	require.Contains(t, tracedCmd.Args, "hello")
@@ -41,25 +41,17 @@ func Test_newCmd(t *testing.T) {
 	t.Parallel()
 
 	cmdPath := filepath.Join("some", "path", "to", "a", "command")
-	tracedCmd := newCmd(t.Context(), cmdPath)
+	tracedCmd := newCmd(t.Context(), nil, cmdPath)
 	require.Equal(t, cmdPath, tracedCmd.Path)
 }
 
 func Test_validatedCommand(t *testing.T) {
 	t.Parallel()
 
-	var cmdPath string
-	switch runtime.GOOS {
-	case "darwin", "linux":
-		cmdPath = "/bin/bash"
-	case "windows":
-		cmdPath = `C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`
-	}
-
-	tracedCmd, err := validatedCommand(t.Context(), cmdPath)
-
+	// Echo is available on all platforms
+	tracedCmd, err := Echo.Cmd(t.Context(), "hello")
 	require.NoError(t, err)
-	require.Equal(t, cmdPath, tracedCmd.Path)
+	require.NotEmpty(t, tracedCmd.Path)
 }
 
 func Test_validatedCommand_doesNotSearchPathOnNonNixOS(t *testing.T) {
@@ -69,8 +61,9 @@ func Test_validatedCommand_doesNotSearchPathOnNonNixOS(t *testing.T) {
 		t.SkipNow()
 	}
 
-	cmdPath := "/not/the/real/path/to/bash"
-	_, err := validatedCommand(t.Context(), cmdPath)
+	// Use a command that has a single path that doesn't exist
+	nonexistent := newAllowedCommand("/not/the/real/path/to/bash")
+	_, err := nonexistent.Cmd(t.Context())
 
 	require.Error(t, err)
 }

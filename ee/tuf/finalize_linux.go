@@ -29,7 +29,7 @@ func patchExecutable(executableLocation string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cmd, err := allowedcmd.Patchelf(ctx, "--set-interpreter", interpreter, executableLocation)
+	cmd, err := allowedcmd.Patchelf.Cmd(ctx, "--set-interpreter", interpreter, executableLocation)
 	if err != nil {
 		return fmt.Errorf("creating patchelf command: %w", err)
 	}
@@ -53,7 +53,7 @@ func getInterpreter(executableLocation string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cmd, err := allowedcmd.Patchelf(ctx, "--print-interpreter", currentExecutable)
+	cmd, err := allowedcmd.Patchelf.Cmd(ctx, "--print-interpreter", currentExecutable)
 	if err != nil {
 		return "", fmt.Errorf("creating patchelf command: %w", err)
 	}

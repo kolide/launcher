@@ -116,9 +116,7 @@ func IsNixOS() bool {
 // it uses os.Executable and resolves at call time. This handles the launcher updates.
 type launcherCommand struct{}
 
-func (_ launcherCommand) Name() string {
-	return "launcher"
-}
+func (_ launcherCommand) Name() string { return "launcher" }
 
 func (_ launcherCommand)  Cmd(ctx context.Context, args ...string) (*TracedCmd, error) {
 	// Try to get our current running path, this skips future path lookups

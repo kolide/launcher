@@ -8,52 +8,40 @@ import (
 	"path/filepath"
 )
 
-func CommandPrompt(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, filepath.Join(os.Getenv("WINDIR"), "System32", "cmd.exe"), arg...)
+var CommandPrompt = newAllowedCommand(filepath.Join(os.Getenv("WINDIR"), "System32", "cmd.exe"))
+
+var Dism = newAllowedCommand(filepath.Join(os.Getenv("WINDIR"), "System32", "Dism.exe"))
+
+var Dsregcmd = newAllowedCommand(filepath.Join(os.Getenv("WINDIR"), "System32", "dsregcmd.exe"))
+
+// echoCommand implements AllowedCommand for Windows where echo is a shell builtin.
+type echoCommand struct{}
+
+func (echoCommand) Name() string { return "echo" }
+
+func (echoCommand) Cmd(ctx context.Context, arg ...string) (*TracedCmd, error) {
+	return newCmd(ctx, nil, "echo", arg...), nil
 }
 
-func Dism(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, filepath.Join(os.Getenv("WINDIR"), "System32", "Dism.exe"), arg...)
-}
+var Echo AllowedCommand = echoCommand{}
 
-func Dsregcmd(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, filepath.Join(os.Getenv("WINDIR"), "System32", "dsregcmd.exe"), arg...)
-}
+var Ipconfig = newAllowedCommand(filepath.Join(os.Getenv("WINDIR"), "System32", "ipconfig.exe"))
 
-func Echo(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	// echo on Windows is only available as a command in cmd.exe
-	return newCmd(ctx, "echo", arg...), nil
-}
+var Powercfg = newAllowedCommand(filepath.Join(os.Getenv("WINDIR"), "System32", "powercfg.exe"))
 
-func Ipconfig(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, filepath.Join(os.Getenv("WINDIR"), "System32", "ipconfig.exe"), arg...)
-}
+var Powershell = newAllowedCommand(filepath.Join(os.Getenv("WINDIR"), "System32", "WindowsPowerShell", "v1.0", "powershell.exe"))
 
-func Powercfg(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, filepath.Join(os.Getenv("WINDIR"), "System32", "powercfg.exe"), arg...)
-}
+var Repcli = newAllowedCommand(filepath.Join(os.Getenv("PROGRAMFILES"), "Confer", "repcli"))
 
-func Powershell(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, filepath.Join(os.Getenv("WINDIR"), "System32", "WindowsPowerShell", "v1.0", "powershell.exe"), arg...)
-}
+var Secedit = newAllowedCommand(filepath.Join(os.Getenv("WINDIR"), "System32", "SecEdit.exe"))
 
-func Repcli(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, filepath.Join(os.Getenv("PROGRAMFILES"), "Confer", "repcli"), arg...)
-}
+var Taskkill = newAllowedCommand(filepath.Join(os.Getenv("WINDIR"), "System32", "taskkill.exe"))
 
-func Secedit(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, filepath.Join(os.Getenv("WINDIR"), "System32", "SecEdit.exe"), arg...)
-}
+var Zscli = newAllowedCommand(filepath.Join(os.Getenv("PROGRAMFILES"), "Zscaler", "ZSACli", "ZSACli.exe"))
 
-func Taskkill(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, filepath.Join(os.Getenv("WINDIR"), "System32", "taskkill.exe"), arg...)
-}
+var zerotierCliPath = newAllowedCommand(filepath.Join(os.Getenv("SYSTEMROOT"), "ProgramData", "ZeroTier", "One", "zerotier-one_x64.exe"))
 
 func ZerotierCli(ctx context.Context, arg ...string) (*TracedCmd, error) {
 	// For windows, "-q" should be prepended before all other args
-	return validatedCommand(ctx, filepath.Join(os.Getenv("SYSTEMROOT"), "ProgramData", "ZeroTier", "One", "zerotier-one_x64.exe"), append([]string{"-q"}, arg...)...)
-}
-
-func Zscli(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, filepath.Join(os.Getenv("PROGRAMFILES"), "Zscaler", "ZSACli", "ZSACli.exe"), arg...)
+	return zerotierCliPath.Cmd(ctx, append([]string{"-q"}, arg...)...)
 }
