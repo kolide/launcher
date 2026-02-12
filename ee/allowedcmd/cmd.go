@@ -100,6 +100,10 @@ func newCmd(ctx context.Context, env []string, fullPathToCmd string, arg ...stri
 }
 
 func allowSearchPath() bool {
+	// We do not currently allow search paths outside linux NIX.
+	if runtime.GOOS != "linux" {
+		return false
+	}
 	return IsNixOS()
 }
 
@@ -111,10 +115,6 @@ var (
 )
 
 func IsNixOS() bool {
-	if runtime.GOOS != "linux" {
-		return false
-	}
-
 	if checkedIsNixOS.Load() {
 		return isNixOS.Load()
 	}

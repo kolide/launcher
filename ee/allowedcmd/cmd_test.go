@@ -72,6 +72,6 @@ func Test_findExecutable_doesNotSearchPathOnNonNixOS(t *testing.T) {
 	// Use a command that has a single path that doesn't exist
 	nonexistent, err := findExecutable([]string{"/not/the/real/path/to/bash"})
 	require.Error(t, err)
-	require.ErrorIs(t, ErrCommandNotFound, err)
+	require.ErrorIs(t, err, ErrCommandNotFound)
 	require.Empty(t, nonexistent)
 }
