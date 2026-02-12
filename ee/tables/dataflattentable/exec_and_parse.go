@@ -92,20 +92,41 @@ func NewExecAndParseTable(flags types.Flags, slogger *slog.Logger, tableName str
 		opt(tbl)
 	}
 
-	return tablewrapper.New(flags, slogger, tbl.tableName, Columns(), tbl.generate, tablewrapper.WithDescription(tbl.Description()))
+	return tablewrapper.New(
+		flags,
+		slogger,
+		tbl.tableName,
+		Columns(),
+		tbl.generate,
+		tablewrapper.WithDescription(tbl.Description()),
+		tablewrapper.WithNotes(eavNote),
+	)
 }
 
+const eavNote = "This is an EAV style table. Output is flattened."
+
 // execTableV2DescriptionTmpl uses text/template to interpolate the table name ({{.TableName}}) into the description.
-const templateString = "{{.TableName}} will exec the command `{{.Command}} {{.CommandArgs}}` and return the output.\n\nThis is an EAV style table. Output is flattened."
+const templateString = "{{.TableName}} will exec the command `{{.Command}} {{.CommandArgs}}` and return the output."
 
 var execTableV2DescriptionTmpl = template.Must(template.New("execTableV2").Parse(templateString))
 
 // Description returns a string description suitable for inclusion in osquery spec files.
 func (tbl *execTableV2) Description() string {
+	// disclaimed commands are being exec'ed through launcher. So we need to untangle them
+	cmdname := tbl.cmd.Name()
+	cmdargs := tbl.execArgs
+	if cmdname == "launcher" && len(cmdargs) > 0 && cmdargs[0] == "rundisclaimed" {
+		if len(cmdargs) < 2 {
+			cmdname = "~unknown~"
+		} else {
+			cmdname = cmdargs[1]
+			cmdargs = cmdargs[2:]
+		}
+	}
 	templateVars := map[string]string{
 		"TableName":   tbl.tableName,
-		"Command":     tbl.cmd.Name(),
-		"CommandArgs": strings.Join(tbl.execArgs, " "),
+		"Command":     cmdname,
+		"CommandArgs": strings.Join(cmdargs, " "),
 	}
 
 	var buf bytes.Buffer

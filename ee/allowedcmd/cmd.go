@@ -50,7 +50,7 @@ func (ac allowedCommand) Name() string {
 		return "~unknown~"
 	}
 
-	return ac.knownPaths[0]
+	return filepath.Base(ac.knownPaths[0])
 }
 
 func (ac allowedCommand) Cmd(ctx context.Context, arg ...string) (*TracedCmd, error) {
