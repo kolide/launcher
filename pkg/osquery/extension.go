@@ -410,48 +410,48 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	}
 
 	// Update region URLs, if needed
-	if resp.RegionURLs != nil {
-		if resp.RegionURLs.EnrollmentURL != "" && resp.RegionURLs.EnrollmentURL != e.knapsack.KolideServerURL() {
-			if err := e.knapsack.SetKolideServerURL(resp.RegionURLs.EnrollmentURL); err != nil {
+	if resp.DeploymentURLs != nil {
+		if resp.DeploymentURLs.EnrollmentURL != "" && resp.DeploymentURLs.EnrollmentURL != e.knapsack.KolideServerURL() {
+			if err := e.knapsack.SetKolideServerURL(resp.DeploymentURLs.EnrollmentURL); err != nil {
 				e.slogger.Log(ctx, slog.LevelError,
 					"could not update enrollment URL to correct region",
-					"enrollment_url", resp.RegionURLs.EnrollmentURL,
+					"enrollment_url", resp.DeploymentURLs.EnrollmentURL,
 					"err", err,
 				)
 			} else {
 				e.slogger.Log(ctx, slog.LevelInfo,
 					"updated kolide server URL after getting region_invalid response to RequestEnrollment",
-					"enrollment_url", resp.RegionURLs.EnrollmentURL,
+					"enrollment_url", resp.DeploymentURLs.EnrollmentURL,
 				)
 			}
 		}
 
-		if resp.RegionURLs.ControlServerURL != "" && resp.RegionURLs.ControlServerURL != e.knapsack.ControlServerURL() {
-			if err := e.knapsack.SetControlServerURL(resp.RegionURLs.ControlServerURL); err != nil {
+		if resp.DeploymentURLs.ControlServerURL != "" && resp.DeploymentURLs.ControlServerURL != e.knapsack.ControlServerURL() {
+			if err := e.knapsack.SetControlServerURL(resp.DeploymentURLs.ControlServerURL); err != nil {
 				e.slogger.Log(ctx, slog.LevelError,
 					"could not update control server URL to correct region",
-					"control_server_url", resp.RegionURLs.ControlServerURL,
+					"control_server_url", resp.DeploymentURLs.ControlServerURL,
 					"err", err,
 				)
 			} else {
 				e.slogger.Log(ctx, slog.LevelInfo,
 					"updated control server URL after getting region_invalid response to RequestEnrollment",
-					"control_server_url", resp.RegionURLs.ControlServerURL,
+					"control_server_url", resp.DeploymentURLs.ControlServerURL,
 				)
 			}
 		}
 
-		if resp.RegionURLs.OsqueryPublisherURL != "" && resp.RegionURLs.OsqueryPublisherURL != e.knapsack.OsqueryPublisherURL() {
-			if err := e.knapsack.SetOsqueryPublisherURL(resp.RegionURLs.OsqueryPublisherURL); err != nil {
+		if resp.DeploymentURLs.OsqueryPublisherURL != "" && resp.DeploymentURLs.OsqueryPublisherURL != e.knapsack.OsqueryPublisherURL() {
+			if err := e.knapsack.SetOsqueryPublisherURL(resp.DeploymentURLs.OsqueryPublisherURL); err != nil {
 				e.slogger.Log(ctx, slog.LevelError,
 					"could not update osquery publisher URL to correct region",
-					"osquery_publisher_url", resp.RegionURLs.OsqueryPublisherURL,
+					"osquery_publisher_url", resp.DeploymentURLs.OsqueryPublisherURL,
 					"err", err,
 				)
 			} else {
 				e.slogger.Log(ctx, slog.LevelInfo,
 					"updated osquery publisher URL after getting region_invalid response to RequestEnrollment",
-					"osquery_publisher_url", resp.RegionURLs.OsqueryPublisherURL,
+					"osquery_publisher_url", resp.DeploymentURLs.OsqueryPublisherURL,
 				)
 			}
 		}

@@ -149,7 +149,7 @@ type (
 		NodeKey            string            `json:"node_key"`
 		Munemo             string            `json:"munemo"`
 		AgentIngesterToken string            `json:"agent_ingester_auth_token"`
-		RegionURLs         *types.KolideURLs `json:"region_urls,omitempty"`
+		DeploymentURLs     *types.KolideURLs `json:"deployment_urls,omitempty"`
 	}
 )
 
@@ -199,48 +199,48 @@ func (e *kryptoEcMiddleware) callbackWorker() {
 			}
 
 			// Check to see if we should update any of our region URLs
-			if r.RegionURLs != nil {
-				if r.RegionURLs.EnrollmentURL != "" && r.RegionURLs.EnrollmentURL != e.flags.KolideServerURL() {
-					if err := e.flags.SetKolideServerURL(r.RegionURLs.EnrollmentURL); err != nil {
+			if r.DeploymentURLs != nil {
+				if r.DeploymentURLs.EnrollmentURL != "" && r.DeploymentURLs.EnrollmentURL != e.flags.KolideServerURL() {
+					if err := e.flags.SetKolideServerURL(r.DeploymentURLs.EnrollmentURL); err != nil {
 						e.slogger.Log(ctx, slog.LevelError,
 							"could not update enrollment URL to correct region",
-							"enrollment_url", r.RegionURLs.EnrollmentURL,
+							"enrollment_url", r.DeploymentURLs.EnrollmentURL,
 							"err", err,
 						)
 					} else {
 						e.slogger.Log(ctx, slog.LevelInfo,
 							"updated kolide server URL during callback",
-							"enrollment_url", r.RegionURLs.EnrollmentURL,
+							"enrollment_url", r.DeploymentURLs.EnrollmentURL,
 						)
 					}
 				}
 
-				if r.RegionURLs.ControlServerURL != "" && r.RegionURLs.ControlServerURL != e.flags.ControlServerURL() {
-					if err := e.flags.SetControlServerURL(r.RegionURLs.ControlServerURL); err != nil {
+				if r.DeploymentURLs.ControlServerURL != "" && r.DeploymentURLs.ControlServerURL != e.flags.ControlServerURL() {
+					if err := e.flags.SetControlServerURL(r.DeploymentURLs.ControlServerURL); err != nil {
 						e.slogger.Log(ctx, slog.LevelError,
 							"could not update control server URL to correct region",
-							"control_server_url", r.RegionURLs.ControlServerURL,
+							"control_server_url", r.DeploymentURLs.ControlServerURL,
 							"err", err,
 						)
 					} else {
 						e.slogger.Log(ctx, slog.LevelInfo,
 							"updated control server URL during callback",
-							"control_server_url", r.RegionURLs.ControlServerURL,
+							"control_server_url", r.DeploymentURLs.ControlServerURL,
 						)
 					}
 				}
 
-				if r.RegionURLs.OsqueryPublisherURL != "" && r.RegionURLs.OsqueryPublisherURL != e.flags.OsqueryPublisherURL() {
-					if err := e.flags.SetOsqueryPublisherURL(r.RegionURLs.OsqueryPublisherURL); err != nil {
+				if r.DeploymentURLs.OsqueryPublisherURL != "" && r.DeploymentURLs.OsqueryPublisherURL != e.flags.OsqueryPublisherURL() {
+					if err := e.flags.SetOsqueryPublisherURL(r.DeploymentURLs.OsqueryPublisherURL); err != nil {
 						e.slogger.Log(ctx, slog.LevelError,
 							"could not update osquery publisher URL to correct region",
-							"osquery_publisher_url", r.RegionURLs.OsqueryPublisherURL,
+							"osquery_publisher_url", r.DeploymentURLs.OsqueryPublisherURL,
 							"err", err,
 						)
 					} else {
 						e.slogger.Log(ctx, slog.LevelInfo,
 							"updated osquery publisher URL during callback",
-							"osquery_publisher_url", r.RegionURLs.OsqueryPublisherURL,
+							"osquery_publisher_url", r.DeploymentURLs.OsqueryPublisherURL,
 						)
 					}
 				}

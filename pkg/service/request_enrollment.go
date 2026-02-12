@@ -27,7 +27,7 @@ type enrollmentResponse struct {
 	NodeKey            string            `json:"node_key"`
 	NodeInvalid        bool              `json:"node_invalid"`
 	RegionInvalid      bool              `json:"region_invalid"`
-	RegionURLs         *types.KolideURLs `json:"region_urls,omitempty"`
+	DeploymentURLs     *types.KolideURLs `json:"deployment_urls,omitempty"`
 	ErrorCode          string            `json:"error_code,omitempty"`
 	Err                error             `json:"err,omitempty"`
 	AgentIngesterToken string            `json:"agent_ingester_auth_token,omitempty"`
@@ -38,7 +38,7 @@ type EnrollmentResponse struct {
 	NodeKey            string
 	NodeInvalid        bool
 	RegionInvalid      bool
-	RegionURLs         *types.KolideURLs
+	DeploymentURLs     *types.KolideURLs
 	AgentIngesterToken string
 }
 
@@ -111,7 +111,7 @@ func (e *Endpoints) RequestEnrollment(ctx context.Context, enrollSecret, hostIde
 		NodeKey:            resp.NodeKey,
 		NodeInvalid:        resp.NodeInvalid,
 		RegionInvalid:      resp.RegionInvalid,
-		RegionURLs:         resp.RegionURLs,
+		DeploymentURLs:     resp.DeploymentURLs,
 		AgentIngesterToken: resp.AgentIngesterToken,
 	}, resp.Err
 }
