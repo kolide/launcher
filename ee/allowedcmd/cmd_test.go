@@ -1,6 +1,7 @@
 package allowedcmd
 
 import (
+	"os"
 	"path/filepath"
 	"runtime"
 	"sync/atomic"
@@ -47,8 +48,8 @@ func TestWithEnv_windows(t *testing.T) {
 
 	random := ulid.New()
 
-	testcmd := Echo.WithEnv("CI_TEST_COMMANDS=" + random)
-	tracedCmd, err := testcmd.Cmd(t.Context(), "%CI_TEST_COMMANDS%")
+	testcmd := newAllowedCommand(filepath.Join(os.Getenv("WINDIR"), "System32", "cmd.exe")).WithEnv("CI_TEST_COMMANDS=" + random)
+	tracedCmd, err := testcmd.Cmd(t.Context(), "/C", "set")
 	require.NoError(t, err)
 
 	require.Contains(t, tracedCmd.Env, "CI_TEST_COMMANDS="+random)
