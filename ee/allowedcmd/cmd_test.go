@@ -25,20 +25,19 @@ func TestWithEnv(t *testing.T) {
 
 	random := ulid.New()
 
-	execcmd := "/usr/bin/printenv"
+	testcmd := newAllowedCommand("/usr/bin/printenv").WithEnv("CI_TEST_COMMANDS=" + random)
 	execargs := "CI_TEST_COMMANDS"
 	if runtime.GOOS == "windows" {
-		execcmd = "echo"
+		testcmd = Echo.WithEnv("CI_TEST_COMMANDS=" + random)
 		execargs = "%CI_TEST_COMMANDS%"
 	}
 
-	testcmd := newAllowedCommand(execcmd).WithEnv("CI_TEST_COMMANDS=" + random)
 	tracedCmd, err := testcmd.Cmd(t.Context(), execargs)
 	require.NoError(t, err)
 
 	require.Contains(t, tracedCmd.Env, "CI_TEST_COMMANDS="+random)
 
-	output, err := tracedCmd.Output()
+	output, err := tracedCmd.CombinedOutput()
 	require.NoError(t, err)
 	require.Contains(t, string(output), random)
 }
