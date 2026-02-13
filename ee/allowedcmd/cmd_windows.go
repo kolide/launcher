@@ -16,12 +16,19 @@ var Dism = newAllowedCommand(filepath.Join(os.Getenv("WINDIR"), "System32", "Dis
 var Dsregcmd = newAllowedCommand(filepath.Join(os.Getenv("WINDIR"), "System32", "dsregcmd.exe"))
 
 // echoCommand implements AllowedCommand for Windows where echo is a shell builtin.
-type echoCommand struct{}
+type echoCommand struct {
+	env []string
+}
 
 func (echoCommand) Name() string { return "echo" }
 
-func (echoCommand) Cmd(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return newCmd(ctx, nil, "echo", arg...), nil
+func (ac echoCommand) Cmd(ctx context.Context, arg ...string) (*TracedCmd, error) {
+	return newCmd(ctx, ac.env, "echo", arg...), nil
+}
+
+func (ac echoCommand) WithEnv(env string) echoCommand {
+	ac.env = append(ac.env, env)
+	return ac
 }
 
 var Echo AllowedCommand = echoCommand{}
