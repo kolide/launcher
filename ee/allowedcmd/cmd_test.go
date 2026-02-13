@@ -17,6 +17,9 @@ func TestEcho(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, tracedCmd.Path, "echo")
 	require.Contains(t, tracedCmd.Args, "hello")
+	output, err := tracedCmd.CombinedOutput()
+	require.NoError(t, err)
+	require.Contains(t, string(output), "hello")
 }
 
 func TestIsNixOS(t *testing.T) { // nolint:paralleltest
