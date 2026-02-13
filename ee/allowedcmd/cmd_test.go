@@ -20,13 +20,20 @@ func TestEcho(t *testing.T) {
 	require.Contains(t, tracedCmd.Args, "hello")
 }
 
-func TestWithEnvt(t *testing.T) {
+func TestWithEnv(t *testing.T) {
 	t.Parallel()
 
 	random := ulid.New()
 
-	testcmd := newAllowedCommand("/usr/bin/printenv").WithEnv("CI_TEST_COMMANDS=" + random)
-	tracedCmd, err := testcmd.Cmd(t.Context(), "CI_TEST_COMMANDS")
+	execcmd := "/usr/bin/printenv"
+	execargs := "CI_TEST_COMMANDS"
+	if runtime.GOOS == "windows" {
+		execcmd = "Get-ChildItem"
+		execargs = "Env:CI_TEST_COMMANDS"
+	}
+
+	testcmd := newAllowedCommand(execcmd).WithEnv("CI_TEST_COMMANDS=" + random)
+	tracedCmd, err := testcmd.Cmd(t.Context(), execargs)
 	require.NoError(t, err)
 
 	require.Contains(t, tracedCmd.Env, "CI_TEST_COMMANDS="+random)
