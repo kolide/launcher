@@ -15,7 +15,8 @@ var Dism = newAllowedCommand(filepath.Join(os.Getenv("WINDIR"), "System32", "Dis
 
 var Dsregcmd = newAllowedCommand(filepath.Join(os.Getenv("WINDIR"), "System32", "dsregcmd.exe"))
 
-// echoCommand implements AllowedCommand for Windows where echo is a shell builtin.
+// echoCommand implements AllowedCommand for Windows where echo is a shell builtin. It skips
+// The path searching behavior.
 type echoCommand struct {
 	env []string
 }

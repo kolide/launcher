@@ -20,19 +20,35 @@ func TestEcho(t *testing.T) {
 	require.Contains(t, tracedCmd.Args, "hello")
 }
 
-func TestWithEnv(t *testing.T) {
+func TestWithEnv_posix(t *testing.T) {
 	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip()
+	}
 
 	random := ulid.New()
 
 	testcmd := newAllowedCommand("/usr/bin/printenv").WithEnv("CI_TEST_COMMANDS=" + random)
-	execargs := "CI_TEST_COMMANDS"
-	if runtime.GOOS == "windows" {
-		testcmd = Echo.WithEnv("CI_TEST_COMMANDS=" + random)
-		execargs = "%CI_TEST_COMMANDS%"
+	tracedCmd, err := testcmd.Cmd(t.Context(), "CI_TEST_COMMANDS")
+	require.NoError(t, err)
+
+	require.Contains(t, tracedCmd.Env, "CI_TEST_COMMANDS="+random)
+
+	output, err := tracedCmd.CombinedOutput()
+	require.NoError(t, err)
+	require.Contains(t, string(output), random)
+}
+
+func TestWithEnv_windows(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS != "windows" {
+		t.Skip()
 	}
 
-	tracedCmd, err := testcmd.Cmd(t.Context(), execargs)
+	random := ulid.New()
+
+	testcmd := Echo.WithEnv("CI_TEST_COMMANDS=" + random)
+	tracedCmd, err := testcmd.Cmd(t.Context(), "%CI_TEST_COMMANDS%")
 	require.NoError(t, err)
 
 	require.Contains(t, tracedCmd.Env, "CI_TEST_COMMANDS="+random)
