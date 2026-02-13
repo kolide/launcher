@@ -28,8 +28,8 @@ func TestWithEnv(t *testing.T) {
 	execcmd := "/usr/bin/printenv"
 	execargs := "CI_TEST_COMMANDS"
 	if runtime.GOOS == "windows" {
-		execcmd = "Get-ChildItem"
-		execargs = "Env:CI_TEST_COMMANDS"
+		execcmd = "echo"
+		execargs = "%CI_TEST_COMMANDS%"
 	}
 
 	testcmd := newAllowedCommand(execcmd).WithEnv("CI_TEST_COMMANDS=" + random)
