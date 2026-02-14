@@ -2,162 +2,74 @@
 
 package allowedcmd
 
-import (
-	"context"
-	"fmt"
-)
+var Airport = newAllowedCommand("/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport")
 
-func Airport(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport", arg...)
-}
+var Bioutil = newAllowedCommand("/usr/bin/bioutil")
 
-func Bioutil(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/bin/bioutil", arg...)
-}
+var Bputil = newAllowedCommand("/usr/bin/bputil")
 
-func Bputil(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/bin/bputil", arg...)
-}
+var Brew = newAllowedCommand("/opt/homebrew/bin/brew", "/usr/local/bin/brew").WithEnv("HOMEBREW_NO_AUTO_UPDATE=1")
 
-func Brew(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	for _, p := range []string{"/opt/homebrew/bin/brew", "/usr/local/bin/brew"} {
-		validatedCmd, err := validatedCommand(ctx, p, arg...)
-		if err != nil {
-			continue
-		}
+var Diskutil = newAllowedCommand("/usr/sbin/diskutil")
 
-		validatedCmd.Env = append(validatedCmd.Environ(), "HOMEBREW_NO_AUTO_UPDATE=1")
+var Echo = newAllowedCommand("/bin/echo")
 
-		return validatedCmd, nil
-	}
+var Falconctl = newAllowedCommand("/Applications/Falcon.app/Contents/Resources/falconctl")
 
-	return nil, fmt.Errorf("%w: homebrew", ErrCommandNotFound)
-}
+var Fdesetup = newAllowedCommand("/usr/bin/fdesetup")
 
-func Diskutil(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/sbin/diskutil", arg...)
-}
+var Firmwarepasswd = newAllowedCommand("/usr/sbin/firmwarepasswd")
 
-func Echo(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/bin/echo", arg...)
-}
+var Ifconfig = newAllowedCommand("/sbin/ifconfig")
 
-func Falconctl(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/Applications/Falcon.app/Contents/Resources/falconctl", arg...)
-}
+var Ioreg = newAllowedCommand("/usr/sbin/ioreg")
 
-func Fdesetup(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/bin/fdesetup", arg...)
-}
+var Launchctl = newAllowedCommand("/bin/launchctl")
 
-func Firmwarepasswd(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/sbin/firmwarepasswd", arg...)
-}
+var Lsof = newAllowedCommand("/usr/sbin/lsof")
 
-func Ifconfig(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/sbin/ifconfig", arg...)
-}
+var Mdfind = newAllowedCommand("/usr/bin/mdfind")
 
-func Ioreg(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/sbin/ioreg", arg...)
-}
+var Mdmclient = newAllowedCommand("/usr/libexec/mdmclient")
 
-func Launchctl(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/bin/launchctl", arg...)
-}
+var MicrosoftDefenderATP = newAllowedCommand("/usr/local/bin/mdatp")
 
-func Lsof(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/sbin/lsof", arg...)
-}
+var Netstat = newAllowedCommand("/usr/sbin/netstat")
 
-func Mdfind(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/bin/mdfind", arg...)
-}
+var NixEnv = newAllowedCommand("/nix/var/nix/profiles/default/bin/nix-env")
 
-func Mdmclient(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/libexec/mdmclient", arg...)
-}
+var Open = newAllowedCommand("/usr/bin/open")
 
-func MicrosoftDefenderATP(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/local/bin/mdatp", arg...)
-}
+var Pkgutil = newAllowedCommand("/usr/sbin/pkgutil")
 
-func Netstat(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/sbin/netstat", arg...)
-}
+var Powermetrics = newAllowedCommand("/usr/bin/powermetrics")
 
-func NixEnv(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/nix/var/nix/profiles/default/bin/nix-env", arg...)
-}
+var Profiles = newAllowedCommand("/usr/bin/profiles")
 
-func Open(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/bin/open", arg...)
-}
+var Ps = newAllowedCommand("/bin/ps")
 
-func Pkgutil(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/sbin/pkgutil", arg...)
-}
+var Pwpolicy = newAllowedCommand("/usr/bin/pwpolicy")
 
-func Powermetrics(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/bin/powermetrics", arg...)
-}
+var Remotectl = newAllowedCommand("/usr/libexec/remotectl")
 
-func Profiles(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/bin/profiles", arg...)
-}
+var Repcli = newAllowedCommand("/Applications/VMware Carbon Black Cloud/repcli.bundle/Contents/MacOS/repcli")
 
-func Ps(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/bin/ps", arg...)
-}
+var Scutil = newAllowedCommand("/usr/sbin/scutil")
 
-func Pwpolicy(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/bin/pwpolicy", arg...)
-}
+var Security = newAllowedCommand("/usr/bin/security")
 
-func Remotectl(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/libexec/remotectl", arg...)
-}
+var Socketfilterfw = newAllowedCommand("/usr/libexec/ApplicationFirewall/socketfilterfw")
 
-func Repcli(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/Applications/VMware Carbon Black Cloud/repcli.bundle/Contents/MacOS/repcli", arg...)
-}
+var Softwareupdate = newAllowedCommand("/usr/sbin/softwareupdate")
 
-func Scutil(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/sbin/scutil", arg...)
-}
+var SystemProfiler = newAllowedCommand("/usr/sbin/system_profiler")
 
-func Security(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/bin/security", arg...)
-}
+var Tmutil = newAllowedCommand("/usr/bin/tmutil")
 
-func Socketfilterfw(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/libexec/ApplicationFirewall/socketfilterfw", arg...)
-}
+var ZerotierCli = newAllowedCommand("/usr/local/bin/zerotier-cli")
 
-func Softwareupdate(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/sbin/softwareupdate", arg...)
-}
+var Zfs = newAllowedCommand("/usr/sbin/zfs")
 
-func SystemProfiler(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/sbin/system_profiler", arg...)
-}
+var Zpool = newAllowedCommand("/usr/sbin/zpool")
 
-func Tmutil(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/bin/tmutil", arg...)
-}
-
-func ZerotierCli(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/local/bin/zerotier-cli", arg...)
-}
-
-func Zfs(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/sbin/zfs", arg...)
-}
-
-func Zpool(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/sbin/zpool", arg...)
-}
-
-func Zscli(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/Applications/Zscaler/Zscaler.app/Contents/PlugIns/zscli", arg...)
-}
+var Zscli = newAllowedCommand("/Applications/Zscaler/Zscaler.app/Contents/PlugIns/zscli")

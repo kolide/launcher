@@ -48,7 +48,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	// Brew is owned by a single user on a system. Brew is only intended to run with the context of
 	// that user. To reduce duplicating the WithUid table helper, we can find the owner of the binary,
 	// and pass the said owner to the WIthUid method to handle setting the appropriate env vars.
-	cmd, err := allowedcmd.Brew(ctx)
+	cmd, err := allowedcmd.Brew.Cmd(ctx)
 
 	if err != nil {
 		if errors.Is(err, allowedcmd.ErrCommandNotFound) {

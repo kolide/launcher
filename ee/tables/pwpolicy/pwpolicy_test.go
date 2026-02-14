@@ -44,7 +44,7 @@ func TestQueries(t *testing.T) {
 	for _, tt := range tests {
 		testTable := &Table{
 			slogger: multislogger.NewNopLogger(),
-			execCC:  execFaker(tt.file),
+			execCC:  execFaker{filename: tt.file},
 		}
 
 		testName := tt.file + "/" + tt.name
@@ -70,11 +70,15 @@ func TestQueries(t *testing.T) {
 
 }
 
-func execFaker(filename string) func(context.Context, ...string) (*allowedcmd.TracedCmd, error) {
-	return func(ctx context.Context, _ ...string) (*allowedcmd.TracedCmd, error) {
-		return &allowedcmd.TracedCmd{
-			Ctx: ctx,
-			Cmd: exec.CommandContext(ctx, "/bin/cat", filename), //nolint:forbidigo // Fine to use exec.CommandContext in test
-		}, nil
-	}
+type execFaker struct {
+	filename string
+}
+
+func (execFaker) Name() string { return "execFaker" }
+
+func (ac execFaker) Cmd(ctx context.Context, arg ...string) (*allowedcmd.TracedCmd, error) {
+	return &allowedcmd.TracedCmd{
+		Ctx: ctx,
+		Cmd: exec.CommandContext(ctx, "/bin/cat", ac.filename), //nolint:forbidigo // Fine to use exec.CommandContext in test
+	}, nil
 }

@@ -99,7 +99,7 @@ func (d *dbusNotifier) Execute() error {
 			actionUri := signal.Body[1].(string)
 
 			for _, browserLauncher := range browserLaunchers {
-				cmd, err := browserLauncher(context.TODO(), actionUri)
+				cmd, err := browserLauncher.Cmd(context.TODO(), actionUri)
 				if err != nil {
 					d.slogger.Log(context.TODO(), slog.LevelWarn,
 						"couldn't create command to start process",
@@ -218,7 +218,7 @@ func (d *dbusNotifier) sendNotificationViaNotifySend(n Notification) error {
 		args = append(args, "-i", d.iconFilepath)
 	}
 
-	cmd, err := allowedcmd.NotifySend(context.TODO(), args...)
+	cmd, err := allowedcmd.NotifySend.Cmd(context.TODO(), args...)
 	if err != nil {
 		return fmt.Errorf("creating command: %w", err)
 	}

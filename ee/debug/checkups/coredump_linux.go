@@ -71,7 +71,7 @@ func (c *coredumpCheckup) Run(ctx context.Context, extraWriter io.Writer) error 
 }
 
 func (c *coredumpCheckup) coredumpList(ctx context.Context, binaryName string) ([]byte, error) {
-	coredumpctlListCmd, err := allowedcmd.Coredumpctl(ctx, "--no-pager", "--no-legend", "--json=short", "list", binaryName)
+	coredumpctlListCmd, err := allowedcmd.Coredumpctl.Cmd(ctx, "--no-pager", "--no-legend", "--json=short", "list", binaryName)
 	if err != nil {
 		return nil, fmt.Errorf("could not create coredumpctl command: %w", err)
 	}
@@ -89,7 +89,7 @@ func (c *coredumpCheckup) coredumpList(ctx context.Context, binaryName string) (
 
 func (c *coredumpCheckup) writeCoredumpInfo(ctx context.Context, binaryName string, z *zip.Writer) error {
 	// Print info about all matching coredumps
-	coredumpctlInfoCmd, err := allowedcmd.Coredumpctl(ctx, "--no-pager", "info", binaryName)
+	coredumpctlInfoCmd, err := allowedcmd.Coredumpctl.Cmd(ctx, "--no-pager", "info", binaryName)
 	if err != nil {
 		return fmt.Errorf("could not create coredumpctl info command: %w", err)
 	}
@@ -112,7 +112,7 @@ func (c *coredumpCheckup) writeCoredumpInfo(ctx context.Context, binaryName stri
 	}
 	defer os.RemoveAll(tempDir)
 	tempDumpFile := filepath.Join(tempDir, fmt.Sprintf("coredump-%s.dump", binaryName))
-	coredumpctlDumpCmd, err := allowedcmd.Coredumpctl(ctx, "--no-pager", fmt.Sprintf("--output=%s", tempDumpFile), "dump", binaryName)
+	coredumpctlDumpCmd, err := allowedcmd.Coredumpctl.Cmd(ctx, "--no-pager", fmt.Sprintf("--output=%s", tempDumpFile), "dump", binaryName)
 	if err != nil {
 		return fmt.Errorf("could not create coredumpctl dump command: %w", err)
 	}

@@ -2,202 +2,78 @@
 
 package allowedcmd
 
-import (
-	"context"
-	"errors"
-)
+var Apt = newAllowedCommand("/usr/bin/apt")
 
-func Apt(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/bin/apt", arg...)
-}
+var Brew = newAllowedCommand("/home/linuxbrew/.linuxbrew/bin/brew").WithEnv("HOMEBREW_NO_AUTO_UPDATE=1")
 
-func Brew(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	validatedCmd, err := validatedCommand(ctx, "/home/linuxbrew/.linuxbrew/bin/brew", arg...)
-	if err != nil {
-		return nil, err
-	}
+var Coredumpctl = newAllowedCommand("/usr/bin/coredumpctl")
 
-	validatedCmd.Env = append(validatedCmd.Environ(), "HOMEBREW_NO_AUTO_UPDATE=1")
+var Cryptsetup = newAllowedCommand("/usr/sbin/cryptsetup", "/sbin/cryptsetup")
 
-	return validatedCmd, nil
-}
+var Dnf = newAllowedCommand("/usr/bin/dnf")
 
-func Coredumpctl(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/bin/coredumpctl", arg...)
-}
+var Dpkg = newAllowedCommand("/usr/bin/dpkg")
 
-func Cryptsetup(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	for _, p := range []string{"/usr/sbin/cryptsetup", "/sbin/cryptsetup"} {
-		validatedCmd, err := validatedCommand(ctx, p, arg...)
-		if err != nil {
-			continue
-		}
+var Echo = newAllowedCommand("/usr/bin/echo")
 
-		return validatedCmd, nil
-	}
+var Falconctl = newAllowedCommand("/opt/CrowdStrike/falconctl")
 
-	return nil, errors.New("cryptsetup not found")
-}
+var FalconKernelCheck = newAllowedCommand("/opt/CrowdStrike/falcon-kernel-check")
 
-func Dnf(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/bin/dnf", arg...)
-}
+var Flatpak = newAllowedCommand("/usr/bin/flatpak")
 
-func Dpkg(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/bin/dpkg", arg...)
-}
+var GnomeExtensions = newAllowedCommand("/usr/bin/gnome-extensions")
 
-func Echo(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/bin/echo", arg...)
-}
+var Gsettings = newAllowedCommand("/usr/bin/gsettings")
 
-func Falconctl(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/opt/CrowdStrike/falconctl", arg...)
-}
+var Ifconfig = newAllowedCommand("/usr/sbin/ifconfig")
 
-func FalconKernelCheck(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/opt/CrowdStrike/falcon-kernel-check", arg...)
-}
+var Ip = newAllowedCommand("/usr/sbin/ip")
 
-func Flatpak(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/bin/flatpak", arg...)
-}
+var Journalctl = newAllowedCommand("/usr/bin/journalctl")
 
-func GnomeExtensions(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/bin/gnome-extensions", arg...)
-}
+var Loginctl = newAllowedCommand("/usr/bin/loginctl")
 
-func Gsettings(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/bin/gsettings", arg...)
-}
+var Lsblk = newAllowedCommand("/bin/lsblk", "/usr/bin/lsblk")
 
-func Ifconfig(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/sbin/ifconfig", arg...)
-}
+var Lsof = newAllowedCommand("/usr/bin/lsof")
 
-func Ip(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/sbin/ip", arg...)
-}
+var MicrosoftDefenderATP = newAllowedCommand("/usr/bin/mdatp")
 
-func Journalctl(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/bin/journalctl", arg...)
-}
+var NixEnv = newAllowedCommand("/run/current-system/sw/bin/nix-env")
 
-func Loginctl(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/bin/loginctl", arg...)
-}
+var Nftables = newAllowedCommand("/usr/sbin/nft")
 
-func Lsblk(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	for _, p := range []string{"/bin/lsblk", "/usr/bin/lsblk"} {
-		validatedCmd, err := validatedCommand(ctx, p, arg...)
-		if err != nil {
-			continue
-		}
+var Nmcli = newAllowedCommand("/usr/bin/nmcli")
 
-		return validatedCmd, nil
-	}
+var NotifySend = newAllowedCommand("/usr/bin/notify-send")
 
-	return nil, errors.New("lsblk not found")
-}
+var Pacman = newAllowedCommand("/usr/bin/pacman")
 
-func Lsof(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/bin/lsof", arg...)
-}
+var Patchelf = newAllowedCommand("/run/current-system/sw/bin/patchelf")
 
-func MicrosoftDefenderATP(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/bin/mdatp", arg...)
-}
+var Ps = newAllowedCommand("/usr/bin/ps")
 
-func NixEnv(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/run/current-system/sw/bin/nix-env", arg...)
-}
+var Repcli = newAllowedCommand("/opt/carbonblack/psc/bin/repcli")
 
-func Nftables(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/sbin/nft", arg...)
-}
+var Rpm = newAllowedCommand("/bin/rpm", "/usr/bin/rpm")
 
-func Nmcli(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/bin/nmcli", arg...)
-}
+var Snap = newAllowedCommand("/usr/bin/snap")
 
-func NotifySend(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/bin/notify-send", arg...)
-}
+var Systemctl = newAllowedCommand("/usr/bin/systemctl")
 
-func Pacman(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/bin/pacman", arg...)
-}
+var Ws1HubUtil = newAllowedCommand("/usr/bin/ws1HubUtil", "/opt/vmware/ws1-hub/bin/ws1HubUtil")
 
-func Patchelf(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/run/current-system/sw/bin/patchelf", arg...)
-}
+var XdgOpen = newAllowedCommand("/usr/bin/xdg-open")
 
-func Ps(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/bin/ps", arg...)
-}
+var Xrdb = newAllowedCommand("/usr/bin/xrdb")
 
-func Repcli(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/opt/carbonblack/psc/bin/repcli", arg...)
-}
+var XWwwBrowser = newAllowedCommand("/usr/bin/x-www-browser")
 
-func Rpm(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	for _, p := range []string{"/bin/rpm", "/usr/bin/rpm"} {
-		validatedCmd, err := validatedCommand(ctx, p, arg...)
-		if err != nil {
-			continue
-		}
+var ZerotierCli = newAllowedCommand("/usr/local/bin/zerotier-cli")
 
-		return validatedCmd, nil
-	}
+var Zfs = newAllowedCommand("/usr/sbin/zfs")
 
-	return nil, errors.New("rpm not found")
-}
+var Zpool = newAllowedCommand("/usr/sbin/zpool")
 
-func Snap(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/bin/snap", arg...)
-}
-
-func Systemctl(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/bin/systemctl", arg...)
-}
-
-func Ws1HubUtil(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	for _, p := range []string{"/usr/bin/ws1HubUtil", "/opt/vmware/ws1-hub/bin/ws1HubUtil"} {
-		validatedCmd, err := validatedCommand(ctx, p, arg...)
-		if err != nil {
-			continue
-		}
-
-		return validatedCmd, nil
-	}
-
-	return nil, errors.New("ws1HubUtil not found")
-}
-
-func XdgOpen(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/bin/xdg-open", arg...)
-}
-
-func Xrdb(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/bin/xrdb", arg...)
-}
-
-func XWwwBrowser(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/bin/x-www-browser", arg...)
-}
-
-func ZerotierCli(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/local/bin/zerotier-cli", arg...)
-}
-
-func Zfs(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/sbin/zfs", arg...)
-}
-
-func Zpool(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/sbin/zpool", arg...)
-}
-
-func Zypper(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/bin/zypper", arg...)
-}
+var Zypper = newAllowedCommand("/usr/bin/zypper")

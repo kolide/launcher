@@ -57,7 +57,7 @@ func (c *gnomeExtensions) Run(ctx context.Context, extraWriter io.Writer) error 
 	for _, consoleUser := range usersToCheck {
 		fmt.Fprintf(extraWriter, "## Checking user %s\n\n", consoleUser.Uid)
 
-		cmd, err := allowedcmd.GnomeExtensions(ctx, "list", "--enabled")
+		cmd, err := allowedcmd.GnomeExtensions.Cmd(ctx, "list", "--enabled")
 		if err != nil {
 			return fmt.Errorf("creating gnome-extensions list command: %w", err)
 		}

@@ -61,7 +61,7 @@ func Run(ctx context.Context, slogger *slog.Logger, timeoutSeconds int, execCmd 
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSeconds)*time.Second)
 	defer cancel()
 
-	cmd, err := execCmd(ctx, args...)
+	cmd, err := execCmd.Cmd(ctx, args...)
 	if err != nil {
 		return fmt.Errorf("creating command: %w", err)
 	}

@@ -88,13 +88,13 @@ var allowedCmdGenerators = map[string]allowedCmdGenerator{
 			"stats": {},
 			"-p":    {},
 		},
-		generate: allowedcmd.Falconctl,
+		generate: allowedcmd.Falconctl.Cmd,
 	},
 	"carbonblack_repcli": {
 		allowedOpts: map[string]struct{}{
 			"status": {},
 		},
-		generate: allowedcmd.Repcli,
+		generate: allowedcmd.Repcli.Cmd,
 	},
 	"zscaler": {
 		allowedOpts: map[string]struct{}{
@@ -102,7 +102,7 @@ var allowedCmdGenerators = map[string]allowedCmdGenerator{
 			"-s":     {},
 			"all":    {},
 		},
-		generate: allowedcmd.Zscli,
+		generate: allowedcmd.Zscli.Cmd,
 	},
 	"microsoft_defender_atp": {
 		allowedOpts: map[string]struct{}{
@@ -110,7 +110,7 @@ var allowedCmdGenerators = map[string]allowedCmdGenerator{
 			"--output": {},
 			"json":     {},
 		},
-		generate: allowedcmd.MicrosoftDefenderATP,
+		generate: allowedcmd.MicrosoftDefenderATP.Cmd,
 	},
 }
 
@@ -206,7 +206,7 @@ func getCmdGenerator(cmd string) (*allowedCmdGenerator, error) {
 }
 
 func generateBrewCommand(ctx context.Context, args ...string) (*allowedcmd.TracedCmd, error) {
-	cmd, err := allowedcmd.Brew(ctx, args...)
+	cmd, err := allowedcmd.Brew.Cmd(ctx, args...)
 	if err != nil {
 		return nil, err
 	}

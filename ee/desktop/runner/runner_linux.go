@@ -99,7 +99,7 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid strin
 	}
 
 	// Get the user's session so we can get their display (needed for opening notification action URLs in browser)
-	cmd, err := allowedcmd.Loginctl(ctx, "show-user", uid, "--value", "--property=Sessions")
+	cmd, err := allowedcmd.Loginctl.Cmd(ctx, "show-user", uid, "--value", "--property=Sessions")
 	if err != nil {
 		r.slogger.Log(ctx, slog.LevelDebug,
 			"could not create loginctl command",
@@ -126,7 +126,7 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid strin
 	sessionList := strings.Split(sessions, " ")
 	for _, session := range sessionList {
 		// Figure out what type of graphical session the user has -- x11, wayland?
-		cmd, err := allowedcmd.Loginctl(ctx, "show-session", session, "--value", "--property=Type")
+		cmd, err := allowedcmd.Loginctl.Cmd(ctx, "show-session", session, "--value", "--property=Type")
 		if err != nil {
 			r.slogger.Log(ctx, slog.LevelDebug,
 				"could not create loginctl command to get session type",
@@ -230,7 +230,7 @@ func nixXdgDataDirs(username string) string {
 
 func (r *DesktopUsersProcessesRunner) displayFromX11(ctx context.Context, session string, uid int32) string {
 	// We can read $DISPLAY from the session properties
-	cmd, err := allowedcmd.Loginctl(ctx, "show-session", session, "--value", "--property=Display")
+	cmd, err := allowedcmd.Loginctl.Cmd(ctx, "show-session", session, "--value", "--property=Display")
 	if err != nil {
 		r.slogger.Log(ctx, slog.LevelDebug,
 			"could not create command to get Display from user session",
