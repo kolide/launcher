@@ -307,8 +307,8 @@ func TestExtensionEnrollInvalidRegion(t *testing.T) {
 	m := &mock.KolideService{
 		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (*service.EnrollmentResponse, error) {
 			return &service.EnrollmentResponse{
-				RegionInvalid: true,
-				RegionURLs: &types.KolideURLs{
+				WrongRegion: true,
+				DeploymentURLs: &types.KolideURLs{
 					EnrollmentURL:       expectedDeviceServerURL,
 					ControlServerURL:    expectedControlServerURL,
 					OsqueryPublisherURL: expectedOsqueryPublisherURL,
@@ -363,8 +363,8 @@ func TestExtensionEnrollInvalidRegion_DoesNotSetMissingUrls(t *testing.T) {
 	m := &mock.KolideService{
 		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (*service.EnrollmentResponse, error) {
 			return &service.EnrollmentResponse{
-				RegionInvalid: true,
-				RegionURLs: &types.KolideURLs{
+				WrongRegion: true,
+				DeploymentURLs: &types.KolideURLs{
 					EnrollmentURL:       "",
 					ControlServerURL:    "",
 					OsqueryPublisherURL: "",

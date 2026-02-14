@@ -17,7 +17,7 @@ const (
 	dbTestFileName = "test.db"
 )
 
-func NewStore(t *testing.T, slogger *slog.Logger, bucketName string) (types.KVStore, error) {
+func NewStore(t testing.TB, slogger *slog.Logger, bucketName string) (types.KVStore, error) {
 	if os.Getenv("CI") == "true" {
 		return inmemory.NewStore(), nil
 	}
@@ -26,7 +26,7 @@ func NewStore(t *testing.T, slogger *slog.Logger, bucketName string) (types.KVSt
 }
 
 // SetupDB is used for creating bbolt databases for testing
-func SetupDB(t *testing.T) *bbolt.DB {
+func SetupDB(t testing.TB) *bbolt.DB {
 	// Create a temp directory to hold our bbolt db
 	dbDir := t.TempDir()
 
