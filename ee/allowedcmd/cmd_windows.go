@@ -27,11 +27,6 @@ func (ac echoCommand) Cmd(ctx context.Context, arg ...string) (*TracedCmd, error
 	return newCmd(ctx, ac.env, "echo", arg...), nil
 }
 
-func (ac echoCommand) WithEnv(env string) echoCommand {
-	ac.env = append(ac.env, env)
-	return ac
-}
-
 var Echo AllowedCommand = echoCommand{}
 
 var Ipconfig = newAllowedCommand(filepath.Join(os.Getenv("WINDIR"), "System32", "ipconfig.exe"))

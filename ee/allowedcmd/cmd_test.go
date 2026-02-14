@@ -21,42 +21,29 @@ func TestEcho(t *testing.T) {
 	require.Contains(t, tracedCmd.Args, "hello")
 }
 
-func TestWithEnv_posix(t *testing.T) {
+func TestWithEnv(t *testing.T) {
 	t.Parallel()
+
+	randomString := ulid.New()
+
+	// Windows has a different mechanism to print envs than posix does, so we vary here
+	cmdpath := "/usr/bin/printenv"
+	cmdargs := []string{"CI_TEST_COMMANDS"}
 	if runtime.GOOS == "windows" {
-		t.Skip()
+		// this is the same as CommandPrompt, but that's not defined on posix machines, so it's simpler just to duplicate here
+		cmdpath = filepath.Join(os.Getenv("WINDIR"), "System32", "cmd.exe")
+		cmdargs = []string{"/C", "set"}
 	}
 
-	random := ulid.New()
+	testcmd := newAllowedCommand(cmdpath).WithEnv("CI_TEST_COMMANDS=" + randomString)
 
-	testcmd := newAllowedCommand("/usr/bin/printenv").WithEnv("CI_TEST_COMMANDS=" + random)
-	tracedCmd, err := testcmd.Cmd(t.Context(), "CI_TEST_COMMANDS")
+	tracedCmd, err := testcmd.Cmd(t.Context(), cmdargs...)
 	require.NoError(t, err)
-
-	require.Contains(t, tracedCmd.Env, "CI_TEST_COMMANDS="+random)
+	require.Contains(t, tracedCmd.Env, "CI_TEST_COMMANDS="+randomString)
 
 	output, err := tracedCmd.CombinedOutput()
 	require.NoError(t, err)
-	require.Contains(t, string(output), random)
-}
-
-func TestWithEnv_windows(t *testing.T) {
-	t.Parallel()
-	if runtime.GOOS != "windows" {
-		t.Skip()
-	}
-
-	random := ulid.New()
-
-	testcmd := newAllowedCommand(filepath.Join(os.Getenv("WINDIR"), "System32", "cmd.exe")).WithEnv("CI_TEST_COMMANDS=" + random)
-	tracedCmd, err := testcmd.Cmd(t.Context(), "/C", "set")
-	require.NoError(t, err)
-
-	require.Contains(t, tracedCmd.Env, "CI_TEST_COMMANDS="+random)
-
-	output, err := tracedCmd.CombinedOutput()
-	require.NoError(t, err)
-	require.Contains(t, string(output), random)
+	require.Contains(t, string(output), randomString)
 }
 
 func TestIsNixOS(t *testing.T) { // nolint:paralleltest
