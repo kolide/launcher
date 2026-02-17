@@ -11,6 +11,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
+	"github.com/kolide/launcher/ee/filewalker"
 	"github.com/kolide/launcher/ee/katc"
 	"github.com/kolide/launcher/ee/tables/cryptoinfotable"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
@@ -67,6 +68,7 @@ func PlatformTables(k types.Knapsack, enrollmentId string, slogger *slog.Logger,
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_zerotier_networks", json_parser.Parser, allowedcmd.ZerotierCli, []string{"listnetworks", "-j"}),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_zerotier_peers", json_parser.Parser, allowedcmd.ZerotierCli, []string{"listpeers", "-j"}),
 		tdebug.LauncherGcInfo(k, slogger),
+		filewalker.NewFilewalkTable(k, k.FilewalkResultsStore(), slogger),
 	}
 
 	// The dataflatten tables

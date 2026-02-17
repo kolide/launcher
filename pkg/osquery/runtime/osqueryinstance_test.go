@@ -468,6 +468,7 @@ func TestReloadKatcExtension(t *testing.T) {
 	katcConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
 	require.NoError(t, err)
 	k.On("KatcConfigStore").Return(katcConfigStore).Maybe()
+	k.On("FilewalkResultsStore").Return(inmemory.NewStore()).Maybe()
 	k.On("ConfigStore").Return(inmemory.NewStore()).Maybe()
 	k.On("EnrollmentStore").Return(inmemory.NewStore()).Maybe()
 	k.On("LauncherHistoryStore").Return(inmemory.NewStore()).Maybe()

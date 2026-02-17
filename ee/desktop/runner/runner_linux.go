@@ -202,10 +202,10 @@ func nixXdgDataDirs(username string) string {
 	xdgDataDirs.WriteString("/nix/profile/share:/nix/var/nix/profiles/default/share:/run/current-system/sw/share")
 
 	// Next, add the ones that we can calculate via username
-	xdgDataDirs.WriteString(fmt.Sprintf(
+	fmt.Fprintf(&xdgDataDirs,
 		":/home/%s/.nix-profile/share:/home/%s/.local/state/nix/profile/share:/etc/profiles/per-user/%s/share",
 		username, username, username,
-	))
+	)
 
 	// Finally, add the ones that we can glob for in the Nix store
 	for _, dataDirGlobPattern := range nixStoreXdgDataDirGlobPatterns {
