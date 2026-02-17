@@ -52,10 +52,17 @@ func (ft *filewalkTable) generate(ctx context.Context, queryContext table.QueryC
 			)
 			continue
 		}
-		lastWalkTime := "0"
-		if lastWalkTimeRaw != nil {
-			lastWalkTime = strconv.FormatInt(int64(binary.NativeEndian.Uint64(lastWalkTimeRaw)), 10)
+		if lastWalkTimeRaw == nil {
+			// This filewalk likely hasn't executed yet -- return a row with the timestamp set to 0
+			results = append(results, map[string]string{
+				"walk_name":           walkName,
+				"path":                "",
+				"last_walk_timestamp": "0", // 0 indicates that the filewalk hasn't occurred yet
+			})
+			continue
 		}
+
+		lastWalkTime := strconv.FormatInt(int64(binary.NativeEndian.Uint64(lastWalkTimeRaw)), 10)
 
 		rawResults, err := ft.resultsStore.Get([]byte(walkName))
 		if err != nil {
@@ -67,7 +74,7 @@ func (ft *filewalkTable) generate(ctx context.Context, queryContext table.QueryC
 			continue
 		}
 
-		// No results, or none stored yet
+		// The filewalk has run, but there are no resulting files
 		if rawResults == nil {
 			continue
 		}

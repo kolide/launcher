@@ -33,7 +33,9 @@ func TestFilewalkTable(t *testing.T) {
 	// Query the table -- we shouldn't have any results yet, since we haven't performed any filewalks
 	response := testFilewalkTable.Call(t.Context(), ci.BuildRequestWithSingleEqualConstraint("walk_name", walkName))
 	require.Equal(t, int32(0), response.Status.Code, response.Status.Message) // 0 means success
-	require.Equal(t, 0, len(response.Response))
+	require.Equal(t, 1, len(response.Response), "we expect one row with a last_walk_timestamp of 0, indicating the filewalk hasn't run yet")
+	require.Equal(t, walkName, response.Response[0]["walk_name"])
+	require.Equal(t, "0", response.Response[0]["last_walk_timestamp"])
 
 	// Set up a temp directory to filewalk
 	testRootDir := t.TempDir()
