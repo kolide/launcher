@@ -43,7 +43,6 @@ require (
 
 require (
 	github.com/apache/thrift v0.22.0
-	github.com/charlievieth/fastwalk v1.0.14
 	github.com/fatih/semgroup v1.2.0
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/golang-migrate/migrate/v4 v4.16.2
