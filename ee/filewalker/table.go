@@ -4,70 +4,91 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"log/slog"
 	"strconv"
 
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
 type filewalkTable struct {
-	resultsKey      []byte
-	lastWalkTimeKey []byte
-	resultsStore    types.Getter
-	slogger         *slog.Logger
+	resultsStore types.Getter
+	slogger      *slog.Logger
 }
 
-func NewFilewalkTable(tableName string, flags types.Flags, resultsStore types.Getter, slogger *slog.Logger) osquery.OsqueryPlugin {
+func NewFilewalkTable(flags types.Flags, resultsStore types.Getter, slogger *slog.Logger) osquery.OsqueryPlugin {
 	ft := &filewalkTable{
-		resultsKey:      []byte(tableName),
-		lastWalkTimeKey: LastWalkTimeKey(tableName),
-		resultsStore:    resultsStore,
-		slogger:         slogger.With("table", tableName),
+		resultsStore: resultsStore,
+		slogger:      slogger.With("table", "kolide_filewalk"),
 	}
 	columns := []table.ColumnDefinition{
+		table.TextColumn("walk_name"),
 		table.TextColumn("path"),
 		table.IntegerColumn("last_walk_timestamp"),
 	}
 
-	return tablewrapper.New(flags, slogger, tableName, columns, ft.generate)
+	return tablewrapper.New(flags, slogger, "kolide_filewalk", columns, ft.generate)
 }
 
 func (ft *filewalkTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	lastWalkTimeRaw, err := ft.resultsStore.Get(ft.lastWalkTimeKey)
-	if err != nil {
-		return nil, fmt.Errorf("retrieving last walk time from store: %w", err)
-	}
-	lastWalkTime := "0"
-	if lastWalkTimeRaw != nil {
-		lastWalkTime = strconv.FormatInt(int64(binary.NativeEndian.Uint64(lastWalkTimeRaw)), 10)
+	walkNames := tablehelpers.GetConstraints(queryContext, "walk_name")
+	if len(walkNames) == 0 {
+		return nil, errors.New("the kolide_filewalk table requires that you specify an equals constraint for walk_name")
 	}
 
-	rawResults, err := ft.resultsStore.Get(ft.resultsKey)
-	if err != nil {
-		return nil, fmt.Errorf("retrieving rows from store: %w", err)
-	}
+	results := make([]map[string]string, 0)
 
-	// No results, or none stored yet
-	if rawResults == nil {
-		return nil, nil
-	}
+	for _, walkName := range walkNames {
+		lastWalkTimeRaw, err := ft.resultsStore.Get(LastWalkTimeKey(walkName))
+		if err != nil {
+			ft.slogger.Log(ctx, slog.LevelWarn,
+				"could not retrieve last walk time from store",
+				"walk_name", walkName,
+				"err", err,
+			)
+			continue
+		}
+		lastWalkTime := "0"
+		if lastWalkTimeRaw != nil {
+			lastWalkTime = strconv.FormatInt(int64(binary.NativeEndian.Uint64(lastWalkTimeRaw)), 10)
+		}
 
-	paths := make([]string, 0)
-	if err := json.Unmarshal(rawResults, &paths); err != nil {
-		return nil, fmt.Errorf("unmarshalling results from store: %w", err)
-	}
+		rawResults, err := ft.resultsStore.Get([]byte(walkName))
+		if err != nil {
+			ft.slogger.Log(ctx, slog.LevelWarn,
+				"could not retrieve rows from store",
+				"walk_name", walkName,
+				"err", err,
+			)
+			continue
+		}
 
-	rows := make([]map[string]string, len(paths))
-	for i, path := range paths {
-		rows[i] = map[string]string{
-			"path":                path,
-			"last_walk_timestamp": lastWalkTime,
+		// No results, or none stored yet
+		if rawResults == nil {
+			continue
+		}
+
+		paths := make([]string, 0)
+		if err := json.Unmarshal(rawResults, &paths); err != nil {
+			ft.slogger.Log(ctx, slog.LevelWarn,
+				"could not unmarshal rows from store",
+				"walk_name", walkName,
+				"err", err,
+			)
+			continue
+		}
+		for _, path := range paths {
+			results = append(results, map[string]string{
+				"walk_name":           walkName,
+				"path":                path,
+				"last_walk_timestamp": lastWalkTime,
+			})
 		}
 	}
 
-	return rows, nil
+	return results, nil
 }

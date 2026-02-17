@@ -468,16 +468,7 @@ func TestReloadKatcExtension(t *testing.T) {
 	katcConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
 	require.NoError(t, err)
 	k.On("KatcConfigStore").Return(katcConfigStore).Maybe()
-	filewalkConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.FilewalkConfigStore.String())
-	require.NoError(t, err)
-	k.On("FilewalkConfigStore").Return(filewalkConfigStore).Maybe()
-	k.On("Stores").Return(map[storage.Store]types.KVStore{
-		storage.KatcConfigStore:     katcConfigStore,
-		storage.FilewalkConfigStore: filewalkConfigStore,
-	}).Maybe()
-	filewalkResultsStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.FilewalkResultsStore.String())
-	require.NoError(t, err)
-	k.On("FilewalkResultsStore").Return(filewalkResultsStore).Maybe()
+	k.On("FilewalkResultsStore").Return(inmemory.NewStore()).Maybe()
 	k.On("ConfigStore").Return(inmemory.NewStore()).Maybe()
 	k.On("EnrollmentStore").Return(inmemory.NewStore()).Maybe()
 	k.On("LauncherHistoryStore").Return(inmemory.NewStore()).Maybe()
@@ -552,7 +543,7 @@ func TestReloadKatcExtension(t *testing.T) {
 
 	// Call ReloadKatcExtension with no changes -- it shouldn't do anything.
 	// We still shouldn't have a KATC server or be able to query for the table.
-	require.NoError(t, i.ReloadCloudConfiguredTablesExtension(t.Context()))
+	require.NoError(t, i.ReloadKatcExtension(t.Context()))
 	i.emsLock.Lock()
 	require.NotContains(t, i.extensionManagerServers, katcExtensionName)
 	i.emsLock.Unlock()
@@ -570,7 +561,7 @@ func TestReloadKatcExtension(t *testing.T) {
 	tableConfigRaw, err := json.Marshal(tableConfig)
 	require.NoError(t, err)
 	require.NoError(t, katcConfigStore.Set([]byte(testKatcTableName), tableConfigRaw))
-	require.NoError(t, i.ReloadCloudConfiguredTablesExtension(t.Context()))
+	require.NoError(t, i.ReloadKatcExtension(t.Context()))
 
 	// We should have an extension manager server for KATC, and it should know about our table
 	i.emsLock.Lock()
@@ -602,7 +593,7 @@ func TestReloadKatcExtension(t *testing.T) {
 	updatedTableConfigRaw, err := json.Marshal(updatedTableConfig)
 	require.NoError(t, err)
 	require.NoError(t, katcConfigStore.Set([]byte(testKatcTableName), updatedTableConfigRaw))
-	require.NoError(t, i.ReloadCloudConfiguredTablesExtension(t.Context()))
+	require.NoError(t, i.ReloadKatcExtension(t.Context()))
 
 	// We should still have an extension manager server for KATC
 	i.emsLock.Lock()
@@ -625,7 +616,7 @@ func TestReloadKatcExtension(t *testing.T) {
 
 	// Delete KATC configuration entirely
 	require.NoError(t, katcConfigStore.Delete([]byte(testKatcTableName)))
-	require.NoError(t, i.ReloadCloudConfiguredTablesExtension(t.Context()))
+	require.NoError(t, i.ReloadKatcExtension(t.Context()))
 
 	// We should no longer have an extension manager server for KATC
 	i.emsLock.Lock()

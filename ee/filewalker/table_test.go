@@ -10,6 +10,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
+	"github.com/kolide/launcher/ee/tables/ci"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -26,14 +27,11 @@ func TestFilewalkTable(t *testing.T) {
 	mockFlags.On("RegisterChangeObserver", mock.Anything, mock.Anything).Return()
 
 	// Set up table
-	tableName := "kolide_filewalk_test"
-	testFilewalkTable := NewFilewalkTable(tableName, mockFlags, store, multislogger.NewNopLogger())
+	walkName := "kolide_filewalk_test"
+	testFilewalkTable := NewFilewalkTable(mockFlags, store, multislogger.NewNopLogger())
 
 	// Query the table -- we shouldn't have any results yet, since we haven't performed any filewalks
-	response := testFilewalkTable.Call(t.Context(), map[string]string{
-		"action":  "generate",
-		"context": "{}",
-	})
+	response := testFilewalkTable.Call(t.Context(), ci.BuildRequestWithSingleEqualConstraint("walk_name", walkName))
 	require.Equal(t, int32(0), response.Status.Code, response.Status.Message) // 0 means success
 	require.Equal(t, 0, len(response.Response))
 
@@ -50,7 +48,7 @@ func TestFilewalkTable(t *testing.T) {
 			FileNameRegex: nil,
 		},
 	}
-	testFilewalker := newFilewalker(tableName, cfg, store, multislogger.NewNopLogger())
+	testFilewalker := newFilewalker(walkName, cfg, store, multislogger.NewNopLogger())
 	startTime := time.Now().Unix()
 	go testFilewalker.Work()
 	t.Cleanup(testFilewalker.Stop)
@@ -59,13 +57,12 @@ func TestFilewalkTable(t *testing.T) {
 	time.Sleep(time.Duration(cfg.WalkInterval * 2))
 
 	// Query table again, and check for our expected file
-	updatedResponse := testFilewalkTable.Call(t.Context(), map[string]string{
-		"action":  "generate",
-		"context": "{}",
-	})
+	updatedResponse := testFilewalkTable.Call(t.Context(), ci.BuildRequestWithSingleEqualConstraint("walk_name", walkName))
 	require.Equal(t, int32(0), updatedResponse.Status.Code, updatedResponse.Status.Message) // 0 means success
 	require.Equal(t, 2, len(updatedResponse.Response))                                      // One file, one directory => 2 total rows
-	require.Equal(t, testRootDir, updatedResponse.Response[0]["path"])                      // We can't always guarantee ordering with filewalk results, but we can for this one
+	require.Equal(t, walkName, updatedResponse.Response[0]["walk_name"])
+	require.Equal(t, walkName, updatedResponse.Response[1]["walk_name"])
+	require.Equal(t, testRootDir, updatedResponse.Response[0]["path"]) // We can't always guarantee ordering with filewalk results, but we can for this one
 	require.Equal(t, expectedFile, updatedResponse.Response[1]["path"])
 	lastWalkTimestamp, err := strconv.Atoi(updatedResponse.Response[0]["last_walk_timestamp"])
 	require.NoError(t, err)

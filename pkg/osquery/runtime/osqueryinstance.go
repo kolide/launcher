@@ -280,10 +280,10 @@ func (i *OsqueryInstance) Exited() <-chan struct{} {
 	return i.errgroup.Exited()
 }
 
-// ReloadCloudConfiguredTablesExtension can be called on a running osquery instance to reload
-// its cloud-configured tables extension manager server, to add new KATC/filewalk tables
-// or update existing KATC/filewalk tables' configurations without restarting the entire instance.
-func (i *OsqueryInstance) ReloadCloudConfiguredTablesExtension(ctx context.Context) error {
+// ReloadKatcExtension can be called on a running osquery instance to reload its KATC extension
+// manager server, to add new KATC tables or update existing KATC tables' configurations
+// without restarting the entire instance.
+func (i *OsqueryInstance) ReloadKatcExtension(ctx context.Context) error {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -292,23 +292,21 @@ func (i *OsqueryInstance) ReloadCloudConfiguredTablesExtension(ctx context.Conte
 	}
 
 	i.emsLock.Lock()
-	if cloudConfiguredTablesServer, ok := i.extensionManagerServers[katcExtensionName]; ok {
-		// Cloud-configured tables extension manager server already exists --
-		// we must stop it so that we can start a new one.
-		// We created the cloud-configured tables extension manager server
-		// by calling StartOsqueryExtensionManagerServer with allowRestart=true
-		// so that we can shut it down here without triggering a full shutdown of the
+	if katcServer, ok := i.extensionManagerServers[katcExtensionName]; ok {
+		// KATC extension manager server already exists -- we must stop it so that we can start a new one.
+		// We created the KATC extension manager server by calling StartOsqueryExtensionManagerServer with
+		// allowRestart=true so that we can shut it down here without triggering a full shutdown of the
 		// errgroup.
-		cloudConfiguredTablesServer.Shutdown(ctx)
+		katcServer.Shutdown(ctx)
 		delete(i.extensionManagerServers, katcExtensionName)
 		i.slogger.Log(ctx, slog.LevelInfo,
-			"shut down cloud-configured tables extension manager server in preparation for reload",
+			"shut down KATC extension manager server in preparation for reload",
 		)
 	}
 	i.emsLock.Unlock()
 
-	if err := i.startCloudConfiguredTablesExtensionManagerServer(ctx, i.extensionManagerClient); err != nil {
-		return fmt.Errorf("starting cloud-configured tables server: %w", err)
+	if err := i.startKatcExtensionManagerServer(ctx, i.extensionManagerClient); err != nil {
+		return fmt.Errorf("starting katc server: %w", err)
 	}
 
 	return nil
@@ -323,27 +321,26 @@ func (i *OsqueryInstance) instanceStarted() bool {
 	return len(i.extensionManagerServers) > 0 && i.extensionManagerClient != nil
 }
 
-// startCloudConfiguredTablesExtensionManagerServer starts a new extension manager server that provides
-// access to the tables provided via control server config -- KATC tables and filewalk tables.
-func (i *OsqueryInstance) startCloudConfiguredTablesExtensionManagerServer(ctx context.Context, client *osquery.ExtensionManagerClient) error {
+// startKatcExtensionManagerServer starts a new extension manager server that provides
+// access to the KATC tables.
+func (i *OsqueryInstance) startKatcExtensionManagerServer(ctx context.Context, client *osquery.ExtensionManagerClient) error {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
-	cloudConfiguredTables := table.KolideCustomAtcTables(i.knapsack, i.enrollmentId, i.knapsack.Slogger().With("component", "katc_tables"))
-	cloudConfiguredTables = append(cloudConfiguredTables, table.KolideFilewalkTables(i.knapsack, i.enrollmentId, i.knapsack.Slogger().With("component", "filewalk_tables"))...)
-	if len(cloudConfiguredTables) == 0 {
+	katcTables := table.KolideCustomAtcTables(i.knapsack, i.enrollmentId, i.knapsack.Slogger().With("component", "katc_tables"))
+	if len(katcTables) == 0 {
 		return nil
 	}
 
 	// We start this server with allowRestart=true so that we can restart it in the future
-	// if the KATC or filewalk configuration changes, without shutting down the entire errgroup.
-	if err := i.StartOsqueryExtensionManagerServer(katcExtensionName, client, cloudConfiguredTables, true); err != nil {
+	// if the KATC configuration changes, without shutting down the entire errgroup.
+	if err := i.StartOsqueryExtensionManagerServer(katcExtensionName, client, katcTables, true); err != nil {
 		i.slogger.Log(ctx, slog.LevelInfo,
-			"unable to create cloud-configured tables extension manager server",
+			"unable to create KATC extension manager server",
 			"err", err,
 		)
-		observability.SetError(span, fmt.Errorf("could not create cloud-configured tables extension server: %w", err))
-		return fmt.Errorf("could not create cloud-configured tables extension server: %w", err)
+		observability.SetError(span, fmt.Errorf("could not create KATC extension server: %w", err))
+		return fmt.Errorf("could not create KATC extension server: %w", err)
 	}
 	return nil
 }
@@ -532,15 +529,15 @@ func (i *OsqueryInstance) Launch() error {
 	}
 	span.AddEvent("extension_server_created")
 
-	// Register the KATC and filewalk tables via a separate extension manager server, so that we can safely
+	// Register the KATC tables via a separate extension manager server, so that we can safely
 	// restart when the configuration changes.
-	if err := i.startCloudConfiguredTablesExtensionManagerServer(ctx, i.extensionManagerClient); err != nil {
+	if err := i.startKatcExtensionManagerServer(ctx, i.extensionManagerClient); err != nil {
 		i.slogger.Log(ctx, slog.LevelInfo,
-			"unable to create extension server for cloud-configured tables, stopping",
+			"unable to create KATC extension server, stopping",
 			"err", err,
 		)
-		observability.SetError(span, fmt.Errorf("could not create cloud-configured tables extension server: %w", err))
-		return fmt.Errorf("could not create cloud-configured tables extension server: %w", err)
+		observability.SetError(span, fmt.Errorf("could not create KATC extension server: %w", err))
+		return fmt.Errorf("could not create KATC extension server: %w", err)
 	}
 
 	// All done with osquery setup! Mark instance as connected, then proceed
