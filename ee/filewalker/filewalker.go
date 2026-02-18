@@ -85,6 +85,10 @@ func (f *filewalker) Delete() {
 			"could not remove stored results for filewalk during delete",
 			"err", err,
 		)
+	} else {
+		f.slogger.Log(context.TODO(), slog.LevelInfo,
+			"removed stored results for filewalk",
+		)
 	}
 	f.Stop()
 }
