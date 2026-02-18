@@ -54,11 +54,11 @@ func (fm *FilewalkManager) Execute() error {
 		fm.filewalkers[filewalkerName] = newFilewalker(filewalkerName, cfg, fm.k.FilewalkResultsStore(), fm.slogger)
 		gowrapper.Go(context.TODO(), fm.slogger, fm.filewalkers[filewalkerName].Work)
 	}
-	fm.filewalkersLock.Unlock()
-
 	fm.slogger.Log(context.TODO(), slog.LevelDebug,
 		"started all filewalkers",
+		"filewalker_count", len(fm.filewalkers),
 	)
+	fm.filewalkersLock.Unlock()
 
 	// Wait for shutdown, then clean up all filewalkers
 	<-fm.interrupt
@@ -142,4 +142,9 @@ func (fm *FilewalkManager) Ping() {
 			delete(fm.filewalkers, filewalkerName)
 		}
 	}
+
+	fm.slogger.Log(context.TODO(), slog.LevelDebug,
+		"completed filewalk config updates",
+		"filewalker_count", len(fm.filewalkers),
+	)
 }
