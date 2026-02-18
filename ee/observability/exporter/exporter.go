@@ -3,7 +3,6 @@ package exporter
 import (
 	"context"
 	"log/slog"
-	"os"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -114,8 +113,6 @@ func NewTelemetryExporter(ctx context.Context, k types.Knapsack, initialTraceBuf
 		k.Slogger().With("component", "telemetry_exporter"),
 	))
 
-	t.addDeviceIdentifyingAttributes()
-
 	// Check if enrollment details are already available, add them immediately if so
 	enrollmentDetails := t.knapsack.GetEnrollmentDetails()
 	if hasRequiredEnrollmentDetails(enrollmentDetails) {
@@ -128,65 +125,6 @@ func NewTelemetryExporter(ctx context.Context, k types.Knapsack, initialTraceBuf
 	}
 
 	return t, nil
-}
-
-// addDeviceIdentifyingAttributes gets device identifiers from the server-provided
-// data and adds them to our resource attributes.
-func (t *TelemetryExporter) addDeviceIdentifyingAttributes() {
-	t.attrLock.Lock()
-	defer t.attrLock.Unlock()
-
-	if deviceId, err := t.knapsack.ServerProvidedDataStore().Get([]byte("device_id")); err != nil {
-		t.slogger.Log(context.TODO(), slog.LevelWarn,
-			"could not get device id for attributes",
-			"err", err,
-		)
-	} else {
-		t.attrs = append(t.attrs, semconv.ServiceInstanceID(string(deviceId)))
-		t.attrs = append(t.attrs, attribute.String("k2.device_id", string(deviceId)))
-	}
-
-	if munemo, err := t.knapsack.ServerProvidedDataStore().Get([]byte("munemo")); err != nil {
-		t.slogger.Log(context.TODO(), slog.LevelWarn,
-			"could not get munemo for attributes",
-			"err", err,
-		)
-	} else {
-		t.attrs = append(t.attrs, attribute.String("k2.munemo", string(munemo)))
-	}
-
-	if orgId, err := t.knapsack.ServerProvidedDataStore().Get([]byte("organization_id")); err != nil {
-		t.slogger.Log(context.TODO(), slog.LevelWarn,
-			"could not get organization id for attributes",
-			"err", err,
-		)
-	} else {
-		t.attrs = append(t.attrs, attribute.String("k2.organization_id", string(orgId)))
-	}
-
-	// Get serial number from enrollment details
-	enrollmentDetails := t.knapsack.GetEnrollmentDetails()
-	if enrollmentDetails.HardwareSerial != "" {
-		t.attrs = append(t.attrs, attribute.String("launcher.serial", enrollmentDetails.HardwareSerial))
-	} else {
-		t.slogger.Log(context.TODO(), slog.LevelWarn,
-			"could not get serial number from enrollment details",
-		)
-	}
-
-	t.attrs = append(t.attrs, attribute.String("launcher.update_channel", t.knapsack.UpdateChannel()))
-
-	// Add some attributes about the currently-running process, too
-	t.attrs = append(t.attrs, attribute.String("launcher.run_id", t.knapsack.GetRunID()))
-	t.attrs = append(t.attrs, semconv.ProcessPID(os.Getpid()))
-	if execPath, err := os.Executable(); err != nil {
-		t.slogger.Log(context.TODO(), slog.LevelWarn,
-			"could not get executable path for attributes",
-			"err", err,
-		)
-	} else {
-		t.attrs = append(t.attrs, semconv.ProcessExecutablePath(execPath))
-	}
 }
 
 // hasRequiredEnrollmentDetails checks if the provided enrollment details contain
@@ -239,7 +177,6 @@ func (t *TelemetryExporter) addAttributesFromEnrollmentDetails(details types.Enr
 		attribute.String("launcher.osquery_version", details.OsqueryVersion),
 		semconv.OSName(details.OSName),
 		semconv.OSVersion(details.OSVersion),
-		semconv.HostName(details.Hostname),
 	)
 
 	t.slogger.Log(context.TODO(), slog.LevelDebug,
@@ -471,8 +408,7 @@ func (t *TelemetryExporter) FlagsChanged(ctx context.Context, flagKeys ...keys.F
 	if slices.Contains(flagKeys, keys.ExportTraces) {
 		if !t.enabled && t.knapsack.ExportTraces() {
 			// Newly enabled
-			// Get any identifying attributes we may not have stored yet
-			t.addDeviceIdentifyingAttributes()
+			// Get any attributes we may not have stored yet
 			t.addAttributesFromOsquery()
 			t.enabled = true
 			needsNewProvider = true
