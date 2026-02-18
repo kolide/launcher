@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/observability"
 )
 
 // filewalker performs filewalks at the configured interval, storing results in its resultsStore.
@@ -85,6 +86,10 @@ func (f *filewalker) Delete() {
 			"could not remove stored results for filewalk during delete",
 			"err", err,
 		)
+	} else {
+		f.slogger.Log(context.TODO(), slog.LevelInfo,
+			"removed stored results for filewalk",
+		)
 	}
 	f.Stop()
 }
@@ -133,6 +138,15 @@ func (f *filewalker) UpdateConfig(newCfg filewalkConfig) {
 			f.fileTypeFilter = overlay.FileTypeFilter
 		}
 	}
+
+	f.slogger.Log(context.TODO(), slog.LevelInfo,
+		"set filewalker config",
+		"walk_interval", f.walkInterval.String(),
+		"root_dirs", f.rootDirs,
+		"file_name_regex", f.fileNameRegex,
+		"file_type_filter", f.fileTypeFilter.String(),
+		"skip_dirs", f.skipDirs,
+	)
 }
 
 func overlayFiltersMatch(overlayFilters map[string]string) bool {
@@ -145,8 +159,13 @@ func overlayFiltersMatch(overlayFilters map[string]string) bool {
 
 // filewalk executes a filewalk with the configured settings, and then stores the results and walk time.
 func (f *filewalker) filewalk(ctx context.Context) {
+	ctx, span := observability.StartSpan(ctx, "filewalk_name", f.name)
+	defer span.End()
+
 	f.walkLock.Lock()
 	defer f.walkLock.Unlock()
+
+	span.AddEvent("walk_lock_acquired")
 
 	fileNames := make([]string, 0)
 
@@ -202,6 +221,8 @@ func (f *filewalker) filewalk(ctx context.Context) {
 		}
 	}
 
+	span.AddEvent("walk_complete")
+
 	resultsRaw, err := json.Marshal(fileNames)
 	if err != nil {
 		f.slogger.Log(ctx, slog.LevelError,
@@ -218,6 +239,8 @@ func (f *filewalker) filewalk(ctx context.Context) {
 		return
 	}
 
+	span.AddEvent("walk_results_stored")
+
 	// Since we've successfully walked and stored the results, store the last walk time
 	lastWalkTimeBuffer := &bytes.Buffer{}
 	if err := binary.Write(lastWalkTimeBuffer, binary.NativeEndian, time.Now().Unix()); err != nil {
@@ -233,6 +256,8 @@ func (f *filewalker) filewalk(ctx context.Context) {
 			"err", err,
 		)
 	}
+
+	span.AddEvent("walk_time_stored")
 
 	f.slogger.Log(ctx, slog.LevelDebug,
 		"completed filewalk",

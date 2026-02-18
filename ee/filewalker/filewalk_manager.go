@@ -54,6 +54,10 @@ func (fm *FilewalkManager) Execute() error {
 		fm.filewalkers[filewalkerName] = newFilewalker(filewalkerName, cfg, fm.k.FilewalkResultsStore(), fm.slogger)
 		gowrapper.Go(context.TODO(), fm.slogger, fm.filewalkers[filewalkerName].Work)
 	}
+	fm.slogger.Log(context.TODO(), slog.LevelDebug,
+		"started all filewalkers",
+		"filewalker_count", len(fm.filewalkers),
+	)
 	fm.filewalkersLock.Unlock()
 
 	// Wait for shutdown, then clean up all filewalkers
@@ -63,6 +67,9 @@ func (fm *FilewalkManager) Execute() error {
 	for _, fw := range fm.filewalkers {
 		fw.Stop()
 	}
+	fm.slogger.Log(context.TODO(), slog.LevelDebug,
+		"shut down all filewalkers",
+	)
 	return nil
 }
 
@@ -99,6 +106,10 @@ func (fm *FilewalkManager) Ping() {
 	fm.filewalkersLock.Lock()
 	defer fm.filewalkersLock.Unlock()
 
+	fm.slogger.Log(context.TODO(), slog.LevelDebug,
+		"processing updated filewalk configs",
+	)
+
 	// Pull the updated config from the store.
 	cfgs, err := fm.pullConfigs()
 	if err != nil {
@@ -123,8 +134,17 @@ func (fm *FilewalkManager) Ping() {
 	// Now, check to see if we need to shut down and delete any filewalkers
 	for filewalkerName, fw := range fm.filewalkers {
 		if _, stillExists := cfgs[filewalkerName]; !stillExists {
+			fm.slogger.Log(context.TODO(), slog.LevelInfo,
+				"deleting filewalker removed from config",
+				"filewalker_name", filewalkerName,
+			)
 			fw.Delete()
 			delete(fm.filewalkers, filewalkerName)
 		}
 	}
+
+	fm.slogger.Log(context.TODO(), slog.LevelDebug,
+		"completed filewalk config updates",
+		"filewalker_count", len(fm.filewalkers),
+	)
 }
