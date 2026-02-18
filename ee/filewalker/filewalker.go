@@ -14,9 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/charlievieth/fastwalk"
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/gowrapper"
 )
 
 // filewalker performs filewalks at the configured interval, storing results in its resultsStore.
@@ -151,19 +149,6 @@ func (f *filewalker) filewalk(ctx context.Context) {
 	defer f.walkLock.Unlock()
 
 	fileNames := make([]string, 0)
-	filenamesChan := make(chan string, 1000)
-	var wg sync.WaitGroup
-	wg.Add(1)
-	gowrapper.Go(ctx, f.slogger, func() {
-		defer wg.Done()
-		for {
-			filename, ok := <-filenamesChan
-			if !ok {
-				return
-			}
-			fileNames = append(fileNames, filename)
-		}
-	})
 
 	for _, rootDir := range f.rootDirs {
 		// rootDir may be a directory, or a glob for a directory.
@@ -177,7 +162,7 @@ func (f *filewalker) filewalk(ctx context.Context) {
 			continue
 		}
 		for _, match := range matches {
-			if err := fastwalk.Walk(&fastwalk.DefaultConfig, match, func(path string, d fs.DirEntry, err error) error {
+			if err := filepath.WalkDir(match, func(path string, d fs.DirEntry, err error) error {
 				if err != nil {
 					f.slogger.Log(ctx, slog.LevelWarn,
 						"error while filewalking",
@@ -190,7 +175,7 @@ func (f *filewalker) filewalk(ctx context.Context) {
 
 				// Check to see if we're in a directory that should be skipped
 				if f.shouldSkip(path) {
-					return fastwalk.SkipDir
+					return fs.SkipDir
 				}
 
 				// If our config restricts file type, check that
@@ -204,7 +189,7 @@ func (f *filewalker) filewalk(ctx context.Context) {
 				}
 
 				// Add this file to our results
-				filenamesChan <- path
+				fileNames = append(fileNames, path)
 				return nil
 			}); err != nil {
 				// Log error, but continue on to process other root dirs
@@ -216,9 +201,6 @@ func (f *filewalker) filewalk(ctx context.Context) {
 			}
 		}
 	}
-
-	close(filenamesChan)
-	wg.Wait()
 
 	resultsRaw, err := json.Marshal(fileNames)
 	if err != nil {
