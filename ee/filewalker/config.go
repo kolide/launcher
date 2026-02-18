@@ -42,6 +42,13 @@ const (
 	fileTypeDir  = "dir"
 )
 
+func (ft *fileTypeFilter) String() string {
+	if ft == nil {
+		return ""
+	}
+	return ft.name
+}
+
 func (ft fileTypeFilter) MarshalJSON() ([]byte, error) {
 	return json.Marshal(ft.name)
 }

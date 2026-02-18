@@ -133,6 +133,15 @@ func (f *filewalker) UpdateConfig(newCfg filewalkConfig) {
 			f.fileTypeFilter = overlay.FileTypeFilter
 		}
 	}
+
+	f.slogger.Log(context.TODO(), slog.LevelInfo,
+		"set filewalker config",
+		"walk_interval", f.walkInterval.String(),
+		"root_dirs", f.rootDirs,
+		"file_name_regex", f.fileNameRegex,
+		"file_type_filter", f.fileTypeFilter.String(),
+		"skip_dirs", f.skipDirs,
+	)
 }
 
 func overlayFiltersMatch(overlayFilters map[string]string) bool {
