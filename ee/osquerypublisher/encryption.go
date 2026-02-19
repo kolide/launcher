@@ -14,6 +14,7 @@ const (
 	// keyDelimiter is used to separate key ID from key material in concatenated strings
 	keyDelimiter                string = ":"
 	currentEncryptedBlobVersion int    = 1
+	hpkeDomain                  string = "AGENT_INGESTER_UPLOAD_ENC_V1"
 )
 
 // KeyData holds a key and it's corresponding identifier.
@@ -74,9 +75,8 @@ func encryptWithHPKE(plaintext []byte, hpkeKey *KeyData, psk *KeyData) (*Encrypt
 		return nil, fmt.Errorf("failed to unmarshal HPKE public key: %w", err)
 	}
 
-	// create sender with recipient's public key.
-	// info parameter is empty for now (can be extended with metadata if needed)
-	sender, err := suite.NewSender(pkR, nil)
+	// create sender with recipient's public key, adding the hpkeDomain string as the information parameter
+	sender, err := suite.NewSender(pkR, []byte(hpkeDomain))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HPKE sender: %w", err)
 	}
@@ -87,7 +87,9 @@ func encryptWithHPKE(plaintext []byte, hpkeKey *KeyData, psk *KeyData) (*Encrypt
 		return nil, fmt.Errorf("failed to setup HPKE PSK encryption: %w", err)
 	}
 
-	// encrypt the plaintext- associated data (aad) is nil for now (can be extended with metadata if needed)
+	// encrypt the plaintext with the associated data (aad). The aad should include any information
+	// that should be cryptographically authenticated but available in plaintext to the receiver.
+	// TODO: add any information that should be accessible by the receiver in plaintext here (probably device id)
 	ciphertext, err := sealer.Seal(plaintext, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encrypt plaintext: %w", err)
