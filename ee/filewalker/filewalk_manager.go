@@ -124,6 +124,8 @@ func (fm *FilewalkManager) Ping() {
 	for filewalkerName, cfg := range cfgs {
 		if fw, alreadyExists := fm.filewalkers[filewalkerName]; alreadyExists {
 			fw.UpdateConfig(cfg)
+			// Kick off a new filewalk in the background, to populate results with the updated config
+			gowrapper.Go(context.TODO(), fm.slogger, func() { fw.Filewalk(context.TODO()) })
 		} else {
 			// Add the new filewalker
 			fm.filewalkers[filewalkerName] = newFilewalker(filewalkerName, cfg, fm.k.FilewalkResultsStore(), fm.slogger)
