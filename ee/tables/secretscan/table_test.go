@@ -173,6 +173,7 @@ func TestSecretScan(t *testing.T) {
 				assert.NotEmpty(t, row["description"], "description should be populated")
 				assert.NotEmpty(t, row["redacted_secret"], "redacted_secret should be populated")
 				assert.NotEqual(t, "0", row["line_number"], "line_number should be > 0")
+				assert.Len(t, row["secret_hash"], 64, "secret_hash should be a 64-char hex SHA-256")
 
 				// For raw_data scans, verify the original input is returned (for SQLite filtering to work)
 				if tt.scanType == "raw_data" {
@@ -199,6 +200,20 @@ func TestSecretScan(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestHashSecret(t *testing.T) {
+	t.Parallel()
+
+	// SHA-256 of "mysecret" is a known value
+	hash1 := hashSecret("mysecret")
+	hash2 := hashSecret("mysecret")
+	hash3 := hashSecret("different")
+
+	assert.Len(t, hash1, 64, "SHA-256 hex should be 64 chars")
+	assert.Equal(t, hash1, hash2, "same input should produce same hash")
+	assert.NotEqual(t, hash1, hash3, "different inputs should produce different hashes")
+	assert.Equal(t, "652c7dc687d98c9889304ed2e408c74b611e86a40caa51c4b43f1dd5913c5cd0", hashSecret("mysecret"))
 }
 
 func TestRedact(t *testing.T) {
