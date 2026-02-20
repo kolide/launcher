@@ -113,16 +113,18 @@ func TestPing(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rawResults, &results))
 	require.Equal(t, 4, len(results)) // 1 directory, 3 files per directory -- 4 total results, 1 for the directory and 3 for the files
 
-	// Prepare an update: update the config for the existing filewalker
+	// Prepare an update: update the config for the existing filewalker with a much longer interval
 	testRegexp := regexp.MustCompile(`.*\.doc`)
-	newCfg := generateCfgWithSeeding(t, 500*time.Millisecond, 2, testRegexp, 3)
+	newCfg := generateCfgWithSeeding(t, 1*time.Minute, 2, testRegexp, 3)
 	newCfgRaw, err := json.Marshal(newCfg)
 	require.NoError(t, err)
 	cfgStore.Set([]byte(firstTestTableName), newCfgRaw)
 
 	// Call Ping
 	filewalkManager.Ping()
-	time.Sleep(time.Duration(3 * cfg.WalkInterval))
+
+	// Sleep less than our new, longer walk interval of one minute
+	time.Sleep(1 * time.Second)
 
 	// Confirm we still have one filewalker
 	filewalkManager.filewalkersLock.Lock()

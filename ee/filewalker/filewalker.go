@@ -65,7 +65,7 @@ func (f *filewalker) Work() {
 	)
 
 	for {
-		f.filewalk(context.TODO())
+		f.Filewalk(context.TODO())
 
 		select {
 		case <-f.interrupt:
@@ -157,8 +157,8 @@ func overlayFiltersMatch(overlayFilters map[string]string) bool {
 	return false
 }
 
-// filewalk executes a filewalk with the configured settings, and then stores the results and walk time.
-func (f *filewalker) filewalk(ctx context.Context) {
+// Filewalk executes a filewalk with the configured settings, and then stores the results and walk time.
+func (f *filewalker) Filewalk(ctx context.Context) {
 	ctx, span := observability.StartSpan(ctx, "filewalk_name", f.name)
 	defer span.End()
 
