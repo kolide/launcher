@@ -2,8 +2,6 @@ package secretscan
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"os"
@@ -23,6 +21,8 @@ import (
 	"github.com/zricethezav/gitleaks/v8/sources"
 )
 
+type contextKey string
+
 const (
 	tableName = "kolide_secret_scan"
 
@@ -31,6 +31,9 @@ const (
 
 	// redactPrefixLength is the number of characters to show before redacting a secret
 	redactPrefixLength = 3
+
+	// key for passing the requested salt through context
+	argon2idSaltKey contextKey = "argon2idSalt"
 )
 
 func newDefaultConfig() (config.Config, error) {
@@ -70,7 +73,8 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		table.IntegerColumn("column_end"),
 		table.TextColumn("entropy"),
 		table.TextColumn("redacted_secret"),
-		table.TextColumn("secret_hash"),
+		table.TextColumn("hash_argon2id"),
+		table.TextColumn("hash_argon2id_salt"),
 	}
 
 	t := &Table{
@@ -94,6 +98,13 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	}
 
 	var results []map[string]string
+
+	// If we have a salt, pass it along
+	ctx = context.WithValue(
+		ctx,
+		argon2idSaltKey,
+		tablehelpers.GetConstraints(queryContext, "hash_argon2id_salt", tablehelpers.WithDefaults(""))[0],
+	)
 
 	requestedPaths := tablehelpers.GetConstraints(queryContext, "path")
 	requestedRawDatas := tablehelpers.GetConstraints(queryContext, "raw_data")
@@ -191,7 +202,7 @@ func (t *Table) scanPath(ctx context.Context, targetPath string) ([]map[string]s
 		return nil, fmt.Errorf("scanning path: %w", err)
 	}
 
-	return t.findingsToRows(findings, findingsPath), nil
+	return t.findingsToRows(ctx, findings, findingsPath), nil
 }
 
 func (t *Table) scanContent(ctx context.Context, content []byte) ([]map[string]string, error) {
@@ -208,42 +219,56 @@ func (t *Table) scanContent(ctx context.Context, content []byte) ([]map[string]s
 		return nil, fmt.Errorf("scanning content: %w", err)
 	}
 
-	return t.findingsToRows(findings, ""), nil
+	return t.findingsToRows(ctx, findings, ""), nil
 }
 
-func (t *Table) findingsToRows(findings []report.Finding, path string) []map[string]string {
+func (t *Table) findingsToRows(ctx context.Context, findings []report.Finding, path string) []map[string]string {
 	results := make([]map[string]string, 0, len(findings))
 
+	var argon2idSalt string
+	var keepHashing bool
+	if salt, isString := ctx.Value(argon2idSaltKey).(string); isString {
+		argon2idSalt = salt
+		keepHashing = true
+	} else {
+		t.slogger.Log(ctx, slog.LevelWarn, "salt from context wasn't a string.")
+		keepHashing = false
+	}
+
 	for _, f := range findings {
+		// Get the hash of this secret. If there's an error, log it, and allow the rest of the data to be returned.
+		// But note that there's an error, since it's probably a salting issue, and we don't need to log a billion times.
+		var argon2idHash string
+		if keepHashing {
+			var err error
+			argon2idHash, err = generateArgon2idHash(f.Match, argon2idSalt)
+			if err != nil {
+				keepHashing = false
+				t.slogger.Log(ctx, slog.LevelWarn, "error hashing", "error", err)
+			}
+		}
+
 		filePath := path
 		if filePath == "" {
 			filePath = f.File
 		}
 		row := map[string]string{
-			"path":            filePath,
-			"raw_data":        "",
-			"rule_id":         f.RuleID,
-			"description":     f.Description,
-			"line_number":     fmt.Sprintf("%d", f.StartLine),
-			"column_start":    fmt.Sprintf("%d", f.StartColumn),
-			"column_end":      fmt.Sprintf("%d", f.EndColumn),
-			"entropy":         fmt.Sprintf("%.2f", f.Entropy),
-			"redacted_secret": redact(f.Match),
-			"secret_hash":     hashSecret(f.Secret, f.Match),
+			"path":               filePath,
+			"raw_data":           "",
+			"rule_id":            f.RuleID,
+			"description":        f.Description,
+			"line_number":        fmt.Sprintf("%d", f.StartLine),
+			"column_start":       fmt.Sprintf("%d", f.StartColumn),
+			"column_end":         fmt.Sprintf("%d", f.EndColumn),
+			"entropy":            fmt.Sprintf("%.2f", f.Entropy),
+			"redacted_secret":    redact(f.Match),
+			"hash_argon2id":      argon2idHash,
+			"hash_argon2id_salt": argon2idSalt,
 		}
 		results = append(results, row)
 	}
 
 	return results
-}
-
-func hashSecret(secret, match string) string {
-	value := secret
-	if value == "" {
-		value = match
-	}
-	sum := sha256.Sum256([]byte(value))
-	return hex.EncodeToString(sum[:])
 }
 
 func redact(secret string) string {
