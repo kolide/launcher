@@ -2,8 +2,6 @@ package secretscan
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"os"
@@ -70,7 +68,6 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		table.IntegerColumn("column_end"),
 		table.TextColumn("entropy"),
 		table.TextColumn("redacted_secret"),
-		table.TextColumn("secret_hash"),
 	}
 
 	t := &Table{
@@ -229,21 +226,11 @@ func (t *Table) findingsToRows(findings []report.Finding, path string) []map[str
 			"column_end":      fmt.Sprintf("%d", f.EndColumn),
 			"entropy":         fmt.Sprintf("%.2f", f.Entropy),
 			"redacted_secret": redact(f.Match),
-			"secret_hash":     hashSecret(f.Secret, f.Match),
 		}
 		results = append(results, row)
 	}
 
 	return results
-}
-
-func hashSecret(secret, match string) string {
-	value := secret
-	if value == "" {
-		value = match
-	}
-	sum := sha256.Sum256([]byte(value))
-	return hex.EncodeToString(sum[:])
 }
 
 func redact(secret string) string {
