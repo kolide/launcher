@@ -8,6 +8,7 @@ import (
 )
 
 func TestGenerateArgon2idHash_Success(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name   string
 		secret string
@@ -55,6 +56,7 @@ func TestGenerateArgon2idHash_Success(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			hash, err := generateArgon2idHash(tt.secret, tt.salt)
 			require.NoError(t, err)
 			require.Equal(t, tt.hash, hash)
@@ -63,6 +65,8 @@ func TestGenerateArgon2idHash_Success(t *testing.T) {
 }
 
 func TestGenerateArgon2idHash_Error(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		secret  string
@@ -97,6 +101,7 @@ func TestGenerateArgon2idHash_Error(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			hash, err := generateArgon2idHash(tt.secret, tt.salt)
 			require.ErrorContains(t, err, tt.wantErr)
 			require.Empty(t, hash, "hash should be empty on error")
