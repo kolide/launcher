@@ -201,6 +201,66 @@ func TestSecretScan(t *testing.T) {
 	}
 }
 
+func TestHashing(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name              string
+		input             string
+		argonSalt         string
+		expectedArgonHash string
+	}{
+		{
+			name:              "have salt1 expect hash",
+			input:             `slack_bot_token: "xoxb-9876543210-9876543210-zyxwvutsrqponmlk"`,
+			argonSalt:         "Hxx5g0dYT4OVzrVc1iskyA==",
+			expectedArgonHash: "XOzUh6NVAPxZqlwuR7ZO",
+		},
+		{
+			name:              "have salt2 expect hash2",
+			input:             `slack_bot_token: "xoxb-9876543210-9876543210-zyxwvutsrqponmlk"`,
+			argonSalt:         "yg9UwWbxYpxawmjNRTl4Cw==",
+			expectedArgonHash: "41Ojh1ZaYDmcotlW6Sf2",
+		},
+		{
+			name:              "no salt no hash",
+			input:             `slack_bot_token: "xoxb-9876543210-9876543210-zyxwvutsrqponmlk"`,
+			argonSalt:         "",
+			expectedArgonHash: "",
+		},
+		{
+			name:              "short salt no hash",
+			input:             `slack_bot_token: "xoxb-9876543210-9876543210-zyxwvutsrqponmlk"`,
+			argonSalt:         "8vWnXlDI6adqBAFMwkmo",
+			expectedArgonHash: "",
+		},
+
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			mockQC := tablehelpers.MockQueryContext(map[string][]string{
+				"raw_data":           {tt.input},
+				"hash_argon2id_salt": {tt.argonSalt},
+			})
+
+			tbl := &Table{
+				slogger: multislogger.NewNopLogger(),
+			}
+
+			results, err := tbl.generate(t.Context(), mockQC)
+			require.NoError(t, err)
+			require.Equal(t, 1, len(results))
+			result := results[0]
+
+			require.Contains(t, result["description"], "Slack Bot token")
+			require.Equal(t, tt.expectedArgonHash, result["hash_argon2id"])
+
+		})
+	}
+}
+
 func TestRedact(t *testing.T) {
 	t.Parallel()
 
