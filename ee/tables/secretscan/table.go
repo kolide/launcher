@@ -225,8 +225,15 @@ func (t *Table) scanContent(ctx context.Context, content []byte) ([]map[string]s
 func (t *Table) findingsToRows(ctx context.Context, findings []report.Finding, path string) []map[string]string {
 	results := make([]map[string]string, 0, len(findings))
 
-	argon2idSalt, saltIsString := ctx.Value(argon2idSaltKey).(string)
-	keepHashing := saltIsString
+	var argon2idSalt string
+	var keepHashing bool
+	if salt, isString := ctx.Value(argon2idSaltKey).(string); isString {
+		argon2idSalt = salt
+		keepHashing = true
+	} else {
+		t.slogger.Log(ctx, slog.LevelWarn, "salt from context wasn't a string.")
+		keepHashing = false
+	}
 
 	for _, f := range findings {
 		// Get the hash of this secret. If there's an error, log it, and allow the rest of the data to be returned.
