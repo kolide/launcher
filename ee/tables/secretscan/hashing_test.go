@@ -18,38 +18,38 @@ func TestGenerateArgon2idHash_Success(t *testing.T) {
 			name:   "secret1, salt1",
 			secret: "my-secret-api-key",
 			salt:   "1QC9NyP0IOpCi99ZRGydWQ==",
-			hash:   "YTI+9SPdgNCnNvSNMnmC",
+			hash:   "sOUjUs9yGqs+SkRuigBXSfmhERJcCGJ3fNnut4t7",
 		},
 		{
 			name:   "secret2, salt1",
 			secret: "some totally different secret",
 			salt:   "1QC9NyP0IOpCi99ZRGydWQ==",
-			hash:   "1e9hrG2HJlmwbfdgn8ud",
+			hash:   "id+jdwdqmfZWwbgwOxJGbTW2+djRRwXlNl2e9zfv",
 		},
 		{
 			name:   "empty secret, salt1",
 			secret: "",
 			salt:   "1QC9NyP0IOpCi99ZRGydWQ==",
-			hash:   "jQMqX6DSoQcOBNMxVkRl",
+			hash:   "LbzSB9Safa9Xw0YGGQFyvlG9zKHj4NCQqmuNpk5t",
 		},
 
 		{
 			name:   "secret1, salt2",
 			secret: "my-secret-api-key",
 			salt:   "iY4GILUmzsaZh2yPVDRcfg==",
-			hash:   "fwhf0he8bPyWt9Jm0mQJ",
+			hash:   "PsvSqF5BqpQ6PqQ6Fgxg2iq2TwYHZdY2Pwn+AelW",
 		},
 		{
 			name:   "secret2, salt2",
 			secret: "some totally different secret",
 			salt:   "iY4GILUmzsaZh2yPVDRcfg==",
-			hash:   "JAuPi57HAnFOrrNniQvx",
+			hash:   "oMXzFhcBZlXGEbkPtHL12mU5MrQZrt1Lgn66M2jh",
 		},
 		{
 			name:   "empty secret, salt2",
 			secret: "",
 			salt:   "iY4GILUmzsaZh2yPVDRcfg==",
-			hash:   "tNivLjqEO9FPHASI70+t",
+			hash:   "0oOa06bKdi+2enIhIPVJ2bi3l4I6phvaxN0+8F5e",
 		},
 	}
 

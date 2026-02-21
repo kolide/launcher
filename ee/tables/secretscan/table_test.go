@@ -214,13 +214,13 @@ func TestHashing(t *testing.T) {
 			name:              "have salt1 expect hash",
 			input:             `slack_bot_token: "xoxb-9876543210-9876543210-zyxwvutsrqponmlk"`,
 			argonSalt:         "Hxx5g0dYT4OVzrVc1iskyA==",
-			expectedArgonHash: "XOzUh6NVAPxZqlwuR7ZO",
+			expectedArgonHash: "AEd4xUJfamVV6TCVK+LkkRBbskEIoILMame6sAVh",
 		},
 		{
 			name:              "have salt2 expect hash2",
 			input:             `slack_bot_token: "xoxb-9876543210-9876543210-zyxwvutsrqponmlk"`,
 			argonSalt:         "yg9UwWbxYpxawmjNRTl4Cw==",
-			expectedArgonHash: "41Ojh1ZaYDmcotlW6Sf2",
+			expectedArgonHash: "bakQ4tXppUqMMDtFgUSLyFNYz9H93IFmo/CufC8n",
 		},
 		{
 			name:              "no salt no hash",
@@ -234,7 +234,6 @@ func TestHashing(t *testing.T) {
 			argonSalt:         "8vWnXlDI6adqBAFMwkmo",
 			expectedArgonHash: "",
 		},
-
 	}
 
 	for _, tt := range tests {

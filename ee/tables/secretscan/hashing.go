@@ -13,15 +13,11 @@ const (
 	argonTimeCost   uint32 = 2         // Number of iterations
 	argonMemoryCost uint32 = 16 * 1024 // Amount of memory in KiB (~32 MB)
 	argonThreads    uint8  = 4         // Number of threads/lanes for parallelism
-	argonKeyLength  uint32 = 32        // Length of the generated hash key in bytes
+	argonKeyLength  uint32 = 30        // Length of the generated hash key in bytes. 30 produces a nice b64
 	argonSaltLength uint32 = 16        // Length of the random salt in bytes
-	// Truncated hash length for deduplication (reduces exposure risk)
-	argonTruncatedLength = 15 // 15 bytes, because it base64s nicely
 )
 
-// generateArgon2idHash takes a secret and generates a truncated argon2id hash.
-// Because it's used to deduplicate secrets server side, we need a consistent hash.
-// To reduce the risk of secret exposure, we truncate the hash.
+// generateArgon2idHash takes a secret and salt, and generates an argon2id hash.
 // salt must be provided, and is expected to be unique per org
 func generateArgon2idHash(secret string, base64Salt string) (hash string, err error) {
 	if len(base64Salt) == 0 {
@@ -38,13 +34,10 @@ func generateArgon2idHash(secret string, base64Salt string) (hash string, err er
 	}
 
 	// Generate the full Argon2id hash
-	fullHash := argon2.IDKey([]byte(secret), saltBytes, argonTimeCost, argonMemoryCost, argonThreads, argonKeyLength)
-
-	// Truncate the hash to reduce exposure risk
-	truncatedHash := fullHash[:argonTruncatedLength]
+	argonHash := argon2.IDKey([]byte(secret), saltBytes, argonTimeCost, argonMemoryCost, argonThreads, argonKeyLength)
 
 	// Encode both to Base64 for storage
-	b64Hash := base64.RawStdEncoding.EncodeToString(truncatedHash)
+	b64Hash := base64.RawStdEncoding.EncodeToString(argonHash)
 
 	return b64Hash, nil
 }
