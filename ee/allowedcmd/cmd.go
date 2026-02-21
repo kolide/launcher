@@ -13,86 +13,97 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sync/atomic"
-
-	"github.com/kolide/launcher/ee/observability"
 )
 
 const cmdGoMaxProcs = 2
 
-type AllowedCommand func(ctx context.Context, arg ...string) (*TracedCmd, error)
+var ErrCommandNotFound = errors.New("command not found")
 
-type TracedCmd struct {
-	Ctx context.Context // nolint:containedctx // This is an approved usage of context for short lived cmd
-	*exec.Cmd
+type AllowedCommand interface {
+	//Cmd returns a exec.CommandContext suitable for subsequent usage
+	Cmd(ctx context.Context, args ...string) (*TracedCmd, error)
+	// Name returns the name of this allowed command
+	Name() string
 }
 
-// Start overrides the Start method to add tracing before executing the command.
-func (t *TracedCmd) Start() error {
-	_, span := observability.StartSpan(t.Ctx, "path", t.Path, "args", fmt.Sprintf("%+v", t.Args))
-	defer span.End()
-
-	return t.Cmd.Start() //nolint:forbidigo // This is our approved usage of t.Cmd.Start()
+// allowedCommand is an internal struct that conforms to the AllowedCommand interface
+type allowedCommand struct {
+	knownPaths []string
+	env        []string
 }
 
-// Run overrides the Run method to add tracing before running the command.
-func (t *TracedCmd) Run() error {
-	_, span := observability.StartSpan(t.Ctx, "path", t.Path, "args", fmt.Sprintf("%+v", t.Args))
-	defer span.End()
-
-	return t.Cmd.Run() //nolint:forbidigo // This is our approved usage of t.Cmd.Run()
+func newAllowedCommand(knownPaths ...string) allowedCommand {
+	return allowedCommand{
+		knownPaths: knownPaths,
+	}
 }
 
-// Output overrides the Output method to add tracing before capturing output.
-func (t *TracedCmd) Output() ([]byte, error) {
-	_, span := observability.StartSpan(t.Ctx, "path", t.Path, "args", fmt.Sprintf("%+v", t.Args))
-	defer span.End()
-
-	return t.Cmd.Output() //nolint:forbidigo // This is our approved usage of t.Cmd.Output()
+func (ac allowedCommand) WithEnv(env string) allowedCommand {
+	ac.env = append(ac.env, env)
+	return ac
 }
 
-// CombinedOutput overrides the CombinedOutput method to add tracing before capturing combined output.
-func (t *TracedCmd) CombinedOutput() ([]byte, error) {
-	_, span := observability.StartSpan(t.Ctx, "path", t.Path, "args", fmt.Sprintf("%+v", t.Args))
-	defer span.End()
+func (ac allowedCommand) Name() string {
+	if len(ac.knownPaths) == 0 {
+		return "~unknown~"
+	}
 
-	return t.Cmd.CombinedOutput() //nolint:forbidigo // This is our approved usage of t.Cmd.CombinedOutput()
+	return filepath.Base(ac.knownPaths[0])
 }
 
-func newCmd(ctx context.Context, fullPathToCmd string, arg ...string) *TracedCmd {
+func (ac allowedCommand) Cmd(ctx context.Context, arg ...string) (*TracedCmd, error) {
+	cmdpath, err := findExecutable(ac.knownPaths)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", ac.Name(), err)
+	}
+
+	return newCmd(ctx, ac.env, cmdpath, arg...), nil
+}
+
+// findExecutable handles the logic of finding an executable. It searches the shared paths,
+// and if allowed, the system path.
+func findExecutable(knownPaths []string) (string, error) {
+	for _, knownPath := range knownPaths {
+		knownPath = filepath.Clean(knownPath)
+
+		if _, err := os.Stat(knownPath); err == nil {
+			return knownPath, nil
+		}
+	}
+
+	// If search the path is disallowed, return an error. We only allow searching on nix,
+	// because paths are indeterminate there.
+	if !allowSearchPath() {
+		return "", fmt.Errorf("not found in expected locations: %w", ErrCommandNotFound)
+	}
+
+	for _, knownPath := range knownPaths {
+		cmdName := filepath.Base(knownPath)
+		if foundPath, err := exec.LookPath(cmdName); err == nil {
+			return foundPath, nil
+		}
+	}
+
+	return "", fmt.Errorf("not found and could not be located elsewhere: %w", ErrCommandNotFound)
+}
+
+func newCmd(ctx context.Context, env []string, fullPathToCmd string, arg ...string) *TracedCmd {
 	cmd := exec.CommandContext(ctx, fullPathToCmd, arg...) //nolint:forbidigo // This is our approved usage of exec.CommandContext
 	cmd.Env = append(cmd.Environ(), fmt.Sprintf("GOMAXPROCS=%d", cmdGoMaxProcs))
+	cmd.Env = append(cmd.Env, env...)
 	return &TracedCmd{
 		Ctx: ctx,
 		Cmd: cmd,
 	}
 }
 
-var ErrCommandNotFound = errors.New("command not found")
-
-func validatedCommand(ctx context.Context, knownPath string, arg ...string) (*TracedCmd, error) {
-	knownPath = filepath.Clean(knownPath)
-
-	if _, err := os.Stat(knownPath); err == nil {
-		return newCmd(ctx, knownPath, arg...), nil
-	}
-
-	// Not found at known location -- return error for darwin and windows.
-	// We expect to know the exact location for allowlisted commands on all
-	// OSes except for a few Linux distros.
-	if !allowSearchPath() {
-		return nil, fmt.Errorf("%w: %s", ErrCommandNotFound, knownPath)
-	}
-
-	cmdName := filepath.Base(knownPath)
-	if foundPath, err := exec.LookPath(cmdName); err == nil {
-		return newCmd(ctx, foundPath, arg...), nil
-	}
-
-	return nil, fmt.Errorf("%w: not found at %s and could not be located elsewhere", ErrCommandNotFound, knownPath)
-}
-
 func allowSearchPath() bool {
+	// We do not currently allow search paths outside linux NIX.
+	if runtime.GOOS != "linux" {
+		return false
+	}
 	return IsNixOS()
 }
 
@@ -116,19 +127,26 @@ func IsNixOS() bool {
 	return isNixOS.Load()
 }
 
-func Launcher(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	// get our currently running path, we will skip autoupdate lookups
+// LauncherCommand is a special struct that conforms to the AllowedCommand interface. It needs it's own implementation because instead of `knownPaths`
+// it uses os.Executable and resolves at call time. This handles the launcher updates.
+type launcherCommand struct{}
+
+func (launcherCommand) Name() string { return "launcher" }
+
+func (launcherCommand) Cmd(ctx context.Context, args ...string) (*TracedCmd, error) {
+	// Try to get our current running path, this skips future path lookups
 	selfPath, err := os.Executable()
 	if err != nil {
 		return nil, fmt.Errorf("getting path to launcher: %w", err)
 	}
 
-	validatedCmd, err := validatedCommand(ctx, selfPath, arg...)
-	if err != nil {
-		return nil, fmt.Errorf("generating validated command for self: %w", err)
+	// FIXME: Should we check that selfPath still exists
+
+	envAdditions := []string{
+		"LAUNCHER_SKIP_UPDATES=TRUE",
 	}
 
-	validatedCmd.Env = append(validatedCmd.Environ(), "LAUNCHER_SKIP_UPDATES=TRUE")
-
-	return validatedCmd, nil
+	return newCmd(ctx, envAdditions, selfPath, args...), nil
 }
+
+var Launcher = launcherCommand{}

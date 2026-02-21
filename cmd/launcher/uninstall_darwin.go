@@ -23,7 +23,7 @@ func removeLauncher(ctx context.Context, identifier string) error {
 
 	launchctlCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	cmd, err := allowedcmd.Launchctl(launchctlCtx, launchCtlArgs...)
+	cmd, err := allowedcmd.Launchctl.Cmd(launchctlCtx, launchCtlArgs...)
 	if err != nil {
 		fmt.Printf("could not find launchctl: %s\n", err)
 		return err
@@ -58,7 +58,7 @@ func removeLauncher(ctx context.Context, identifier string) error {
 
 	pkgutiltCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	pkgUtilcmd, err := allowedcmd.Pkgutil(pkgutiltCtx, "--forget", fmt.Sprintf("com.%s.launcher", identifier))
+	pkgUtilcmd, err := allowedcmd.Pkgutil.Cmd(pkgutiltCtx, "--forget", fmt.Sprintf("com.%s.launcher", identifier))
 	if err != nil {
 		fmt.Printf("could not find pkgutil: %s\n", err)
 		return err

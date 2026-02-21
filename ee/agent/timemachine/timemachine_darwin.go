@@ -90,7 +90,7 @@ func addExclusionsFromPathPatterns(ctx context.Context, k types.Knapsack, exclus
 		return
 	}
 
-	cmd, err := allowedcmd.Tmutil(ctx, append([]string{"addexclusion"}, exclusionPaths...)...)
+	cmd, err := allowedcmd.Tmutil.Cmd(ctx, append([]string{"addexclusion"}, exclusionPaths...)...)
 	if err != nil {
 		k.Slogger().Log(ctx, slog.LevelError,
 			"could not create tmutil command to add launcher machine exclusions",

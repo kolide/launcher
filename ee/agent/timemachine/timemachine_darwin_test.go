@@ -100,7 +100,7 @@ func TestAddExclusions(t *testing.T) {
 
 	// ensure the files are included / excluded as expected
 	for fileName, shouldBeExcluded := range shouldBeExcluded {
-		cmd, err := allowedcmd.Tmutil(t.Context(), "isexcluded", filepath.Join(testDir, fileName))
+		cmd, err := allowedcmd.Tmutil.Cmd(t.Context(), "isexcluded", filepath.Join(testDir, fileName))
 		require.NoError(t, err)
 
 		out, err := cmd.CombinedOutput()

@@ -30,6 +30,7 @@ type wrappedTable struct {
 	genTimeout      time.Duration
 	genTimeoutLock  *sync.Mutex
 	workers         *semaphore.Weighted
+	tableOpts       []table.TableOpt
 }
 
 type tablePluginOption func(*wrappedTable)
@@ -42,6 +43,27 @@ func WithTableGenerateTimeout(genTimeout time.Duration) tablePluginOption {
 	}
 }
 
+// WithDescription sets the informational table description passed to the underlying osquery table plugin.
+func WithDescription(description string) tablePluginOption {
+	return func(w *wrappedTable) {
+		w.tableOpts = append(w.tableOpts, table.WithDescription(description))
+	}
+}
+
+// WithNotes sets the informational table notes passed to the underlying osquery table plugin.
+func WithNotes(notes string) tablePluginOption {
+	return func(w *wrappedTable) {
+		w.tableOpts = append(w.tableOpts, table.WithNotes(notes))
+	}
+}
+
+// WithExample adds an example, which will be passed to the underlying osquery table plugin
+func WithExample(example string) tablePluginOption {
+	return func(w *wrappedTable) {
+		w.tableOpts = append(w.tableOpts, table.WithExample(example))
+	}
+}
+
 type generateResult struct {
 	rows []map[string]string
 	err  error
@@ -51,7 +73,7 @@ type generateResult struct {
 // at which point it will instead return no rows and a timeout error.
 func New(flags types.Flags, slogger *slog.Logger, name string, columns []table.ColumnDefinition, gen table.GenerateFunc, opts ...tablePluginOption) *table.Plugin {
 	wt := newWrappedTable(flags, slogger, name, gen, opts...)
-	return table.NewPlugin(name, columns, wt.generate) //nolint:forbidigo // This is our one allowed usage of table.NewPlugin
+	return table.NewPlugin(name, columns, wt.generate, wt.tableOpts...) //nolint:forbidigo // This is our one allowed usage of table.NewPlugin
 }
 
 // newWrappedTable returns a new `wrappedTable`. We split the constructor out for ease of testing

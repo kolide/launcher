@@ -254,7 +254,7 @@ func gatherServiceManagerEvents(ctx context.Context, z *zip.Writer, kolideSvcNam
 		"ConvertTo-Json",
 	}
 
-	cmd, err := allowedcmd.Powershell(ctx, cmdArgs...)
+	cmd, err := allowedcmd.Powershell.Cmd(ctx, cmdArgs...)
 	if err != nil {
 		return fmt.Errorf("creating powershell command: %w", err)
 	}
@@ -285,7 +285,7 @@ func gatherServiceManagerEventLogs(ctx context.Context, z *zip.Writer, kolideSvc
 		"Format-Table", "-Wrap", "-AutoSize", // ensure output doesn't get truncated
 	}
 
-	getEventLogCmd, err := allowedcmd.Powershell(ctx, cmdletArgs...)
+	getEventLogCmd, err := allowedcmd.Powershell.Cmd(ctx, cmdletArgs...)
 	if err != nil {
 		return fmt.Errorf("creating powershell command: %w", err)
 	}

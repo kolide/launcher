@@ -145,7 +145,7 @@ func callQueryWindowsUpdatesSubcommand(ctx context.Context, locale string, mode 
 		"-table_mode", strconv.Itoa(int(mode)),
 	}
 
-	cmd, err := allowedcmd.Launcher(ctx, args...)
+	cmd, err := allowedcmd.Launcher.Cmd(ctx, args...)
 	if err != nil {
 		err = fmt.Errorf("creating launcher query-windowsupdates cmd: %w", err)
 		observability.SetError(span, err)
