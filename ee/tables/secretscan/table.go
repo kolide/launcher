@@ -94,8 +94,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	var results []map[string]string
 
-	ctx = tablehelpers.SaveQueryContextToContext(ctx, queryContext)
-
+	argon2idSalts := tablehelpers.GetConstraints(queryContext, "hash_argon2id_salt", tablehelpers.WithDefaults(""))
 	requestedPaths := tablehelpers.GetConstraints(queryContext, "path")
 	requestedRawDatas := tablehelpers.GetConstraints(queryContext, "raw_data")
 
@@ -115,7 +114,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		}
 
 		for _, targetPath := range expandedPaths {
-			pathResults, err := t.scanPath(ctx, targetPath)
+			pathResults, err := t.scanPath(ctx, argon2idSalts, targetPath)
 			if err != nil {
 				t.slogger.Log(ctx, slog.LevelWarn,
 					"failed to scan path",
@@ -129,7 +128,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	}
 
 	for _, rawData := range requestedRawDatas {
-		rawResults, err := t.scanContent(ctx, []byte(rawData))
+		rawResults, err := t.scanContent(ctx, argon2idSalts, []byte(rawData))
 		if err != nil {
 			t.slogger.Log(ctx, slog.LevelWarn,
 				"failed to scan content",
@@ -147,7 +146,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	return results, nil
 }
 
-func (t *Table) scanPath(ctx context.Context, targetPath string) ([]map[string]string, error) {
+func (t *Table) scanPath(ctx context.Context, argon2idSalts []string, targetPath string) ([]map[string]string, error) {
 	info, err := os.Stat(targetPath)
 	if err != nil {
 		return nil, fmt.Errorf("stat path: %w", err)
@@ -192,10 +191,10 @@ func (t *Table) scanPath(ctx context.Context, targetPath string) ([]map[string]s
 		return nil, fmt.Errorf("scanning path: %w", err)
 	}
 
-	return t.findingsToRows(ctx, findings, findingsPath), nil
+	return t.findingsToRows(ctx, argon2idSalts, findings, findingsPath), nil
 }
 
-func (t *Table) scanContent(ctx context.Context, content []byte) ([]map[string]string, error) {
+func (t *Table) scanContent(ctx context.Context, argon2idSalts []string, content []byte) ([]map[string]string, error) {
 	// Fresh detector per scan - gitleaks accumulates findings internally
 	detector := detect.NewDetector(*t.defaultConfig)
 
@@ -209,22 +208,18 @@ func (t *Table) scanContent(ctx context.Context, content []byte) ([]map[string]s
 		return nil, fmt.Errorf("scanning content: %w", err)
 	}
 
-	return t.findingsToRows(ctx, findings, ""), nil
+	return t.findingsToRows(ctx, argon2idSalts, findings, ""), nil
 }
 
-func (t *Table) findingsToRows(ctx context.Context, findings []report.Finding, path string) []map[string]string {
+func (t *Table) findingsToRows(ctx context.Context, argon2idSalts []string, findings []report.Finding, path string) []map[string]string {
 	results := make([]map[string]string, 0, len(findings))
 
 	keepHashing := true
-
-	// Grab the salt from the queryContext
-	argon2idSalts, err := tablehelpers.GetConstraintsFromContext(ctx, "hash_argon2id_salt", tablehelpers.WithDefaults(""))
-	if err != nil {
-		t.slogger.Log(ctx, slog.LevelWarn, "error getting salt", "err", err)
-		keepHashing = false
-	}
 	if len(argon2idSalts) != 1 {
-		t.slogger.Log(ctx, slog.LevelWarn, "got %d salts, only support 1", len(argon2idSalts))
+		t.slogger.Log(ctx, slog.LevelWarn,
+			"got unexpected number of salts, only support 1",
+			"count", len(argon2idSalts),
+		)
 		keepHashing = false
 	}
 

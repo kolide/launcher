@@ -2,7 +2,6 @@ package tablehelpers
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"slices"
 	"strings"
@@ -17,11 +16,6 @@ type constraintOptions struct {
 	defaults          []string
 	slogger           *slog.Logger
 }
-
-type contextKey string
-
-// key for passing the queryContext through context.Context
-const queryContextKey contextKey = "argon2idSalt"
 
 type GetConstraintOpts func(*constraintOptions)
 
@@ -51,22 +45,6 @@ func WithAllowedValues(allowed []string) GetConstraintOpts {
 	return func(co *constraintOptions) {
 		co.allowedValues = allowed
 	}
-}
-
-// SaveQueryContextToContext saves table.QueryContext to context.Context to allow simpler passing through
-// a call stack
-func SaveQueryContextToContext(ctx context.Context, queryContext table.QueryContext) context.Context {
-	return context.WithValue(ctx, queryContextKey, queryContext)
-}
-
-// GetConstraintsFromContext extracts table.QueryContext from context.Context, and calls GetConstraints
-func GetConstraintsFromContext(ctx context.Context, columnName string, opts ...GetConstraintOpts) ([]string, error) {
-	queryContext, ok := ctx.Value(queryContextKey).(table.QueryContext)
-	if !ok {
-		return nil, errors.New("queryContext was not of type queryContext")
-	}
-
-	return GetConstraints(queryContext, columnName, opts...), nil
 }
 
 // GetConstraints returns a []string of the constraint expressions on
