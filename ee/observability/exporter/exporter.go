@@ -113,6 +113,8 @@ func NewTelemetryExporter(ctx context.Context, k types.Knapsack, initialTraceBuf
 		k.Slogger().With("component", "telemetry_exporter"),
 	))
 
+	t.addOrgAttributes()
+
 	// Check if enrollment details are already available, add them immediately if so
 	enrollmentDetails := t.knapsack.GetEnrollmentDetails()
 	if hasRequiredEnrollmentDetails(enrollmentDetails) {
@@ -125,6 +127,31 @@ func NewTelemetryExporter(ctx context.Context, k types.Knapsack, initialTraceBuf
 	}
 
 	return t, nil
+}
+
+// addOrgAttributes gets the org identifiers from the server-provided
+// data and adds them to our resource attributes.
+func (t *TelemetryExporter) addOrgAttributes() {
+	t.attrLock.Lock()
+	defer t.attrLock.Unlock()
+
+	if orgId, err := t.knapsack.ServerProvidedDataStore().Get([]byte("organization_id")); err != nil {
+		t.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not get organization id for attributes",
+			"err", err,
+		)
+	} else {
+		t.attrs = append(t.attrs, attribute.String("k2.organization_id", string(orgId)))
+	}
+
+	if munemo, err := t.knapsack.ServerProvidedDataStore().Get([]byte("munemo")); err != nil {
+		t.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not get munemo for attributes",
+			"err", err,
+		)
+	} else {
+		t.attrs = append(t.attrs, attribute.String("k2.munemo", string(munemo)))
+	}
 }
 
 // hasRequiredEnrollmentDetails checks if the provided enrollment details contain
@@ -409,6 +436,7 @@ func (t *TelemetryExporter) FlagsChanged(ctx context.Context, flagKeys ...keys.F
 		if !t.enabled && t.knapsack.ExportTraces() {
 			// Newly enabled
 			// Get any attributes we may not have stored yet
+			t.addOrgAttributes()
 			t.addAttributesFromOsquery()
 			t.enabled = true
 			needsNewProvider = true
