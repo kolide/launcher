@@ -177,6 +177,7 @@ func (lpc *LogPublisherClient) publish(ctx context.Context, slogger *slog.Logger
 		return nil, fmt.Errorf("marshaling unencrypted request payload: %w", err)
 	}
 
+	// TODO: (upcoming PR) data should be compressed here prior to encryption
 	// encrypt the payload
 	encryptedBlob, err := encryptWithHPKE(jsonData, hpkeKey, psk)
 	if err != nil {

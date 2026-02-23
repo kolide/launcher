@@ -89,7 +89,7 @@ func encryptWithHPKE(plaintext []byte, hpkeKey *KeyData, psk *KeyData) (*Encrypt
 
 	// encrypt the plaintext with the associated data (aad). The aad should include any information
 	// that should be cryptographically authenticated but available in plaintext to the receiver.
-	// TODO: add any information that should be accessible by the receiver in plaintext here (probably device id)
+	// TODO: (upcoming PR) add metadata here for k2 (probably device id and encryption suite)
 	ciphertext, err := sealer.Seal(plaintext, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encrypt plaintext: %w", err)

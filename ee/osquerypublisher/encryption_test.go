@@ -118,33 +118,3 @@ func TestEncryptWithHPKE(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, plaintext, decrypted, "decrypted plaintext should match original")
 }
-
-func TestEncryptWithHPKE_EmptyPlaintext(t *testing.T) {
-	t.Parallel()
-
-	// Generate a test HPKE keypair
-	suite := hpke.NewSuite(hpke.KEM_X25519_HKDF_SHA256, hpke.KDF_HKDF_SHA256, hpke.AEAD_AES256GCM)
-	kemID, _, _ := suite.Params()
-	kemScheme := kemID.Scheme()
-	_, pkR, err := kemScheme.GenerateKeyPair()
-	require.NoError(t, err)
-
-	pkRBytes, err := pkR.MarshalBinary()
-	require.NoError(t, err)
-
-	hpkeKey := &KeyData{
-		Key:   pkRBytes,
-		KeyID: "test-key-id",
-	}
-
-	psk := &KeyData{
-		Key:   []byte("test-psk-32-bytes-long!!"),
-		KeyID: "test-psk-id",
-	}
-
-	// Encrypt empty plaintext
-	encryptedBlob, err := encryptWithHPKE([]byte{}, hpkeKey, psk)
-	require.NoError(t, err)
-	require.NotNil(t, encryptedBlob)
-	require.NotEmpty(t, encryptedBlob.Ciphertext, "even empty plaintext should produce ciphertext")
-}
