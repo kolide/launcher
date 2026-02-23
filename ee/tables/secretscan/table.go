@@ -21,8 +21,6 @@ import (
 	"github.com/zricethezav/gitleaks/v8/sources"
 )
 
-type contextKey string
-
 const (
 	tableName = "kolide_secret_scan"
 
@@ -31,9 +29,6 @@ const (
 
 	// redactPrefixLength is the number of characters to show before redacting a secret
 	redactPrefixLength = 3
-
-	// key for passing the requested salt through context
-	argon2idSaltKey contextKey = "argon2idSalt"
 )
 
 func newDefaultConfig() (config.Config, error) {
@@ -99,12 +94,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	var results []map[string]string
 
-	// If we have a salt, pass it along
-	ctx = context.WithValue(
-		ctx,
-		argon2idSaltKey,
-		tablehelpers.GetConstraints(queryContext, "hash_argon2id_salt", tablehelpers.WithDefaults(""))[0],
-	)
+	ctx = tablehelpers.SaveQueryContextToContext(ctx, queryContext)
 
 	requestedPaths := tablehelpers.GetConstraints(queryContext, "path")
 	requestedRawDatas := tablehelpers.GetConstraints(queryContext, "raw_data")
@@ -225,15 +215,20 @@ func (t *Table) scanContent(ctx context.Context, content []byte) ([]map[string]s
 func (t *Table) findingsToRows(ctx context.Context, findings []report.Finding, path string) []map[string]string {
 	results := make([]map[string]string, 0, len(findings))
 
-	var argon2idSalt string
-	var keepHashing bool
-	if salt, isString := ctx.Value(argon2idSaltKey).(string); isString {
-		argon2idSalt = salt
-		keepHashing = true
-	} else {
-		t.slogger.Log(ctx, slog.LevelWarn, "salt from context wasn't a string")
+	keepHashing := true
+
+	// Grab the salt from the queryContext
+	argon2idSalts, err := tablehelpers.GetConstraintsFromContext(ctx, "hash_argon2id_salt", tablehelpers.WithDefaults(""))
+	if err != nil {
+		t.slogger.Log(ctx, slog.LevelWarn, "error getting salt", "err", err)
 		keepHashing = false
 	}
+	if len(argon2idSalts) != 1 {
+		t.slogger.Log(ctx, slog.LevelWarn, "got %d salts, only support 1", len(argon2idSalts))
+		keepHashing = false
+	}
+
+	argon2idSalt := argon2idSalts[0]
 
 	for _, f := range findings {
 		// Get the hash of this secret. If there's an error, log it, and allow the rest of the data to be returned.
