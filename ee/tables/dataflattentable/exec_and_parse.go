@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"text/template"
 
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
@@ -78,7 +79,7 @@ func WithReportMissingBinary() execTableV2Opt {
 }
 
 func NewExecAndParseTable(flags types.Flags, slogger *slog.Logger, tableName string, p parser, cmd allowedcmd.AllowedCommand, execArgs []string, opts ...execTableV2Opt) *table.Plugin {
-	t := &execTableV2{
+	tbl := &execTableV2{
 		slogger:        slogger.With("table", tableName),
 		tableName:      tableName,
 		flattener:      flattenerFromParser(p),
@@ -88,14 +89,55 @@ func NewExecAndParseTable(flags types.Flags, slogger *slog.Logger, tableName str
 	}
 
 	for _, opt := range opts {
-		opt(t)
+		opt(tbl)
 	}
 
-	return tablewrapper.New(flags, slogger, t.tableName, Columns(), t.generate)
+	return tablewrapper.New(
+		flags,
+		slogger,
+		tbl.tableName,
+		Columns(),
+		tbl.generate,
+		tablewrapper.WithDescription(tbl.Description()),
+		tablewrapper.WithNotes(eavNote),
+	)
 }
 
-func (t *execTableV2) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, span := observability.StartSpan(ctx, "table_name", t.tableName)
+const eavNote = "This is an EAV style table. Output is flattened."
+
+// execTableV2DescriptionTmpl uses text/template to interpolate the table name ({{.TableName}}) into the description.
+const templateString = "{{.TableName}} will exec the command `{{.Command}} {{.CommandArgs}}` and return the output."
+
+var execTableV2DescriptionTmpl = template.Must(template.New("execTableV2").Parse(templateString))
+
+// Description returns a string description suitable for inclusion in osquery spec files.
+func (tbl *execTableV2) Description() string {
+	// disclaimed commands are being exec'ed through launcher. So we need to untangle them
+	cmdname := tbl.cmd.Name()
+	cmdargs := tbl.execArgs
+	if cmdname == "launcher" && len(cmdargs) > 0 && cmdargs[0] == "rundisclaimed" {
+		if len(cmdargs) < 2 {
+			cmdname = "~unknown~"
+		} else {
+			cmdname = cmdargs[1]
+			cmdargs = cmdargs[2:]
+		}
+	}
+	templateVars := map[string]string{
+		"TableName":   tbl.tableName,
+		"Command":     cmdname,
+		"CommandArgs": strings.Join(cmdargs, " "),
+	}
+
+	var buf bytes.Buffer
+	if err := execTableV2DescriptionTmpl.Execute(&buf, templateVars); err != nil {
+		return ""
+	}
+	return buf.String()
+}
+
+func (tbl *execTableV2) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := observability.StartSpan(ctx, "table_name", tbl.tableName)
 	defer span.End()
 
 	var results []map[string]string
@@ -103,14 +145,14 @@ func (t *execTableV2) generate(ctx context.Context, queryContext table.QueryCont
 
 	// historically, callers expect that includeStderr implies stdout == stderr, so we do that here.
 	// callers are free to ignore stdErr if not needed in other cases.
-	if t.includeStderr {
+	if tbl.includeStderr {
 		stdErr = stdout
 	}
 
-	if err := tablehelpers.Run(ctx, t.slogger, t.timeoutSeconds, t.cmd, t.execArgs, &stdout, &stdErr); err != nil {
+	if err := tablehelpers.Run(ctx, tbl.slogger, tbl.timeoutSeconds, tbl.cmd, tbl.execArgs, &stdout, &stdErr); err != nil {
 		// exec will error if there's no binary, don't record that unless configured to do so
 		if os.IsNotExist(errors.Cause(err)) || errors.Is(err, allowedcmd.ErrCommandNotFound) {
-			if t.reportMissingBinary {
+			if tbl.reportMissingBinary {
 				return append(results, ToMap([]dataflatten.Row{
 					{
 						Path:  []string{"error"},
@@ -123,13 +165,13 @@ func (t *execTableV2) generate(ctx context.Context, queryContext table.QueryCont
 		}
 
 		observability.SetError(span, err)
-		t.slogger.Log(ctx, slog.LevelInfo,
+		tbl.slogger.Log(ctx, slog.LevelInfo,
 			"exec failed",
 			"err", err,
 		)
 
 		// Run failed, but we may have stderr to report with results anyway
-		if t.reportStderr && stdErr.Len() > 0 {
+		if tbl.reportStderr && stdErr.Len() > 0 {
 			return append(results, ToMap([]dataflatten.Row{
 				{
 					Path:  []string{"error"},
@@ -143,16 +185,16 @@ func (t *execTableV2) generate(ctx context.Context, queryContext table.QueryCont
 
 	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 		flattenOpts := []dataflatten.FlattenOpts{
-			dataflatten.WithSlogger(t.slogger),
+			dataflatten.WithSlogger(tbl.slogger),
 			dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 		}
-		if t.tabledebug {
+		if tbl.tabledebug {
 			flattenOpts = append(flattenOpts, dataflatten.WithDebugLogging())
 		}
 
-		flattened, err := t.flattener.FlattenBytes(stdout.Bytes(), flattenOpts...)
+		flattened, err := tbl.flattener.FlattenBytes(stdout.Bytes(), flattenOpts...)
 		if err != nil {
-			t.slogger.Log(ctx, slog.LevelInfo,
+			tbl.slogger.Log(ctx, slog.LevelInfo,
 				"failure flattening output",
 				"err", err,
 			)
@@ -165,7 +207,7 @@ func (t *execTableV2) generate(ctx context.Context, queryContext table.QueryCont
 
 	// we could have made it through tablehelpers.Run above but still have seen error messaging
 	// to stderr- ensure we include that here if configured to do so
-	if t.reportStderr && stdErr.Len() > 0 {
+	if tbl.reportStderr && stdErr.Len() > 0 {
 		results = append(results, ToMap([]dataflatten.Row{
 			{
 				Path:  []string{"error"},

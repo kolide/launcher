@@ -74,7 +74,7 @@ func (c *launchdCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 	}
 
 	// Run launchctl to check status
-	cmd, err := allowedcmd.Launchctl(ctx, "print", launchdServiceName)
+	cmd, err := allowedcmd.Launchctl.Cmd(ctx, "print", launchdServiceName)
 	if err != nil {
 		c.status = Erroring
 		c.summary = fmt.Sprintf("unable to create launchctl command: %s", err)

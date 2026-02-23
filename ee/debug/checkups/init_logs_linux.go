@@ -11,7 +11,7 @@ import (
 )
 
 func writeInitLogs(ctx context.Context, logZip *zip.Writer) error {
-	cmd, err := allowedcmd.Journalctl(ctx, "-u", "launcher.kolide-k2.service")
+	cmd, err := allowedcmd.Journalctl.Cmd(ctx, "-u", "launcher.kolide-k2.service")
 	if err != nil {
 		return fmt.Errorf("creating journalctl command: %w", err)
 	}

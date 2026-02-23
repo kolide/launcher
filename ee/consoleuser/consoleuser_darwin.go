@@ -90,7 +90,7 @@ const (
 )
 
 func CurrentUids(ctx context.Context) ([]string, error) {
-	cmd, err := allowedcmd.Scutil(ctx)
+	cmd, err := allowedcmd.Scutil.Cmd(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("creating scutil command: %w", err)
 	}

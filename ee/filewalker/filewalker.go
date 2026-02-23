@@ -14,9 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/charlievieth/fastwalk"
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/gowrapper"
+	"github.com/kolide/launcher/ee/observability"
 )
 
 // filewalker performs filewalks at the configured interval, storing results in its resultsStore.
@@ -60,8 +59,13 @@ func (f *filewalker) Work() {
 	f.ticker = time.NewTicker(f.walkInterval)
 	defer f.ticker.Stop()
 
+	f.slogger.Log(context.TODO(), slog.LevelDebug,
+		"starting up",
+		"walk_interval", f.walkInterval.String(),
+	)
+
 	for {
-		f.filewalk(context.TODO())
+		f.Filewalk(context.TODO())
 
 		select {
 		case <-f.interrupt:
@@ -81,6 +85,10 @@ func (f *filewalker) Delete() {
 		f.slogger.Log(context.TODO(), slog.LevelWarn,
 			"could not remove stored results for filewalk during delete",
 			"err", err,
+		)
+	} else {
+		f.slogger.Log(context.TODO(), slog.LevelInfo,
+			"removed stored results for filewalk",
 		)
 	}
 	f.Stop()
@@ -130,6 +138,15 @@ func (f *filewalker) UpdateConfig(newCfg filewalkConfig) {
 			f.fileTypeFilter = overlay.FileTypeFilter
 		}
 	}
+
+	f.slogger.Log(context.TODO(), slog.LevelInfo,
+		"set filewalker config",
+		"walk_interval", f.walkInterval.String(),
+		"root_dirs", f.rootDirs,
+		"file_name_regex", f.fileNameRegex,
+		"file_type_filter", f.fileTypeFilter.String(),
+		"skip_dirs", f.skipDirs,
+	)
 }
 
 func overlayFiltersMatch(overlayFilters map[string]string) bool {
@@ -140,25 +157,17 @@ func overlayFiltersMatch(overlayFilters map[string]string) bool {
 	return false
 }
 
-// filewalk executes a filewalk with the configured settings, and then stores the results and walk time.
-func (f *filewalker) filewalk(ctx context.Context) {
+// Filewalk executes a filewalk with the configured settings, and then stores the results and walk time.
+func (f *filewalker) Filewalk(ctx context.Context) {
+	ctx, span := observability.StartSpan(ctx, "filewalk_name", f.name)
+	defer span.End()
+
 	f.walkLock.Lock()
 	defer f.walkLock.Unlock()
 
+	span.AddEvent("walk_lock_acquired")
+
 	fileNames := make([]string, 0)
-	filenamesChan := make(chan string, 1000)
-	var wg sync.WaitGroup
-	wg.Add(1)
-	gowrapper.Go(ctx, f.slogger, func() {
-		defer wg.Done()
-		for {
-			filename, ok := <-filenamesChan
-			if !ok {
-				return
-			}
-			fileNames = append(fileNames, filename)
-		}
-	})
 
 	for _, rootDir := range f.rootDirs {
 		// rootDir may be a directory, or a glob for a directory.
@@ -172,7 +181,7 @@ func (f *filewalker) filewalk(ctx context.Context) {
 			continue
 		}
 		for _, match := range matches {
-			if err := fastwalk.Walk(&fastwalk.DefaultConfig, match, func(path string, d fs.DirEntry, err error) error {
+			if err := filepath.WalkDir(match, func(path string, d fs.DirEntry, err error) error {
 				if err != nil {
 					f.slogger.Log(ctx, slog.LevelWarn,
 						"error while filewalking",
@@ -185,7 +194,7 @@ func (f *filewalker) filewalk(ctx context.Context) {
 
 				// Check to see if we're in a directory that should be skipped
 				if f.shouldSkip(path) {
-					return fastwalk.SkipDir
+					return fs.SkipDir
 				}
 
 				// If our config restricts file type, check that
@@ -199,7 +208,7 @@ func (f *filewalker) filewalk(ctx context.Context) {
 				}
 
 				// Add this file to our results
-				filenamesChan <- path
+				fileNames = append(fileNames, path)
 				return nil
 			}); err != nil {
 				// Log error, but continue on to process other root dirs
@@ -212,8 +221,7 @@ func (f *filewalker) filewalk(ctx context.Context) {
 		}
 	}
 
-	close(filenamesChan)
-	wg.Wait()
+	span.AddEvent("walk_complete")
 
 	resultsRaw, err := json.Marshal(fileNames)
 	if err != nil {
@@ -231,6 +239,8 @@ func (f *filewalker) filewalk(ctx context.Context) {
 		return
 	}
 
+	span.AddEvent("walk_results_stored")
+
 	// Since we've successfully walked and stored the results, store the last walk time
 	lastWalkTimeBuffer := &bytes.Buffer{}
 	if err := binary.Write(lastWalkTimeBuffer, binary.NativeEndian, time.Now().Unix()); err != nil {
@@ -246,6 +256,12 @@ func (f *filewalker) filewalk(ctx context.Context) {
 			"err", err,
 		)
 	}
+
+	span.AddEvent("walk_time_stored")
+
+	f.slogger.Log(ctx, slog.LevelDebug,
+		"completed filewalk",
+	)
 }
 
 // LastWalkTimeKey gives the key to query the results store to retrieve the last walk time for the given filewalker.

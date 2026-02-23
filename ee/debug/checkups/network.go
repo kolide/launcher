@@ -62,7 +62,7 @@ func runCommand(ctx context.Context, c networkCommand, commandOutput io.Writer) 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	cmd, err := c.cmd(ctx, c.args...)
+	cmd, err := c.cmd.Cmd(ctx, c.args...)
 	if err != nil {
 		return
 	}

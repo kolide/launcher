@@ -185,6 +185,6 @@ func BenchmarkFilewalk(b *testing.B) {
 
 	b.ReportAllocs()
 	for b.Loop() {
-		testFilewalker.filewalk(b.Context())
+		testFilewalker.Filewalk(b.Context())
 	}
 }

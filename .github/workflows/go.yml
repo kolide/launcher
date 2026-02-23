@@ -317,7 +317,7 @@ jobs:
 
     - name: Get run ID for last launcher table performance test on main
       id: main-run-id
-      if: github.ref != 'refs/heads/main'
+      if: github.ref != 'refs/heads/main' && github.ref_type != 'tag'
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
@@ -326,7 +326,7 @@ jobs:
 
     - name: Download benchmark from main
       id: download-benchmark
-      if: github.ref != 'refs/heads/main'
+      if: github.ref != 'refs/heads/main' && github.ref_type != 'tag'
       uses: actions/download-artifact@v4
       continue-on-error: true
       with:
@@ -336,11 +336,11 @@ jobs:
         path: main
 
     - name: Install benchstat
-      if: github.ref != 'refs/heads/main' && steps.download-benchmark.outcome == 'success'
+      if: github.ref != 'refs/heads/main' && github.ref_type != 'tag' && steps.download-benchmark.outcome == 'success'
       run: go install golang.org/x/perf/cmd/benchstat@latest
 
     - name: Compare performance against main
-      if: github.ref != 'refs/heads/main' && steps.download-benchmark.outcome == 'success'
+      if: github.ref != 'refs/heads/main' && github.ref_type != 'tag' && steps.download-benchmark.outcome == 'success'
       shell: bash
       run: |
         benchstat main/benchmark.txt ./benchmark.txt > benchstat.txt
@@ -363,7 +363,7 @@ jobs:
         fi
 
     - name: Skip benchmark comparison (no baseline)
-      if: github.ref != 'refs/heads/main' && steps.download-benchmark.outcome != 'success'
+      if: github.ref != 'refs/heads/main' && github.ref_type != 'tag' && steps.download-benchmark.outcome != 'success'
       shell: bash
       run: |
         echo "::notice::Skipping benchmark comparison - no baseline found on main branch. This is expected for new benchmarks."
