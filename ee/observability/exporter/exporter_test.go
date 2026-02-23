@@ -35,6 +35,11 @@ func TestNewTelemetryExporter(t *testing.T) { //nolint:paralleltest
 	mockKnapsack.On("TokenStore").Return(tokenStore)
 	tokenStore.Set(storage.ObservabilityIngestAuthTokenKey, []byte("test token"))
 
+	serverProvidedDataStore := testServerProvidedDataStore(t)
+	mockKnapsack.On("ServerProvidedDataStore").Return(serverProvidedDataStore)
+	serverProvidedDataStore.Set([]byte("munemo"), []byte("nababe"))
+	serverProvidedDataStore.Set([]byte("organization_id"), []byte("101"))
+
 	mockKnapsack.On("TraceIngestServerURL").Return("localhost:3417")
 	mockKnapsack.On("DisableTraceIngestTLS").Return(false)
 	mockKnapsack.On("ExportTraces").Return(true)
@@ -58,10 +63,10 @@ func TestNewTelemetryExporter(t *testing.T) { //nolint:paralleltest
 	// Wait a few seconds to allow the osquery queries to go through
 	time.Sleep(500 * time.Millisecond)
 
-	// We expect a total of 7 attributes: 4 initial attributes and 3 from osquery
+	// We expect a total of 9 attributes: 4 initial attributes, 2 org attributes, and 3 from osquery
 	telemetryExporter.attrLock.RLock()
 	defer telemetryExporter.attrLock.RUnlock()
-	require.Equal(t, 7, len(telemetryExporter.attrs))
+	require.Equal(t, 9, len(telemetryExporter.attrs))
 
 	// Confirm we set a provider
 	telemetryExporter.providerLock.Lock()
@@ -166,6 +171,52 @@ func TestInterrupt_Multiple(t *testing.T) { //nolint:paralleltest
 	}
 
 	require.Equal(t, expectedInterrupts, receivedInterrupts)
+}
+
+func Test_addOrgAttributes(t *testing.T) {
+	t.Parallel()
+
+	s := testServerProvidedDataStore(t)
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("ServerProvidedDataStore").Return(s)
+
+	// Set expected data
+	expectedMunemo := "nababe"
+	s.Set([]byte("munemo"), []byte(expectedMunemo))
+
+	expectedOrganizationId := "100"
+	s.Set([]byte("organization_id"), []byte(expectedOrganizationId))
+
+	traceExporter := &TelemetryExporter{
+		knapsack:                  mockKnapsack,
+		slogger:                   multislogger.NewNopLogger(),
+		attrs:                     make([]attribute.KeyValue, 0),
+		attrLock:                  sync.RWMutex{},
+		ingestClientAuthenticator: newClientAuthenticator("test token", false),
+		ingestAuthToken:           "test token",
+		ingestUrl:                 "localhost:4317",
+		disableIngestTLS:          false,
+		enabled:                   true,
+		traceSamplingRate:         1.0,
+		gomaxprocsAttrValue:       &atomic.Int64{},
+	}
+
+	traceExporter.addOrgAttributes()
+
+	// Confirm all expected attributes were added
+	require.Equal(t, 2, len(traceExporter.attrs))
+	for _, actualAttr := range traceExporter.attrs {
+		switch actualAttr.Key {
+		case "k2.munemo":
+			require.Equal(t, expectedMunemo, actualAttr.Value.AsString())
+		case "k2.organization_id":
+			require.Equal(t, expectedOrganizationId, actualAttr.Value.AsString())
+		default:
+			t.Fatalf("unexpected attr %s", actualAttr.Key)
+		}
+	}
+
+	mockKnapsack.AssertExpectations(t)
 }
 
 func Test_addAttributesFromOsquery(t *testing.T) {
@@ -296,6 +347,7 @@ func TestFlagsChanged_ExportTraces(t *testing.T) { //nolint:paralleltest
 
 	for _, tt := range tests { //nolint:paralleltest
 		t.Run(tt.testName, func(t *testing.T) {
+			s := testServerProvidedDataStore(t)
 			mockKnapsack := typesmocks.NewKnapsack(t)
 			mockKnapsack.On("ExportTraces").Return(tt.newEnableValue)
 			mockKnapsack.On("UpdateChannel").Return("nightly").Maybe()
@@ -306,6 +358,7 @@ func TestFlagsChanged_ExportTraces(t *testing.T) { //nolint:paralleltest
 			}
 
 			if tt.shouldReplaceProvider {
+				mockKnapsack.On("ServerProvidedDataStore").Return(s)
 				mockKnapsack.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{
 					OsqueryVersion: "5.8.0",
 					OSName:         "Windows",
@@ -723,6 +776,12 @@ func TestFlagsChanged_LauncherGoMaxProcs(t *testing.T) { //nolint:paralleltest
 			}
 		})
 	}
+}
+
+func testServerProvidedDataStore(t *testing.T) types.KVStore {
+	s, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ServerProvidedDataStore.String())
+	require.NoError(t, err)
+	return s
 }
 
 func testTokenStore(t *testing.T) types.KVStore {
