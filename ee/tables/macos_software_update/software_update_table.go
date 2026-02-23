@@ -31,7 +31,6 @@ func MacOSUpdate(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		table.IntegerColumn("autoupdate_enabled"),
 		table.IntegerColumn("download_managed"),
 		table.IntegerColumn("download"),
-		table.IntegerColumn("app_updates"),
 		table.IntegerColumn("os_updates_managed"),
 		table.IntegerColumn("os_updates"),
 		table.IntegerColumn("config_data_critical_updates_managed"),
@@ -64,7 +63,6 @@ func (table *osUpdateTable) generateMacUpdate(ctx context.Context, queryContext 
 		isAutomaticallyCheckForUpdatesEnabled             = C.int(0)
 		isdoBackgroundDownloadManaged                     = C.int(0)
 		doesBackgroundDownload                            = C.int(0)
-		doesAppStoreAutoUpdates                           = C.int(0)
 		doesOSXAutoUpdatesManaged                         = C.int(0)
 		doesOSXAutoUpdates                                = C.int(0)
 		isAutomaticConfigDataCriticalUpdateInstallManaged = C.int(0)
@@ -78,7 +76,6 @@ func (table *osUpdateTable) generateMacUpdate(ctx context.Context, queryContext 
 		&isAutomaticallyCheckForUpdatesEnabled,
 		&isdoBackgroundDownloadManaged,
 		&doesBackgroundDownload,
-		&doesAppStoreAutoUpdates,
 		&doesOSXAutoUpdatesManaged,
 		&doesOSXAutoUpdates,
 		&isAutomaticConfigDataCriticalUpdateInstallManaged,
@@ -93,7 +90,6 @@ func (table *osUpdateTable) generateMacUpdate(ctx context.Context, queryContext 
 			"autoupdate_enabled":                   fmt.Sprintf("%d", isAutomaticallyCheckForUpdatesEnabled),
 			"download_managed":                     fmt.Sprintf("%d", isdoBackgroundDownloadManaged),
 			"download":                             fmt.Sprintf("%d", doesBackgroundDownload),
-			"app_updates":                          fmt.Sprintf("%d", doesAppStoreAutoUpdates),
 			"os_updates_managed":                   fmt.Sprintf("%d", doesOSXAutoUpdatesManaged),
 			"os_updates":                           fmt.Sprintf("%d", doesOSXAutoUpdates),
 			"config_data_critical_updates_managed": fmt.Sprintf("%d", isAutomaticConfigDataCriticalUpdateInstallManaged),
