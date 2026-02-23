@@ -215,15 +215,16 @@ func (t *Table) findingsToRows(ctx context.Context, argon2idSalts []string, find
 	results := make([]map[string]string, 0, len(findings))
 
 	keepHashing := true
-	if len(argon2idSalts) != 1 {
+	argon2idSalt := ""
+	if len(argon2idSalts) == 1 {
+		argon2idSalt = argon2idSalts[0]
+	} else {
 		t.slogger.Log(ctx, slog.LevelWarn,
 			"got unexpected number of salts, only support 1",
 			"count", len(argon2idSalts),
 		)
 		keepHashing = false
 	}
-
-	argon2idSalt := argon2idSalts[0]
 
 	for _, f := range findings {
 		// Get the hash of this secret. If there's an error, log it, and allow the rest of the data to be returned.
