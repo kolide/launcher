@@ -231,7 +231,7 @@ func (t *Table) findingsToRows(ctx context.Context, findings []report.Finding, p
 		argon2idSalt = salt
 		keepHashing = true
 	} else {
-		t.slogger.Log(ctx, slog.LevelWarn, "salt from context wasn't a string.")
+		t.slogger.Log(ctx, slog.LevelWarn, "salt from context wasn't a string")
 		keepHashing = false
 	}
 
@@ -244,7 +244,7 @@ func (t *Table) findingsToRows(ctx context.Context, findings []report.Finding, p
 			argon2idHash, err = generateArgon2idHash(f.Match, argon2idSalt)
 			if err != nil {
 				keepHashing = false
-				t.slogger.Log(ctx, slog.LevelWarn, "error hashing", "error", err)
+				t.slogger.Log(ctx, slog.LevelWarn, "error hashing", "err", err)
 			}
 		}
 
