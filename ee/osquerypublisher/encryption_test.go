@@ -108,7 +108,7 @@ func TestEncryptWithHPKE(t *testing.T) {
 	ciphertextBytes, err := base64.StdEncoding.DecodeString(encryptedBlob.Ciphertext)
 	require.NoError(t, err, "ciphertext should be valid base64")
 
-	receiver, err := suite.NewReceiver(skR, nil)
+	receiver, err := suite.NewReceiver(skR, []byte(hpkeDomain))
 	require.NoError(t, err)
 
 	opener, err := receiver.SetupPSK(encapsulatedKeyBytes, psk.Key, []byte(psk.KeyID))
