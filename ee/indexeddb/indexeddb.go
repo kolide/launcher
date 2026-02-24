@@ -11,8 +11,10 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/kolide/goleveldb/leveldb"
+	leveldbcomparer "github.com/kolide/goleveldb/leveldb/comparer"
 	leveldberrors "github.com/kolide/goleveldb/leveldb/errors"
 	"github.com/kolide/goleveldb/leveldb/opt"
 	"github.com/kolide/launcher/ee/agent"
@@ -193,6 +195,18 @@ func OpenLeveldb(ctx context.Context, slogger *slog.Logger, dbLocation string) (
 	}
 	db, dbOpenErr := leveldb.OpenFile(dbLocation, opts)
 	if dbOpenErr != nil {
+		// TODO we should update goleveldb to return a specific, checkable error type for this case so we don't have to do this gross string check
+		// error looks like- leveldb: manifest corrupted (field 'comparer'): mismatch: want 'idb_cmp1', got 'leveldb.BytewiseComparator'
+		if strings.Contains(dbOpenErr.Error(), "mismatch: want 'idb_cmp1', got 'leveldb.BytewiseComparator'") {
+			// try again with the default comparer
+			opts.Comparer = leveldbcomparer.DefaultComparer
+			db, dbOpenErr = leveldb.OpenFile(dbLocation, opts)
+			// if this fixed the issue, return the db. otherwise continue on to try recovery,
+			// we know that we're better off in this scenario with the bytewise comparator anyway
+			if dbOpenErr == nil {
+				return db, nil
+			}
+		}
 		// ensure we log this error so we can investigate. we don't think we're seeing any non-idb_cmp1
 		// leveldbs, but when that is the case we still get a valid db returned, and then no errors from
 		// the RecoverFile call, so it is possible that this is a valid corruption error which recovery wouldn't have actually fixed.
