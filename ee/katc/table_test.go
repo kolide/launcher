@@ -521,7 +521,7 @@ func TestQueryLevelDB(t *testing.T) {
 // TestQueryBytewiseLevelDB uses the embedded bytewise.leveldb.zip (created with the default
 // bytewise comparator, not idb_cmp1). Opening it exercises the fallback in indexeddb.OpenLeveldb
 // that retries with leveldbcomparer.DefaultComparer when the manifest reports leveldb.BytewiseComparator.
-// unfortunately there does not appear to be a good way to verify they actual comparer used from the db returned
+// unfortunately there does not appear to be a good way to verify the actual comparer used from the db returned
 // by OpenLeveldb, and we don't yet understand what causes keys to be found by bytewiseComparator but not idb_cmp1,
 // so I've verified this behavior manually via debugging this test, we should update the test fixture if we can get
 // a known problematic set of keys that are found by bytewiseComparator but not idb_cmp1.
