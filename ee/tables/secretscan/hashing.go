@@ -37,9 +37,8 @@ func generateArgon2idHash(secret string, base64Salt string) (hash string, err er
 	// Generate the full Argon2id hash
 	argonHash := argon2.IDKey([]byte(secret), saltBytes, argonTimeCost, argonMemoryCost, argonThreads, argonKeyLength)
 
-	// Encode both to Base64 for storage
-	//b64Hash := base64.RawStdEncoding.EncodeToString(argonHash)
-	b64Hash := hex.EncodeToString(argonHash)
+	// Encode to string
+	encodedHash := hex.EncodeToString(argonHash)
 
-	return b64Hash, nil
+	return encodedHash, nil
 }
