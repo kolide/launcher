@@ -26,9 +26,6 @@ const (
 
 	// directoryScanConcurrency is the number of concurrent file scans when scanning a directory
 	directoryScanConcurrency = 4
-
-	// redactPrefixLength is the number of characters to show before redacting a secret
-	redactPrefixLength = 3
 )
 
 func newDefaultConfig() (config.Config, error) {
@@ -67,7 +64,6 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		table.IntegerColumn("column_start"),
 		table.IntegerColumn("column_end"),
 		table.TextColumn("entropy"),
-		table.TextColumn("redacted_secret"),
 		table.TextColumn("hash_argon2id"),
 		table.TextColumn("hash_argon2id_salt"),
 	}
@@ -252,7 +248,6 @@ func (t *Table) findingsToRows(ctx context.Context, argon2idSalts []string, find
 			"column_start":       fmt.Sprintf("%d", f.StartColumn),
 			"column_end":         fmt.Sprintf("%d", f.EndColumn),
 			"entropy":            fmt.Sprintf("%.2f", f.Entropy),
-			"redacted_secret":    redact(f.Match),
 			"hash_argon2id":      argon2idHash,
 			"hash_argon2id_salt": argon2idSalt,
 		}
@@ -260,12 +255,4 @@ func (t *Table) findingsToRows(ctx context.Context, argon2idSalts []string, find
 	}
 
 	return results
-}
-
-func redact(secret string) string {
-	// Only show prefix if secret is long enough that we're not revealing too much
-	if len(secret) <= redactPrefixLength*2 {
-		return "***"
-	}
-	return secret[:redactPrefixLength] + "..."
 }
