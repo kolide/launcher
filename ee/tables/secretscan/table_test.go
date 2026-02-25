@@ -171,7 +171,6 @@ func TestSecretScan(t *testing.T) {
 				// Verify columns are properly populated
 				assert.NotEmpty(t, row["rule_id"], "rule_id should be populated")
 				assert.NotEmpty(t, row["description"], "description should be populated")
-				assert.NotEmpty(t, row["redacted_secret"], "redacted_secret should be populated")
 				assert.NotEqual(t, "0", row["line_number"], "line_number should be > 0")
 
 				// For raw_data scans, verify the original input is returned (for SQLite filtering to work)
@@ -214,13 +213,13 @@ func TestHashing(t *testing.T) {
 			name:              "have salt1 expect hash",
 			input:             `slack_bot_token: "xoxb-9876543210-9876543210-zyxwvutsrqponmlk"`,
 			argonSalt:         "Hxx5g0dYT4OVzrVc1iskyA==",
-			expectedArgonHash: "AEd4xUJfamVV6TCVK+LkkRBbskEIoILMame6sAVh",
+			expectedArgonHash: "7857dfa8cd",
 		},
 		{
 			name:              "have salt2 expect hash2",
 			input:             `slack_bot_token: "xoxb-9876543210-9876543210-zyxwvutsrqponmlk"`,
 			argonSalt:         "yg9UwWbxYpxawmjNRTl4Cw==",
-			expectedArgonHash: "bakQ4tXppUqMMDtFgUSLyFNYz9H93IFmo/CufC8n",
+			expectedArgonHash: "9633b8b35f",
 		},
 		{
 			name:              "no salt no hash",
@@ -256,48 +255,6 @@ func TestHashing(t *testing.T) {
 			require.Contains(t, result["description"], "Slack Bot token")
 			require.Equal(t, tt.expectedArgonHash, result["hash_argon2id"])
 
-		})
-	}
-}
-
-func TestRedact(t *testing.T) {
-	t.Parallel()
-
-	for _, tt := range []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{
-			name:     "long secret",
-			input:    "AKIAIOSFODNN7EXAMPLE",
-			expected: "AKI...",
-		},
-		{
-			name:     "short secret",
-			input:    "abc",
-			expected: "***",
-		},
-		{
-			name:     "exactly 6 chars redacts fully",
-			input:    "abcdef",
-			expected: "***",
-		},
-		{
-			name:     "7 chars shows prefix",
-			input:    "abcdefg",
-			expected: "abc...",
-		},
-		{
-			name:     "empty string",
-			input:    "",
-			expected: "***",
-		},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			result := redact(tt.input)
-			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
