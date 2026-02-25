@@ -14,7 +14,7 @@ const (
 	argonTimeCost   uint32 = 2         // Number of iterations
 	argonMemoryCost uint32 = 16 * 1024 // Amount of memory in KiB (~32 MB)
 	argonThreads    uint8  = 4         // Number of threads/lanes for parallelism
-	argonKeyLength  uint32 = 5         // Length of the generated hash key, in bytes. This number is sensitive. See PS-267
+	argonKeyLength  uint32 = 3         // Length of the generated hash key, in bytes. This number is sensitive. See PS-267
 	argonSaltLength uint32 = 16        // Length of the random salt in bytes
 )
 

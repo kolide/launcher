@@ -19,38 +19,38 @@ func TestGenerateArgon2idHash_Success(t *testing.T) {
 			name:   "secret1, salt1",
 			secret: "my-secret-api-key",
 			salt:   "1QC9NyP0IOpCi99ZRGydWQ==",
-			hash:   "ea1fe11a28",
+			hash:   "53a76f",
 		},
 		{
 			name:   "secret2, salt1",
 			secret: "some totally different secret",
 			salt:   "1QC9NyP0IOpCi99ZRGydWQ==",
-			hash:   "2f260a67ab",
+			hash:   "48c55e",
 		},
 		{
 			name:   "empty secret, salt1",
 			secret: "",
 			salt:   "1QC9NyP0IOpCi99ZRGydWQ==",
-			hash:   "ba340ffe24",
+			hash:   "711773",
 		},
 
 		{
 			name:   "secret1, salt2",
 			secret: "my-secret-api-key",
 			salt:   "iY4GILUmzsaZh2yPVDRcfg==",
-			hash:   "f9f16ab77e",
+			hash:   "1e092d",
 		},
 		{
 			name:   "secret2, salt2",
 			secret: "some totally different secret",
 			salt:   "iY4GILUmzsaZh2yPVDRcfg==",
-			hash:   "1e1592fb4e",
+			hash:   "a9875b",
 		},
 		{
 			name:   "empty secret, salt2",
 			secret: "",
 			salt:   "iY4GILUmzsaZh2yPVDRcfg==",
-			hash:   "68a8a965de",
+			hash:   "55432d",
 		},
 	}
 
