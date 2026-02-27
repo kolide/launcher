@@ -65,7 +65,6 @@ import (
 	osqueryruntime "github.com/kolide/launcher/pkg/osquery/runtime"
 	osqueryInstanceHistory "github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/rungroup"
-	"github.com/kolide/launcher/pkg/service"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"go.etcd.io/bbolt"
@@ -374,11 +373,6 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	windowsUpdatesCacher := windowsupdatetable.NewWindowsUpdatesCacher(k, k.WindowsUpdatesCacheStore(), 1*time.Hour, k.Slogger())
 	runGroup.Add("windowsUpdatesCacher", windowsUpdatesCacher.Execute, windowsUpdatesCacher.Interrupt)
 
-	client, err := service.NewJSONRPCClient(k)
-	if err != nil {
-		return fmt.Errorf("creating jsonrpc client: %w", err)
-	}
-
 	// make sure keys exist -- we expect these keys to exist before rungroup starts
 	if err := agent.SetupKeys(ctx, k.Slogger(), k.ConfigStore()); err != nil {
 		return fmt.Errorf("setting up agent keys: %w", err)
@@ -406,7 +400,6 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	// create the runner that will launch osquery
 	osqueryRunner := osqueryruntime.New(
 		k,
-		client,
 		logPublishClient,
 		startupSettingsWriter,
 		osqueryruntime.WithAugeasLensFunction(augeas.InstallLenses),

@@ -73,8 +73,10 @@ func TestCreateOsqueryCommand(t *testing.T) {
 	k.On("RootDirectory").Return(rootDir)
 	setupHistory(t, k)
 	lpc := makeTestOsqLogPublisher(t, k)
+	k.On("KolideServerURL").Return("").Maybe()
+	k.On("InsecureTransportTLS").Return(true).Maybe()
 
-	i := newInstance(types.DefaultEnrollmentID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
+	i := newInstance(types.DefaultEnrollmentID, k, lpc, settingsstoremock.NewSettingsStoreWriter(t))
 	i.paths = paths
 
 	_, err := i.createOsquerydCommand("") // we do not actually exec so don't need to download a real osquery for this test
@@ -98,8 +100,10 @@ func TestCreateOsqueryCommandWithFlags(t *testing.T) {
 	k.On("RootDirectory").Return(rootDir)
 	setupHistory(t, k)
 	lpc := makeTestOsqLogPublisher(t, k)
+	k.On("KolideServerURL").Return("").Maybe()
+	k.On("InsecureTransportTLS").Return(true).Maybe()
 
-	i := newInstance(types.DefaultEnrollmentID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
+	i := newInstance(types.DefaultEnrollmentID, k, lpc, settingsstoremock.NewSettingsStoreWriter(t))
 	i.paths = &osqueryFilePaths{}
 
 	cmd, err := i.createOsquerydCommand("") // we do not actually exec so don't need to download a real osquery for this test
@@ -133,8 +137,10 @@ func TestCreateOsqueryCommand_SetsEnabledWatchdogSettingsAppropriately(t *testin
 	k.On("RootDirectory").Return(rootDir)
 	setupHistory(t, k)
 	lpc := makeTestOsqLogPublisher(t, k)
+	k.On("KolideServerURL").Return("").Maybe()
+	k.On("InsecureTransportTLS").Return(true).Maybe()
 
-	i := newInstance(types.DefaultEnrollmentID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
+	i := newInstance(types.DefaultEnrollmentID, k, lpc, settingsstoremock.NewSettingsStoreWriter(t))
 	i.paths = &osqueryFilePaths{}
 
 	cmd, err := i.createOsquerydCommand("") // we do not actually exec so don't need to download a real osquery for this test
@@ -184,8 +190,10 @@ func TestCreateOsqueryCommand_SetsDisabledWatchdogSettingsAppropriately(t *testi
 	k.On("RootDirectory").Return(rootDir)
 	setupHistory(t, k)
 	lpc := makeTestOsqLogPublisher(t, k)
+	k.On("KolideServerURL").Return("").Maybe()
+	k.On("InsecureTransportTLS").Return(true).Maybe()
 
-	i := newInstance(types.DefaultEnrollmentID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
+	i := newInstance(types.DefaultEnrollmentID, k, lpc, settingsstoremock.NewSettingsStoreWriter(t))
 	i.paths = &osqueryFilePaths{}
 
 	cmd, err := i.createOsquerydCommand("") // we do not actually exec so don't need to download a real osquery for this test
@@ -226,7 +234,7 @@ func TestHealthy_DoesNotPassForUnlaunchedInstance(t *testing.T) {
 	setupHistory(t, k)
 	lpc := makeTestOsqLogPublisher(t, k)
 
-	i := newInstance(types.DefaultEnrollmentID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
+	i := newInstance(types.DefaultEnrollmentID, k, lpc, settingsstoremock.NewSettingsStoreWriter(t))
 
 	require.Error(t, i.Healthy(), "unlaunched instance should not return healthy status")
 }
@@ -239,7 +247,7 @@ func TestQuery_ReturnsErrorForUnlaunchedInstance(t *testing.T) {
 	setupHistory(t, k)
 	lpc := makeTestOsqLogPublisher(t, k)
 
-	i := newInstance(types.DefaultEnrollmentID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
+	i := newInstance(types.DefaultEnrollmentID, k, lpc, settingsstoremock.NewSettingsStoreWriter(t))
 
 	_, err := i.Query("select * from osquery_info;")
 	require.Error(t, err, "should not be able to query unlaunched instance")
@@ -252,7 +260,7 @@ func Test_healthcheckWithRetries(t *testing.T) {
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	setupHistory(t, k)
 	lpc := makeTestOsqLogPublisher(t, k)
-	i := newInstance(types.DefaultEnrollmentID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
+	i := newInstance(types.DefaultEnrollmentID, k, lpc, settingsstoremock.NewSettingsStoreWriter(t))
 
 	// No client available, so healthcheck should fail despite retries
 	require.Error(t, i.healthcheckWithRetries(t.Context(), 5, 100*time.Millisecond))
@@ -299,12 +307,15 @@ func TestHealthy(t *testing.T) {
 	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
 	s := settingsstoremock.NewSettingsStoreWriter(t)
-	s.On("WriteSettings").Return(nil)
+	s.On("WriteSettings").Return(nil).Maybe()
 	setupHistory(t, k)
 	lpc := makeTestOsqLogPublisher(t, k)
+	testServer := setupMockDeviceServer(t)
+	k.On("KolideServerURL").Return(testServer).Maybe()
+	k.On("InsecureTransportTLS").Return(true).Maybe()
 
 	// Run the instance
-	i := newInstance(types.DefaultEnrollmentID, k, mockServiceClient(t), lpc, s)
+	i := newInstance(types.DefaultEnrollmentID, k, lpc, s)
 	go i.Launch()
 
 	// Wait for `Healthy` to pass
@@ -396,13 +407,16 @@ func TestLaunch(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
+	testServer := setupMockDeviceServer(t)
+	k.On("KolideServerURL").Return(testServer).Maybe()
+	k.On("InsecureTransportTLS").Return(true).Maybe()
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil).Maybe()
 	osqHistory := setupHistory(t, k)
 	lpc := makeTestOsqLogPublisher(t, k)
 
-	i := newInstance(types.DefaultEnrollmentID, k, mockServiceClient(t), lpc, s)
+	i := newInstance(types.DefaultEnrollmentID, k, lpc, s)
 	require.False(t, i.instanceStarted())
 	go i.Launch()
 
@@ -499,13 +513,16 @@ func TestReloadKatcExtension(t *testing.T) {
 	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
 	s := settingsstoremock.NewSettingsStoreWriter(t)
-	s.On("WriteSettings").Return(nil)
+	s.On("WriteSettings").Return(nil).Maybe()
 	osqHistory := setupHistory(t, k)
 	k.On("ServerReleaseTrackerDataStore").Return(inmemory.NewStore()).Maybe()
 	lpc := makeTestOsqLogPublisher(t, k)
+	testServer := setupMockDeviceServer(t)
+	k.On("KolideServerURL").Return(testServer).Maybe()
+	k.On("InsecureTransportTLS").Return(true).Maybe()
 
 	// Create an instance and launch it
-	i := newInstance(types.DefaultEnrollmentID, k, mockServiceClient(t), lpc, s)
+	i := newInstance(types.DefaultEnrollmentID, k, lpc, s)
 	go i.Launch()
 
 	// Wait for the instance to become healthy

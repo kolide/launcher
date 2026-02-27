@@ -126,7 +126,7 @@ func (e iterationTerminatedError) Error() string {
 // NewExtension creates a new Extension from the provided service.KolideService
 // implementation. The background routines should be started by calling
 // Start().
-func NewExtension(ctx context.Context, client service.KolideService, logPublishClient types.OsqueryPublisher, settingsWriter settingsStoreWriter, k types.Knapsack, enrollmentId string, opts ExtensionOpts) (*Extension, error) {
+func NewExtension(ctx context.Context, logPublishClient types.OsqueryPublisher, settingsWriter settingsStoreWriter, k types.Knapsack, enrollmentId string, opts ExtensionOpts) (*Extension, error) {
 	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -152,6 +152,11 @@ func NewExtension(ctx context.Context, client service.KolideService, logPublishC
 
 	forwardAllDistributedUntil := &atomic.Int64{}
 	forwardAllDistributedUntil.Store(time.Now().Unix() + 120) // forward all queries for the first 2 minutes after startup
+
+	client, err := service.NewJSONRPCClient(k)
+	if err != nil {
+		return nil, fmt.Errorf("creating jsonrpc client: %w", err)
+	}
 
 	e := &Extension{
 		slogger:                       slogger,

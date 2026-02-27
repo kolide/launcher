@@ -12,7 +12,6 @@ import (
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/pkg/service"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -31,7 +30,6 @@ type Runner struct {
 	instanceLock     sync.Mutex                  // locks access to `instances` to avoid e.g. restarting an instance that isn't running yet
 	slogger          *slog.Logger
 	knapsack         types.Knapsack
-	serviceClient    service.KolideService   // shared service client for communication between osquery instance and Kolide SaaS
 	logPublishClient types.OsqueryPublisher  // client used for cutting over to new osquery log publication service (agent-ingester)
 	settingsWriter   settingsStoreWriter     // writes to startup settings store
 	opts             []OsqueryInstanceOption // global options applying to all osquery instances
@@ -41,13 +39,12 @@ type Runner struct {
 	restartLock      sync.Mutex // use a restart lock to ensure we don't get multiple quick succession restarts due to in modern standy flapping
 }
 
-func New(k types.Knapsack, serviceClient service.KolideService, logPublishClient types.OsqueryPublisher, settingsWriter settingsStoreWriter, opts ...OsqueryInstanceOption) *Runner {
+func New(k types.Knapsack, logPublishClient types.OsqueryPublisher, settingsWriter settingsStoreWriter, opts ...OsqueryInstanceOption) *Runner {
 	runner := &Runner{
 		enrollmentIds:    k.EnrollmentIDs(),
 		instances:        make(map[string]*OsqueryInstance),
 		slogger:          k.Slogger().With("component", "osquery_runner"),
 		knapsack:         k,
-		serviceClient:    serviceClient,
 		logPublishClient: logPublishClient,
 		settingsWriter:   settingsWriter,
 		shutdown:         make(chan struct{}),
@@ -171,7 +168,7 @@ func (r *Runner) launchInstanceWithRetries(ctx context.Context, enrollmentId str
 		// Add the instance to our instances map right away, so that if we receive a shutdown
 		// request during launch, we can shut down the instance.
 		r.instanceLock.Lock()
-		instance := newInstance(enrollmentId, r.knapsack, r.serviceClient, r.logPublishClient, r.settingsWriter, r.opts...)
+		instance := newInstance(enrollmentId, r.knapsack, r.logPublishClient, r.settingsWriter, r.opts...)
 		r.instances[enrollmentId] = instance
 		r.instanceLock.Unlock()
 		err := instance.Launch()
