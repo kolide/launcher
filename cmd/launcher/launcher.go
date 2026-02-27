@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/x509"
 	"fmt"
 	"log/slog"
 	"net"
@@ -66,7 +65,6 @@ import (
 	osqueryruntime "github.com/kolide/launcher/pkg/osquery/runtime"
 	osqueryInstanceHistory "github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/rungroup"
-	"github.com/kolide/launcher/pkg/service"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"go.etcd.io/bbolt"
@@ -326,19 +324,6 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	dbBackupSaver := agentbbolt.NewDatabaseBackupSaver(k)
 	runGroup.Add("dbBackupSaver", dbBackupSaver.Execute, dbBackupSaver.Interrupt)
 
-	// create the certificate pool
-	var rootPool *x509.CertPool
-	if k.RootPEM() != "" {
-		rootPool = x509.NewCertPool()
-		pemContents, err := os.ReadFile(k.RootPEM())
-		if err != nil {
-			return fmt.Errorf("reading root certs PEM at path: %s: %w", k.RootPEM(), err)
-		}
-		if ok := rootPool.AppendCertsFromPEM(pemContents); !ok {
-			return fmt.Errorf("found no valid certs in PEM at path: %s", k.RootPEM())
-		}
-	}
-
 	// Add the log checkpoints to the rungroup, and run it once early, to try to get data into the logs.
 	// The checkpointer can take up to 5 seconds to run, so do this in the background.
 	checkpointer := checkups.NewCheckupLogger(slogger, k)
@@ -388,8 +373,6 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	windowsUpdatesCacher := windowsupdatetable.NewWindowsUpdatesCacher(k, k.WindowsUpdatesCacheStore(), 1*time.Hour, k.Slogger())
 	runGroup.Add("windowsUpdatesCacher", windowsUpdatesCacher.Execute, windowsUpdatesCacher.Interrupt)
 
-	client := service.NewJSONRPCClient(k, rootPool)
-
 	// make sure keys exist -- we expect these keys to exist before rungroup starts
 	if err := agent.SetupKeys(ctx, k.Slogger(), k.ConfigStore()); err != nil {
 		return fmt.Errorf("setting up agent keys: %w", err)
@@ -417,7 +400,6 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	// create the runner that will launch osquery
 	osqueryRunner := osqueryruntime.New(
 		k,
-		client,
 		logPublishClient,
 		startupSettingsWriter,
 		osqueryruntime.WithAugeasLensFunction(augeas.InstallLenses),

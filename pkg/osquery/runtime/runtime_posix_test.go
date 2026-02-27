@@ -72,17 +72,20 @@ func TestOsquerySlowStart(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
 	setUpMockStores(t, k)
 	osqHistory := setupHistory(t, k)
+	testServer := setupMockDeviceServer(t)
+	k.On("KolideServerURL").Return(testServer).Maybe()
+	k.On("InsecureTransportTLS").Return(true).Maybe()
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
-	s.On("WriteSettings").Return(nil)
+	s.On("WriteSettings").Return(nil).Maybe()
 	lpc := makeTestOsqLogPublisher(t, k)
 
-	runner := New(k, mockServiceClient(t), lpc, s, WithStartFunc(func(cmd *exec.Cmd) error {
+	runner := New(k, lpc, s, WithStartFunc(func(cmd *exec.Cmd) error {
 		err := cmd.Start()
 		if err != nil {
 			return fmt.Errorf("unexpected error starting command: %w", err)
@@ -143,19 +146,22 @@ func TestExtensionSocketPath(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
 	setUpMockStores(t, k)
 	osqHistory := setupHistory(t, k)
+	testServer := setupMockDeviceServer(t)
+	k.On("KolideServerURL").Return(testServer).Maybe()
+	k.On("InsecureTransportTLS").Return(true).Maybe()
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
-	s.On("WriteSettings").Return(nil)
+	s.On("WriteSettings").Return(nil).Maybe()
 
 	extensionSocketPath := filepath.Join(rootDirectory, "sock")
 	lpc := makeTestOsqLogPublisher(t, k)
 
-	runner := New(k, mockServiceClient(t), lpc, s, WithExtensionSocketPath(extensionSocketPath))
+	runner := New(k, lpc, s, WithExtensionSocketPath(extensionSocketPath))
 	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 

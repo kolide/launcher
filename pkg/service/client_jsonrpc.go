@@ -4,18 +4,17 @@ import (
 	"bytes"
 	"context"
 	"crypto/x509"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
-	"slices"
+	"os"
 	"sync"
 	"time"
 
 	"github.com/go-kit/kit/transport/http/jsonrpc"
-	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/observability"
 )
 
 // forceNoChunkedEncoding forces the connection not to use chunked
@@ -61,11 +60,7 @@ type jsonRpcResponse struct {
 
 // New creates a new Kolide Client (implementation of the KolideService
 // interface) using a JSONRPC client connection.
-func NewJSONRPCClient(
-	k types.Knapsack,
-	rootPool *x509.CertPool,
-	options ...jsonrpc.ClientOption,
-) KolideService {
+func NewJSONRPCClient(k types.Knapsack, options ...jsonrpc.ClientOption) (KolideService, error) {
 	serviceURL := buildServiceURL(k)
 
 	httpClient := &http.Client{
@@ -75,6 +70,10 @@ func NewJSONRPCClient(
 		},
 	}
 	if !k.InsecureTransportTLS() {
+		rootPool, err := buildRootPool(k)
+		if err != nil {
+			return nil, fmt.Errorf("building root pool: %w", err)
+		}
 		tlsConfig := makeTLSConfig(k, rootPool)
 		httpClient.Transport = &http.Transport{
 			TLSClientConfig:   tlsConfig,
@@ -144,9 +143,7 @@ func NewJSONRPCClient(
 	// the logger context.
 	client = uuidMiddleware(client)
 
-	k.RegisterChangeObserver(client, keys.KolideServerURL)
-
-	return client
+	return client, nil
 }
 
 func buildServiceURL(k types.Knapsack) *url.URL {
@@ -161,64 +158,17 @@ func buildServiceURL(k types.Knapsack) *url.URL {
 	return serviceURL
 }
 
-func (e *Endpoints) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
-	ctx, span := observability.StartSpan(ctx)
-	defer span.End()
-
-	if !slices.Contains(flagKeys, keys.KolideServerURL) {
-		return
+func buildRootPool(k types.Knapsack) (*x509.CertPool, error) {
+	var rootPool *x509.CertPool
+	if k.RootPEM() != "" {
+		rootPool = x509.NewCertPool()
+		pemContents, err := os.ReadFile(k.RootPEM())
+		if err != nil {
+			return nil, fmt.Errorf("reading root certs PEM at path: %s: %w", k.RootPEM(), err)
+		}
+		if ok := rootPool.AppendCertsFromPEM(pemContents); !ok {
+			return nil, fmt.Errorf("found no valid certs in PEM at path: %s", k.RootPEM())
+		}
 	}
-
-	// Update URL, reusing previous http client
-	serviceURL := buildServiceURL(e.k)
-	opts := []jsonrpc.ClientOption{
-		jsonrpc.SetClient(e.client),
-		jsonrpc.ClientBefore(
-			forceNoChunkedEncoding(e.k.Slogger()),
-		),
-	}
-
-	// Re-create all endpoints with new base URL, locking to prevent concurrent requests during the update
-	e.endpointsLock.Lock()
-	defer e.endpointsLock.Unlock()
-	e.RequestEnrollmentEndpoint = jsonrpc.NewClient(
-		serviceURL,
-		"RequestEnrollment",
-		append(opts, jsonrpc.ClientResponseDecoder(decodeJSONRPCEnrollmentResponse))...,
-	).Endpoint()
-
-	e.RequestConfigEndpoint = jsonrpc.NewClient(
-		serviceURL,
-		"RequestConfig",
-		append(opts, jsonrpc.ClientResponseDecoder(decodeJSONRPCConfigResponse))...,
-	).Endpoint()
-
-	e.PublishLogsEndpoint = jsonrpc.NewClient(
-		serviceURL,
-		"PublishLogs",
-		append(opts, jsonrpc.ClientResponseDecoder(decodeJSONRPCPublishLogsResponse))...,
-	).Endpoint()
-
-	e.RequestQueriesEndpoint = jsonrpc.NewClient(
-		serviceURL,
-		"RequestQueries",
-		append(opts, jsonrpc.ClientResponseDecoder(decodeJSONRPCQueryCollection))...,
-	).Endpoint()
-
-	e.PublishResultsEndpoint = jsonrpc.NewClient(
-		serviceURL,
-		"PublishResults",
-		append(opts, jsonrpc.ClientResponseDecoder(decodeJSONRPCPublishResultsResponse))...,
-	).Endpoint()
-
-	e.CheckHealthEndpoint = jsonrpc.NewClient(
-		serviceURL,
-		"CheckHealth",
-		append(opts, jsonrpc.ClientResponseDecoder(decodeJSONRPCHealthCheckResponse))...,
-	).Endpoint()
-
-	e.k.Slogger().Log(ctx, slog.LevelInfo,
-		"successfully updated URL for Kolide service",
-		"new_url", serviceURL.String(),
-	)
+	return rootPool, nil
 }

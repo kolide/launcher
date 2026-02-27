@@ -47,6 +47,7 @@ type Extension struct {
 	enrollmentId                  string
 	knapsack                      types.Knapsack
 	serviceClient                 service.KolideService
+	serviceClientLock             *sync.RWMutex
 	logPublishClient              types.OsqueryPublisher
 	settingsWriter                settingsStoreWriter
 	enrollMutex                   *sync.Mutex // ensures that for non-secretless installations, we never have simultaneous RequestEnrollment requests
@@ -126,7 +127,7 @@ func (e iterationTerminatedError) Error() string {
 // NewExtension creates a new Extension from the provided service.KolideService
 // implementation. The background routines should be started by calling
 // Start().
-func NewExtension(ctx context.Context, client service.KolideService, logPublishClient types.OsqueryPublisher, settingsWriter settingsStoreWriter, k types.Knapsack, enrollmentId string, opts ExtensionOpts) (*Extension, error) {
+func NewExtension(ctx context.Context, logPublishClient types.OsqueryPublisher, settingsWriter settingsStoreWriter, k types.Knapsack, enrollmentId string, opts ExtensionOpts) (*Extension, error) {
 	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -153,9 +154,15 @@ func NewExtension(ctx context.Context, client service.KolideService, logPublishC
 	forwardAllDistributedUntil := &atomic.Int64{}
 	forwardAllDistributedUntil.Store(time.Now().Unix() + 120) // forward all queries for the first 2 minutes after startup
 
+	client, err := service.NewJSONRPCClient(k)
+	if err != nil {
+		return nil, fmt.Errorf("creating jsonrpc client: %w", err)
+	}
+
 	e := &Extension{
 		slogger:                       slogger,
 		serviceClient:                 client,
+		serviceClientLock:             &sync.RWMutex{},
 		logPublishClient:              logPublishClient,
 		settingsWriter:                settingsWriter,
 		enrollmentId:                  enrollmentId,
@@ -168,7 +175,7 @@ func NewExtension(ctx context.Context, client service.KolideService, logPublishC
 		distributedForwardingInterval: distributedForwardingInterval,
 		forwardAllDistributedUntil:    forwardAllDistributedUntil,
 	}
-	k.RegisterChangeObserver(e, keys.DistributedForwardingInterval)
+	k.RegisterChangeObserver(e, keys.DistributedForwardingInterval, keys.KolideServerURL)
 
 	// Ensure host identifier is set as early as possible
 	identifier, err := e.getHostIdentifier()
@@ -235,6 +242,21 @@ func (e *Extension) Shutdown(_ error) {
 func (e *Extension) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
 	if slices.Contains(flagKeys, keys.DistributedForwardingInterval) {
 		e.distributedForwardingInterval.Store(int64(e.knapsack.DistributedForwardingInterval().Seconds()))
+	}
+
+	if slices.Contains(flagKeys, keys.KolideServerURL) {
+		client, err := service.NewJSONRPCClient(e.knapsack)
+		if err != nil {
+			e.slogger.Log(ctx, slog.LevelError,
+				"unable to create new jsonrpc client after url change",
+				"err", err,
+			)
+			return // no more keys to process
+		}
+
+		e.serviceClientLock.Lock()
+		e.serviceClient = client
+		e.serviceClientLock.Unlock()
 	}
 }
 
@@ -369,7 +391,9 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	// If no cached node key, enroll for new node key
 	// note that we set invalid two ways. Via the return (resp.NodeInvalid), _or_ via isNodeInvalidErr
 	invalid := false
+	e.serviceClientLock.RLock()
 	resp, err := e.serviceClient.RequestEnrollment(ctx, enrollSecret, identifier, enrollDetails)
+	e.serviceClientLock.RUnlock()
 
 	switch {
 	case errors.Is(err, service.ErrDeviceDisabled{}):
@@ -593,7 +617,9 @@ func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bo
 		nodeKey = newNodeKey
 	}
 
+	e.serviceClientLock.RLock()
 	config, invalid, err := e.serviceClient.RequestConfig(ctx, nodeKey)
+	e.serviceClientLock.RUnlock()
 	switch {
 	case errors.Is(err, service.ErrDeviceDisabled{}):
 		e.slogger.Log(ctx, slog.LevelInfo,
@@ -880,7 +906,9 @@ func (e *Extension) writeLogsWithReenroll(ctx context.Context, typ logger.LogTyp
 		nodeKey = newNodeKey
 	}
 
+	e.serviceClientLock.RLock()
 	_, _, invalid, err := e.serviceClient.PublishLogs(ctx, nodeKey, typ, logs)
+	e.serviceClientLock.RUnlock()
 
 	if errors.Is(err, service.ErrDeviceDisabled{}) {
 		e.slogger.Log(ctx, slog.LevelInfo,
@@ -1038,7 +1066,9 @@ func (e *Extension) getQueriesWithReenroll(ctx context.Context, reenroll bool) (
 	}
 
 	// Note that we set invalid two ways -- in the return, and via isNodeinvaliderr
+	e.serviceClientLock.RLock()
 	queries, invalid, err := e.serviceClient.RequestQueries(ctx, nodeKey)
+	e.serviceClientLock.RUnlock()
 
 	switch {
 	case errors.Is(err, service.ErrDeviceDisabled{}):
@@ -1112,7 +1142,9 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 		nodeKey = newNodeKey
 	}
 
+	e.serviceClientLock.RLock()
 	_, _, invalid, err := e.serviceClient.PublishResults(ctx, nodeKey, results)
+	e.serviceClientLock.RUnlock()
 	switch {
 	case errors.Is(err, service.ErrDeviceDisabled{}):
 		e.slogger.Log(ctx, slog.LevelInfo,

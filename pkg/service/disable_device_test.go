@@ -8,11 +8,9 @@ import (
 	"testing"
 
 	"github.com/go-kit/kit/transport/http/jsonrpc"
-	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/osquery/osquery-go/plugin/logger"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -92,25 +90,21 @@ func TestDeviceDisabled(t *testing.T) {
 			mockKnapsack.On("KolideServerURL").Return(u.Host)
 			mockKnapsack.On("InsecureTransportTLS").Return(true)
 			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
-			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.KolideServerURL).Return()
 
-			clients := []KolideService{
-				NewJSONRPCClient(mockKnapsack, nil),
-			}
+			client, err := NewJSONRPCClient(mockKnapsack)
+			require.NoError(t, err)
 
-			for _, client := range clients {
-				jsonRpcServerResult = `{"disable_device": false}`
+			jsonRpcServerResult = `{"disable_device": false}`
 
-				require.NoError(t, tt.f(client),
-					"should not return an error when device is not disabled",
-				)
+			require.NoError(t, tt.f(client),
+				"should not return an error when device is not disabled",
+			)
 
-				jsonRpcServerResult = `{"disable_device": true}`
+			jsonRpcServerResult = `{"disable_device": true}`
 
-				require.ErrorIs(t, tt.f(client), ErrDeviceDisabled{},
-					"should return an ErrDeviceDisabled error when device is disabled",
-				)
-			}
+			require.ErrorIs(t, tt.f(client), ErrDeviceDisabled{},
+				"should return an ErrDeviceDisabled error when device is disabled",
+			)
 		})
 	}
 }

@@ -24,10 +24,11 @@ func TestExtensionLogPublicationHappyPath(t *testing.T) {
 	}
 	k := makeKnapsack(t)
 	lpc := makeTestOsqLogPublisher(k)
-	e, err := NewExtension(t.Context(), m, lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
+	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
 		MaxBytesPerBatch: startingBatchLimitBytes,
 	})
 	require.Nil(t, err)
+	e.serviceClient = m
 
 	// issue a few successful calls, expect that the batch limit is unchanged from the original opts
 	for range 3 {
@@ -59,10 +60,11 @@ func TestExtensionLogPublicationRespondsToNetworkTimeouts(t *testing.T) {
 	}
 	k := makeKnapsack(t)
 	lpc := makeTestOsqLogPublisher(k)
-	e, err := NewExtension(t.Context(), m, lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
+	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
 		MaxBytesPerBatch: startingBatchLimitBytes,
 	})
 	require.Nil(t, err)
+	e.serviceClient = m
 
 	// expect each subsequent failed call to reduce the batch size until the min threshold is reached
 	expectedMaxValue := e.Opts.MaxBytesPerBatch
@@ -109,10 +111,11 @@ func TestExtensionLogPublicationIgnoresNonTimeoutErrors(t *testing.T) {
 	}
 	k := makeKnapsack(t)
 	lpc := makeTestOsqLogPublisher(k)
-	e, err := NewExtension(t.Context(), m, lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
+	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
 		MaxBytesPerBatch: startingBatchLimitBytes,
 	})
 	require.Nil(t, err)
+	e.serviceClient = m
 
 	// issue a few calls that error immediately, expect that the batch limit is unchanged from the original opts
 	for range 3 {

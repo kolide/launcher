@@ -3,12 +3,12 @@ package runtime
 // these tests have to be run as admin on windows
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -34,10 +34,8 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/osquery/testutil"
 	"github.com/kolide/launcher/pkg/service"
-	servicemock "github.com/kolide/launcher/pkg/service/mock"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/osquery/osquery-go/plugin/distributed"
-	"github.com/osquery/osquery-go/plugin/logger"
 	"github.com/shirou/gopsutil/v4/process"
 
 	"github.com/stretchr/testify/assert"
@@ -115,13 +113,16 @@ func TestBadBinaryPath(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	setUpMockStores(t, k)
 	setupHistory(t, k)
 	lpc := makeTestOsqLogPublisher(t, k)
+	testServer := setupMockDeviceServer(t)
+	k.On("KolideServerURL").Return(testServer).Maybe()
+	k.On("InsecureTransportTLS").Return(true).Maybe()
 
-	runner := New(k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
+	runner := New(k, lpc, settingsstoremock.NewSettingsStoreWriter(t))
 	ensureShutdownOnCleanup(t, runner, logBytes)
 
 	// The runner will repeatedly try to launch the instance, so `Run`
@@ -173,17 +174,20 @@ func TestWithOsqueryFlags(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
 	setUpMockStores(t, k)
 	osqHistory := setupHistory(t, k)
 	lpc := makeTestOsqLogPublisher(t, k)
+	testServer := setupMockDeviceServer(t)
+	k.On("KolideServerURL").Return(testServer).Maybe()
+	k.On("InsecureTransportTLS").Return(true).Maybe()
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
-	s.On("WriteSettings").Return(nil)
+	s.On("WriteSettings").Return(nil).Maybe()
 
-	runner := New(k, mockServiceClient(t), lpc, s)
+	runner := New(k, lpc, s)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 	waitHealthy(t, runner, logBytes, osqHistory)
@@ -228,21 +232,24 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
 	setUpMockStores(t, k)
 	osqHistory := setupHistory(t, k)
 	lpc := makeTestOsqLogPublisher(t, k)
+	testServer := setupMockDeviceServer(t)
+	k.On("KolideServerURL").Return(testServer).Maybe()
+	k.On("InsecureTransportTLS").Return(true).Maybe()
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
-	s.On("WriteSettings").Return(nil)
+	s.On("WriteSettings").Return(nil).Maybe()
 
 	// set to false initially so osq can start
 	k.On("InModernStandby").Return(false).Twice()
 
 	// Start the runner
-	runner := New(k, mockServiceClient(t), lpc, s)
+	runner := New(k, lpc, s)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 
@@ -373,16 +380,19 @@ func TestPing(t *testing.T) {
 	k.On("WindowsUpdatesCacheStore").Return(inmemory.NewStore()).Maybe()
 	osqHistory := setupHistory(t, k)
 	s := settingsstoremock.NewSettingsStoreWriter(t)
-	s.On("WriteSettings").Return(nil)
+	s.On("WriteSettings").Return(nil).Maybe()
 	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
 	k.On("ServerReleaseTrackerDataStore").Return(inmemory.NewStore()).Maybe()
 	lpc := makeTestOsqLogPublisher(t, k)
+	testServer := setupMockDeviceServer(t)
+	k.On("KolideServerURL").Return(testServer).Maybe()
+	k.On("InsecureTransportTLS").Return(true).Maybe()
 
 	// Start the runner
-	runner := New(k, mockServiceClient(t), lpc, s)
+	runner := New(k, lpc, s)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 
@@ -632,16 +642,19 @@ func TestSimplePath(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
 	setUpMockStores(t, k)
 	osqHistory := setupHistory(t, k)
+	testServer := setupMockDeviceServer(t)
+	k.On("KolideServerURL").Return(testServer).Maybe()
+	k.On("InsecureTransportTLS").Return(true).Maybe()
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
-	s.On("WriteSettings").Return(nil)
+	s.On("WriteSettings").Return(nil).Maybe()
 	lpc := makeTestOsqLogPublisher(t, k)
-	runner := New(k, mockServiceClient(t), lpc, s)
+	runner := New(k, lpc, s)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 
@@ -690,18 +703,20 @@ func TestMultipleInstances(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
 	setUpMockStores(t, k)
 	osqHistory := setupHistory(t, k)
-	serviceClient := mockServiceClient(t)
 	lpc := makeTestOsqLogPublisher(t, k)
+	testServer := setupMockDeviceServer(t)
+	k.On("KolideServerURL").Return(testServer).Maybe()
+	k.On("InsecureTransportTLS").Return(true).Maybe()
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
-	s.On("WriteSettings").Return(nil)
+	s.On("WriteSettings").Return(nil).Maybe()
 
-	runner := New(k, serviceClient, lpc, s)
+	runner := New(k, lpc, s)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 
 	// Start the instance
@@ -780,18 +795,20 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
 	setUpMockStores(t, k)
 	osqHistory := setupHistory(t, k)
-	serviceClient := mockServiceClient(t)
+	testServer := setupMockDeviceServer(t)
+	k.On("KolideServerURL").Return(testServer).Maybe()
+	k.On("InsecureTransportTLS").Return(true).Maybe()
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
-	s.On("WriteSettings").Return(nil)
+	s.On("WriteSettings").Return(nil).Maybe()
 	lpc := makeTestOsqLogPublisher(t, k)
 
-	runner := New(k, serviceClient, lpc, s)
+	runner := New(k, lpc, s)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 
 	// Add in an extra instance
@@ -868,17 +885,20 @@ func TestMultipleShutdowns(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
 	setUpMockStores(t, k)
 	osqHistory := setupHistory(t, k)
+	testServer := setupMockDeviceServer(t)
+	k.On("KolideServerURL").Return(testServer).Maybe()
+	k.On("InsecureTransportTLS").Return(true).Maybe()
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
-	s.On("WriteSettings").Return(nil)
+	s.On("WriteSettings").Return(nil).Maybe()
 	lpc := makeTestOsqLogPublisher(t, k)
 
-	runner := New(k, mockServiceClient(t), lpc, s)
+	runner := New(k, lpc, s)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 
@@ -925,17 +945,20 @@ func TestOsqueryDies(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
 	setUpMockStores(t, k)
 	osqHistory := setupHistory(t, k)
+	testServer := setupMockDeviceServer(t)
+	k.On("KolideServerURL").Return(testServer).Maybe()
+	k.On("InsecureTransportTLS").Return(true).Maybe()
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
-	s.On("WriteSettings").Return(nil)
+	s.On("WriteSettings").Return(nil).Maybe()
 	lpc := makeTestOsqLogPublisher(t, k)
 
-	runner := New(k, mockServiceClient(t), lpc, s)
+	runner := New(k, lpc, s)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 
@@ -986,7 +1009,7 @@ func TestNotStarted(t *testing.T) {
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	setupHistory(t, k)
 	lpc := makeTestOsqLogPublisher(t, k)
-	runner := New(k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
+	runner := New(k, lpc, settingsstoremock.NewSettingsStoreWriter(t))
 
 	assert.Error(t, runner.Healthy())
 	assert.NoError(t, runner.Shutdown())
@@ -1112,17 +1135,20 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
 	setUpMockStores(t, k)
 	osqHistory = setupHistory(t, k)
+	testServer := setupMockDeviceServer(t)
+	k.On("KolideServerURL").Return(testServer).Maybe()
+	k.On("InsecureTransportTLS").Return(true).Maybe()
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
-	s.On("WriteSettings").Return(nil)
+	s.On("WriteSettings").Return(nil).Maybe()
 	lpc := makeTestOsqLogPublisher(t, k)
 
-	runner = New(k, mockServiceClient(t), lpc, s)
+	runner = New(k, lpc, s)
 	go runner.Run()
 	waitHealthy(t, runner, logBytes, osqHistory)
 
@@ -1158,9 +1184,9 @@ func setupHistory(t *testing.T, k *typesMocks.Knapsack) *history.History {
 	return osqHistory
 }
 
-// mockServiceClient returns a mock KolideService that returns the minimum possible response
+// setupMockDeviceServer returns a mock KolideService that returns the minimum possible response
 // for all methods.
-func mockServiceClient(t *testing.T) *servicemock.KolideService {
+func setupMockDeviceServer(t *testing.T) string {
 	testOptions := map[string]any{
 		"distributed_interval": 30,
 		"verbose":              true,
@@ -1172,34 +1198,47 @@ func mockServiceClient(t *testing.T) *servicemock.KolideService {
 	testConfigBytes, err := json.Marshal(testConfig)
 	require.NoError(t, err)
 
-	return &servicemock.KolideService{
-		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (*service.EnrollmentResponse, error) {
-			return &service.EnrollmentResponse{
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		type jsonrpcRequest struct {
+			Method string `json:"method"` // there's more but method is all we care about here
+		}
+		var rDecoded jsonrpcRequest
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&rDecoded))
+
+		var err error
+		var respRaw []byte
+		switch r.Method {
+		case "RequestEnrollment":
+			respRaw, err = json.Marshal(&service.EnrollmentResponse{
 				NodeKey:            "testnodekey",
 				NodeInvalid:        false,
 				AgentIngesterToken: "",
-			}, nil
-		},
-		RequestConfigFunc: func(ctx context.Context, nodeKey string) (string, bool, error) {
-			return string(testConfigBytes), false, nil
-		},
-		PublishLogsFunc: func(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error) {
-			return "", "", false, nil
-		},
-		RequestQueriesFunc: func(ctx context.Context, nodeKey string) (*distributed.GetQueriesResult, bool, error) {
-			return &distributed.GetQueriesResult{
+			})
+			require.NoError(t, err)
+		case "RequestConfig":
+			respRaw = testConfigBytes
+		case "PublishLogs", "PublishResults":
+			respRaw = []byte("")
+		case "RequestQueries":
+			respRaw, err = json.Marshal(&distributed.GetQueriesResult{
 				Queries: map[string]string{
 					"test-distributed-query": "SELECT * FROM system_info",
 				},
-			}, false, nil
-		},
-		PublishResultsFunc: func(ctx context.Context, nodeKey string, results []distributed.Result) (string, string, bool, error) {
-			return "", "", false, nil
-		},
-		CheckHealthFunc: func(ctx context.Context) (int32, error) {
-			return 1, nil
-		},
-	}
+			})
+			require.NoError(t, err)
+		case "CheckHealth":
+			respRaw = []byte("1")
+		}
+
+		w.Write(respRaw)
+
+	}))
+
+	t.Cleanup(func() {
+		testServer.Close()
+	})
+
+	return strings.TrimPrefix(testServer.URL, "http://")
 }
 
 // setUpTestSlogger sets up a logger that will log to a buffer.
