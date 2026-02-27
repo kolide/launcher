@@ -1238,7 +1238,7 @@ func setupMockDeviceServer(t *testing.T) string {
 		testServer.Close()
 	})
 
-	return testServer.URL
+	return strings.TrimPrefix(testServer.URL, "http://")
 }
 
 // setUpTestSlogger sets up a logger that will log to a buffer.

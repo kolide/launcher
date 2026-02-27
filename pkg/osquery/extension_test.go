@@ -11,7 +11,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"sort"
+	"strings"
 	"sync"
 	"testing"
 	"testing/quick"
@@ -20,6 +22,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/kolide/kit/testutil"
 	"github.com/kolide/kit/ulid"
+	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	"github.com/kolide/launcher/ee/agent/storage/inmemory"
@@ -519,6 +522,80 @@ func TestExtensionEnroll(t *testing.T) {
 	assert.Equal(t, expectedEnrollSecret, gotEnrollSecret)
 
 	k.AssertExpectations(t)
+}
+
+func TestFlagsChanged(t *testing.T) {
+	requestSentToStartingServer := false
+	resultLock := &sync.Mutex{}
+	startingTestServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resultLock.Lock()
+		requestSentToStartingServer = true
+		resultLock.Unlock()
+	}))
+
+	t.Cleanup(func() {
+		startingTestServer.Close()
+	})
+
+	requestSentToUpdatedServer := false
+	updatedTestServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resultLock.Lock()
+		requestSentToUpdatedServer = true
+		resultLock.Unlock()
+	}))
+
+	t.Cleanup(func() {
+		updatedTestServer.Close()
+	})
+
+	m := mocks.NewKnapsack(t)
+	m.On("OsquerydPath").Maybe().Return("")
+	m.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
+	m.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
+	m.On("Slogger").Return(multislogger.NewNopLogger())
+	m.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
+	m.On("RootDirectory").Maybe().Return("whatever")
+	m.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
+	m.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything, testifymock.Anything).Maybe().Return()
+	m.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
+	m.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
+	store := inmemory.NewStore()
+	osqHistory, err := history.InitHistory(store)
+	require.NoError(t, err)
+	m.On("OsqueryHistory").Return(osqHistory).Maybe()
+	m.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
+	m.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
+	m.On("NodeKey", testifymock.Anything).Return("", nil).Maybe()
+	// for now, don't enable dual log publication (cutover to new agent-ingester service) for these
+	// tests. that logic is tested separately and we can add more logic to test here if needed once
+	// we've settled on a cutover plan and desired behaviors
+	m.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
+	m.On("OsqueryPublisherURL").Return("").Maybe()
+	m.On("KolideServerURL").Return(strings.TrimPrefix(startingTestServer.URL, "http://")).Once() // our first test server
+	m.On("InsecureTransportTLS").Return(true).Maybe()
+	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
+	require.NoError(t, err)
+	m.On("TokenStore").Return(tokenStore).Maybe()
+
+	lpc := makeTestOsqLogPublisher(m)
+	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), m, types.DefaultEnrollmentID, ExtensionOpts{})
+	require.NoError(t, err)
+
+	// Make a request to know that we're talking to the starting server
+	_, _ = e.GetQueries(t.Context())
+	resultLock.Lock()
+	require.True(t, requestSentToStartingServer)
+	resultLock.Unlock()
+
+	// Prepare for URL update
+	m.On("KolideServerURL").Return(strings.TrimPrefix(updatedTestServer.URL, "http://"))
+	e.FlagsChanged(t.Context(), keys.KolideServerURL)
+
+	// Make a request to know that we are now talking to the updated server
+	_, _ = e.GetQueries(t.Context())
+	resultLock.Lock()
+	require.True(t, requestSentToUpdatedServer)
+	resultLock.Unlock()
 }
 
 func TestExtensionGenerateConfigsTransportError(t *testing.T) {
