@@ -10,14 +10,11 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"slices"
 	"sync"
 	"time"
 
 	"github.com/go-kit/kit/transport/http/jsonrpc"
-	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/observability"
 )
 
 // forceNoChunkedEncoding forces the connection not to use chunked
@@ -146,8 +143,6 @@ func NewJSONRPCClient(k types.Knapsack, options ...jsonrpc.ClientOption) (Kolide
 	// the logger context.
 	client = uuidMiddleware(client)
 
-	k.RegisterChangeObserver(client, keys.KolideServerURL)
-
 	return client, nil
 }
 
@@ -176,66 +171,4 @@ func buildRootPool(k types.Knapsack) (*x509.CertPool, error) {
 		}
 	}
 	return rootPool, nil
-}
-
-func (e *Endpoints) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
-	ctx, span := observability.StartSpan(ctx)
-	defer span.End()
-
-	if !slices.Contains(flagKeys, keys.KolideServerURL) {
-		return
-	}
-
-	// Update URL, reusing previous http client
-	serviceURL := buildServiceURL(e.k)
-	opts := []jsonrpc.ClientOption{
-		jsonrpc.SetClient(e.client),
-		jsonrpc.ClientBefore(
-			forceNoChunkedEncoding(e.k.Slogger()),
-		),
-	}
-
-	// Re-create all endpoints with new base URL, locking to prevent concurrent requests during the update
-	e.endpointsLock.Lock()
-	defer e.endpointsLock.Unlock()
-	e.RequestEnrollmentEndpoint = jsonrpc.NewClient(
-		serviceURL,
-		"RequestEnrollment",
-		append(opts, jsonrpc.ClientResponseDecoder(decodeJSONRPCEnrollmentResponse))...,
-	).Endpoint()
-
-	e.RequestConfigEndpoint = jsonrpc.NewClient(
-		serviceURL,
-		"RequestConfig",
-		append(opts, jsonrpc.ClientResponseDecoder(decodeJSONRPCConfigResponse))...,
-	).Endpoint()
-
-	e.PublishLogsEndpoint = jsonrpc.NewClient(
-		serviceURL,
-		"PublishLogs",
-		append(opts, jsonrpc.ClientResponseDecoder(decodeJSONRPCPublishLogsResponse))...,
-	).Endpoint()
-
-	e.RequestQueriesEndpoint = jsonrpc.NewClient(
-		serviceURL,
-		"RequestQueries",
-		append(opts, jsonrpc.ClientResponseDecoder(decodeJSONRPCQueryCollection))...,
-	).Endpoint()
-
-	e.PublishResultsEndpoint = jsonrpc.NewClient(
-		serviceURL,
-		"PublishResults",
-		append(opts, jsonrpc.ClientResponseDecoder(decodeJSONRPCPublishResultsResponse))...,
-	).Endpoint()
-
-	e.CheckHealthEndpoint = jsonrpc.NewClient(
-		serviceURL,
-		"CheckHealth",
-		append(opts, jsonrpc.ClientResponseDecoder(decodeJSONRPCHealthCheckResponse))...,
-	).Endpoint()
-
-	e.k.Slogger().Log(ctx, slog.LevelInfo,
-		"successfully updated URL for Kolide service",
-		"new_url", serviceURL.String(),
-	)
 }
