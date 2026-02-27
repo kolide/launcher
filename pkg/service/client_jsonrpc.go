@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"crypto/x509"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
 	"slices"
 	"sync"
 	"time"
@@ -61,11 +63,7 @@ type jsonRpcResponse struct {
 
 // New creates a new Kolide Client (implementation of the KolideService
 // interface) using a JSONRPC client connection.
-func NewJSONRPCClient(
-	k types.Knapsack,
-	rootPool *x509.CertPool,
-	options ...jsonrpc.ClientOption,
-) KolideService {
+func NewJSONRPCClient(k types.Knapsack, options ...jsonrpc.ClientOption) (KolideService, error) {
 	serviceURL := buildServiceURL(k)
 
 	httpClient := &http.Client{
@@ -75,6 +73,10 @@ func NewJSONRPCClient(
 		},
 	}
 	if !k.InsecureTransportTLS() {
+		rootPool, err := buildRootPool(k)
+		if err != nil {
+			return nil, fmt.Errorf("building root pool: %w", err)
+		}
 		tlsConfig := makeTLSConfig(k, rootPool)
 		httpClient.Transport = &http.Transport{
 			TLSClientConfig:   tlsConfig,
@@ -146,7 +148,7 @@ func NewJSONRPCClient(
 
 	k.RegisterChangeObserver(client, keys.KolideServerURL)
 
-	return client
+	return client, nil
 }
 
 func buildServiceURL(k types.Knapsack) *url.URL {
@@ -159,6 +161,21 @@ func buildServiceURL(k types.Knapsack) *url.URL {
 	}
 
 	return serviceURL
+}
+
+func buildRootPool(k types.Knapsack) (*x509.CertPool, error) {
+	var rootPool *x509.CertPool
+	if k.RootPEM() != "" {
+		rootPool = x509.NewCertPool()
+		pemContents, err := os.ReadFile(k.RootPEM())
+		if err != nil {
+			return nil, fmt.Errorf("reading root certs PEM at path: %s: %w", k.RootPEM(), err)
+		}
+		if ok := rootPool.AppendCertsFromPEM(pemContents); !ok {
+			return nil, fmt.Errorf("found no valid certs in PEM at path: %s", k.RootPEM())
+		}
+	}
+	return rootPool, nil
 }
 
 func (e *Endpoints) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {

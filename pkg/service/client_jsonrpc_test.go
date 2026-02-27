@@ -51,7 +51,8 @@ func TestFlagsChanged(t *testing.T) {
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.KolideServerURL).Return()
 
-	testClient := NewJSONRPCClient(mockKnapsack, nil)
+	testClient, err := NewJSONRPCClient(mockKnapsack)
+	require.NoError(t, err)
 
 	// set up JSON-RPC test server with updated url
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

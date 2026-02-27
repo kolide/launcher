@@ -94,23 +94,20 @@ func TestDeviceDisabled(t *testing.T) {
 			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.KolideServerURL).Return()
 
-			clients := []KolideService{
-				NewJSONRPCClient(mockKnapsack, nil),
-			}
+			client, err := NewJSONRPCClient(mockKnapsack)
+			require.NoError(t, err)
 
-			for _, client := range clients {
-				jsonRpcServerResult = `{"disable_device": false}`
+			jsonRpcServerResult = `{"disable_device": false}`
 
-				require.NoError(t, tt.f(client),
-					"should not return an error when device is not disabled",
-				)
+			require.NoError(t, tt.f(client),
+				"should not return an error when device is not disabled",
+			)
 
-				jsonRpcServerResult = `{"disable_device": true}`
+			jsonRpcServerResult = `{"disable_device": true}`
 
-				require.ErrorIs(t, tt.f(client), ErrDeviceDisabled{},
-					"should return an ErrDeviceDisabled error when device is disabled",
-				)
-			}
+			require.ErrorIs(t, tt.f(client), ErrDeviceDisabled{},
+				"should return an ErrDeviceDisabled error when device is disabled",
+			)
 		})
 	}
 }
