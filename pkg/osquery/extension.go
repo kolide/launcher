@@ -47,7 +47,7 @@ type Extension struct {
 	enrollmentId                  string
 	knapsack                      types.Knapsack
 	serviceClient                 service.KolideService
-	serviceClientLock             *sync.Mutex
+	serviceClientLock             *sync.RWMutex
 	logPublishClient              types.OsqueryPublisher
 	settingsWriter                settingsStoreWriter
 	enrollMutex                   *sync.Mutex // ensures that for non-secretless installations, we never have simultaneous RequestEnrollment requests
@@ -162,7 +162,7 @@ func NewExtension(ctx context.Context, logPublishClient types.OsqueryPublisher, 
 	e := &Extension{
 		slogger:                       slogger,
 		serviceClient:                 client,
-		serviceClientLock:             &sync.Mutex{},
+		serviceClientLock:             &sync.RWMutex{},
 		logPublishClient:              logPublishClient,
 		settingsWriter:                settingsWriter,
 		enrollmentId:                  enrollmentId,
@@ -391,9 +391,9 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	// If no cached node key, enroll for new node key
 	// note that we set invalid two ways. Via the return (resp.NodeInvalid), _or_ via isNodeInvalidErr
 	invalid := false
-	e.serviceClientLock.Lock()
+	e.serviceClientLock.RLock()
 	resp, err := e.serviceClient.RequestEnrollment(ctx, enrollSecret, identifier, enrollDetails)
-	e.serviceClientLock.Unlock()
+	e.serviceClientLock.RUnlock()
 
 	switch {
 	case errors.Is(err, service.ErrDeviceDisabled{}):
@@ -617,9 +617,9 @@ func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bo
 		nodeKey = newNodeKey
 	}
 
-	e.serviceClientLock.Lock()
+	e.serviceClientLock.RLock()
 	config, invalid, err := e.serviceClient.RequestConfig(ctx, nodeKey)
-	e.serviceClientLock.Unlock()
+	e.serviceClientLock.RUnlock()
 	switch {
 	case errors.Is(err, service.ErrDeviceDisabled{}):
 		e.slogger.Log(ctx, slog.LevelInfo,
@@ -906,9 +906,9 @@ func (e *Extension) writeLogsWithReenroll(ctx context.Context, typ logger.LogTyp
 		nodeKey = newNodeKey
 	}
 
-	e.serviceClientLock.Lock()
+	e.serviceClientLock.RLock()
 	_, _, invalid, err := e.serviceClient.PublishLogs(ctx, nodeKey, typ, logs)
-	e.serviceClientLock.Unlock()
+	e.serviceClientLock.RUnlock()
 
 	if errors.Is(err, service.ErrDeviceDisabled{}) {
 		e.slogger.Log(ctx, slog.LevelInfo,
@@ -1066,9 +1066,9 @@ func (e *Extension) getQueriesWithReenroll(ctx context.Context, reenroll bool) (
 	}
 
 	// Note that we set invalid two ways -- in the return, and via isNodeinvaliderr
-	e.serviceClientLock.Lock()
+	e.serviceClientLock.RLock()
 	queries, invalid, err := e.serviceClient.RequestQueries(ctx, nodeKey)
-	e.serviceClientLock.Unlock()
+	e.serviceClientLock.RUnlock()
 
 	switch {
 	case errors.Is(err, service.ErrDeviceDisabled{}):
@@ -1142,9 +1142,9 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 		nodeKey = newNodeKey
 	}
 
-	e.serviceClientLock.Lock()
+	e.serviceClientLock.RLock()
 	_, _, invalid, err := e.serviceClient.PublishResults(ctx, nodeKey, results)
-	e.serviceClientLock.Unlock()
+	e.serviceClientLock.RUnlock()
 	switch {
 	case errors.Is(err, service.ErrDeviceDisabled{}):
 		e.slogger.Log(ctx, slog.LevelInfo,
