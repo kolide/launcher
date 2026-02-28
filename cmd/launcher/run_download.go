@@ -23,15 +23,16 @@ func runDownload(_ *multislogger.MultiSlogger, args []string) error {
 	fs := flag.NewFlagSet("launcher download", flag.ExitOnError)
 
 	var (
-		flChannel = fs.String("channel", "stable", "What channel to download from (or a specific version)")
-		flDir     = fs.String("directory", ".", "Where to download the binary to")
+		flChannel  = fs.String("channel", "stable", "What channel to download from (or a specific version)")
+		flDir      = fs.String("directory", ".", "Where to download the binary to")
+		flPlatform = fs.String("platform", runtime.GOOS, "Target platform (darwin, linux, windows)")
+		flArch     = fs.String("arch", runtime.GOARCH, "Target architecture (amd64, arm64)")
 	)
 
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 
-	// First non-flag arg is the binary name: launcher or osqueryd
 	binary := fs.Arg(0)
 	if binary == "" {
 		return fmt.Errorf("must specify binary to download: launcher or osqueryd")
@@ -45,12 +46,13 @@ func runDownload(_ *multislogger.MultiSlogger, args []string) error {
 	defer cancel()
 
 	target := packaging.Target{}
-	if err := target.PlatformFromString(runtime.GOOS); err != nil {
-		return fmt.Errorf("error parsing platform: %w, %s", err, runtime.GOOS)
+	if err := target.PlatformFromString(*flPlatform); err != nil {
+		return fmt.Errorf("error parsing platform: %w", err)
 	}
-	target.Arch = packaging.ArchFlavor(runtime.GOARCH)
-	if runtime.GOOS == "darwin" {
+	if *flPlatform == "darwin" {
 		target.Arch = packaging.Universal
+	} else if err := target.ArchFromString(*flArch); err != nil {
+		return fmt.Errorf("error parsing arch: %w", err)
 	}
 
 	cacheDir, err := os.MkdirTemp("", binary+"-download")
