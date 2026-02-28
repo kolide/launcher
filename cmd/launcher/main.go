@@ -247,6 +247,8 @@ func runSubcommands(systemMultiSlogger *multislogger.MultiSlogger) error {
 		run = runInteractive
 	case "desktop":
 		run = runDesktop
+	case "download":
+		run = runDownload
 	case "download-osquery":
 		run = runDownloadOsquery
 	case "uninstall":
