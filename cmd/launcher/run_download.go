@@ -21,13 +21,13 @@ import (
 
 // runDownload downloads launcher or osqueryd from the TUF repo with TUF verification
 // and extracts the tarball contents to the output directory.
-func runDownload(_ *multislogger.MultiSlogger, args []string) error {
+func runDownload(slogger *multislogger.MultiSlogger, args []string) error {
 	fs := flag.NewFlagSet("launcher download", flag.ExitOnError)
 
 	var (
 		flTarget   = fs.String("target", "", "Target to download: launcher or osqueryd")
 		flChannel  = fs.String("channel", "stable", "What channel to download from (or a specific version)")
-		flDir      = fs.String("directory", ".", "Where to extract the downloaded files")
+		flDir      = fs.String("directory", ".", "Parent directory (a subdirectory named after the target will be created)")
 		flPlatform = fs.String("platform", runtime.GOOS, "Target platform (darwin, linux, windows)")
 		flArch     = fs.String("arch", runtime.GOARCH, "Target architecture (amd64, arm64)")
 	)
@@ -41,23 +41,24 @@ func runDownload(_ *multislogger.MultiSlogger, args []string) error {
 		return fmt.Errorf("must specify --target (e.g. launcher or osqueryd)")
 	}
 
-	if err := os.MkdirAll(*flDir, 0755); err != nil {
-		return fmt.Errorf("creating directory: %w", err)
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
 	defer cancel()
 
-	tarGzBytes, err := simpleclient.Download(ctx, target, *flPlatform, *flArch, *flChannel, nil)
+	tarGzBytes, err := simpleclient.Download(ctx, slogger.Logger, target, *flPlatform, *flArch, *flChannel, nil)
 	if err != nil {
 		return fmt.Errorf("error fetching %s: %w", target, err)
 	}
 
-	if err := extractTarGz(bytes.NewReader(tarGzBytes), *flDir); err != nil {
+	destDir := filepath.Join(*flDir, target)
+	if err := os.MkdirAll(destDir, 0755); err != nil {
+		return fmt.Errorf("creating directory %s: %w", destDir, err)
+	}
+
+	if err := extractTarGz(bytes.NewReader(tarGzBytes), destDir); err != nil {
 		return fmt.Errorf("error extracting: %w", err)
 	}
 
-	fmt.Printf("Downloaded and extracted %s to: %s\n", target, *flDir)
+	fmt.Printf("Downloaded and extracted %s to: %s\n", target, destDir)
 
 	return nil
 }
@@ -90,7 +91,7 @@ func extractTarGz(r io.Reader, destDir string) error {
 			if err := os.MkdirAll(target, os.FileMode(header.Mode)); err != nil {
 				return fmt.Errorf("creating directory %s: %w", target, err)
 			}
-		case tar.TypeReg, tar.TypeRegA:
+		case tar.TypeReg:
 			if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
 				return fmt.Errorf("creating parent directory for %s: %w", target, err)
 			}

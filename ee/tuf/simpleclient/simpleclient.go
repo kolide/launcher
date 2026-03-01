@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"path"
 	"strings"
@@ -58,7 +59,7 @@ func (o *Options) httpClient() *http.Client {
 // platform must be "darwin", "linux", or "windows".
 // arch must be "amd64" or "arm64" (darwin uses "universal" automatically).
 // versionOrChannel is a channel ("stable", "beta", etc.) or specific version ("1.2.3").
-func Download(ctx context.Context, target, platform, arch, versionOrChannel string, opts *Options) ([]byte, error) {
+func Download(ctx context.Context, slogger *slog.Logger, target, platform, arch, versionOrChannel string, opts *Options) ([]byte, error) {
 	if opts == nil {
 		opts = &Options{}
 	}
@@ -67,6 +68,7 @@ func Download(ctx context.Context, target, platform, arch, versionOrChannel stri
 	target = strings.ToLower(target)
 
 	// Create an in-memory TUF metadata client and update
+	metadataStart := time.Now()
 	localStore := client.MemoryLocalStore()
 	remoteStore, err := client.HTTPRemoteStore(opts.metadataURL(), &client.HTTPRemoteOptions{
 		MetadataPath: "/repository",
@@ -88,8 +90,14 @@ func Download(ctx context.Context, target, platform, arch, versionOrChannel stri
 	if err != nil {
 		return nil, fmt.Errorf("resolving target: %w", err)
 	}
+	slogger.Log(ctx, slog.LevelDebug,
+		"TUF metadata updated and target resolved",
+		"target_path", targetPath,
+		"duration", time.Since(metadataStart).String(),
+	)
 
 	// Download from mirror
+	downloadStart := time.Now()
 	downloadURL := strings.TrimSuffix(opts.mirrorURL(), "/") + path.Join("/", "kolide", targetPath)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
 	if err != nil {
@@ -115,6 +123,12 @@ func Download(ctx context.Context, target, platform, arch, versionOrChannel stri
 	if err := tufutil.TargetFileMetaEqual(actualMeta, metadata); err != nil {
 		return nil, fmt.Errorf("verification failed: %w", err)
 	}
+	slogger.Log(ctx, slog.LevelDebug,
+		"target downloaded and verified",
+		"target_path", targetPath,
+		"size", buf.Len(),
+		"duration", time.Since(downloadStart).String(),
+	)
 
 	return buf.Bytes(), nil
 }
