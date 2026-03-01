@@ -41,7 +41,10 @@ func CachedWindowsUpdatesTablePlugin(flags types.Flags, slogger *slog.Logger, ca
 		name:       "kolide_windows_updates_cached",
 	}
 
-	return tablewrapper.New(flags, slogger, t.name, columns, t.generateFromCachedData)
+	return tablewrapper.New(flags, slogger, t.name, columns, t.generateFromCachedData,
+		tablewrapper.WithDescription("Cached Windows Update data, flattened as key-value pairs. Returns previously fetched update information without querying the Windows Update API. Useful for faster, offline access to update status."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
+	)
 }
 
 func (c *CachedWindowsUpdatesTable) generateFromCachedData(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

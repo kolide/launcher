@@ -34,6 +34,7 @@ import (
 	"github.com/kolide/launcher/ee/tables/security"
 	"github.com/kolide/launcher/ee/tables/spotlight"
 	"github.com/kolide/launcher/ee/tables/systemprofiler"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/ee/tables/zfs"
 	osquery "github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -57,7 +58,9 @@ func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsque
 		[]table.ColumnDefinition{
 			table.IntegerColumn("enabled"),
 			table.IntegerColumn("grace_period"),
-		})
+		},
+		tablewrapper.WithDescription("Per-user screen lock settings on macOS, including whether screen lock is enabled and the grace period before a password is required. Useful for auditing screen lock compliance."),
+	)
 
 	keychainAclsTable := osquery_user_exec_table.TablePlugin(
 		k, slogger, "kolide_keychain_acls",
@@ -68,7 +71,9 @@ func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsque
 			table.TextColumn("path"),
 			table.TextColumn("description"),
 			table.TextColumn("label"),
-		})
+		},
+		tablewrapper.WithDescription("macOS keychain access control lists (ACLs) per user, showing which applications are authorized to access keychain items. Useful for auditing keychain permissions."),
+	)
 
 	keychainItemsTable := osquery_user_exec_table.TablePlugin(
 		k, slogger, "kolide_keychain_items",
@@ -81,7 +86,9 @@ func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsque
 			table.TextColumn("modified"),
 			table.TextColumn("type"),
 			table.TextColumn("path"),
-		})
+		},
+		tablewrapper.WithDescription("macOS keychain items per user, including labels, types, creation and modification dates. Useful for enumerating certificates, keys, and passwords stored in user keychains."),
+	)
 
 	return []osquery.OsqueryPlugin{
 		keychainAclsTable,

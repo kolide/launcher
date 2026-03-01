@@ -39,7 +39,10 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", "kolide_wmi"),
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_wmi", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_wmi", columns, t.generate,
+		tablewrapper.WithDescription("Windows Management Instrumentation (WMI) query results, flattened as key-value pairs. Requires a class constraint and optional properties constraint. Useful for querying Windows system management data."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
+	)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

@@ -41,7 +41,10 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", "kolide_secedit"),
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_secedit", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_secedit", columns, t.generate,
+		tablewrapper.WithDescription("Windows security policy settings from `secedit /export`, flattened as key-value pairs. Useful for auditing local security policy configuration such as password policies and audit settings."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
+	)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

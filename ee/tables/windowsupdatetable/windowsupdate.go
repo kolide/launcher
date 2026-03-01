@@ -68,7 +68,10 @@ func TablePlugin(mode tableMode, flags types.Flags, slogger *slog.Logger) *table
 
 	t.slogger = slogger.With("name", t.name)
 
-	return tablewrapper.New(flags, slogger, t.name, columns, t.generateWithLauncherExec)
+	return tablewrapper.New(flags, slogger, t.name, columns, t.generateWithLauncherExec,
+		tablewrapper.WithDescription("Windows Update history and pending updates, flattened as key-value pairs. Useful for auditing update compliance and identifying missing patches."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
+	)
 }
 
 func queryUpdates(searcher *windowsupdate.IUpdateSearcher) (interface{}, error) {
