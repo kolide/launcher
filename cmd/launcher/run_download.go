@@ -19,7 +19,6 @@ import (
 	"github.com/kolide/launcher/pkg/log/multislogger"
 )
 
-
 // runDownload downloads launcher or osqueryd from the TUF repo with TUF verification
 // and extracts the tarball contents to the output directory.
 func runDownload(slogger *multislogger.MultiSlogger, args []string) error {

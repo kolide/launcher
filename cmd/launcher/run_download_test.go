@@ -67,8 +67,8 @@ func TestExtractTarGz(t *testing.T) {
 		t.Parallel()
 		destDir := t.TempDir()
 		buf := createTestTarGz(t, map[string]string{
-			"app/bin/launcher":   "launcher-binary",
-			"app/lib/helper.so":  "shared-lib",
+			"app/bin/launcher":  "launcher-binary",
+			"app/lib/helper.so": "shared-lib",
 		})
 
 		if err := extractTarGz(buf, destDir); err != nil {
