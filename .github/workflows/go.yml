@@ -496,7 +496,7 @@ jobs:
 
       - name: Osquery Version
         working-directory: build
-        run: ./osqueryd --version
+        run: ./osqueryd/osqueryd --version
 
       - name: Launcher Doctor
         working-directory: build
