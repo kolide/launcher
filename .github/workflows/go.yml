@@ -417,6 +417,7 @@ jobs:
         working-directory: build
         run: |
           ./launcher download-osquery --directory osqueryd-download
+          sleep 2
           ls osqueryd-download
           ls osqueryd-download/osqueryd
           mv ./osqueryd-download/osqueryd/osqueryd* ./
