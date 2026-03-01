@@ -19,7 +19,9 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		table.TextColumn("start_time"),
 		table.TextColumn("last_health_check"),
 	}
-	return tablewrapper.New(flags, slogger, "kolide_desktop_procs", columns, generate())
+	return tablewrapper.New(flags, slogger, "kolide_desktop_procs", columns, generate(),
+		tablewrapper.WithDescription("Running Kolide Desktop UI processes, including PID, UID, start time, and last health check. Useful for verifying the desktop component is running."),
+	)
 }
 
 func generate() table.GenerateFunc {

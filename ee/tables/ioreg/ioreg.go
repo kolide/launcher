@@ -48,7 +48,9 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		tableName: "kolide_ioreg",
 	}
 
-	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generate)
+	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generate,
+		tablewrapper.WithDescription("macOS I/O Registry data from `ioreg`, flattened as key-value pairs. Supports constraints for class (-c), depth (-d), key (-k), name (-n), plane (-p), and root (-r). Useful for querying hardware properties, battery info, USB devices, and other I/O Kit data."),
+	)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

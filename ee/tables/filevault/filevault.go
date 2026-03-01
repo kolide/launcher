@@ -31,7 +31,9 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", "kolide_filevault"),
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_filevault", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_filevault", columns, t.generate,
+		tablewrapper.WithDescription("macOS FileVault full-disk encryption status from `fdesetup status`. Useful for verifying that FileVault disk encryption is enabled."),
+	)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

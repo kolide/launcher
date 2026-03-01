@@ -47,7 +47,9 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", tableName),
 	}
 
-	return tablewrapper.New(flags, slogger, t.name, columns, t.generate)
+	return tablewrapper.New(flags, slogger, t.name, columns, t.generate,
+		tablewrapper.WithDescription("Firefox user preferences parsed from prefs.js files, returned as flattened key-value pairs. Requires a WHERE path = constraint. Useful for auditing browser configuration settings."),
+	)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

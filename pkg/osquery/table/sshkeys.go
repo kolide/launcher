@@ -55,7 +55,9 @@ func SshKeys(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		kIdentifer: kIdentifer,
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_ssh_keys", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_ssh_keys", columns, t.generate,
+		tablewrapper.WithDescription("SSH key metadata from user .ssh directories, including key type, encryption status, bits, and fingerprints. Deprecated in favor of using osquery's file table joined with kolide_keyinfo."),
+	)
 }
 
 func (t *SshKeysTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

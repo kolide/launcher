@@ -21,6 +21,7 @@ import (
 	"github.com/kolide/launcher/ee/tables/firefox_preferences"
 	"github.com/kolide/launcher/ee/tables/jwt"
 	"github.com/kolide/launcher/ee/tables/launcher_db"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/ee/tables/osquery_instance_history"
 	"github.com/kolide/launcher/ee/tables/release_tracker_data"
 	"github.com/kolide/launcher/ee/tables/secretscan"
@@ -38,8 +39,12 @@ func LauncherTables(k types.Knapsack, slogger *slog.Logger) []osquery.OsqueryPlu
 		LauncherConfigTable(k, slogger, k.ConfigStore(), k),
 		LauncherDbInfo(k, slogger, k.BboltDB()),
 		LauncherInfoTable(k, slogger, k.ConfigStore(), k.LauncherHistoryStore()),
-		launcher_db.TablePlugin(k, slogger, "kolide_server_data", k.ServerProvidedDataStore()),
-		launcher_db.TablePlugin(k, slogger, "kolide_control_flags", k.AgentFlagsStore()),
+		launcher_db.TablePlugin(k, slogger, "kolide_server_data", k.ServerProvidedDataStore(),
+			tablewrapper.WithDescription("Key-value data provided by the control server. Useful for inspecting server-pushed configuration or metadata."),
+		),
+		launcher_db.TablePlugin(k, slogger, "kolide_control_flags", k.AgentFlagsStore(),
+			tablewrapper.WithDescription("Agent control flags pushed by the control server, such as feature toggles and behavior overrides. Useful for debugging server-controlled agent settings."),
+		),
 		LauncherAutoupdateConfigTable(slogger, k),
 		osquery_instance_history.TablePlugin(k, slogger),
 		release_tracker_data.TablePlugin(k, slogger, k.ServerReleaseTrackerDataStore()),

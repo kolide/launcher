@@ -74,7 +74,9 @@ func AppIcons(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		table.TextColumn("icon"),
 		table.TextColumn("hash"),
 	}
-	return tablewrapper.New(flags, slogger, "kolide_app_icons", columns, generateAppIcons)
+	return tablewrapper.New(flags, slogger, "kolide_app_icons", columns, generateAppIcons,
+		tablewrapper.WithDescription("Application icons on macOS as base64-encoded PNG images with CRC64 hashes. Requires a WHERE path = constraint. Useful for identifying applications by their icon."),
+	)
 }
 
 func generateAppIcons(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

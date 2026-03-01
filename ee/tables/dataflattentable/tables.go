@@ -22,6 +22,7 @@ type DataSourceType struct {
 	flattenBytesFunc func(string) dataflatten.DataFunc
 	flattenFileFunc  func(string) dataflatten.DataFileFunc
 	tableName        string
+	description      string
 }
 
 var (
@@ -29,26 +30,31 @@ var (
 		flattenBytesFunc: func(_ string) dataflatten.DataFunc { return dataflatten.Plist },
 		flattenFileFunc:  func(_ string) dataflatten.DataFileFunc { return dataflatten.PlistFile },
 		tableName:        "kolide_plist",
+		description:      "Parses Apple plist files or raw plist data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading macOS preference files, application plists, and system configuration.",
 	}
 	JsonType = DataSourceType{
 		flattenBytesFunc: func(_ string) dataflatten.DataFunc { return dataflatten.Json },
 		flattenFileFunc:  func(_ string) dataflatten.DataFileFunc { return dataflatten.JsonFile },
 		tableName:        "kolide_json",
+		description:      "Parses JSON files or raw JSON data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading any JSON configuration or data file.",
 	}
 	JsonlType = DataSourceType{
 		flattenBytesFunc: func(_ string) dataflatten.DataFunc { return dataflatten.Jsonl },
 		flattenFileFunc:  func(_ string) dataflatten.DataFileFunc { return dataflatten.JsonlFile },
 		tableName:        "kolide_jsonl",
+		description:      "Parses JSONL (JSON Lines) files or raw data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading line-delimited JSON log files.",
 	}
 	XmlType = DataSourceType{
 		flattenBytesFunc: func(_ string) dataflatten.DataFunc { return dataflatten.Xml },
 		flattenFileFunc:  func(_ string) dataflatten.DataFileFunc { return dataflatten.XmlFile },
 		tableName:        "kolide_xml",
+		description:      "Parses XML files or raw XML data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading XML configuration or data files.",
 	}
 	IniType = DataSourceType{
 		flattenBytesFunc: func(_ string) dataflatten.DataFunc { return dataflatten.Ini },
 		flattenFileFunc:  func(_ string) dataflatten.DataFileFunc { return dataflatten.IniFile },
 		tableName:        "kolide_ini",
+		description:      "Parses INI files or raw INI data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading INI-style configuration files.",
 	}
 	KeyValueType = DataSourceType{
 		flattenBytesFunc: func(kvDelimiter string) dataflatten.DataFunc {
@@ -121,8 +127,12 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger, dataSourceType DataSou
 
 	t.slogger = slogger.With("table", t.tableName)
 
-	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generate)
+	var opts []tablewrapper.TablePluginOption
+	if dataSourceType.description != "" {
+		opts = append(opts, tablewrapper.WithDescription(dataSourceType.description))
+	}
 
+	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generate, opts...)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

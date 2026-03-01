@@ -27,7 +27,10 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", "kolide_deadly_sleeper"),
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_deadly_sleeper", columns, t.generate, tablewrapper.WithTableGenerateTimeout(10*time.Minute))
+	return tablewrapper.New(flags, slogger, "kolide_deadly_sleeper", columns, t.generate,
+		tablewrapper.WithTableGenerateTimeout(10*time.Minute),
+		tablewrapper.WithDescription("Debug table that sleeps for a given duration before returning. Used to test query timeout behavior. Not intended for production use."),
+	)
 
 }
 

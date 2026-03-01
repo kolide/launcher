@@ -45,7 +45,9 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		execCC:    allowedcmd.Pwpolicy,
 	}
 
-	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generate)
+	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generate,
+		tablewrapper.WithDescription("macOS password policy settings from `pwpolicy getaccountpolicies`, flattened as key-value pairs. Supports an optional username constraint. Useful for auditing password complexity, expiration, and lockout policies."),
+	)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
