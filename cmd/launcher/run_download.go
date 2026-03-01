@@ -12,7 +12,6 @@ import (
 
 	"github.com/kolide/launcher/ee/tuf/simpleclient"
 	"github.com/kolide/launcher/pkg/log/multislogger"
-	"github.com/kolide/launcher/pkg/packaging"
 )
 
 // runDownload downloads launcher or osqueryd from the TUF repo with TUF verification.
@@ -42,17 +41,10 @@ func runDownload(_ *multislogger.MultiSlogger, args []string) error {
 		return fmt.Errorf("binary must be launcher or osqueryd, got %q", binary)
 	}
 
-	target := packaging.Target{}
-	if err := target.PlatformFromString(*flPlatform); err != nil {
-		return fmt.Errorf("error parsing platform: %w", err)
+	binaryName := binary
+	if *flPlatform == "windows" {
+		binaryName += ".exe"
 	}
-	if *flPlatform == "darwin" {
-		target.Arch = packaging.Universal
-	} else if err := target.ArchFromString(*flArch); err != nil {
-		return fmt.Errorf("error parsing arch: %w", err)
-	}
-
-	binaryName := target.PlatformBinaryName(binary)
 	outfile := filepath.Join(*flDir, binaryName)
 
 	if err := os.MkdirAll(*flDir, 0755); err != nil {
@@ -68,7 +60,7 @@ func runDownload(_ *multislogger.MultiSlogger, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
 	defer cancel()
 
-	if err := simpleclient.Download(ctx, binary, *flPlatform, string(target.Arch), *flChannel, f, nil); err != nil {
+	if err := simpleclient.Download(ctx, binary, *flPlatform, *flArch, *flChannel, f, nil); err != nil {
 		return fmt.Errorf("error fetching %s binary: %w", binary, err)
 	}
 
