@@ -5,8 +5,8 @@ package table
 import (
 	"log/slog"
 
-	"github.com/knightsc/system_policy/osquery/table/kextpolicy"
-	"github.com/knightsc/system_policy/osquery/table/legacyexec"
+	"github.com/kolide/launcher/ee/tables/knightsc/kextpolicy"
+	"github.com/kolide/launcher/ee/tables/knightsc/legacyexec"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/airport"
@@ -109,12 +109,12 @@ func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsque
 		ioreg.TablePlugin(k, slogger),
 		profiles.TablePlugin(k, slogger),
 		airport.TablePlugin(k, slogger),
-		kextpolicy.TablePlugin(),
+		kextpolicy.TablePlugin(k, slogger),
 		filevault.TablePlugin(k, slogger),
 		find_my.FindMyDevice(k, slogger),
 		mdmclient.TablePlugin(k, slogger),
 		apple_silicon_security_policy.TablePlugin(k, slogger),
-		legacyexec.TablePlugin(),
+		legacyexec.TablePlugin(k, slogger),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_diskutil_list", plist.Parser, allowedcmd.Diskutil, []string{"list", "-plist"}),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_falconctl_stats", plist.Parser, allowedcmd.Launcher, []string{"rundisclaimed", "falconctl", "stats", "-p"}),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_apfs_list", plist.Parser, allowedcmd.Diskutil, []string{"apfs", "list", "-plist"}),
