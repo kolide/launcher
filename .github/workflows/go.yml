@@ -415,11 +415,14 @@ jobs:
 
       - name: Download Osquery
         working-directory: build
-        run: ./launcher download-osquery --directory .
+        run: |
+          ./launcher download-osquery --directory .
+          mv osqueryd osqueryd-download
+          mv ./osqueryd-download/osqueryd ./
 
       - name: Osquery Version
         working-directory: build
-        run: ./osqueryd/osqueryd --version
+        run: ./osqueryd --version
 
       - name: Launcher Doctor
         working-directory: build
@@ -492,11 +495,14 @@ jobs:
 
       - name: Download Osquery
         working-directory: build
-        run: ./launcher download-osquery --directory .
+        run: |
+          ./launcher download-osquery --directory .
+          mv osqueryd osqueryd-download
+          mv ./osqueryd-download/osqueryd ./
 
       - name: Osquery Version
         working-directory: build
-        run: ./osqueryd/osqueryd --version
+        run: ./osqueryd --version
 
       - name: Launcher Doctor
         working-directory: build

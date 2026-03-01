@@ -30,6 +30,7 @@ func runDownload(slogger *multislogger.MultiSlogger, args []string) error {
 		flDir      = fs.String("directory", ".", "Parent directory (a subdirectory named after the target will be created)")
 		flPlatform = fs.String("platform", runtime.GOOS, "Target platform (darwin, linux, windows)")
 		flArch     = fs.String("arch", runtime.GOARCH, "Target architecture (amd64, arm64)")
+		flRaw      = fs.Bool("raw", false, "Write verified tarball as-is instead of extracting")
 		flTufStore = fs.String("tuf-store", "", "Directory for TUF local metadata (omit for in-memory)")
 		flDebug    = fs.Bool("debug", false, "Enable debug logging")
 	)
@@ -67,6 +68,18 @@ func runDownload(slogger *multislogger.MultiSlogger, args []string) error {
 	tarGzBytes, err := simpleclient.Download(ctx, slogger.Logger, target, *flPlatform, *flArch, *flChannel, opts)
 	if err != nil {
 		return fmt.Errorf("error fetching %s: %w", target, err)
+	}
+
+	if *flRaw {
+		if err := os.MkdirAll(*flDir, 0755); err != nil {
+			return fmt.Errorf("creating directory %s: %w", *flDir, err)
+		}
+		outFile := filepath.Join(*flDir, target+".tar.gz")
+		if err := os.WriteFile(outFile, tarGzBytes, 0644); err != nil {
+			return fmt.Errorf("writing %s: %w", outFile, err)
+		}
+		fmt.Println(outFile)
+		return nil
 	}
 
 	destDir := filepath.Join(*flDir, target)
