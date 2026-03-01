@@ -26,7 +26,7 @@ func runDownload(slogger *multislogger.MultiSlogger, args []string) error {
 	fs := flag.NewFlagSet("launcher download", flag.ExitOnError)
 
 	var (
-		flTarget   = fs.String("target", "", "Target to download: launcher or osqueryd")
+		flTarget   = fs.String("target", "", "Target to download (omit to list available targets)")
 		flChannel  = fs.String("channel", "stable", "What channel to download from (or a specific version)")
 		flDir      = fs.String("directory", ".", "Parent directory (a subdirectory named after the target will be created)")
 		flPlatform = fs.String("platform", runtime.GOOS, "Target platform (darwin, linux, windows)")
@@ -46,16 +46,26 @@ func runDownload(slogger *multislogger.MultiSlogger, args []string) error {
 	slogger.AddHandler(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
 
 	target := strings.ToLower(*flTarget)
-	if target == "" {
-		return fmt.Errorf("must specify --target (e.g. launcher or osqueryd)")
-	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
 	defer cancel()
 
-	tarGzBytes, err := simpleclient.Download(ctx, slogger.Logger, target, *flPlatform, *flArch, *flChannel, &simpleclient.Options{
+	opts := &simpleclient.Options{
 		LocalStorePath: *flTufStore,
-	})
+	}
+
+	if target == "" {
+		targets, err := simpleclient.ListTargets(ctx, slogger.Logger, opts)
+		if err != nil {
+			return fmt.Errorf("listing targets: %w", err)
+		}
+		for _, t := range targets {
+			fmt.Println(t)
+		}
+		return nil
+	}
+
+	tarGzBytes, err := simpleclient.Download(ctx, slogger.Logger, target, *flPlatform, *flArch, *flChannel, opts)
 	if err != nil {
 		return fmt.Errorf("error fetching %s: %w", target, err)
 	}

@@ -10,7 +10,9 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"maps"
 	"path"
+	"slices"
 	"strings"
 	"time"
 
@@ -25,7 +27,7 @@ const (
 	DefaultMirrorURL   = "https://dl.kolide.co"
 )
 
-// Options configures the Download operation.
+// Options configures the Download and ListTargets operations.
 type Options struct {
 	MetadataURL string
 	MirrorURL   string
@@ -56,23 +58,12 @@ func (o *Options) httpClient() *http.Client {
 	return &http.Client{Timeout: 2 * time.Minute}
 }
 
-// Download fetches a target from the TUF mirror and verifies it against TUF metadata.
-// Returns the verified tarball bytes.
-//
-// target is the TUF target name (e.g. "launcher", "osqueryd").
-// platform must be "darwin", "linux", or "windows".
-// arch must be "amd64" or "arm64" (darwin uses "universal" automatically).
-// versionOrChannel is a channel ("stable", "beta", etc.) or specific version ("1.2.3").
-func Download(ctx context.Context, slogger *slog.Logger, target, platform, arch, versionOrChannel string, opts *Options) ([]byte, error) {
-	if opts == nil {
-		opts = &Options{}
-	}
+// initMetadataClient creates a TUF metadata client, initializes it with the
+// root JSON, and fetches the latest metadata. Returns the ready-to-use client.
+func initMetadataClient(ctx context.Context, slogger *slog.Logger, opts *Options) (*client.Client, error) {
 	httpClient := opts.httpClient()
 
-	target = strings.ToLower(target)
-
-	// Create TUF metadata client and update
-	metadataStart := time.Now()
+	start := time.Now()
 	var localStore client.LocalStore
 	if opts.LocalStorePath != "" {
 		var err error
@@ -97,6 +88,57 @@ func Download(ctx context.Context, slogger *slog.Logger, target, platform, arch,
 	if _, err := metadataClient.Update(); err != nil {
 		return nil, fmt.Errorf("updating TUF metadata: %w", err)
 	}
+	slogger.Log(ctx, slog.LevelDebug,
+		"TUF metadata updated",
+		"duration", time.Since(start).String(),
+	)
+
+	return metadataClient, nil
+}
+
+// ListTargets fetches TUF metadata and returns the sorted list of all target paths.
+func ListTargets(ctx context.Context, slogger *slog.Logger, opts *Options) ([]string, error) {
+	if opts == nil {
+		opts = &Options{}
+	}
+
+	metadataClient, err := initMetadataClient(ctx, slogger, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	targets, err := metadataClient.Targets()
+	if err != nil {
+		return nil, fmt.Errorf("getting targets: %w", err)
+	}
+
+	seen := make(map[string]any)
+	for p := range targets {
+		name, _, _ := strings.Cut(p, "/")
+		seen[name] = nil
+	}
+
+	return slices.Sorted(maps.Keys(seen)), nil
+}
+
+// Download fetches a target from the TUF mirror and verifies it against TUF metadata.
+// Returns the verified tarball bytes.
+//
+// target is the TUF target name (e.g. "launcher", "osqueryd").
+// platform must be "darwin", "linux", or "windows".
+// arch must be "amd64" or "arm64" (darwin uses "universal" automatically).
+// versionOrChannel is a channel ("stable", "beta", etc.) or specific version ("1.2.3").
+func Download(ctx context.Context, slogger *slog.Logger, target, platform, arch, versionOrChannel string, opts *Options) ([]byte, error) {
+	if opts == nil {
+		opts = &Options{}
+	}
+
+	target = strings.ToLower(target)
+
+	metadataClient, err := initMetadataClient(ctx, slogger, opts)
+	if err != nil {
+		return nil, err
+	}
 
 	// Resolve target name + channel/version to a concrete target path
 	targetPath, metadata, err := tuf.ResolveTarget(metadataClient, target, platform, arch, versionOrChannel)
@@ -104,13 +146,13 @@ func Download(ctx context.Context, slogger *slog.Logger, target, platform, arch,
 		return nil, fmt.Errorf("resolving target: %w", err)
 	}
 	slogger.Log(ctx, slog.LevelDebug,
-		"TUF metadata updated and target resolved",
+		"target resolved",
 		"target_path", targetPath,
-		"duration", time.Since(metadataStart).String(),
 	)
 
 	// Download from mirror
 	downloadStart := time.Now()
+	httpClient := opts.httpClient()
 	downloadURL := strings.TrimSuffix(opts.mirrorURL(), "/") + path.Join("/", "kolide", targetPath)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
 	if err != nil {
