@@ -74,9 +74,6 @@ func Download(ctx context.Context, target, platform, arch, versionOrChannel stri
 	}
 
 	target = strings.ToLower(target)
-	if target != "launcher" && target != "osqueryd" {
-		return nil, fmt.Errorf("target must be launcher or osqueryd, got %q", target)
-	}
 
 	metadataClient, err := newMetadataClient(opts.metadataURL(), opts.httpClient())
 	if err != nil {

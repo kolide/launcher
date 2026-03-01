@@ -38,10 +38,7 @@ func runDownload(_ *multislogger.MultiSlogger, args []string) error {
 
 	target := strings.ToLower(*flTarget)
 	if target == "" {
-		return fmt.Errorf("must specify --target (launcher or osqueryd)")
-	}
-	if target != "launcher" && target != "osqueryd" {
-		return fmt.Errorf("target must be launcher or osqueryd, got %q", target)
+		return fmt.Errorf("must specify --target (e.g. launcher or osqueryd)")
 	}
 
 	if err := os.MkdirAll(*flDir, 0755); err != nil {
