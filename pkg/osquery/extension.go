@@ -501,16 +501,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		)
 	}
 
-	// save the new agent ingester auth token and ping the log publish client to update its token
-	if err := e.knapsack.TokenStore().Set(storage.AgentIngesterAuthTokenKey, []byte(resp.AgentIngesterToken)); err != nil {
-		e.slogger.Log(ctx, slog.LevelError,
-			"could not save agent ingester auth token",
-			"err", err,
-		)
-	} else {
-		e.logPublishClient.Ping()
-		e.slogger.Log(ctx, slog.LevelInfo, "stored new agent ingester auth token")
-	}
+	e.persistAgentIngesterKeys(ctx, resp)
 
 	e.slogger.Log(ctx, slog.LevelInfo,
 		"completed enrollment",
@@ -528,6 +519,52 @@ func (e *Extension) enrolled() bool {
 func (e *Extension) nodeKey() string {
 	nodeKey, _ := e.knapsack.NodeKey(e.enrollmentId)
 	return nodeKey
+}
+
+// persistAgentIngesterKeys persists the agent ingester keys from an enrollment responseto the token store
+// and pings the log publish client to update its token cache if any updates were made
+func (e *Extension) persistAgentIngesterKeys(ctx context.Context, resp *service.EnrollmentResponse) {
+	// track if we made any updates to the token store so we can ping the log publish client
+	updatesMade := false
+	if resp.AgentIngesterToken != "" {
+		if err := e.knapsack.TokenStore().Set(storage.AgentIngesterAuthTokenKey, []byte(resp.AgentIngesterToken)); err != nil {
+			e.slogger.Log(ctx, slog.LevelError,
+				"could not save agent ingester auth token",
+				"err", err,
+			)
+		} else {
+			updatesMade = true
+			e.slogger.Log(ctx, slog.LevelInfo, "stored new agent ingester auth token")
+		}
+	}
+
+	if resp.AgentIngesterHPKEPublicKey != "" {
+		if err := e.knapsack.TokenStore().Set(storage.AgentIngesterHPKEPublicKey, []byte(resp.AgentIngesterHPKEPublicKey)); err != nil {
+			e.slogger.Log(ctx, slog.LevelError,
+				"could not save agent ingester HPKE public key",
+				"err", err,
+			)
+		} else {
+			updatesMade = true
+			e.slogger.Log(ctx, slog.LevelInfo, "stored new agent ingester HPKE public key")
+		}
+	}
+
+	if resp.AgentIngesterHPKEPresharedKey != "" {
+		if err := e.knapsack.TokenStore().Set(storage.AgentIngesterHPKEPresharedKey, []byte(resp.AgentIngesterHPKEPresharedKey)); err != nil {
+			e.slogger.Log(ctx, slog.LevelError,
+				"could not save agent ingester HPKE preshared key",
+				"err", err,
+			)
+		} else {
+			updatesMade = true
+			e.slogger.Log(ctx, slog.LevelInfo, "stored new agent ingester HPKE preshared key")
+		}
+	}
+
+	if updatesMade {
+		e.logPublishClient.Ping()
+	}
 }
 
 // RequireReenroll clears the existing node key information, ensuring that the

@@ -38,8 +38,10 @@ type (
 		slogger     *slog.Logger
 		knapsack    types.Knapsack
 		client      PublisherHTTPClient
-		tokens      map[string]string
-		tokensMutex *sync.RWMutex
+		authTokens  map[string]string
+		hpkeKeys    map[string]*KeyData
+		psks        map[string]*KeyData
+		tokensMutex *sync.RWMutex // used to protect the authTokens, hpkeKeys, and psks maps
 	}
 )
 
@@ -48,16 +50,13 @@ func NewLogPublisherClient(logger *slog.Logger, k types.Knapsack, client Publish
 		slogger:     logger.With("component", "osquery_log_publisher"),
 		knapsack:    k,
 		client:      client,
-		tokens:      make(map[string]string),
+		authTokens:  make(map[string]string),
 		tokensMutex: &sync.RWMutex{},
+		hpkeKeys:    make(map[string]*KeyData),
+		psks:        make(map[string]*KeyData),
 	}
 
-	if err := lpc.refreshTokenCache(); err != nil {
-		lpc.slogger.Log(context.TODO(), slog.LevelWarn,
-			"unable to refresh token cache on log publisher client initialization, may not be set yet",
-			"err", err,
-		)
-	}
+	lpc.refreshTokenCache()
 
 	return &lpc
 }
@@ -155,6 +154,7 @@ func (lpc *LogPublisherClient) PublishResults(ctx context.Context, results []dis
 // publish handles the common logic for publishing logs and results to the agent-ingester service. This
 // includes marshalling the payload, fetching the auth token, issuing the request, and handling the response/logging.
 func (lpc *LogPublisherClient) publish(ctx context.Context, slogger *slog.Logger, payload any, publicationPath string) (*types.OsqueryPublicationResponse, error) {
+	var err error
 	// in the future we will want to plumb an enrollment ID through here, for now just use the default
 	enrollmentID := types.DefaultEnrollmentID
 	authToken := lpc.getTokenForEnrollment(enrollmentID)
@@ -162,18 +162,43 @@ func (lpc *LogPublisherClient) publish(ctx context.Context, slogger *slog.Logger
 		return nil, fmt.Errorf("no auth token found for enrollment: %s", enrollmentID)
 	}
 
+	hpkeKey := lpc.getHPKEKeyForEnrollment(enrollmentID)
+	if hpkeKey == nil {
+		return nil, fmt.Errorf("no HPKE key available for enrollment '%s': %w", enrollmentID, err)
+	}
+
+	psk := lpc.getPSKForEnrollment(enrollmentID)
+	if psk == nil {
+		return nil, fmt.Errorf("no PSK available for enrollment '%s': %w", enrollmentID, err)
+	}
+
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling unencrypted request payload: %w", err)
+	}
+
+	// TODO: (upcoming PR) data should be compressed here prior to encryption
+	// encrypt the payload
+	encryptedBlob, err := encryptWithHPKE(jsonData, hpkeKey, psk)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encrypt payload with HPKE: %w", err)
+	}
+
+	// replace payload with encrypted blob
+	jsonData, err = json.Marshal(encryptedBlob)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling encrypted blob: %w", err)
+	}
+
 	requestUUID := uuid.NewForRequest()
 	ctx = uuid.NewContext(ctx, requestUUID)
-	logger := slogger.With(
-		"request_uuid", requestUUID,
-		"publication_type", publicationPath,
-	)
-	var resp *http.Response
+	resp := &http.Response{}
 	var publicationResponse types.OsqueryPublicationResponse
-	var err error
 
 	defer func(begin time.Time) {
-		logger.Log(ctx, levelForError(err), "attempted osquery publication",
+		slogger.Log(ctx, levelForError(err), "attempted osquery publication",
+			"request_uuid", requestUUID,
+			"publication_type", publicationPath,
 			"response", publicationResponse,
 			"status_code", resp.StatusCode,
 			"err", err,
@@ -181,22 +206,9 @@ func (lpc *LogPublisherClient) publish(ctx context.Context, slogger *slog.Logger
 		)
 	}(time.Now())
 
-	jsonData, err := json.Marshal(payload)
-	if err != nil {
-		logger.Log(ctx, slog.LevelError,
-			"failed to marshal publication request",
-			"err", err,
-		)
-		return nil, fmt.Errorf("marshaling request: %w", err)
-	}
-
 	url := fmt.Sprintf("%s/%s", lpc.knapsack.OsqueryPublisherURL(), publicationPath)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(jsonData))
 	if err != nil {
-		logger.Log(ctx, slog.LevelError,
-			"failed to create HTTP request",
-			"err", err,
-		)
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
 
@@ -205,32 +217,18 @@ func (lpc *LogPublisherClient) publish(ctx context.Context, slogger *slog.Logger
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
 	resp, err = lpc.client.Do(req)
 	if err != nil {
-		logger.Log(ctx, slog.LevelError,
-			"failed to issue HTTP request",
-			"err", err,
-		)
-		return nil, fmt.Errorf("sending request: %w", err)
+		return nil, fmt.Errorf("issuing publication request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	// read in the response and unmarshal
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		logger.Log(ctx, slog.LevelError,
-			"failed to read response body",
-			"status_code", resp.StatusCode,
-			"err", err,
-		)
-		return nil, fmt.Errorf("reading response: %w", err)
+		return nil, fmt.Errorf("reading publication response: %w", err)
 	}
 
 	err = json.Unmarshal(body, &publicationResponse)
 	if err != nil {
-		logger.Log(ctx, slog.LevelError,
-			"failed to unmarshal response body",
-			"status_code", resp.StatusCode,
-			"err", err,
-		)
 		return nil, fmt.Errorf("unable to unmarshal agent-ingester response: %w", err)
 	}
 
@@ -245,39 +243,97 @@ func (lpc *LogPublisherClient) publish(ctx context.Context, slogger *slog.Logger
 }
 
 func (lpc *LogPublisherClient) Ping() {
-	if err := lpc.refreshTokenCache(); err != nil {
-		lpc.slogger.Log(context.TODO(), slog.LevelWarn,
-			"unable to refresh token cache after ping",
-			"err", err,
-		)
-	}
+	lpc.refreshTokenCache()
 }
 
-// refreshTokenCache loads in the agent ingester auth token from the TokenStore and stores it in
-// our locally cached map
-func (lpc *LogPublisherClient) refreshTokenCache() error {
-	// for now we will only see a single token for the default enrollment, in the future we
-	// will iterate the TokenStorage and grab everything with a key prefix of storage.AgentIngesterAuthTokenKey
-	newToken, err := lpc.knapsack.TokenStore().Get(storage.AgentIngesterAuthTokenKey)
-	if err != nil || len(newToken) == 0 {
-		return fmt.Errorf("error loading token from TokenStore: %w", err)
-	}
-
+// refreshTokenCache loads in the agent ingester auth token, HPKE keys, and PSKs from the TokenStore
+// and stores them in our locally cached maps. for now we will only see single tokens for the default enrollments,
+// in the future we will iterate the TokenStorage and grab everything with corresponding key prefixes to
+// populate any configured enrollments.
+func (lpc *LogPublisherClient) refreshTokenCache() {
 	lpc.tokensMutex.Lock()
 	defer lpc.tokensMutex.Unlock()
 
-	lpc.tokens[types.DefaultEnrollmentID] = string(newToken)
-	return nil
+	newToken, err := lpc.knapsack.TokenStore().Get(storage.AgentIngesterAuthTokenKey)
+	if err != nil || len(newToken) == 0 {
+		lpc.slogger.Log(context.TODO(), slog.LevelWarn,
+			"failed to fetch ingester auth token from TokenStore, may not be set yet",
+			"err", err,
+		)
+	} else {
+		lpc.authTokens[types.DefaultEnrollmentID] = string(newToken)
+	}
+
+	// Load HPKE public key
+	hpkeKeyData, err := lpc.knapsack.TokenStore().Get(storage.AgentIngesterHPKEPublicKey)
+	// nothing we can do if we haven't set the HPKE key yet, just log a warning and continue
+	if err != nil || len(hpkeKeyData) == 0 {
+		lpc.slogger.Log(context.TODO(), slog.LevelWarn,
+			"failed to fetch HPKE key from TokenStore, may not be set yet",
+			"err", err,
+		)
+	} else {
+		hpkeKey, parseErr := parseKeyData(string(hpkeKeyData))
+		if parseErr != nil {
+			lpc.slogger.Log(context.TODO(), slog.LevelWarn,
+				"failed to parse HPKE key from TokenStore",
+				"err", parseErr,
+			)
+		} else {
+			lpc.hpkeKeys[types.DefaultEnrollmentID] = hpkeKey
+		}
+	}
+
+	// Load PSK
+	pskData, err := lpc.knapsack.TokenStore().Get(storage.AgentIngesterHPKEPresharedKey)
+	if err != nil || len(pskData) == 0 {
+		lpc.slogger.Log(context.TODO(), slog.LevelWarn,
+			"failed to fetch PSK from TokenStore, may not be set yet",
+			"err", err,
+		)
+	} else {
+		psk, parseErr := parseKeyData(string(pskData))
+		if parseErr != nil {
+			lpc.slogger.Log(context.TODO(), slog.LevelWarn,
+				"failed to parse PSK from TokenStore",
+				"err", parseErr,
+			)
+		} else {
+			lpc.psks[types.DefaultEnrollmentID] = psk
+		}
+	}
 }
 
 func (lpc *LogPublisherClient) getTokenForEnrollment(enrollmentID string) string {
 	lpc.tokensMutex.RLock()
 	defer lpc.tokensMutex.RUnlock()
-	if token, ok := lpc.tokens[enrollmentID]; ok {
+	if token, ok := lpc.authTokens[enrollmentID]; ok {
 		return token
 	}
 
 	return ""
+}
+
+// getHPKEKeyForEnrollment returns the HPKE key data for the given enrollment ID
+func (lpc *LogPublisherClient) getHPKEKeyForEnrollment(enrollmentID string) *KeyData {
+	lpc.tokensMutex.RLock()
+	defer lpc.tokensMutex.RUnlock()
+	if key, ok := lpc.hpkeKeys[enrollmentID]; ok {
+		return key
+	}
+
+	return nil
+}
+
+// getPSKForEnrollment returns the PSK data for the given enrollment ID
+func (lpc *LogPublisherClient) getPSKForEnrollment(enrollmentID string) *KeyData {
+	lpc.tokensMutex.RLock()
+	defer lpc.tokensMutex.RUnlock()
+	if psk, ok := lpc.psks[enrollmentID]; ok {
+		return psk
+	}
+
+	return nil
 }
 
 func (lpc *LogPublisherClient) shouldPublishLogs() bool {
