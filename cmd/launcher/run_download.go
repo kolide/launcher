@@ -1,9 +1,13 @@
 package main
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -14,17 +18,15 @@ import (
 	"github.com/kolide/launcher/pkg/log/multislogger"
 )
 
-// runDownload downloads launcher or osqueryd from the TUF repo with TUF verification.
-// It's meant for use in CI pipelines and release verification.
-//
-// Usage: launcher download [flags]
+// runDownload downloads launcher or osqueryd from the TUF repo with TUF verification
+// and extracts the tarball contents to the output directory.
 func runDownload(_ *multislogger.MultiSlogger, args []string) error {
 	fs := flag.NewFlagSet("launcher download", flag.ExitOnError)
 
 	var (
-		flBinary   = fs.String("binary", "", "Binary to download: launcher or osqueryd")
+		flTarget   = fs.String("target", "", "Target to download: launcher or osqueryd")
 		flChannel  = fs.String("channel", "stable", "What channel to download from (or a specific version)")
-		flDir      = fs.String("directory", ".", "Where to download the binary to")
+		flDir      = fs.String("directory", ".", "Where to extract the downloaded files")
 		flPlatform = fs.String("platform", runtime.GOOS, "Target platform (darwin, linux, windows)")
 		flArch     = fs.String("arch", runtime.GOARCH, "Target architecture (amd64, arm64)")
 	)
@@ -33,38 +35,78 @@ func runDownload(_ *multislogger.MultiSlogger, args []string) error {
 		return err
 	}
 
-	binary := strings.ToLower(*flBinary)
-	if binary == "" {
-		return fmt.Errorf("must specify --binary (launcher or osqueryd)")
+	target := strings.ToLower(*flTarget)
+	if target == "" {
+		return fmt.Errorf("must specify --target (launcher or osqueryd)")
 	}
-	if binary != "launcher" && binary != "osqueryd" {
-		return fmt.Errorf("binary must be launcher or osqueryd, got %q", binary)
+	if target != "launcher" && target != "osqueryd" {
+		return fmt.Errorf("target must be launcher or osqueryd, got %q", target)
 	}
-
-	binaryName := binary
-	if *flPlatform == "windows" {
-		binaryName += ".exe"
-	}
-	outfile := filepath.Join(*flDir, binaryName)
 
 	if err := os.MkdirAll(*flDir, 0755); err != nil {
 		return fmt.Errorf("creating directory: %w", err)
 	}
 
-	f, err := os.OpenFile(outfile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
-	if err != nil {
-		return fmt.Errorf("opening output file: %w", err)
-	}
-	defer f.Close()
-
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
 	defer cancel()
 
-	if err := simpleclient.Download(ctx, binary, *flPlatform, *flArch, *flChannel, f, nil); err != nil {
-		return fmt.Errorf("error fetching %s binary: %w", binary, err)
+	var buf bytes.Buffer
+	if err := simpleclient.Download(ctx, target, *flPlatform, *flArch, *flChannel, &buf, nil); err != nil {
+		return fmt.Errorf("error fetching %s: %w", target, err)
 	}
 
-	fmt.Printf("Downloaded %s to: %s\n", binary, outfile)
+	if err := extractTarGz(&buf, *flDir); err != nil {
+		return fmt.Errorf("error extracting: %w", err)
+	}
+
+	fmt.Printf("Downloaded and extracted %s to: %s\n", target, *flDir)
+
+	return nil
+}
+
+func extractTarGz(r io.Reader, destDir string) error {
+	gzr, err := gzip.NewReader(r)
+	if err != nil {
+		return fmt.Errorf("creating gzip reader: %w", err)
+	}
+	defer gzr.Close()
+
+	tr := tar.NewReader(gzr)
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("reading tar: %w", err)
+		}
+
+		clean := filepath.Clean(header.Name)
+		if strings.Contains(clean, "..") {
+			return fmt.Errorf("tar entry %q contains path traversal", header.Name)
+		}
+		target := filepath.Join(destDir, clean)
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(target, os.FileMode(header.Mode)); err != nil {
+				return fmt.Errorf("creating directory %s: %w", target, err)
+			}
+		case tar.TypeReg, tar.TypeRegA:
+			if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+				return fmt.Errorf("creating parent directory for %s: %w", target, err)
+			}
+			f, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(header.Mode))
+			if err != nil {
+				return fmt.Errorf("creating file %s: %w", target, err)
+			}
+			if _, err := io.Copy(f, tr); err != nil {
+				f.Close()
+				return fmt.Errorf("writing file %s: %w", target, err)
+			}
+			f.Close()
+		}
+	}
 
 	return nil
 }
