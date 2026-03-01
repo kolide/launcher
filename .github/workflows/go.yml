@@ -415,12 +415,19 @@ jobs:
 
       - name: Download Osquery
         working-directory: build
+        run: ./launcher download-osquery --directory osqueryd-download
+
+      - name: Move Osquery (posix)
+        if: ${{ runner.os != 'Windows' }}
+        working-directory: build
+        run: mv ./osqueryd-download/osqueryd/osqueryd ./
+
+      - name: Move Osquery (windows)
+        if: ${{ runner.os == 'Windows' }}
+        working-directory: build
         run: |
-          ./launcher download-osquery --directory osqueryd-download
           sleep 2
-          ls osqueryd-download
-          ls osqueryd-download/osqueryd
-          mv ./osqueryd-download/osqueryd/osqueryd* ./
+          mv ./osqueryd-download/osqueryd/osqueryd.exe ./
 
       - name: Osquery Version
         working-directory: build
@@ -499,7 +506,7 @@ jobs:
         working-directory: build
         run: |
           ./launcher download-osquery --directory osqueryd-download
-          mv ./osqueryd-download/osqueryd/osqueryd* ./
+          mv ./osqueryd-download/osqueryd/osqueryd ./
 
       - name: Osquery Version
         working-directory: build
