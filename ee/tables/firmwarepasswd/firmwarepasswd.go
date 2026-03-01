@@ -38,7 +38,18 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 
 	t := New(slogger.With("table", "kolide_firmwarepasswd"))
 
-	return tablewrapper.New(flags, slogger, "kolide_firmwarepasswd", columns, t.generate)
+	desc := "Information about the macOS x86 firmware passwords.\n\n It execs `kolide_firmwarepasswd -check` and `kolide_firmwarepasswd -mode` and parses the output."
+	note := "This does not work on modern Apple Silicon hardware. It is a legacy table."
+
+	return tablewrapper.New(
+		flags,
+		slogger,
+		"kolide_firmwarepasswd",
+		columns,
+		t.generate,
+		tablewrapper.WithDescription(desc),
+		tablewrapper.WithNote(note),
+	)
 
 }
 

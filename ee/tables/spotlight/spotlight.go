@@ -42,7 +42,9 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", "kolide_spotlight"),
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_spotlight", columns, t.generate)
+	desc := "This table is a wrapper over the `mdfind` command. It is recommended that you use osquery's `mdfind` table instead"
+
+	return tablewrapper.New(flags, slogger, "kolide_spotlight", columns, t.generate, tablewrapper.WithDescription(desc))
 }
 
 func (t *spotlightTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

@@ -50,10 +50,10 @@ func WithDescription(description string) tablePluginOption {
 	}
 }
 
-// WithNotes sets the informational table notes passed to the underlying osquery table plugin.
-func WithNotes(notes string) tablePluginOption {
+// WithNote sets the informational table note passed to the underlying osquery table plugin.
+func WithNote(note string) tablePluginOption {
 	return func(w *wrappedTable) {
-		w.tableOpts = append(w.tableOpts, table.WithNotes(notes))
+		w.tableOpts = append(w.tableOpts, table.WithNotes(note))
 	}
 }
 

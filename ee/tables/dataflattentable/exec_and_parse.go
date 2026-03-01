@@ -111,7 +111,7 @@ func NewExecAndParseTable(flags types.Flags, slogger *slog.Logger, tableName str
 		Columns(),
 		tbl.generate,
 		tablewrapper.WithDescription(tbl.Description()),
-		tablewrapper.WithNotes(eavNote),
+		tablewrapper.WithNote(eavNote),
 	)
 }
 
