@@ -125,16 +125,20 @@ func extractTarGz(r io.Reader, destDir string) error {
 	return nil
 }
 
-func extractFile(dest string, mode int64, r io.Reader) error {
+func extractFile(dest string, mode int64, r io.Reader) (retErr error) {
 	f, err := os.OpenFile(dest, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(mode))
 	if err != nil {
 		return fmt.Errorf("creating file %s: %w", dest, err)
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); retErr == nil && err != nil {
+			retErr = fmt.Errorf("closing file %s: %w", dest, err)
+		}
+	}()
 
 	if _, err := io.Copy(f, r); err != nil {
 		return fmt.Errorf("writing file %s: %w", dest, err)
 	}
 
-	return f.Close()
+	return nil
 }
