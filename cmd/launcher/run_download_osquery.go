@@ -7,6 +7,5 @@ import (
 // runDownloadOsquery downloads the stable osquery to the provided path. It's meant for use in our CI pipeline.
 // This is a legacy wrapper around runDownload for backward compatibility.
 func runDownloadOsquery(slogger *multislogger.MultiSlogger, args []string) error {
-	// Prepend "osqueryd" so runDownload receives it as the binary argument
-	return runDownload(slogger, append([]string{"osqueryd"}, args...))
+	return runDownload(slogger, append([]string{"--binary=osqueryd"}, args...))
 }

@@ -10,19 +10,20 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kolide/kit/fsutil"
+	"github.com/kolide/launcher/ee/tuf/simpleclient"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/packaging"
 )
 
-// runDownload downloads launcher or osqueryd from the TUF repo to the provided path.
+// runDownload downloads launcher or osqueryd from the TUF repo with TUF verification.
 // It's meant for use in CI pipelines and release verification.
 //
-// Usage: launcher download <launcher|osqueryd> [flags]
+// Usage: launcher download [flags]
 func runDownload(_ *multislogger.MultiSlogger, args []string) error {
 	fs := flag.NewFlagSet("launcher download", flag.ExitOnError)
 
 	var (
+		flBinary   = fs.String("binary", "", "Binary to download: launcher or osqueryd")
 		flChannel  = fs.String("channel", "stable", "What channel to download from (or a specific version)")
 		flDir      = fs.String("directory", ".", "Where to download the binary to")
 		flPlatform = fs.String("platform", runtime.GOOS, "Target platform (darwin, linux, windows)")
@@ -33,17 +34,13 @@ func runDownload(_ *multislogger.MultiSlogger, args []string) error {
 		return err
 	}
 
-	binary := fs.Arg(0)
+	binary := strings.ToLower(*flBinary)
 	if binary == "" {
-		return fmt.Errorf("must specify binary to download: launcher or osqueryd")
+		return fmt.Errorf("must specify --binary (launcher or osqueryd)")
 	}
-	binary = strings.ToLower(binary)
 	if binary != "launcher" && binary != "osqueryd" {
 		return fmt.Errorf("binary must be launcher or osqueryd, got %q", binary)
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
-	defer cancel()
 
 	target := packaging.Target{}
 	if err := target.PlatformFromString(*flPlatform); err != nil {
@@ -55,21 +52,24 @@ func runDownload(_ *multislogger.MultiSlogger, args []string) error {
 		return fmt.Errorf("error parsing arch: %w", err)
 	}
 
-	cacheDir, err := os.MkdirTemp("", binary+"-download")
-	if err != nil {
-		return fmt.Errorf("creating temp cache dir: %w", err)
-	}
-	defer os.RemoveAll(cacheDir)
-
 	binaryName := target.PlatformBinaryName(binary)
-	dlpath, err := packaging.FetchBinary(ctx, cacheDir, binary, binaryName, *flChannel, target)
-	if err != nil {
-		return fmt.Errorf("error fetching %s binary: %w", binary, err)
+	outfile := filepath.Join(*flDir, binaryName)
+
+	if err := os.MkdirAll(*flDir, 0755); err != nil {
+		return fmt.Errorf("creating directory: %w", err)
 	}
 
-	outfile := filepath.Join(*flDir, filepath.Base(dlpath))
-	if err := fsutil.CopyFile(dlpath, outfile); err != nil {
-		return fmt.Errorf("error copying %s binary: %w", binary, err)
+	f, err := os.OpenFile(outfile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
+	if err != nil {
+		return fmt.Errorf("opening output file: %w", err)
+	}
+	defer f.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
+	defer cancel()
+
+	if err := simpleclient.Download(ctx, binary, *flPlatform, string(target.Arch), *flChannel, f, nil); err != nil {
+		return fmt.Errorf("error fetching %s binary: %w", binary, err)
 	}
 
 	fmt.Printf("Downloaded %s to: %s\n", binary, outfile)
