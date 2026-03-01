@@ -16,6 +16,7 @@ import (
 
 	"github.com/kolide/launcher/ee/tuf"
 	client "github.com/theupdateframework/go-tuf/client"
+	filejsonstore "github.com/theupdateframework/go-tuf/client/filejsonstore"
 	tufutil "github.com/theupdateframework/go-tuf/util"
 )
 
@@ -29,6 +30,9 @@ type Options struct {
 	MetadataURL string
 	MirrorURL   string
 	HTTPClient  *http.Client
+	// LocalStorePath is the directory for the TUF local metadata store.
+	// If empty, an in-memory store is used.
+	LocalStorePath string
 }
 
 func (o *Options) metadataURL() string {
@@ -67,9 +71,18 @@ func Download(ctx context.Context, slogger *slog.Logger, target, platform, arch,
 
 	target = strings.ToLower(target)
 
-	// Create an in-memory TUF metadata client and update
+	// Create TUF metadata client and update
 	metadataStart := time.Now()
-	localStore := client.MemoryLocalStore()
+	var localStore client.LocalStore
+	if opts.LocalStorePath != "" {
+		var err error
+		localStore, err = filejsonstore.NewFileJSONStore(opts.LocalStorePath)
+		if err != nil {
+			return nil, fmt.Errorf("creating local store at %s: %w", opts.LocalStorePath, err)
+		}
+	} else {
+		localStore = client.MemoryLocalStore()
+	}
 	remoteStore, err := client.HTTPRemoteStore(opts.metadataURL(), &client.HTTPRemoteOptions{
 		MetadataPath: "/repository",
 	}, httpClient)

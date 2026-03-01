@@ -31,6 +31,7 @@ func runDownload(slogger *multislogger.MultiSlogger, args []string) error {
 		flDir      = fs.String("directory", ".", "Parent directory (a subdirectory named after the target will be created)")
 		flPlatform = fs.String("platform", runtime.GOOS, "Target platform (darwin, linux, windows)")
 		flArch     = fs.String("arch", runtime.GOARCH, "Target architecture (amd64, arm64)")
+		flTufStore = fs.String("tuf-store", "", "Directory for TUF local metadata (omit for in-memory)")
 		flDebug    = fs.Bool("debug", false, "Enable debug logging")
 	)
 
@@ -52,7 +53,9 @@ func runDownload(slogger *multislogger.MultiSlogger, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
 	defer cancel()
 
-	tarGzBytes, err := simpleclient.Download(ctx, slogger.Logger, target, *flPlatform, *flArch, *flChannel, nil)
+	tarGzBytes, err := simpleclient.Download(ctx, slogger.Logger, target, *flPlatform, *flArch, *flChannel, &simpleclient.Options{
+		LocalStorePath: *flTufStore,
+	})
 	if err != nil {
 		return fmt.Errorf("error fetching %s: %w", target, err)
 	}
