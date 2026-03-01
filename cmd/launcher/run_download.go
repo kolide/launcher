@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -30,11 +31,18 @@ func runDownload(slogger *multislogger.MultiSlogger, args []string) error {
 		flDir      = fs.String("directory", ".", "Parent directory (a subdirectory named after the target will be created)")
 		flPlatform = fs.String("platform", runtime.GOOS, "Target platform (darwin, linux, windows)")
 		flArch     = fs.String("arch", runtime.GOARCH, "Target architecture (amd64, arm64)")
+		flDebug    = fs.Bool("debug", false, "Enable debug logging")
 	)
 
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
+
+	level := slog.LevelInfo
+	if *flDebug {
+		level = slog.LevelDebug
+	}
+	slogger.AddHandler(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
 
 	target := strings.ToLower(*flTarget)
 	if target == "" {
