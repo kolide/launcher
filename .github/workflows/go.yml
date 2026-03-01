@@ -417,7 +417,7 @@ jobs:
         working-directory: build
         run: |
           ./launcher download-osquery --directory osqueryd-download
-          mv ./osqueryd-download/osqueryd/osqueryd ./
+          mv ./osqueryd-download/osqueryd/osqueryd* ./
 
       - name: Osquery Version
         working-directory: build
@@ -496,7 +496,7 @@ jobs:
         working-directory: build
         run: |
           ./launcher download-osquery --directory osqueryd-download
-          mv ./osqueryd-download/osqueryd/osqueryd ./
+          mv ./osqueryd-download/osqueryd/osqueryd* ./
 
       - name: Osquery Version
         working-directory: build
