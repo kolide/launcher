@@ -60,7 +60,10 @@ func NewFalconctlOptionTable(flags types.Flags, slogger *slog.Logger) *table.Plu
 		execFunc:  tablehelpers.RunSimple,
 	}
 
-	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generate)
+	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generate,
+		tablewrapper.WithDescription("CrowdStrike Falcon sensor configuration options from `falconctl`, flattened as key-value pairs. Useful for verifying CrowdStrike sensor settings and connectivity."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
+	)
 }
 
 func (t *falconctlOptionsTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

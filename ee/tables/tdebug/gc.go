@@ -35,6 +35,7 @@ func LauncherGcInfo(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 
 	return tablewrapper.New(flags, slogger, gcTableName, columns, t.generate,
 		tablewrapper.WithDescription("Go runtime garbage collection statistics for the launcher process, including pause times and GC counts. Useful for debugging launcher memory and performance issues."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
 	)
 }
 

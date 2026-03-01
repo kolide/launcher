@@ -49,6 +49,7 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 
 	return tablewrapper.New(flags, slogger, t.name, columns, t.generate,
 		tablewrapper.WithDescription("Firefox user preferences parsed from prefs.js files, returned as flattened key-value pairs. Requires a WHERE path = constraint. Useful for auditing browser configuration settings."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
 	)
 }
 

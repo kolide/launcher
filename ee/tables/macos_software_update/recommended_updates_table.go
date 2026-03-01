@@ -41,6 +41,7 @@ func RecommendedUpdates(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 
 	return tablewrapper.New(flags, slogger, tableName, columns, t.generate,
 		tablewrapper.WithDescription("macOS recommended software updates available for installation, flattened as key-value pairs. Useful for identifying pending OS and security updates."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
 	)
 }
 

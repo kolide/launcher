@@ -51,6 +51,7 @@ func CertTrustSettingsTablePlugin(flags types.Flags, slogger *slog.Logger) *tabl
 
 	return tablewrapper.New(flags, slogger, c.name, columns, c.generate,
 		tablewrapper.WithDescription("macOS certificate trust settings from `security dump-trust-settings`, flattened as key-value pairs. Supports system and admin domain constraints. Useful for auditing custom certificate trust overrides."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
 	)
 }
 

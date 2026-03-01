@@ -35,6 +35,7 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 
 	return tablewrapper.New(flags, slogger, tableName, columns, t.generate,
 		tablewrapper.WithDescription("Apple Silicon boot and security policies from `bputil --display-all-policies`, flattened as key-value pairs. Useful for verifying Secure Boot, kernel extension, and boot policy configuration on Apple Silicon Macs."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
 	)
 }
 

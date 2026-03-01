@@ -111,11 +111,11 @@ func NewExecAndParseTable(flags types.Flags, slogger *slog.Logger, tableName str
 		Columns(),
 		tbl.generate,
 		tablewrapper.WithDescription(tbl.Description()),
-		tablewrapper.WithNote(eavNote),
+		tablewrapper.WithNote(EAVNote),
 	)
 }
 
-const eavNote = "This is an EAV style table. Output is flattened."
+const EAVNote = "This is an EAV (Entity-Attribute-Value) table. Rather than a column per field, data is returned as rows with fullkey, key, and value columns. fullkey is the slash-separated path to the value (e.g. network/interfaces/0/name), parent is the path of the containing object, and key is the leaf key name. Use the query constraint to filter by path -- it supports glob patterns (e.g. WHERE query = 'network/interfaces/*/name')."
 
 var (
 	defaultDescriptionTmpl = template.Must(template.New("default").Parse(

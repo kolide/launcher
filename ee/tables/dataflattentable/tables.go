@@ -131,6 +131,7 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger, dataSourceType DataSou
 	if dataSourceType.description != "" {
 		opts = append(opts, tablewrapper.WithDescription(dataSourceType.description))
 	}
+	opts = append(opts, tablewrapper.WithNote(EAVNote))
 
 	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generate, opts...)
 }

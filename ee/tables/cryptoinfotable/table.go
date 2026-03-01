@@ -36,6 +36,7 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 
 	return tablewrapper.New(flags, slogger, "kolide_cryptinfo", columns, t.generate,
 		tablewrapper.WithDescription("Parses encrypted files (such as encrypted plists) with an optional passphrase and returns flattened content. Requires a WHERE path = constraint. Useful for inspecting encrypted configuration files."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
 	)
 }
 

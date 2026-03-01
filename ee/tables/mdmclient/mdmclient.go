@@ -66,6 +66,7 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 
 	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generate,
 		tablewrapper.WithDescription("macOS MDM client data from `mdmclient` Query commands (e.g. QueryDeviceInformation, QuerySecurityInfo), flattened as key-value pairs. Useful for inspecting detailed MDM device information and security configuration."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
 	)
 }
 

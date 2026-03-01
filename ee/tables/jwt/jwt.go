@@ -61,6 +61,7 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 
 	return tablewrapper.New(flags, slogger, "kolide_jwt", columns, t.generate,
 		tablewrapper.WithDescription("Parses JWT files and returns flattened claims and header data, with optional signature verification via signing keys. Requires a WHERE path = constraint. Useful for inspecting JWT tokens on disk."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
 	)
 }
 

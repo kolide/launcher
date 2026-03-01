@@ -47,6 +47,7 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 
 	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generate,
 		tablewrapper.WithDescription("macOS password policy settings from `pwpolicy getaccountpolicies`, flattened as key-value pairs. Supports an optional username constraint. Useful for auditing password complexity, expiration, and lockout policies."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
 	)
 }
 

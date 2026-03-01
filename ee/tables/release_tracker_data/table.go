@@ -27,6 +27,7 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger, store types.KVStore) *
 
 	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generateKolideReleaseTrackerDataTable(store),
 		tablewrapper.WithDescription("Release metadata from the server's release tracker, flattened as key-value pairs. Useful for inspecting available software release information."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
 	)
 }
 

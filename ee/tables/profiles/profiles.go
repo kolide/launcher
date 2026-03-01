@@ -59,6 +59,7 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 
 	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generate,
 		tablewrapper.WithDescription("macOS configuration profiles from the `profiles` command, flattened as key-value pairs. Supports show/list/status commands and user/device profile types. Useful for auditing MDM-installed profiles and system configuration."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
 	)
 }
 

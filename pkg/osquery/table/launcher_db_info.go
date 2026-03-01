@@ -22,6 +22,7 @@ func LauncherDbInfo(flags types.Flags, slogger *slog.Logger, db *bbolt.DB) *tabl
 	columns := dataflattentable.Columns()
 	return tablewrapper.New(flags, slogger, "kolide_launcher_db_info", columns, generateLauncherDbInfo(db),
 		tablewrapper.WithDescription("Internal launcher database statistics, including bucket sizes and key counts. Useful for debugging launcher storage health."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
 	)
 }
 
