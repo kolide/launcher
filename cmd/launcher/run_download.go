@@ -103,17 +103,25 @@ func extractTarGz(r io.Reader, destDir string) error {
 			if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
 				return fmt.Errorf("creating parent directory for %s: %w", target, err)
 			}
-			f, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(header.Mode))
-			if err != nil {
-				return fmt.Errorf("creating file %s: %w", target, err)
+			if err := extractFile(target, header.Mode, tr); err != nil {
+				return err
 			}
-			if _, err := io.Copy(f, tr); err != nil {
-				f.Close()
-				return fmt.Errorf("writing file %s: %w", target, err)
-			}
-			f.Close()
 		}
 	}
 
 	return nil
+}
+
+func extractFile(dest string, mode int64, r io.Reader) error {
+	f, err := os.OpenFile(dest, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(mode))
+	if err != nil {
+		return fmt.Errorf("creating file %s: %w", dest, err)
+	}
+	defer f.Close()
+
+	if _, err := io.Copy(f, r); err != nil {
+		return fmt.Errorf("writing file %s: %w", dest, err)
+	}
+
+	return f.Close()
 }
