@@ -1,12 +1,11 @@
 // Package simpleclient provides a minimal TUF client for downloading and verifying
 // targets from the TUF repository. It handles metadata fetching, target resolution,
-// and verified download, writing the verified tarball to an io.Writer.
+// and verified download, returning the verified bytes.
 package simpleclient
 
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -62,49 +61,40 @@ func (o *Options) httpClient() *http.Client {
 	return &http.Client{Timeout: 2 * time.Minute}
 }
 
-// Download fetches a target from the TUF mirror, verifies it against TUF metadata,
-// and writes the verified tarball to dest.
+// Download fetches a target from the TUF mirror and verifies it against TUF metadata.
+// Returns the verified tarball bytes.
 //
 // target must be "launcher" or "osqueryd".
 // platform must be "darwin", "linux", or "windows".
 // arch must be "amd64" or "arm64" (darwin uses "universal" automatically).
 // versionOrChannel is a channel ("stable", "beta", etc.) or specific version ("1.2.3").
-func Download(ctx context.Context, target, platform, arch, versionOrChannel string, dest io.Writer, opts *Options) error {
+func Download(ctx context.Context, target, platform, arch, versionOrChannel string, opts *Options) ([]byte, error) {
 	if opts == nil {
 		opts = &Options{}
 	}
 
 	target = strings.ToLower(target)
 	if target != "launcher" && target != "osqueryd" {
-		return fmt.Errorf("target must be launcher or osqueryd, got %q", target)
+		return nil, fmt.Errorf("target must be launcher or osqueryd, got %q", target)
 	}
 
 	metadataClient, err := newMetadataClient(opts.metadataURL(), opts.httpClient())
 	if err != nil {
-		return fmt.Errorf("creating metadata client: %w", err)
+		return nil, fmt.Errorf("creating metadata client: %w", err)
 	}
 
 	if err := metadataClient.Init(tuf.RootJSON()); err != nil {
-		return fmt.Errorf("initializing TUF client: %w", err)
+		return nil, fmt.Errorf("initializing TUF client: %w", err)
 	}
 
 	if _, err := metadataClient.Update(); err != nil {
-		return fmt.Errorf("updating TUF metadata: %w", err)
+		return nil, fmt.Errorf("updating TUF metadata: %w", err)
 	}
 
 	targetPath, metadata, err := tuf.ResolveTarget(metadataClient, target, platform, arch, versionOrChannel)
 	if err != nil {
-		return fmt.Errorf("resolving target: %w", err)
+		return nil, fmt.Errorf("resolving target: %w", err)
 	}
 
-	verifiedBytes, err := downloadAndVerify(ctx, opts.mirrorURL(), targetPath, metadata, opts.httpClient())
-	if err != nil {
-		return fmt.Errorf("downloading: %w", err)
-	}
-
-	if _, err := dest.Write(verifiedBytes); err != nil {
-		return fmt.Errorf("writing: %w", err)
-	}
-
-	return nil
+	return downloadAndVerify(ctx, opts.mirrorURL(), targetPath, metadata, opts.httpClient())
 }

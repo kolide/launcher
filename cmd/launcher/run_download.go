@@ -18,6 +18,7 @@ import (
 	"github.com/kolide/launcher/pkg/log/multislogger"
 )
 
+
 // runDownload downloads launcher or osqueryd from the TUF repo with TUF verification
 // and extracts the tarball contents to the output directory.
 func runDownload(_ *multislogger.MultiSlogger, args []string) error {
@@ -50,12 +51,12 @@ func runDownload(_ *multislogger.MultiSlogger, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
 	defer cancel()
 
-	var buf bytes.Buffer
-	if err := simpleclient.Download(ctx, target, *flPlatform, *flArch, *flChannel, &buf, nil); err != nil {
+	tarGzBytes, err := simpleclient.Download(ctx, target, *flPlatform, *flArch, *flChannel, nil)
+	if err != nil {
 		return fmt.Errorf("error fetching %s: %w", target, err)
 	}
 
-	if err := extractTarGz(&buf, *flDir); err != nil {
+	if err := extractTarGz(bytes.NewReader(tarGzBytes), *flDir); err != nil {
 		return fmt.Errorf("error extracting: %w", err)
 	}
 
