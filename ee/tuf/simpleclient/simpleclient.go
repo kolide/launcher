@@ -4,40 +4,30 @@
 package simpleclient
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"net/http"
+	"path"
 	"strings"
 	"time"
 
 	"github.com/kolide/launcher/ee/tuf"
 	client "github.com/theupdateframework/go-tuf/client"
+	tufutil "github.com/theupdateframework/go-tuf/util"
 )
 
-// newMetadataClient creates a TUF metadata client using an in-memory store.
-// It fetches metadata from the given URL. Call Init(rootJson) and Update() before use.
-func newMetadataClient(metadataURL string, httpClient *http.Client) (*client.Client, error) {
-	if httpClient == nil {
-		httpClient = http.DefaultClient
-	}
-	localStore := client.MemoryLocalStore()
-	remoteStore, err := client.HTTPRemoteStore(metadataURL, &client.HTTPRemoteOptions{
-		MetadataPath: "/repository",
-	}, httpClient)
-	if err != nil {
-		return nil, fmt.Errorf("creating remote store: %w", err)
-	}
-	return client.NewClient(localStore, remoteStore), nil
-}
+const (
+	DefaultMetadataURL = "https://tuf.kolide.com"
+	DefaultMirrorURL   = "https://dl.kolide.co"
+)
 
 // Options configures the Download operation.
 type Options struct {
-	// MetadataURL is the TUF metadata server (default: https://tuf.kolide.com).
 	MetadataURL string
-	// MirrorURL is the mirror for binary downloads (default: https://dl.kolide.co).
-	MirrorURL string
-	// HTTPClient is used for HTTP requests. If nil, uses default with 2min timeout.
-	HTTPClient *http.Client
+	MirrorURL   string
+	HTTPClient  *http.Client
 }
 
 func (o *Options) metadataURL() string {
@@ -64,7 +54,7 @@ func (o *Options) httpClient() *http.Client {
 // Download fetches a target from the TUF mirror and verifies it against TUF metadata.
 // Returns the verified tarball bytes.
 //
-// target must be "launcher" or "osqueryd".
+// target is the TUF target name (e.g. "launcher", "osqueryd").
 // platform must be "darwin", "linux", or "windows".
 // arch must be "amd64" or "arm64" (darwin uses "universal" automatically).
 // versionOrChannel is a channel ("stable", "beta", etc.) or specific version ("1.2.3").
@@ -72,26 +62,59 @@ func Download(ctx context.Context, target, platform, arch, versionOrChannel stri
 	if opts == nil {
 		opts = &Options{}
 	}
+	httpClient := opts.httpClient()
 
 	target = strings.ToLower(target)
 
-	metadataClient, err := newMetadataClient(opts.metadataURL(), opts.httpClient())
+	// Create an in-memory TUF metadata client and update
+	localStore := client.MemoryLocalStore()
+	remoteStore, err := client.HTTPRemoteStore(opts.metadataURL(), &client.HTTPRemoteOptions{
+		MetadataPath: "/repository",
+	}, httpClient)
 	if err != nil {
-		return nil, fmt.Errorf("creating metadata client: %w", err)
+		return nil, fmt.Errorf("creating remote store: %w", err)
 	}
+	metadataClient := client.NewClient(localStore, remoteStore)
 
 	if err := metadataClient.Init(tuf.RootJSON()); err != nil {
 		return nil, fmt.Errorf("initializing TUF client: %w", err)
 	}
-
 	if _, err := metadataClient.Update(); err != nil {
 		return nil, fmt.Errorf("updating TUF metadata: %w", err)
 	}
 
+	// Resolve target name + channel/version to a concrete target path
 	targetPath, metadata, err := tuf.ResolveTarget(metadataClient, target, platform, arch, versionOrChannel)
 	if err != nil {
 		return nil, fmt.Errorf("resolving target: %w", err)
 	}
 
-	return downloadAndVerify(ctx, opts.mirrorURL(), targetPath, metadata, opts.httpClient())
+	// Download from mirror
+	downloadURL := strings.TrimSuffix(opts.mirrorURL(), "/") + path.Join("/", "kolide", targetPath)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("downloading: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("download failed: %s", resp.Status)
+	}
+
+	// Read and verify against TUF metadata
+	var buf bytes.Buffer
+	stream := io.LimitReader(resp.Body, metadata.Length)
+	actualMeta, err := tufutil.GenerateTargetFileMeta(io.TeeReader(stream, &buf), metadata.HashAlgorithms()...)
+	if err != nil {
+		return nil, fmt.Errorf("computing hash: %w", err)
+	}
+	if err := tufutil.TargetFileMetaEqual(actualMeta, metadata); err != nil {
+		return nil, fmt.Errorf("verification failed: %w", err)
+	}
+
+	return buf.Bytes(), nil
 }
