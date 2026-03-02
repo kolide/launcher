@@ -85,12 +85,9 @@ func encodeJSONRPCEnrollmentResponse(_ context.Context, obj any) (json.RawMessag
 const requestTimeout = 60 * time.Second
 
 // RequestEnrollment implements KolideService.RequestEnrollment
-func (e *Endpoints) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string, details EnrollmentDetails) (*EnrollmentResponse, error) {
+func (e Endpoints) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string, details EnrollmentDetails) (*EnrollmentResponse, error) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
-
-	e.endpointsLock.RLock()
-	defer e.endpointsLock.RUnlock()
 
 	newCtx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()

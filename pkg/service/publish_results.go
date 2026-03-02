@@ -62,12 +62,9 @@ func encodeJSONRPCPublishResultsResponse(_ context.Context, obj any) (json.RawMe
 }
 
 // PublishResults implements KolideService.PublishResults
-func (e *Endpoints) PublishResults(ctx context.Context, nodeKey string, results []distributed.Result) (string, string, bool, error) {
+func (e Endpoints) PublishResults(ctx context.Context, nodeKey string, results []distributed.Result) (string, string, bool, error) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
-
-	e.endpointsLock.RLock()
-	defer e.endpointsLock.RUnlock()
 
 	newCtx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
