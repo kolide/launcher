@@ -40,7 +40,9 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	}
 
 	return tablewrapper.New(flags, slogger, "kolide_wmi", columns, t.generate,
-		tablewrapper.WithDescription("Windows Management Instrumentation (WMI) query results, flattened as key-value pairs. Requires a class constraint and optional properties constraint. Useful for querying Windows system management data."),
+		tablewrapper.WithDescription("Windows Management Instrumentation (WMI) query results, flattened as key-value pairs. Provides access to any WMI class, making it useful for querying a wide range of Windows system management data. Requires WHERE class = and properties = constraints."),
+		tablewrapper.WithExample("SELECT * FROM kolide_wmi WHERE class = 'SoftwareLicensingProduct' AND properties = 'name,licensefamily,licensestatus,partialproductkey'"),
+		tablewrapper.WithExample("SELECT * FROM kolide_wmi WHERE class = 'Win32_Environment' AND properties = 'Name,UserName,VariableValue,SystemVariable'"),
 		tablewrapper.WithNote(dataflattentable.EAVNote),
 	)
 }
