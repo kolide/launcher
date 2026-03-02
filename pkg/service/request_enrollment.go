@@ -89,9 +89,6 @@ func (e *Endpoints) RequestEnrollment(ctx context.Context, enrollSecret, hostIde
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
-	e.endpointsLock.RLock()
-	defer e.endpointsLock.RUnlock()
-
 	newCtx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 

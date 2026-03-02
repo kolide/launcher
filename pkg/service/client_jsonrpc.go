@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/go-kit/kit/transport/http/jsonrpc"
@@ -133,7 +132,6 @@ func NewJSONRPCClient(k types.Knapsack, options ...jsonrpc.ClientOption) (Kolide
 		RequestQueriesEndpoint:    requestQueriesEndpoint,
 		PublishResultsEndpoint:    publishResultsEndpoint,
 		CheckHealthEndpoint:       checkHealthEndpoint,
-		endpointsLock:             &sync.RWMutex{},
 		client:                    httpClient,
 		k:                         k,
 	}

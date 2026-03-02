@@ -87,9 +87,6 @@ func (e *Endpoints) RequestQueries(ctx context.Context, nodeKey string) (*distri
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
-	e.endpointsLock.RLock()
-	defer e.endpointsLock.RUnlock()
-
 	newCtx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 	request := queriesRequest{NodeKey: nodeKey}

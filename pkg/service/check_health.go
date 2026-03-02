@@ -50,9 +50,6 @@ func decodeJSONRPCHealthCheckResponse(_ context.Context, res jsonrpc.Response) (
 }
 
 func (e *Endpoints) CheckHealth(ctx context.Context) (int32, error) {
-	e.endpointsLock.RLock()
-	defer e.endpointsLock.RUnlock()
-
 	newCtx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 	request := healthcheckRequest{}

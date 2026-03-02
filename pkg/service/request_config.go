@@ -68,9 +68,6 @@ func (e *Endpoints) RequestConfig(ctx context.Context, nodeKey string) (string, 
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
-	e.endpointsLock.RLock()
-	defer e.endpointsLock.RUnlock()
-
 	newCtx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 	request := configRequest{NodeKey: nodeKey}
