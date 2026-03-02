@@ -27,7 +27,9 @@ func ChromeLoginKeychainInfo(flags types.Flags, slogger *slog.Logger) *table.Plu
 		table.TextColumn("action_url"),
 		table.TextColumn("username_value"),
 	}
-	return tablewrapper.New(flags, slogger, "kolide_chrome_login_keychain", columns, c.generate)
+	return tablewrapper.New(flags, slogger, "kolide_chrome_login_keychain", columns, c.generate,
+		tablewrapper.WithDescription("Saved login URLs and usernames from Chrome's Login Data database on macOS. Deprecated in favor of kolide_chrome_login_data_emails."),
+	)
 }
 
 type ChromeLoginKeychain struct {

@@ -52,7 +52,9 @@ func LauncherInfoTable(knapsack types.Knapsack, slogger *slog.Logger, configStor
 		table.TextColumn("fingerprint"),
 		table.TextColumn("public_key"),
 	}
-	return tablewrapper.New(knapsack, slogger, "kolide_launcher_info", columns, generateLauncherInfoTable(knapsack, configStore, LauncherHistoryStore))
+	return tablewrapper.New(knapsack, slogger, "kolide_launcher_info", columns, generateLauncherInfoTable(knapsack, configStore, LauncherHistoryStore),
+		tablewrapper.WithDescription("Launcher build metadata, version, enrollment identifiers, uptime, and cryptographic key details. Useful for verifying the launcher version, checking agent identity, or debugging enrollment issues."),
+	)
 }
 
 func generateLauncherInfoTable(knapsack types.Knapsack, configStore types.GetterSetter, LauncherHistoryStore types.GetterSetter) table.GenerateFunc {

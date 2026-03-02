@@ -26,6 +26,7 @@ type bytesFlattener interface {
 type execTableV2 struct {
 	slogger             *slog.Logger
 	tableName           string
+	description         string
 	flattener           bytesFlattener
 	timeoutSeconds      int
 	tabledebug          bool
@@ -65,6 +66,17 @@ func WithReportStderr() execTableV2Opt {
 	}
 }
 
+// WithDescription provides a human-readable description of what the table returns and
+// when it's useful. This is incorporated into the auto-generated table description that
+// also includes the underlying command. For example:
+//
+//	WithDescription("information about disk partitions, volumes, and APFS containers on macOS. Useful for checking disk health or verifying APFS container structure")
+func WithDescription(desc string) execTableV2Opt {
+	return func(t *execTableV2) {
+		t.description = desc
+	}
+}
+
 // WithReportMissingBinary will include an error row in the results
 // indicating that the binary is missing. Without this option, queries
 // against missing binaries typically return no results, with the error
@@ -99,22 +111,24 @@ func NewExecAndParseTable(flags types.Flags, slogger *slog.Logger, tableName str
 		Columns(),
 		tbl.generate,
 		tablewrapper.WithDescription(tbl.Description()),
-		tablewrapper.WithNotes(eavNote),
+		tablewrapper.WithNote(EAVNote),
 	)
 }
 
-const eavNote = "This is an EAV style table. Output is flattened."
+const EAVNote = "This is an EAV (Entity-Attribute-Value) table. Rather than a column per field, data is returned as rows with fullkey, key, and value columns. fullkey is the slash-separated path to the value (e.g. network/interfaces/0/name), parent is the path of the containing object, and key is the leaf key name.\n\nFor advanced usage, the query constraint can filter by path -- it supports glob patterns (e.g. WHERE query = 'network/interfaces/*/name')."
 
-// execTableV2DescriptionTmpl uses text/template to interpolate the table name ({{.TableName}}) into the description.
-const templateString = "{{.TableName}} will exec the command `{{.Command}} {{.CommandArgs}}` and return the output."
-
-var execTableV2DescriptionTmpl = template.Must(template.New("execTableV2").Parse(templateString))
+var (
+	defaultDescriptionTmpl = template.Must(template.New("default").Parse(
+		"{{.TableName}} will exec the command `{{.Command}} {{.CommandArgs}}` and return the output."))
+	richDescriptionTmpl = template.Must(template.New("rich").Parse(
+		"{{.Description}}\n\nIt execs the command `{{.Command}} {{.CommandArgs}}`."))
+)
 
 // Description returns a string description suitable for inclusion in osquery spec files.
 func (tbl *execTableV2) Description() string {
-	// disclaimed commands are being exec'ed through launcher. So we need to untangle them
 	cmdname := tbl.cmd.Name()
 	cmdargs := tbl.execArgs
+	// disclaimed commands are being exec'ed through launcher. So we need to untangle them
 	if cmdname == "launcher" && len(cmdargs) > 0 && cmdargs[0] == "rundisclaimed" {
 		if len(cmdargs) < 2 {
 			cmdname = "~unknown~"
@@ -123,14 +137,21 @@ func (tbl *execTableV2) Description() string {
 			cmdargs = cmdargs[2:]
 		}
 	}
+
+	tmpl := defaultDescriptionTmpl
+	if tbl.description != "" {
+		tmpl = richDescriptionTmpl
+	}
+
 	templateVars := map[string]string{
 		"TableName":   tbl.tableName,
 		"Command":     cmdname,
 		"CommandArgs": strings.Join(cmdargs, " "),
+		"Description": tbl.description,
 	}
 
 	var buf bytes.Buffer
-	if err := execTableV2DescriptionTmpl.Execute(&buf, templateVars); err != nil {
+	if err := tmpl.Execute(&buf, templateVars); err != nil {
 		return ""
 	}
 	return buf.String()

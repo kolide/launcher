@@ -25,7 +25,10 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger, store types.KVStore) *
 		tableName: "kolide_sourced_data",
 	}
 
-	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generateKolideReleaseTrackerDataTable(store))
+	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generateKolideReleaseTrackerDataTable(store),
+		tablewrapper.WithDescription("Third party release metadata from the Kolide's release tracker, flattened as key-value pairs. Useful for inspecting available software release information."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
+	)
 }
 
 func (t *Table) generateKolideReleaseTrackerDataTable(store types.KVStore) table.GenerateFunc {

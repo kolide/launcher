@@ -44,7 +44,9 @@ func ZfsPropertiesPlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin 
 		tableName: "kolide_zfs_properties",
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_zfs_properties", columns(), t.generate)
+	desc := "Information about objects inside ZFS. It runs the command `zfs get -H <values> <names>`"
+
+	return tablewrapper.New(flags, slogger, "kolide_zfs_properties", columns(), t.generate, tablewrapper.WithDescription(desc))
 }
 
 func ZpoolPropertiesPlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
@@ -54,7 +56,9 @@ func ZpoolPropertiesPlugin(flags types.Flags, slogger *slog.Logger) *table.Plugi
 		tableName: "kolide_zpool_properties",
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_zpool_properties", columns(), t.generate)
+	desc := "Information about zpools inside ZFS. It runs the command `zpool get -H <values> <names>`"
+
+	return tablewrapper.New(flags, slogger, "kolide_zpool_properties", columns(), t.generate, tablewrapper.WithDescription(desc))
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

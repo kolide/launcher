@@ -57,7 +57,10 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		tableName: "kolide_profiles",
 	}
 
-	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generate)
+	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generate,
+		tablewrapper.WithDescription("macOS configuration profiles from the `profiles` command, flattened as key-value pairs. Supports show/list/status commands and user/device profile types. Useful for auditing MDM-installed profiles and system configuration."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
+	)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

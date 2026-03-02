@@ -39,7 +39,9 @@ func MacOSUpdate(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		table.IntegerColumn("last_successful_check_timestamp"),
 	}
 	tableGen := &osUpdateTable{}
-	return tablewrapper.New(flags, slogger, "kolide_macos_software_update", columns, tableGen.generateMacUpdate)
+	return tablewrapper.New(flags, slogger, "kolide_macos_software_update", columns, tableGen.generateMacUpdate,
+		tablewrapper.WithDescription("macOS software update preferences including auto-update, background download, OS update, and critical update settings. Useful for verifying that automatic software updates are properly configured."),
+	)
 }
 
 type osUpdateTable struct {

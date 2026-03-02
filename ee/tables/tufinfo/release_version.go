@@ -30,7 +30,9 @@ func TufReleaseVersionTable(slogger *slog.Logger, flags types.Flags) *table.Plug
 		table.TextColumn("target"),
 	}
 
-	return tablewrapper.New(flags, slogger, tufReleaseVersionTableName, columns, generateTufReleaseVersionTable(flags))
+	return tablewrapper.New(flags, slogger, tufReleaseVersionTableName, columns, generateTufReleaseVersionTable(flags),
+		tablewrapper.WithDescription("TUF release version metadata for launcher and osqueryd binaries, including target version per OS, architecture, and update channel. Useful for checking what binary versions are targeted for deployment."),
+	)
 }
 
 func generateTufReleaseVersionTable(flags types.Flags) table.GenerateFunc {

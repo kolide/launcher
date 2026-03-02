@@ -42,7 +42,10 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("name", tableName),
 	}
 
-	return tablewrapper.New(flags, slogger, t.name, columns, t.generate)
+	return tablewrapper.New(flags, slogger, t.name, columns, t.generate,
+		tablewrapper.WithDescription("macOS Wi-Fi information from the `airport` utility, including current network info (--getinfo) and scan results (--scan). Useful for checking Wi-Fi connection status, signal strength, and nearby networks."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
+	)
 }
 
 type airportExecutor struct {

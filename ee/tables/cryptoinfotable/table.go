@@ -34,7 +34,10 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", "kolide_cryptinfo"),
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_cryptinfo", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_cryptinfo", columns, t.generate,
+		tablewrapper.WithDescription("Parses encrypted files (such as encrypted plists) with an optional passphrase and returns flattened content. Requires a WHERE path = constraint. Useful for inspecting metadata about encrypted files."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
+	)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

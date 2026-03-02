@@ -36,7 +36,10 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", "kolide_brew_upgradeable"),
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_brew_upgradeable", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_brew_upgradeable", columns, t.generate,
+		tablewrapper.WithDescription("Homebrew packages with available upgrades, from `brew outdated --json`. Useful for identifying outdated Homebrew packages on macOS and Linux."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
+	)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
