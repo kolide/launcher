@@ -244,6 +244,9 @@ jobs:
         key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
         enableCrossOsArchive: true
 
+    - name: Install gotestsum
+      run: go install gotest.tools/gotestsum@latest
+
     - name: Test
       run: make test
 
@@ -253,6 +256,13 @@ jobs:
         name: ${{ runner.os }}-coverage.out
         path: ./coverage.out
         if-no-files-found: error
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ runner.os }}-test-results.xml
+        path: ./test-results.xml
 
   launcher_table_test:
     name: Launcher table performance test
