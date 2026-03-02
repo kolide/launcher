@@ -36,7 +36,7 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	}
 
 	return tablewrapper.New(flags, slogger, "kolide_nix_upgradeable", columns, t.generate,
-		tablewrapper.WithDescription("Nix packages with available upgrades from the nix-env package manager, flattened as key-value pairs. Useful for identifying outdated Nix packages."),
+		tablewrapper.WithDescription("Nix packages with available upgrades from the nix-env package manager, flattened as key-value pairs. Useful for identifying outdated Nix packages. Requires a WHERE uid = constraint to specify which user's Nix profile to check."),
 		tablewrapper.WithNote(dataflattentable.EAVNote),
 	)
 }

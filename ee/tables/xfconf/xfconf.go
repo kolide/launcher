@@ -39,7 +39,7 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	}
 
 	return tablewrapper.New(flags, slogger, "kolide_xfconf", dataflattentable.Columns(table.TextColumn("username"), table.TextColumn("path")), t.generate,
-		tablewrapper.WithDescription("Linux XFCE desktop configuration from xfconf-query, flattened as key-value pairs. Useful for auditing XFCE desktop settings like screensaver lock and power management."),
+		tablewrapper.WithDescription("Linux XFCE desktop configuration from xfconf-query, flattened as key-value pairs. Useful for auditing XFCE desktop settings like screensaver lock and power management. Requires a WHERE username = constraint."),
 		tablewrapper.WithNote(dataflattentable.EAVNote),
 	)
 }
