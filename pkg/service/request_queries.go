@@ -83,7 +83,7 @@ func MakeRequestQueriesEndpoint(svc KolideService) endpoint.Endpoint {
 }
 
 // RequestQueries implements KolideService.RequestQueries
-func (e *Endpoints) RequestQueries(ctx context.Context, nodeKey string) (*distributed.GetQueriesResult, bool, error) {
+func (e Endpoints) RequestQueries(ctx context.Context, nodeKey string) (*distributed.GetQueriesResult, bool, error) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 

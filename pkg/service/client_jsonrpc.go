@@ -125,14 +125,13 @@ func NewJSONRPCClient(k types.Knapsack, options ...jsonrpc.ClientOption) (Kolide
 		append(commonOpts, jsonrpc.ClientResponseDecoder(decodeJSONRPCHealthCheckResponse))...,
 	).Endpoint()
 
-	var client KolideService = &Endpoints{
+	var client KolideService = Endpoints{
 		RequestEnrollmentEndpoint: requestEnrollmentEndpoint,
 		RequestConfigEndpoint:     requestConfigEndpoint,
 		PublishLogsEndpoint:       publishLogsEndpoint,
 		RequestQueriesEndpoint:    requestQueriesEndpoint,
 		PublishResultsEndpoint:    publishResultsEndpoint,
 		CheckHealthEndpoint:       checkHealthEndpoint,
-		k:                         k,
 	}
 
 	client = LoggingMiddleware(k)(client)

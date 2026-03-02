@@ -49,7 +49,7 @@ func decodeJSONRPCHealthCheckResponse(_ context.Context, res jsonrpc.Response) (
 	return result, nil
 }
 
-func (e *Endpoints) CheckHealth(ctx context.Context) (int32, error) {
+func (e Endpoints) CheckHealth(ctx context.Context) (int32, error) {
 	newCtx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 	request := healthcheckRequest{}

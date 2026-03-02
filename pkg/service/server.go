@@ -2,7 +2,6 @@ package service
 
 import (
 	"github.com/go-kit/kit/endpoint"
-	"github.com/kolide/launcher/ee/agent/types"
 )
 
 // KolideClient is an alias for the Endpoints type.
@@ -17,5 +16,4 @@ type Endpoints struct {
 	RequestQueriesEndpoint    endpoint.Endpoint
 	PublishResultsEndpoint    endpoint.Endpoint
 	CheckHealthEndpoint       endpoint.Endpoint
-	k                         types.Knapsack
 }

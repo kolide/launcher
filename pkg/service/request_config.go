@@ -64,7 +64,7 @@ func decodeJSONRPCConfigResponse(_ context.Context, res jsonrpc.Response) (any, 
 }
 
 // RequestConfig implements KolideService.RequestConfig.
-func (e *Endpoints) RequestConfig(ctx context.Context, nodeKey string) (string, bool, error) {
+func (e Endpoints) RequestConfig(ctx context.Context, nodeKey string) (string, bool, error) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
