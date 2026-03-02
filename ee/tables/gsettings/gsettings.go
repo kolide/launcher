@@ -49,7 +49,7 @@ func Settings(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	}
 
 	return tablewrapper.New(flags, slogger, "kolide_gsettings", columns, t.generate,
-		tablewrapper.WithDescription("Returns GNOME desktop environment settings (gsettings/dconf) for a given user. Useful for checking desktop configuration such as screen lock timeout, idle delay, proxy settings, and other GNOME preferences. Requires a WHERE username = constraint."),
+		tablewrapper.WithDescription("GNOME desktop environment settings (gsettings/dconf) for a given user. Useful for checking desktop configuration such as screen lock timeout, idle delay, proxy settings, and other GNOME preferences. Requires a WHERE username = constraint."),
 	)
 }
 

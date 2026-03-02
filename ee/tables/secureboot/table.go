@@ -27,7 +27,7 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	}
 
 	return tablewrapper.New(flags, slogger, "kolide_secureboot", columns, t.generate,
-		tablewrapper.WithDescription("Returns the UEFI Secure Boot status and setup mode from EFI variables. Useful for verifying that Secure Boot is enabled and that the system is not in setup mode."),
+		tablewrapper.WithDescription("UEFI Secure Boot status from EFI variables. Reports whether Secure Boot is enabled and whether the system is in setup mode (setup mode means Secure Boot keys can be modified, indicating Secure Boot is not fully enforced)."),
 	)
 }
 

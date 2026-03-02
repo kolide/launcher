@@ -49,7 +49,7 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	}
 
 	return tablewrapper.New(flags, slogger, "kolide_xrdb", columns, t.generate,
-		tablewrapper.WithDescription("Returns X11 resource database (xrdb) settings for a given user and display. Useful for checking X server preferences such as DPI, cursor size, font rendering, and other Xresources values. Requires a WHERE username = constraint."),
+		tablewrapper.WithDescription("X11 resource database (xrdb) settings for a given user and display. Useful for checking X server preferences such as DPI, cursor size, font rendering, and other Xresources values. Requires a WHERE username = constraint."),
 	)
 }
 
