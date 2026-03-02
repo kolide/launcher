@@ -21,11 +21,11 @@ import (
 	"github.com/kolide/launcher/ee/tables/firefox_preferences"
 	"github.com/kolide/launcher/ee/tables/jwt"
 	"github.com/kolide/launcher/ee/tables/launcher_db"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/ee/tables/osquery_instance_history"
 	"github.com/kolide/launcher/ee/tables/release_tracker_data"
 	"github.com/kolide/launcher/ee/tables/secretscan"
 	"github.com/kolide/launcher/ee/tables/sleeper"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/ee/tables/tdebug"
 	"github.com/kolide/launcher/ee/tables/tufinfo"
 

@@ -14,7 +14,7 @@ type mockCommand struct {
 }
 
 func (m mockCommand) Cmd(ctx context.Context, args ...string) (*allowedcmd.TracedCmd, error) {
-	return &allowedcmd.TracedCmd{Cmd: exec.CommandContext(ctx, m.name, args...)}, nil
+	return &allowedcmd.TracedCmd{Cmd: exec.CommandContext(ctx, m.name, args...)}, nil //nolint:forbidigo // Fine to use exec.CommandContext in tests
 }
 
 func (m mockCommand) Name() string { return m.name }

@@ -46,7 +46,6 @@ func ZfsPropertiesPlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin 
 
 	desc := "Information about objects inside ZFS. It runs the command `zfs get -H <values> <names>`"
 
-
 	return tablewrapper.New(flags, slogger, "kolide_zfs_properties", columns(), t.generate, tablewrapper.WithDescription(desc))
 }
 

@@ -5,8 +5,6 @@ package table
 import (
 	"log/slog"
 
-	"github.com/kolide/launcher/ee/tables/knightsc/kextpolicy"
-	"github.com/kolide/launcher/ee/tables/knightsc/legacyexec"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/airport"
@@ -25,6 +23,8 @@ import (
 	"github.com/kolide/launcher/ee/tables/firmwarepasswd"
 	brew_upgradeable "github.com/kolide/launcher/ee/tables/homebrew"
 	"github.com/kolide/launcher/ee/tables/ioreg"
+	"github.com/kolide/launcher/ee/tables/knightsc/kextpolicy"
+	"github.com/kolide/launcher/ee/tables/knightsc/legacyexec"
 	"github.com/kolide/launcher/ee/tables/macos_software_update"
 	"github.com/kolide/launcher/ee/tables/mdmclient"
 	"github.com/kolide/launcher/ee/tables/munki"
