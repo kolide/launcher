@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -107,6 +108,9 @@ func TestExtractTarGz(t *testing.T) {
 	})
 
 	t.Run("preserves file mode", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("Windows does not support POSIX file permissions")
+		}
 		t.Parallel()
 		destDir := t.TempDir()
 
