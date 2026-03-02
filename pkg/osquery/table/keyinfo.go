@@ -44,7 +44,9 @@ func KeyInfo(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		kIdentifer: kIdentifer,
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_keyinfo", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_keyinfo", columns, t.generate,
+		tablewrapper.WithDescription("Cryptographic key metadata for a given file path, including key type, encryption status, bit length, and fingerprints. Requires a WHERE path = constraint. Useful for auditing SSH keys, certificates, or other key material."),
+	)
 }
 
 func (t *KeyInfoTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

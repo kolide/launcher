@@ -48,7 +48,9 @@ func Settings(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		getBytes: execGsettings,
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_gsettings", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_gsettings", columns, t.generate,
+		tablewrapper.WithDescription("GNOME desktop environment settings (gsettings/dconf) for a given user. Useful for checking desktop configuration such as screen lock timeout, idle delay, proxy settings, and other GNOME preferences. Requires a WHERE username = constraint."),
+	)
 }
 
 func (t *GsettingsValues) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

@@ -23,7 +23,9 @@ func TablePlugin(k types.Knapsack, slogger *slog.Logger) *table.Plugin {
 		table.TextColumn("version"),
 		table.TextColumn("errors"),
 	}
-	return tablewrapper.New(k, slogger, "kolide_launcher_osquery_instance_history", columns, generate(k))
+	return tablewrapper.New(k, slogger, "kolide_launcher_osquery_instance_history", columns, generate(k),
+		tablewrapper.WithDescription("History of osquery instance runs, including start/connect/exit times, version, hostname, and errors. Useful for debugging osquery restarts or connectivity issues."),
+	)
 }
 
 func generate(k types.Knapsack) table.GenerateFunc {

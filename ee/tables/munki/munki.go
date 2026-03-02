@@ -43,7 +43,9 @@ func (m *MunkiInfo) MunkiReport(flags types.Flags, slogger *slog.Logger) *table.
 		table.TextColumn("console_user"),
 		table.TextColumn("manifest_name"),
 	}
-	return tablewrapper.New(flags, slogger, "kolide_munki_report", columns, m.generateMunkiReport)
+	return tablewrapper.New(flags, slogger, "kolide_munki_report", columns, m.generateMunkiReport,
+		tablewrapper.WithDescription("Munki run report metadata from ManagedInstallReport.plist, including version, start/end times, success status, errors, warnings, and manifest name. Useful for monitoring Munki software management runs."),
+	)
 }
 
 func (m *MunkiInfo) ManagedInstalls(flags types.Flags, slogger *slog.Logger) *table.Plugin {
@@ -53,7 +55,9 @@ func (m *MunkiInfo) ManagedInstalls(flags types.Flags, slogger *slog.Logger) *ta
 		table.TextColumn("name"),
 		table.TextColumn("end_time"),
 	}
-	return tablewrapper.New(flags, slogger, "kolide_munki_installs", columns, m.generateMunkiInstalls)
+	return tablewrapper.New(flags, slogger, "kolide_munki_installs", columns, m.generateMunkiInstalls,
+		tablewrapper.WithDescription("Munki managed software install records from ManagedInstallReport.plist, including package name, installed version, install status, and timestamp. Useful for auditing software managed by Munki."),
+	)
 }
 
 func (m *MunkiInfo) generateMunkiInstalls(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

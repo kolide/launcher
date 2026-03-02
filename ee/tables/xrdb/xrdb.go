@@ -48,7 +48,9 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		getBytes: execXRDB,
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_xrdb", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_xrdb", columns, t.generate,
+		tablewrapper.WithDescription("X11 resource database (xrdb) settings for a given user and display. Useful for checking X server preferences such as DPI, cursor size, font rendering, and other Xresources values. Requires a WHERE username = constraint."),
+	)
 }
 
 func (t *XRDBSettings) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

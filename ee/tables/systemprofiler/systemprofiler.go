@@ -99,7 +99,10 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		tableName: "kolide_system_profiler",
 	}
 
-	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generate)
+	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generate,
+		tablewrapper.WithDescription("macOS system profiler data from `system_profiler -xml`, flattened as key-value pairs. Supports data type constraints (e.g. SPHardwareDataType, SPNetworkDataType) and detail levels (mini/basic/full). Useful for querying detailed hardware, software, and network configuration."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
+	)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

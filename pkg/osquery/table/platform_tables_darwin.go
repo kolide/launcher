@@ -5,8 +5,6 @@ package table
 import (
 	"log/slog"
 
-	"github.com/knightsc/system_policy/osquery/table/kextpolicy"
-	"github.com/knightsc/system_policy/osquery/table/legacyexec"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/airport"
@@ -25,6 +23,8 @@ import (
 	"github.com/kolide/launcher/ee/tables/firmwarepasswd"
 	brew_upgradeable "github.com/kolide/launcher/ee/tables/homebrew"
 	"github.com/kolide/launcher/ee/tables/ioreg"
+	"github.com/kolide/launcher/ee/tables/knightsc/kextpolicy"
+	"github.com/kolide/launcher/ee/tables/knightsc/legacyexec"
 	"github.com/kolide/launcher/ee/tables/macos_software_update"
 	"github.com/kolide/launcher/ee/tables/mdmclient"
 	"github.com/kolide/launcher/ee/tables/munki"
@@ -34,6 +34,7 @@ import (
 	"github.com/kolide/launcher/ee/tables/security"
 	"github.com/kolide/launcher/ee/tables/spotlight"
 	"github.com/kolide/launcher/ee/tables/systemprofiler"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/ee/tables/zfs"
 	osquery "github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -57,7 +58,9 @@ func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsque
 		[]table.ColumnDefinition{
 			table.IntegerColumn("enabled"),
 			table.IntegerColumn("grace_period"),
-		})
+		},
+		tablewrapper.WithDescription("Per-user screen lock settings on macOS, including whether screen lock is enabled and the grace period before a password is required. Useful for auditing screen lock compliance."),
+	)
 
 	keychainAclsTable := osquery_user_exec_table.TablePlugin(
 		k, slogger, "kolide_keychain_acls",
@@ -68,7 +71,9 @@ func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsque
 			table.TextColumn("path"),
 			table.TextColumn("description"),
 			table.TextColumn("label"),
-		})
+		},
+		tablewrapper.WithDescription("macOS keychain access control lists (ACLs) per user, showing which applications are authorized to access keychain items. Useful for auditing keychain permissions."),
+	)
 
 	keychainItemsTable := osquery_user_exec_table.TablePlugin(
 		k, slogger, "kolide_keychain_items",
@@ -81,7 +86,9 @@ func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsque
 			table.TextColumn("modified"),
 			table.TextColumn("type"),
 			table.TextColumn("path"),
-		})
+		},
+		tablewrapper.WithDescription("macOS keychain items per user, including labels, types, creation and modification dates. Useful for enumerating certificates, keys, and passwords stored in user keychains."),
+	)
 
 	return []osquery.OsqueryPlugin{
 		keychainAclsTable,
@@ -102,12 +109,12 @@ func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsque
 		ioreg.TablePlugin(k, slogger),
 		profiles.TablePlugin(k, slogger),
 		airport.TablePlugin(k, slogger),
-		kextpolicy.TablePlugin(),
+		kextpolicy.TablePlugin(k, slogger),
 		filevault.TablePlugin(k, slogger),
 		find_my.FindMyDevice(k, slogger),
 		mdmclient.TablePlugin(k, slogger),
 		apple_silicon_security_policy.TablePlugin(k, slogger),
-		legacyexec.TablePlugin(),
+		legacyexec.TablePlugin(k, slogger),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_diskutil_list", plist.Parser, allowedcmd.Diskutil, []string{"list", "-plist"}),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_falconctl_stats", plist.Parser, allowedcmd.Launcher, []string{"rundisclaimed", "falconctl", "stats", "-p"}),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_apfs_list", plist.Parser, allowedcmd.Diskutil, []string{"apfs", "list", "-plist"}),

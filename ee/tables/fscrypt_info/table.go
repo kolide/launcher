@@ -31,5 +31,7 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	t := &Table{
 		slogger: slogger.With("table", tableName),
 	}
-	return tablewrapper.New(flags, slogger, tableName, columns, t.generate)
+	return tablewrapper.New(flags, slogger, tableName, columns, t.generate,
+		tablewrapper.WithDescription("Filesystem encryption status using Linux fscrypt. Reports whether a given path is encrypted, its encryption algorithms, and the associated mountpoint and device. Requires a WHERE path = constraint."),
+	)
 }

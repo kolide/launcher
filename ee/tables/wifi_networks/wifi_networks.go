@@ -53,7 +53,10 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		getBytes: execPwsh(slogger),
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_wifi_networks", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_wifi_networks", columns, t.generate,
+		tablewrapper.WithDescription("Windows Wi-Fi network profiles and configuration, flattened as key-value pairs. Useful for auditing saved Wi-Fi networks and their security settings."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
+	)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

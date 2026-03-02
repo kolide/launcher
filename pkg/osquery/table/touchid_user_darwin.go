@@ -28,7 +28,9 @@ func TouchIDUserConfig(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		table.IntegerColumn("effective_applepay"),
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_touchid_user_config", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_touchid_user_config", columns, t.generate,
+		tablewrapper.WithDescription("Per-user Touch ID configuration on macOS, including number of enrolled fingerprints and whether Touch ID is enabled for unlock and Apple Pay. Requires a WHERE uid = constraint. Useful for auditing biometric authentication settings."),
+	)
 }
 
 type touchIDUserConfigTable struct {

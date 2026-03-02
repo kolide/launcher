@@ -43,7 +43,9 @@ func OnePasswordAccounts(flags types.Flags, slogger *slog.Logger) *table.Plugin 
 		slogger: slogger.With("table", "kolide_onepassword_accounts"),
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_onepassword_accounts", columns, o.generate)
+	return tablewrapper.New(flags, slogger, "kolide_onepassword_accounts", columns, o.generate,
+		tablewrapper.WithDescription("1Password account information from local SQLite databases, including user email, team name, server, and account type. Useful for identifying 1Password accounts configured on a device."),
+	)
 }
 
 type onePasswordAccountsTable struct {

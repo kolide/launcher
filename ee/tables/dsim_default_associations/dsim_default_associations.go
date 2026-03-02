@@ -35,7 +35,10 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", "kolide_dsim_default_associations"),
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_dsim_default_associations", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_dsim_default_associations", columns, t.generate,
+		tablewrapper.WithDescription("Windows default file associations from DISM, flattened as key-value pairs. Useful for auditing which applications handle specific file types."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
+	)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

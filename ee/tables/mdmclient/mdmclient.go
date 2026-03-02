@@ -64,7 +64,10 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		tableName: "kolide_mdmclient",
 	}
 
-	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generate)
+	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generate,
+		tablewrapper.WithDescription("macOS MDM client data from `mdmclient` Query commands, flattened as key-value pairs. Useful for inspecting detailed MDM device information and security configuration. Requires a WHERE command = constraint (e.g. 'QueryDeviceInformation', 'QuerySecurityInfo')."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
+	)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

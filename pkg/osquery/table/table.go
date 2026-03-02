@@ -25,6 +25,7 @@ import (
 	"github.com/kolide/launcher/ee/tables/release_tracker_data"
 	"github.com/kolide/launcher/ee/tables/secretscan"
 	"github.com/kolide/launcher/ee/tables/sleeper"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/ee/tables/tdebug"
 	"github.com/kolide/launcher/ee/tables/tufinfo"
 
@@ -38,8 +39,12 @@ func LauncherTables(k types.Knapsack, slogger *slog.Logger) []osquery.OsqueryPlu
 		LauncherConfigTable(k, slogger, k.ConfigStore(), k),
 		LauncherDbInfo(k, slogger, k.BboltDB()),
 		LauncherInfoTable(k, slogger, k.ConfigStore(), k.LauncherHistoryStore()),
-		launcher_db.TablePlugin(k, slogger, "kolide_server_data", k.ServerProvidedDataStore()),
-		launcher_db.TablePlugin(k, slogger, "kolide_control_flags", k.AgentFlagsStore()),
+		launcher_db.TablePlugin(k, slogger, "kolide_server_data", k.ServerProvidedDataStore(),
+			tablewrapper.WithDescription("Key-value data provided by the Kolide SaaS. Useful for inspecting server-pushed configuration or metadata."),
+		),
+		launcher_db.TablePlugin(k, slogger, "kolide_control_flags", k.AgentFlagsStore(),
+			tablewrapper.WithDescription("Agent control flags pushed by the Kolide SaaS, such as feature toggles and behavior overrides. Useful for debugging server-controlled agent settings."),
+		),
 		LauncherAutoupdateConfigTable(slogger, k),
 		osquery_instance_history.TablePlugin(k, slogger),
 		release_tracker_data.TablePlugin(k, slogger, k.ServerReleaseTrackerDataStore()),

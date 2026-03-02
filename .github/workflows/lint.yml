@@ -76,6 +76,31 @@ jobs:
             exit 1
           fi
 
+  table_specs:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    name: table specs
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: './go.mod'
+          check-latest: true
+          cache: false
+
+      - run: make deps
+
+      - name: Build launcher
+        run: go build -o ./build/launcher ./cmd/launcher
+
+      - name: Check table specs
+        run: ./build/launcher specs --required description --required name --quiet
+
   # This job is here as a github status check -- it allows us to move
   # the merge dependency from being on all the jobs to this single
   # one.
@@ -86,3 +111,4 @@ jobs:
     needs:
       - golangci
       - govulncheck
+      - table_specs

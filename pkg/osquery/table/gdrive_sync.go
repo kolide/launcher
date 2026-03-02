@@ -26,7 +26,9 @@ func GDriveSyncConfig(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		table.TextColumn("user_email"),
 		table.TextColumn("local_sync_root_path"),
 	}
-	return tablewrapper.New(flags, slogger, "kolide_gdrive_sync_config", columns, g.generate)
+	return tablewrapper.New(flags, slogger, "kolide_gdrive_sync_config", columns, g.generate,
+		tablewrapper.WithDescription("Google Drive sync configuration on macOS, including the syncing user's email and local sync root path. Useful for identifying Google Drive accounts and sync locations."),
+	)
 }
 
 type gdrive struct {

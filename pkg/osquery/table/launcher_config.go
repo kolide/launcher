@@ -16,7 +16,9 @@ func LauncherConfigTable(flags types.Flags, slogger *slog.Logger, store types.Ge
 		table.TextColumn("config"),
 		table.TextColumn("enrollment_id"),
 	}
-	return tablewrapper.New(flags, slogger, "kolide_launcher_config", columns, generateLauncherConfig(store, enrollmentTracker))
+	return tablewrapper.New(flags, slogger, "kolide_launcher_config", columns, generateLauncherConfig(store, enrollmentTracker),
+		tablewrapper.WithDescription("The current osquery configuration for each enrollment, including scheduled queries and options. Useful for verifying what queries are configured to run."),
+	)
 }
 
 func generateLauncherConfig(store types.Getter, enrollmentTracker types.EnrollmentTracker) table.GenerateFunc {

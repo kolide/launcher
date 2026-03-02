@@ -31,7 +31,9 @@ func NewFilewalkTable(flags types.Flags, resultsStore types.Getter, slogger *slo
 		table.IntegerColumn("last_walk_timestamp"),
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_filewalk", columns, ft.generate)
+	return tablewrapper.New(flags, slogger, "kolide_filewalk", columns, ft.generate,
+		tablewrapper.WithDescription("Results of configured file walk operations, including discovered file paths and last walk timestamps. Requires a WHERE walk_name = constraint. Useful for auditing files found during periodic filesystem scans."),
+	)
 }
 
 func (ft *filewalkTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

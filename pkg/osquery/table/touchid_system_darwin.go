@@ -25,7 +25,9 @@ func TouchIDSystemConfig(flags types.Flags, slogger *slog.Logger) *table.Plugin 
 		table.IntegerColumn("touchid_unlock"),
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_touchid_system_config", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_touchid_system_config", columns, t.generate,
+		tablewrapper.WithDescription("System-wide Touch ID and Secure Enclave configuration on macOS, including hardware compatibility and whether Touch ID is enabled. Useful for checking biometric hardware support."),
+	)
 }
 
 type touchIDSystemConfigTable struct {

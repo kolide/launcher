@@ -72,7 +72,10 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", tableName),
 	}
 
-	return tablewrapper.New(flags, slogger, tableName, columns, t.generate)
+	return tablewrapper.New(flags, slogger, tableName, columns, t.generate,
+		tablewrapper.WithDescription("Scans files or raw content for leaked secrets using gitleaks rules. Requires a WHERE path = or raw_data = constraint. Returns rule matches with line numbers. Useful for detecting accidentally committed credentials or API keys."),
+		tablewrapper.WithNote("The hash_argon2id column provides a privacy-preserving way to track whether the same secret appears across devices without exposing the secret itself. It returns only 3 bytes (6 hex characters), which is enough for rough uniqueness comparison but not enough to reverse the secret. To enable hashing, provide a WHERE hash_argon2id_salt = constraint with a 16-byte random salt, base64-encoded. The salt should be unique per organization and not predictable. If no salt is provided, the hash column will be empty."),
+	)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

@@ -33,32 +33,32 @@ type wrappedTable struct {
 	tableOpts       []table.TableOpt
 }
 
-type tablePluginOption func(*wrappedTable)
+type TablePluginOption func(*wrappedTable)
 
 // WithTableGenerateTimeout overrides the default table timeout of four minutes.
 // The control server may override this value.
-func WithTableGenerateTimeout(genTimeout time.Duration) tablePluginOption {
+func WithTableGenerateTimeout(genTimeout time.Duration) TablePluginOption {
 	return func(w *wrappedTable) {
 		w.genTimeout = genTimeout
 	}
 }
 
 // WithDescription sets the informational table description passed to the underlying osquery table plugin.
-func WithDescription(description string) tablePluginOption {
+func WithDescription(description string) TablePluginOption {
 	return func(w *wrappedTable) {
 		w.tableOpts = append(w.tableOpts, table.WithDescription(description))
 	}
 }
 
-// WithNotes sets the informational table notes passed to the underlying osquery table plugin.
-func WithNotes(notes string) tablePluginOption {
+// WithNote sets the informational table note passed to the underlying osquery table plugin.
+func WithNote(note string) TablePluginOption {
 	return func(w *wrappedTable) {
-		w.tableOpts = append(w.tableOpts, table.WithNotes(notes))
+		w.tableOpts = append(w.tableOpts, table.WithNotes(note))
 	}
 }
 
 // WithExample adds an example, which will be passed to the underlying osquery table plugin
-func WithExample(example string) tablePluginOption {
+func WithExample(example string) TablePluginOption {
 	return func(w *wrappedTable) {
 		w.tableOpts = append(w.tableOpts, table.WithExample(example))
 	}
@@ -71,14 +71,14 @@ type generateResult struct {
 
 // New returns a table plugin that will attempt to execute a query up until the given timeout,
 // at which point it will instead return no rows and a timeout error.
-func New(flags types.Flags, slogger *slog.Logger, name string, columns []table.ColumnDefinition, gen table.GenerateFunc, opts ...tablePluginOption) *table.Plugin {
+func New(flags types.Flags, slogger *slog.Logger, name string, columns []table.ColumnDefinition, gen table.GenerateFunc, opts ...TablePluginOption) *table.Plugin {
 	wt := newWrappedTable(flags, slogger, name, gen, opts...)
 	return table.NewPlugin(name, columns, wt.generate, wt.tableOpts...) //nolint:forbidigo // This is our one allowed usage of table.NewPlugin
 }
 
 // newWrappedTable returns a new `wrappedTable`. We split the constructor out for ease of testing
 // specific wrappedTable functionality around flag changes.
-func newWrappedTable(flags types.Flags, slogger *slog.Logger, name string, gen table.GenerateFunc, opts ...tablePluginOption) *wrappedTable {
+func newWrappedTable(flags types.Flags, slogger *slog.Logger, name string, gen table.GenerateFunc, opts ...TablePluginOption) *wrappedTable {
 	wt := &wrappedTable{
 		flagsController: flags,
 		slogger:         slogger.With("table_name", name),
