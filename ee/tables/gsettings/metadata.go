@@ -45,7 +45,9 @@ func Metadata(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		cmdRunner: execGsettingsCommand,
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_gsettings_metadata", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_gsettings_metadata", columns, t.generate,
+		tablewrapper.WithDescription("Returns metadata (description, type) for GNOME gsettings keys within a given schema. Useful for discovering what settings are available and what values they accept. Requires a WHERE schema = constraint."),
+	)
 }
 
 func (t *GsettingsMetadata) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

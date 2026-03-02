@@ -26,7 +26,9 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", "kolide_secureboot"),
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_secureboot", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_secureboot", columns, t.generate,
+		tablewrapper.WithDescription("Returns the UEFI Secure Boot status and setup mode from EFI variables. Useful for verifying that Secure Boot is enabled and that the system is not in setup mode."),
+	)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
