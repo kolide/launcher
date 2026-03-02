@@ -73,7 +73,7 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	}
 
 	return tablewrapper.New(flags, slogger, tableName, columns, t.generate,
-		tablewrapper.WithDescription("Scans files or raw content for leaked secrets using gitleaks rules. Requires a WHERE path = or raw_data = constraint. Returns rule matches with redacted secrets, line numbers, and optional Argon2id hashes. Useful for detecting accidentally committed credentials or API keys."),
+		tablewrapper.WithDescription("Scans files or raw content for leaked secrets using gitleaks rules. Requires a WHERE path = or raw_data = constraint. Returns rule matches, line numbers, and optional Argon2id hashes. Useful for detecting accidentally committed credentials or API keys."),
 	)
 }
 
