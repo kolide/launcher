@@ -132,7 +132,6 @@ func NewJSONRPCClient(k types.Knapsack, options ...jsonrpc.ClientOption) (Kolide
 		RequestQueriesEndpoint:    requestQueriesEndpoint,
 		PublishResultsEndpoint:    publishResultsEndpoint,
 		CheckHealthEndpoint:       checkHealthEndpoint,
-		client:                    httpClient,
 		k:                         k,
 	}
 

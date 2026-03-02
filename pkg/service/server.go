@@ -1,8 +1,6 @@
 package service
 
 import (
-	"net/http"
-
 	"github.com/go-kit/kit/endpoint"
 	"github.com/kolide/launcher/ee/agent/types"
 )
@@ -19,6 +17,5 @@ type Endpoints struct {
 	RequestQueriesEndpoint    endpoint.Endpoint
 	PublishResultsEndpoint    endpoint.Endpoint
 	CheckHealthEndpoint       endpoint.Endpoint
-	client                    *http.Client
 	k                         types.Knapsack
 }
