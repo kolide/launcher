@@ -18,6 +18,9 @@ import (
 )
 
 type DataSourceType struct {
+	tableName   string
+	description string
+
 	// Required: factory returning the bytes flatten func. Receives QueryContext
 	// so types can vary behavior per-query (e.g., protobuf schema selection).
 	flattenBytesFunc func(table.QueryContext) dataflatten.DataFunc
@@ -29,43 +32,41 @@ type DataSourceType struct {
 	flattenFileFunc func(table.QueryContext) dataflatten.DataFileFunc
 
 	extraColumns []table.ColumnDefinition
-	tableName    string
-	description  string
 }
 
 var allTypes = []DataSourceType{
 	{
-		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Json },
-		flattenFileFunc:  func(_ table.QueryContext) dataflatten.DataFileFunc { return dataflatten.JsonFile },
 		tableName:        "kolide_json",
 		description:      "Parses JSON files or raw JSON data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading any JSON configuration or data file.",
+		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Json },
+		flattenFileFunc:  func(_ table.QueryContext) dataflatten.DataFileFunc { return dataflatten.JsonFile },
 	},
 	{
-		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Xml },
-		flattenFileFunc:  func(_ table.QueryContext) dataflatten.DataFileFunc { return dataflatten.XmlFile },
 		tableName:        "kolide_xml",
 		description:      "Parses XML files or raw XML data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading XML configuration or data files.",
+		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Xml },
+		flattenFileFunc:  func(_ table.QueryContext) dataflatten.DataFileFunc { return dataflatten.XmlFile },
 	},
 	{
-		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Ini },
-		flattenFileFunc:  func(_ table.QueryContext) dataflatten.DataFileFunc { return dataflatten.IniFile },
 		tableName:        "kolide_ini",
 		description:      "Parses INI files or raw INI data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading INI-style configuration files.",
+		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Ini },
+		flattenFileFunc:  func(_ table.QueryContext) dataflatten.DataFileFunc { return dataflatten.IniFile },
 	},
 	{
-		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Plist },
 		tableName:        "kolide_plist",
 		description:      "Parses Apple plist files or raw plist data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading macOS preference files, application plists, and system configuration.",
+		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Plist },
 	},
 	{
-		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Jsonl },
 		tableName:        "kolide_jsonl",
 		description:      "Parses JSONL (JSON Lines) files or raw data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading line-delimited JSON log files.",
+		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Jsonl },
 	},
 	{
-		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Protobuf },
 		tableName:        "kolide_protobuf",
 		description:      "Parses marshaled protobuf files or raw protobuf data and returns flattened key-value pairs. Field numbers are used as keys since protobuf wire format is schema-less. Requires a WHERE path = or raw_data = constraint.",
+		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Protobuf },
 	},
 }
 
