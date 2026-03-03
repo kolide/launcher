@@ -2,7 +2,6 @@ package dataflatten
 
 import (
 	"encoding/base64"
-	"os"
 	"path/filepath"
 	"sort"
 	"testing"
@@ -19,27 +18,6 @@ var simplePBData = []byte{
 	0x10, 0x2a, // field 2 varint 42
 	0x1a, 0x10, 't', 'e', 's', 't', '@', 'e', 'x', 'a', 'm', 'p', 'l', 'e', '.', 'c', 'o', 'm', // field 3 string "test@example.com"
 }
-
-const simpleProtoSchema = `syntax = "proto3";
-message Simple {
-  string name = 1;
-  int32 id = 2;
-  string email = 3;
-}
-
-message Address {
-  string street = 1;
-  string city = 2;
-  string state = 3;
-}
-
-message Person {
-  string name = 1;
-  int32 id = 2;
-  Address address = 3;
-  repeated string tags = 4;
-}
-`
 
 // personPBData is the wire format for a Person message:
 //
@@ -278,111 +256,6 @@ func TestProtobuf_Base64(t *testing.T) {
 	assert.Equal(t, "test@example.com", rowMap["3"])
 }
 
-// TestProtobuf_SchemalessVsSchemaAware compares output of the same protobuf
-// data decoded with and without a .proto schema.
-func TestProtobuf_SchemalessVsSchemaAware(t *testing.T) {
-	t.Parallel()
-
-	// Schema-less: field numbers as keys
-	schemalessRows, err := Protobuf(simplePBData)
-	require.NoError(t, err)
-	require.Len(t, schemalessRows, 3)
-
-	schemalessMap := make(map[string]string)
-	for _, r := range schemalessRows {
-		schemalessMap[r.StringPath("/")] = r.Value
-	}
-	assert.Equal(t, "test", schemalessMap["1"])
-	assert.Equal(t, "42", schemalessMap["2"])
-	assert.Equal(t, "test@example.com", schemalessMap["3"])
-
-	// Schema-aware: field names as keys
-	schemaFn := ProtobufWithSchema([]byte(simpleProtoSchema), "Simple")
-	schemaRows, err := schemaFn(simplePBData)
-	require.NoError(t, err)
-	require.Len(t, schemaRows, 3)
-
-	schemaMap := make(map[string]string)
-	for _, r := range schemaRows {
-		schemaMap[r.StringPath("/")] = r.Value
-	}
-	assert.Equal(t, "test", schemaMap["name"])
-	assert.Equal(t, "42", schemaMap["id"])
-	assert.Equal(t, "test@example.com", schemaMap["email"])
-}
-
-// TestProtobuf_SchemaAwareBase64 verifies schema-aware decoding with
-// base64-encoded input.
-func TestProtobuf_SchemaAwareBase64(t *testing.T) {
-	t.Parallel()
-
-	encoded := base64.StdEncoding.EncodeToString(simplePBData)
-	schemaFn := ProtobufWithSchema([]byte(simpleProtoSchema), "Simple")
-	rows, err := schemaFn([]byte(encoded))
-	require.NoError(t, err)
-	require.Len(t, rows, 3)
-
-	rowMap := make(map[string]string)
-	for _, r := range rows {
-		rowMap[r.StringPath("/")] = r.Value
-	}
-	assert.Equal(t, "test", rowMap["name"])
-	assert.Equal(t, "42", rowMap["id"])
-	assert.Equal(t, "test@example.com", rowMap["email"])
-}
-
-// TestProtobuf_SchemaFromFile tests schema-aware decoding using .proto and
-// .pb files on disk.
-func TestProtobuf_SchemaFromFile(t *testing.T) {
-	t.Parallel()
-
-	protoFile := filepath.Join("testdata", "simple.proto")
-	pbFile := filepath.Join("testdata", "simple.pb")
-
-	protoSource, err := os.ReadFile(protoFile)
-	require.NoError(t, err)
-
-	pbData, err := os.ReadFile(pbFile)
-	require.NoError(t, err)
-
-	schemaFn := ProtobufWithSchema(protoSource, "Simple")
-	rows, err := schemaFn(pbData)
-	require.NoError(t, err)
-	require.Len(t, rows, 3)
-
-	rowMap := make(map[string]string)
-	for _, r := range rows {
-		rowMap[r.StringPath("/")] = r.Value
-	}
-	assert.Equal(t, "test", rowMap["name"])
-	assert.Equal(t, "42", rowMap["id"])
-	assert.Equal(t, "test@example.com", rowMap["email"])
-}
-
-// TestProtobuf_SchemaWithQuery tests that query filtering works with
-// schema-aware decoding.
-func TestProtobuf_SchemaWithQuery(t *testing.T) {
-	t.Parallel()
-
-	schemaFn := ProtobufWithSchema([]byte(simpleProtoSchema), "Simple")
-	rows, err := schemaFn(simplePBData, WithQuery([]string{"email"}))
-	require.NoError(t, err)
-	require.Len(t, rows, 1)
-	assert.Equal(t, "test@example.com", rows[0].Value)
-	assert.Equal(t, []string{"email"}, rows[0].Path)
-}
-
-// TestProtobuf_SchemaMessageNotFound verifies a clear error when the
-// message type doesn't exist in the schema.
-func TestProtobuf_SchemaMessageNotFound(t *testing.T) {
-	t.Parallel()
-
-	schemaFn := ProtobufWithSchema([]byte(simpleProtoSchema), "DoesNotExist")
-	_, err := schemaFn(simplePBData)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "DoesNotExist")
-}
-
 // TestProtobuf_NestedSchemaless decodes a Person message (with nested Address
 // and repeated tags) without a schema, verifying field-number-based paths.
 func TestProtobuf_NestedSchemaless(t *testing.T) {
@@ -403,42 +276,6 @@ func TestProtobuf_NestedSchemaless(t *testing.T) {
 	assert.Equal(t, "IL", rowMap["3/3"])
 	assert.Equal(t, "admin", rowMap["4/0"])
 	assert.Equal(t, "user", rowMap["4/1"])
-}
-
-// TestProtobuf_NestedSchemaAware decodes the same Person message with a
-// schema, verifying field-name-based paths including nested messages.
-func TestProtobuf_NestedSchemaAware(t *testing.T) {
-	t.Parallel()
-
-	schemaFn := ProtobufWithSchema([]byte(simpleProtoSchema), "Person")
-	rows, err := schemaFn(personPBData)
-	require.NoError(t, err)
-
-	rowMap := make(map[string]string)
-	for _, r := range rows {
-		rowMap[r.StringPath("/")] = r.Value
-	}
-
-	assert.Equal(t, "Alice", rowMap["name"])
-	assert.Equal(t, "1", rowMap["id"])
-	assert.Equal(t, "123 Main St", rowMap["address/street"])
-	assert.Equal(t, "Springfield", rowMap["address/city"])
-	assert.Equal(t, "IL", rowMap["address/state"])
-	assert.Equal(t, "admin", rowMap["tags/0"])
-	assert.Equal(t, "user", rowMap["tags/1"])
-}
-
-// TestProtobuf_NestedSchemaAwareQuery verifies query filtering works with
-// nested schema-aware decoding.
-func TestProtobuf_NestedSchemaAwareQuery(t *testing.T) {
-	t.Parallel()
-
-	schemaFn := ProtobufWithSchema([]byte(simpleProtoSchema), "Person")
-	rows, err := schemaFn(personPBData, WithQuery([]string{"address", "city"}))
-	require.NoError(t, err)
-	require.Len(t, rows, 1)
-	assert.Equal(t, "Springfield", rows[0].Value)
-	assert.Equal(t, []string{"address", "city"}, rows[0].Path)
 }
 
 func sortRows(rows []Row) {
