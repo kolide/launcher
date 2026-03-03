@@ -3,7 +3,6 @@ package dataflattentable
 import (
 	"context"
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -19,82 +18,59 @@ import (
 )
 
 type DataSourceType struct {
-	flattenBytesFunc func(string) dataflatten.DataFunc
-	flattenFileFunc  func(string) dataflatten.DataFileFunc
-	tableName        string
-	description      string
+	// Required: factory returning the bytes flatten func. Receives QueryContext
+	// so types can vary behavior per-query (e.g., protobuf schema selection).
+	flattenBytesFunc func(table.QueryContext) dataflatten.DataFunc
+
+	// Optional: factory returning the file flatten func. When nil, the table
+	// auto-generates one that reads the file with os.ReadFile and delegates
+	// to flattenBytesFunc. Only needed when file handling differs from
+	// "read bytes, parse bytes" (e.g., JSON's UTF-16 fallback, XML's reader API).
+	flattenFileFunc func(table.QueryContext) dataflatten.DataFileFunc
+
+	extraColumns []table.ColumnDefinition
+	tableName    string
+	description  string
 }
 
-var (
-	PlistType = DataSourceType{
-		flattenBytesFunc: func(_ string) dataflatten.DataFunc { return dataflatten.Plist },
-		flattenFileFunc:  func(_ string) dataflatten.DataFileFunc { return dataflatten.PlistFile },
-		tableName:        "kolide_plist",
-		description:      "Parses Apple plist files or raw plist data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading macOS preference files, application plists, and system configuration.",
-	}
-	JsonType = DataSourceType{
-		flattenBytesFunc: func(_ string) dataflatten.DataFunc { return dataflatten.Json },
-		flattenFileFunc:  func(_ string) dataflatten.DataFileFunc { return dataflatten.JsonFile },
+var allTypes = []DataSourceType{
+	{
+		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Json },
+		flattenFileFunc:  func(_ table.QueryContext) dataflatten.DataFileFunc { return dataflatten.JsonFile },
 		tableName:        "kolide_json",
 		description:      "Parses JSON files or raw JSON data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading any JSON configuration or data file.",
-	}
-	JsonlType = DataSourceType{
-		flattenBytesFunc: func(_ string) dataflatten.DataFunc { return dataflatten.Jsonl },
-		flattenFileFunc:  func(_ string) dataflatten.DataFileFunc { return dataflatten.JsonlFile },
-		tableName:        "kolide_jsonl",
-		description:      "Parses JSONL (JSON Lines) files or raw data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading line-delimited JSON log files.",
-	}
-	XmlType = DataSourceType{
-		flattenBytesFunc: func(_ string) dataflatten.DataFunc { return dataflatten.Xml },
-		flattenFileFunc:  func(_ string) dataflatten.DataFileFunc { return dataflatten.XmlFile },
+	},
+	{
+		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Xml },
+		flattenFileFunc:  func(_ table.QueryContext) dataflatten.DataFileFunc { return dataflatten.XmlFile },
 		tableName:        "kolide_xml",
 		description:      "Parses XML files or raw XML data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading XML configuration or data files.",
-	}
-	IniType = DataSourceType{
-		flattenBytesFunc: func(_ string) dataflatten.DataFunc { return dataflatten.Ini },
-		flattenFileFunc:  func(_ string) dataflatten.DataFileFunc { return dataflatten.IniFile },
+	},
+	{
+		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Ini },
+		flattenFileFunc:  func(_ table.QueryContext) dataflatten.DataFileFunc { return dataflatten.IniFile },
 		tableName:        "kolide_ini",
 		description:      "Parses INI files or raw INI data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading INI-style configuration files.",
-	}
-	KeyValueType = DataSourceType{
-		flattenBytesFunc: func(kvDelimiter string) dataflatten.DataFunc {
-			return dataflatten.StringDelimitedFunc(kvDelimiter, dataflatten.DuplicateKeys)
+	},
+	{
+		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Plist },
+		tableName:        "kolide_plist",
+		description:      "Parses Apple plist files or raw plist data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading macOS preference files, application plists, and system configuration.",
+	},
+	{
+		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Jsonl },
+		tableName:        "kolide_jsonl",
+		description:      "Parses JSONL (JSON Lines) files or raw data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading line-delimited JSON log files.",
+	},
+	{
+		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Protobuf },
+		extraColumns: []table.ColumnDefinition{
+			table.TextColumn("proto_file"),
+			table.TextColumn("message_type"),
 		},
-		flattenFileFunc: func(kvDelimiter string) dataflatten.DataFileFunc {
-			// This func is unused -- only flattenBytesFunc is used, in `TablePluginExec` --
-			// but we include it here for completeness.
-			return func(file string, opts ...dataflatten.FlattenOpts) ([]dataflatten.Row, error) {
-				f, err := os.Open(file)
-				if err != nil {
-					return nil, fmt.Errorf("unable to access file: %w", err)
-				}
-
-				defer f.Close()
-
-				rawdata, err := io.ReadAll(f)
-				if err != nil {
-					return nil, fmt.Errorf("unable to read JWT: %w", err)
-				}
-
-				flattenFunc := dataflatten.StringDelimitedFunc(kvDelimiter, dataflatten.DuplicateKeys)
-
-				return flattenFunc(rawdata, opts...)
-			}
-		},
-		tableName: "", // table name not set for key-value type as there are multiple tables constructed via `TablePluginExec` using this type
-	}
-)
-
-func (d DataSourceType) FlattenBytesFunc(kvDelimiter string) dataflatten.DataFunc {
-	return d.flattenBytesFunc(kvDelimiter)
-}
-
-func (d DataSourceType) FlattenFileFunc(kvDelimiter string) dataflatten.DataFileFunc {
-	return d.flattenFileFunc(kvDelimiter)
-}
-
-func (d DataSourceType) TableName() string {
-	return d.tableName
+		tableName:   "kolide_protobuf",
+		description: "Parses marshaled protobuf files or raw protobuf data using schema-less wire format decoding and returns flattened key-value pairs. Field numbers are used as keys. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific fields.",
+	},
 }
 
 type Table struct {
@@ -107,33 +83,54 @@ type Table struct {
 
 // AllTablePlugins is a helper to return all the expected flattening tables.
 func AllTablePlugins(flags types.Flags, slogger *slog.Logger) []osquery.OsqueryPlugin {
-	return []osquery.OsqueryPlugin{
-		TablePlugin(flags, slogger, JsonType),
-		TablePlugin(flags, slogger, XmlType),
-		TablePlugin(flags, slogger, IniType),
-		TablePlugin(flags, slogger, PlistType),
-		TablePlugin(flags, slogger, JsonlType),
+	plugins := make([]osquery.OsqueryPlugin, 0, len(allTypes))
+	for _, dst := range allTypes {
+		plugins = append(plugins, TablePlugin(flags, slogger, dst))
 	}
+	return plugins
 }
 
-func TablePlugin(flags types.Flags, slogger *slog.Logger, dataSourceType DataSourceType) osquery.OsqueryPlugin {
-	columns := Columns(table.TextColumn("path"), table.TextColumn("raw_data"))
+func TablePlugin(flags types.Flags, slogger *slog.Logger, dst DataSourceType) osquery.OsqueryPlugin {
+	columns := Columns(append(
+		[]table.ColumnDefinition{table.TextColumn("path"), table.TextColumn("raw_data")},
+		dst.extraColumns...,
+	)...)
 
-	t := &Table{
-		tableName:        dataSourceType.TableName(),
-		flattenFileFunc:  dataSourceType.FlattenFileFunc(""),
-		flattenBytesFunc: dataSourceType.FlattenBytesFunc(""),
+	tableSlogger := slogger.With("table", dst.tableName)
+
+	generate := func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+		bytesFn := dst.flattenBytesFunc(queryContext)
+
+		var fileFn dataflatten.DataFileFunc
+		if dst.flattenFileFunc != nil {
+			fileFn = dst.flattenFileFunc(queryContext)
+		}
+		if fileFn == nil {
+			fileFn = func(file string, opts ...dataflatten.FlattenOpts) ([]dataflatten.Row, error) {
+				raw, err := os.ReadFile(file)
+				if err != nil {
+					return nil, err
+				}
+				return bytesFn(raw, opts...)
+			}
+		}
+
+		t := &Table{
+			slogger:          tableSlogger,
+			tableName:        dst.tableName,
+			flattenBytesFunc: bytesFn,
+			flattenFileFunc:  fileFn,
+		}
+		return t.generate(ctx, queryContext)
 	}
 
-	t.slogger = slogger.With("table", t.tableName)
-
 	var opts []tablewrapper.TablePluginOption
-	if dataSourceType.description != "" {
-		opts = append(opts, tablewrapper.WithDescription(dataSourceType.description))
+	if dst.description != "" {
+		opts = append(opts, tablewrapper.WithDescription(dst.description))
 	}
 	opts = append(opts, tablewrapper.WithNote(EAVNote))
 
-	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generate, opts...)
+	return tablewrapper.New(flags, slogger, dst.tableName, columns, generate, opts...)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
