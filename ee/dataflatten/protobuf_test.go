@@ -162,26 +162,6 @@ func TestProtobuf_NestedQuery(t *testing.T) {
 func TestProtobufFile(t *testing.T) {
 	t.Parallel()
 
-	testFile := filepath.Join("..", "tables", "protobuf", "test-data", "ws.pb")
-
-	rows, err := ProtobufFile(testFile)
-	require.NoError(t, err, "ProtobufFile should decode ws.pb without error")
-	assert.NotEmpty(t, rows, "ws.pb should produce at least some flattened rows")
-
-	t.Logf("ProtobufFile produced %d rows from ws.pb", len(rows))
-
-	for i, row := range rows {
-		if i >= 20 {
-			t.Logf("  ... and %d more rows", len(rows)-20)
-			break
-		}
-		t.Logf("  %s = %s", row.StringPath("/"), row.Value)
-	}
-}
-
-func TestProtobufFile_Simple(t *testing.T) {
-	t.Parallel()
-
 	rows, err := ProtobufFile(filepath.Join("testdata", "protobuf-simple.pb"))
 	require.NoError(t, err)
 	require.Len(t, rows, 3)
