@@ -35,27 +35,16 @@ type DataSourceType struct {
 
 var allTypes = []DataSourceType{
 	{
-		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Json },
-		flattenFileFunc:  func(_ table.QueryContext) dataflatten.DataFileFunc { return dataflatten.JsonFile },
-		tableName:        "kolide_json",
-		description:      "Parses JSON files or raw JSON data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading any JSON configuration or data file.",
-	},
-	{
-		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Xml },
-		flattenFileFunc:  func(_ table.QueryContext) dataflatten.DataFileFunc { return dataflatten.XmlFile },
-		tableName:        "kolide_xml",
-		description:      "Parses XML files or raw XML data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading XML configuration or data files.",
-	},
-	{
 		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Ini },
 		flattenFileFunc:  func(_ table.QueryContext) dataflatten.DataFileFunc { return dataflatten.IniFile },
 		tableName:        "kolide_ini",
 		description:      "Parses INI files or raw INI data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading INI-style configuration files.",
 	},
 	{
-		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Plist },
-		tableName:        "kolide_plist",
-		description:      "Parses Apple plist files or raw plist data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading macOS preference files, application plists, and system configuration.",
+		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Json },
+		flattenFileFunc:  func(_ table.QueryContext) dataflatten.DataFileFunc { return dataflatten.JsonFile },
+		tableName:        "kolide_json",
+		description:      "Parses JSON files or raw JSON data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading any JSON configuration or data file.",
 	},
 	{
 		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Jsonl },
@@ -63,9 +52,26 @@ var allTypes = []DataSourceType{
 		description:      "Parses JSONL (JSON Lines) files or raw data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading line-delimited JSON log files.",
 	},
 	{
+		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Plist },
+		tableName:        "kolide_plist",
+		description:      "Parses Apple plist files or raw plist data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading macOS preference files, application plists, and system configuration.",
+	},
+	{
 		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Protobuf },
 		tableName:        "kolide_protobuf",
 		description:      "Parses marshaled protobuf files or raw protobuf data and returns flattened key-value pairs. Field numbers are used as keys since protobuf wire format is schema-less. Requires a WHERE path = or raw_data = constraint.",
+	},
+	{
+		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Toml },
+		flattenFileFunc:  func(_ table.QueryContext) dataflatten.DataFileFunc { return dataflatten.TomlFile },
+		tableName:        "kolide_toml",
+		description:      "Parses TOML files or raw TOML data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading TOML configuration files (e.g. Cargo.toml, pyproject.toml).",
+	},
+	{
+		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Xml },
+		flattenFileFunc:  func(_ table.QueryContext) dataflatten.DataFileFunc { return dataflatten.XmlFile },
+		tableName:        "kolide_xml",
+		description:      "Parses XML files or raw XML data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading XML configuration or data files.",
 	},
 }
 

@@ -156,6 +156,25 @@ func TestDataFlattenTables(t *testing.T) {
 			queries:      []string{"this/does/not/exist"},
 			expectNoData: true,
 		},
+
+		// toml
+		{
+			testTables:   map[string]Table{"toml": {slogger: slogger, flattenFileFunc: dataflatten.TomlFile, flattenBytesFunc: dataflatten.Toml}},
+			testFile:     path.Join("testdata", "simple.toml"),
+			expectedRows: 5,
+		},
+		{
+			testTables:   map[string]Table{"toml": {slogger: slogger, flattenFileFunc: dataflatten.TomlFile, flattenBytesFunc: dataflatten.Toml}},
+			testFile:     path.Join("testdata", "simple.toml"),
+			queries:      []string{"metadata"},
+			expectedRows: 2,
+		},
+		{
+			testTables:   map[string]Table{"toml": {slogger: slogger, flattenFileFunc: dataflatten.TomlFile, flattenBytesFunc: dataflatten.Toml}},
+			testFile:     path.Join("testdata", "simple.toml"),
+			queries:      []string{"this/does/not/exist"},
+			expectNoData: true,
+		},
 	}
 
 	for testN, tt := range tests {
