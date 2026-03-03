@@ -17,8 +17,8 @@ import (
 	"time"
 
 	"github.com/kolide/launcher/ee/tuf"
-	tufv2config "github.com/theupdateframework/go-tuf/v2/metadata/config"
 	tufv2metadata "github.com/theupdateframework/go-tuf/v2/metadata"
+	tufv2config "github.com/theupdateframework/go-tuf/v2/metadata/config"
 	tufv2updater "github.com/theupdateframework/go-tuf/v2/metadata/updater"
 )
 
