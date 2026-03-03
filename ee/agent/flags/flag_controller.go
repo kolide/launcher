@@ -213,23 +213,9 @@ func (fc *FlagController) overrideFlag(ctx context.Context, key keys.FlagKey, du
 }
 
 func (fc *FlagController) SetKolideServerURL(url string) error {
-	fc.slogger.Log(context.TODO(), slog.LevelDebug,
-		"setting kolide server URL",
-		"updated_value", url,
-	)
-
 	return fc.setControlServerValue(keys.KolideServerURL, []byte(url))
 }
 func (fc *FlagController) KolideServerURL() string {
-	fc.slogger.Log(context.TODO(), slog.LevelDebug,
-		"fetching kolide server URL",
-		"default_value", fc.cmdLineOpts.KolideServerURL,
-		"control_server_value", string(fc.getControlServerValue(keys.KolideServerURL)),
-		"returned_value", NewStringFlagValue(
-			WithDefaultString(fc.cmdLineOpts.KolideServerURL),
-		).get(fc.getControlServerValue(keys.KolideServerURL)),
-	)
-
 	return NewStringFlagValue(
 		WithDefaultString(fc.cmdLineOpts.KolideServerURL),
 	).get(fc.getControlServerValue(keys.KolideServerURL))
@@ -374,23 +360,9 @@ func (fc *FlagController) ForceControlSubsystems() bool {
 }
 
 func (fc *FlagController) SetControlServerURL(url string) error {
-	fc.slogger.Log(context.TODO(), slog.LevelDebug,
-		"setting control server URL",
-		"updated_value", url,
-	)
-
 	return fc.setControlServerValue(keys.ControlServerURL, []byte(url))
 }
 func (fc *FlagController) ControlServerURL() string {
-	fc.slogger.Log(context.TODO(), slog.LevelDebug,
-		"fetching control server URL",
-		"default_value", fc.cmdLineOpts.ControlServerURL,
-		"control_server_value", string(fc.getControlServerValue(keys.ControlServerURL)),
-		"returned_value", NewStringFlagValue(
-			WithDefaultString(fc.cmdLineOpts.ControlServerURL),
-		).get(fc.getControlServerValue(keys.ControlServerURL)),
-	)
-
 	return NewStringFlagValue(
 		WithDefaultString(fc.cmdLineOpts.ControlServerURL),
 	).get(fc.getControlServerValue(keys.ControlServerURL))
