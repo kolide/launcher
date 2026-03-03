@@ -1,25 +1,25 @@
 // Package simpleclient provides a minimal TUF client for downloading and verifying
-// targets from the TUF repository. It handles metadata fetching, target resolution,
-// and verified download, returning the verified bytes.
+// targets from the TUF repository. It uses go-tuf v2 and is isolated from the rest
+// of the codebase, which continues to use go-tuf v0.x.
 package simpleclient
 
 import (
-	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"maps"
 	"net/http"
 	"path"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/kolide/launcher/ee/tuf"
-	client "github.com/theupdateframework/go-tuf/client"
-	filejsonstore "github.com/theupdateframework/go-tuf/client/filejsonstore"
-	tufutil "github.com/theupdateframework/go-tuf/util"
+	tufv2config "github.com/theupdateframework/go-tuf/v2/metadata/config"
+	tufv2metadata "github.com/theupdateframework/go-tuf/v2/metadata"
+	tufv2updater "github.com/theupdateframework/go-tuf/v2/metadata/updater"
 )
 
 const (
@@ -33,7 +33,7 @@ type Options struct {
 	MirrorURL   string
 	HTTPClient  *http.Client
 	// LocalStorePath is the directory for the TUF local metadata store.
-	// If empty, an in-memory store is used.
+	// If empty, an in-memory store is used (no persistent cache).
 	LocalStorePath string
 }
 
@@ -58,60 +58,105 @@ func (o *Options) httpClient() *http.Client {
 	return &http.Client{Timeout: 2 * time.Minute}
 }
 
-// initMetadataClient creates a TUF metadata client, initializes it with the
-// root JSON, and fetches the latest metadata. Returns the ready-to-use client.
-func initMetadataClient(ctx context.Context, slogger *slog.Logger, opts *Options) (*client.Client, error) {
-	httpClient := opts.httpClient()
+// initUpdater creates a go-tuf v2 Updater: loads trusted root and refreshes metadata.
+func initUpdater(ctx context.Context, slogger *slog.Logger, opts *Options) (*tufv2updater.Updater, error) {
+	metadataBase := strings.TrimSuffix(opts.metadataURL(), "/") + "/repository"
+	cfg, err := tufv2config.New(metadataBase, tuf.RootJSON())
+	if err != nil {
+		return nil, fmt.Errorf("creating TUF config: %w", err)
+	}
+
+	if opts.LocalStorePath != "" {
+		cfg.LocalMetadataDir = filepath.Join(opts.LocalStorePath, "metadata")
+		cfg.LocalTargetsDir = filepath.Join(opts.LocalStorePath, "targets")
+	} else {
+		cfg.DisableLocalCache = true
+		cfg.LocalMetadataDir = ""
+		cfg.LocalTargetsDir = ""
+	}
+	cfg.PrefixTargetsWithHash = false
+
+	if err := cfg.SetDefaultFetcherHTTPClient(opts.httpClient()); err != nil {
+		return nil, fmt.Errorf("setting HTTP client: %w", err)
+	}
+
+	up, err := tufv2updater.New(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("creating TUF updater: %w", err)
+	}
 
 	start := time.Now()
-	var localStore client.LocalStore
-	if opts.LocalStorePath != "" {
-		var err error
-		localStore, err = filejsonstore.NewFileJSONStore(opts.LocalStorePath)
-		if err != nil {
-			return nil, fmt.Errorf("creating local store at %s: %w", opts.LocalStorePath, err)
-		}
-	} else {
-		localStore = client.MemoryLocalStore()
-	}
-	remoteStore, err := client.HTTPRemoteStore(opts.metadataURL(), &client.HTTPRemoteOptions{
-		MetadataPath: "/repository",
-	}, httpClient)
-	if err != nil {
-		return nil, fmt.Errorf("creating remote store: %w", err)
-	}
-	metadataClient := client.NewClient(localStore, remoteStore)
-
-	if err := metadataClient.Init(tuf.RootJSON()); err != nil {
-		return nil, fmt.Errorf("initializing TUF client: %w", err)
-	}
-	if _, err := metadataClient.Update(); err != nil {
-		return nil, fmt.Errorf("updating TUF metadata: %w", err)
+	if err := up.Refresh(); err != nil {
+		return nil, fmt.Errorf("refreshing TUF metadata: %w", err)
 	}
 	slogger.Log(ctx, slog.LevelDebug,
 		"TUF metadata updated",
 		"duration", time.Since(start).String(),
 	)
 
-	return metadataClient, nil
+	return up, nil
 }
 
-// ListTargets fetches TUF metadata and returns the sorted list of all target paths.
+// resolveTarget returns the TUF target path and metadata for the given target name,
+// platform, arch, and version or channel (same semantics as ee/tuf.ResolveTarget).
+func resolveTarget(up *tufv2updater.Updater, targetName, platform, arch, versionOrChannel string) (targetPath string, targetMeta *tufv2metadata.TargetFiles, err error) {
+	tufArch := tuf.ArchForPlatform(platform, arch)
+	isChannel := versionOrChannel == "stable" || versionOrChannel == "beta" ||
+		versionOrChannel == "nightly" || versionOrChannel == "alpha"
+
+	if isChannel {
+		return resolveTargetForChannel(up, targetName, platform, tufArch, versionOrChannel)
+	}
+	return resolveTargetForVersion(up, targetName, platform, tufArch, versionOrChannel)
+}
+
+func resolveTargetForChannel(up *tufv2updater.Updater, targetName, platform, arch, channel string) (string, *tufv2metadata.TargetFiles, error) {
+	releasePath := path.Join(targetName, platform, arch, channel, "release.json")
+	releaseMeta, err := up.GetTargetInfo(releasePath)
+	if err != nil {
+		return "", nil, fmt.Errorf("release file %s not found: %w", releasePath, err)
+	}
+
+	var custom struct {
+		Target string `json:"target"`
+	}
+	if releaseMeta.Custom == nil {
+		return "", nil, fmt.Errorf("release file %s has no custom metadata", releasePath)
+	}
+	if err := json.Unmarshal(*releaseMeta.Custom, &custom); err != nil {
+		return "", nil, fmt.Errorf("parsing release metadata: %w", err)
+	}
+
+	meta, err := up.GetTargetInfo(custom.Target)
+	if err != nil {
+		return "", nil, fmt.Errorf("target %s not found: %w", custom.Target, err)
+	}
+
+	return custom.Target, meta, nil
+}
+
+func resolveTargetForVersion(up *tufv2updater.Updater, targetName, platform, arch, version string) (string, *tufv2metadata.TargetFiles, error) {
+	targetPath := path.Join(targetName, platform, arch, fmt.Sprintf("%s-%s.tar.gz", targetName, version))
+	meta, err := up.GetTargetInfo(targetPath)
+	if err != nil {
+		return "", nil, fmt.Errorf("target %s not found: %w", targetPath, err)
+	}
+	return targetPath, meta, nil
+}
+
+// ListTargets fetches TUF metadata and returns the sorted list of top-level
+// target names (e.g. "launcher", "osqueryd").
 func ListTargets(ctx context.Context, slogger *slog.Logger, opts *Options) ([]string, error) {
 	if opts == nil {
 		opts = &Options{}
 	}
 
-	metadataClient, err := initMetadataClient(ctx, slogger, opts)
+	up, err := initUpdater(ctx, slogger, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	targets, err := metadataClient.Targets()
-	if err != nil {
-		return nil, fmt.Errorf("getting targets: %w", err)
-	}
-
+	targets := up.GetTopLevelTargets()
 	seen := make(map[string]any)
 	for p := range targets {
 		name, _, _ := strings.Cut(p, "/")
@@ -135,13 +180,12 @@ func Download(ctx context.Context, slogger *slog.Logger, target, platform, arch,
 
 	target = strings.ToLower(target)
 
-	metadataClient, err := initMetadataClient(ctx, slogger, opts)
+	up, err := initUpdater(ctx, slogger, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	// Resolve target name + channel/version to a concrete target path
-	targetPath, metadata, err := tuf.ResolveTarget(metadataClient, target, platform, arch, versionOrChannel)
+	targetPath, targetMeta, err := resolveTarget(up, target, platform, arch, versionOrChannel)
 	if err != nil {
 		return nil, fmt.Errorf("resolving target: %w", err)
 	}
@@ -150,40 +194,19 @@ func Download(ctx context.Context, slogger *slog.Logger, target, platform, arch,
 		"target_path", targetPath,
 	)
 
-	// Download from mirror
 	downloadStart := time.Now()
-	httpClient := opts.httpClient()
-	downloadURL := strings.TrimSuffix(opts.mirrorURL(), "/") + path.Join("/", "kolide", targetPath)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
+	targetBaseURL := strings.TrimSuffix(opts.mirrorURL(), "/") + "/kolide/"
+	_, data, err := up.DownloadTarget(targetMeta, "", targetBaseURL)
 	if err != nil {
-		return nil, fmt.Errorf("creating request: %w", err)
-	}
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("downloading: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("download failed: %s", resp.Status)
+		return nil, fmt.Errorf("downloading target: %w", err)
 	}
 
-	// Read and verify against TUF metadata
-	var buf bytes.Buffer
-	stream := io.LimitReader(resp.Body, metadata.Length)
-	actualMeta, err := tufutil.GenerateTargetFileMeta(io.TeeReader(stream, &buf), metadata.HashAlgorithms()...)
-	if err != nil {
-		return nil, fmt.Errorf("computing hash: %w", err)
-	}
-	if err := tufutil.TargetFileMetaEqual(actualMeta, metadata); err != nil {
-		return nil, fmt.Errorf("verification failed: %w", err)
-	}
 	slogger.Log(ctx, slog.LevelDebug,
 		"target downloaded and verified",
 		"target_path", targetPath,
-		"size", buf.Len(),
+		"size", len(data),
 		"duration", time.Since(downloadStart).String(),
 	)
 
-	return buf.Bytes(), nil
+	return data, nil
 }
