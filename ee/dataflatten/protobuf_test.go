@@ -170,7 +170,6 @@ func TestProtobufFile(t *testing.T) {
 
 	t.Logf("ProtobufFile produced %d rows from ws.pb", len(rows))
 
-	// Log a sample of the first few rows for visibility
 	for i, row := range rows {
 		if i >= 20 {
 			t.Logf("  ... and %d more rows", len(rows)-20)
@@ -178,6 +177,23 @@ func TestProtobufFile(t *testing.T) {
 		}
 		t.Logf("  %s = %s", row.StringPath("/"), row.Value)
 	}
+}
+
+func TestProtobufFile_Simple(t *testing.T) {
+	t.Parallel()
+
+	rows, err := ProtobufFile(filepath.Join("testdata", "protobuf-simple.pb"))
+	require.NoError(t, err)
+	require.Len(t, rows, 3)
+
+	rowMap := make(map[string]string)
+	for _, r := range rows {
+		rowMap[r.StringPath("/")] = r.Value
+	}
+
+	assert.Equal(t, "test", rowMap["1"])
+	assert.Equal(t, "42", rowMap["2"])
+	assert.Equal(t, "test@example.com", rowMap["3"])
 }
 
 func TestProtobufFile_NotFound(t *testing.T) {
