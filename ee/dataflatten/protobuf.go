@@ -2,6 +2,7 @@ package dataflatten
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -49,7 +50,7 @@ func decodeRawProtobuf(data []byte) (map[string]any, error) {
 	for len(data) > 0 {
 		num, wtype, tagLen := protowire.ConsumeTag(data)
 		if tagLen < 0 {
-			return nil, fmt.Errorf("invalid protobuf tag")
+			return nil, errors.New("invalid protobuf tag")
 		}
 		if num > protowire.MaxValidNumber {
 			return nil, fmt.Errorf("field number %d exceeds maximum valid number", num)
@@ -103,6 +104,9 @@ func decodeRawProtobuf(data []byte) (map[string]any, error) {
 				return nil, fmt.Errorf("decoding group field %s: %w", key, err)
 			}
 			val = nested
+
+		case protowire.EndGroupType:
+			return nil, fmt.Errorf("unexpected end group for field %s", key)
 
 		default:
 			return nil, fmt.Errorf("unknown wire type %d for field %s", wtype, key)

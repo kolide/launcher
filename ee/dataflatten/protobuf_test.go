@@ -215,6 +215,7 @@ func TestDecodeBytesField_Heuristics(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := decodeBytesField(tt.input)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -228,8 +229,8 @@ func TestPbBytesLooksLikeString(t *testing.T) {
 	assert.True(t, pbBytesLooksLikeString([]byte("line1\nline2")))
 	assert.True(t, pbBytesLooksLikeString([]byte("col1\tcol2")))
 	assert.False(t, pbBytesLooksLikeString([]byte{0x08, 0x01})) // protobuf tag + varint
-	assert.False(t, pbBytesLooksLikeString([]byte{0x00}))        // null byte
-	assert.False(t, pbBytesLooksLikeString([]byte{0xFF, 0xFE}))  // invalid UTF-8
+	assert.False(t, pbBytesLooksLikeString([]byte{0x00}))       // null byte
+	assert.False(t, pbBytesLooksLikeString([]byte{0xFF, 0xFE})) // invalid UTF-8
 }
 
 // TestProtobuf_Base64 verifies that base64-encoded protobuf data is
