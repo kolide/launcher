@@ -63,13 +63,21 @@ var allTypes = []DataSourceType{
 		description:      "Parses JSONL (JSON Lines) files or raw data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading line-delimited JSON log files.",
 	},
 	{
-		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Protobuf },
+		flattenBytesFunc: func(qc table.QueryContext) dataflatten.DataFunc {
+			protoSource := protobufSchemaFromConstraints(qc)
+			messageTypes := tablehelpers.GetConstraints(qc, "message_type")
+			if protoSource != nil && len(messageTypes) > 0 {
+				return dataflatten.ProtobufWithSchema(protoSource, messageTypes[0])
+			}
+			return dataflatten.Protobuf
+		},
 		extraColumns: []table.ColumnDefinition{
 			table.TextColumn("proto_file"),
+			table.TextColumn("proto_raw"),
 			table.TextColumn("message_type"),
 		},
 		tableName:   "kolide_protobuf",
-		description: "Parses marshaled protobuf files or raw protobuf data using schema-less wire format decoding and returns flattened key-value pairs. Field numbers are used as keys. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific fields.",
+		description: "Parses marshaled protobuf files or raw protobuf data and returns flattened key-value pairs. Without a schema, field numbers are used as keys. With proto_file or proto_raw plus message_type, field names from the schema are used instead. Requires a WHERE path = or raw_data = constraint.",
 	},
 }
 
@@ -229,4 +237,18 @@ func (t *Table) generatePath(ctx context.Context, filePath string, dataQuery str
 	}
 
 	return ToMap(data, dataQuery, rowData), nil
+}
+
+// protobufSchemaFromConstraints reads a .proto schema from the query
+// constraints, preferring proto_file (path on disk) over proto_raw (inline).
+func protobufSchemaFromConstraints(qc table.QueryContext) []byte {
+	if paths := tablehelpers.GetConstraints(qc, "proto_file"); len(paths) > 0 {
+		if content, err := os.ReadFile(paths[0]); err == nil {
+			return content
+		}
+	}
+	if raws := tablehelpers.GetConstraints(qc, "proto_raw"); len(raws) > 0 {
+		return []byte(raws[0])
+	}
+	return nil
 }
