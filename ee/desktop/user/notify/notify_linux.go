@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 
 	"github.com/godbus/dbus/v5"
-	"github.com/kolide/launcher/ee/allowedcmd"
+	"github.com/kolide/launcher/v2/ee/allowedcmd"
 )
 
 type dbusNotifier struct {

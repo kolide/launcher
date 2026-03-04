@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
-	"github.com/kolide/launcher/ee/agent/types"
+	agentsqlite "github.com/kolide/launcher/v2/ee/agent/storage/sqlite"
+	"github.com/kolide/launcher/v2/ee/agent/types"
 )
 
 type startupSettingsReader struct {

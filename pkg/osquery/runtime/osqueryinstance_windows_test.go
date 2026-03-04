@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
-	"github.com/kolide/launcher/pkg/log/multislogger"
-	settingsstoremock "github.com/kolide/launcher/pkg/osquery/mocks"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	typesMocks "github.com/kolide/launcher/v2/ee/agent/types/mocks"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
+	settingsstoremock "github.com/kolide/launcher/v2/pkg/osquery/mocks"
 	"github.com/stretchr/testify/require"
 )
 

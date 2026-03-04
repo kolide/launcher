@@ -16,8 +16,8 @@ import (
 	"text/template"
 
 	"github.com/kolide/kit/fsutil"
-	"github.com/kolide/launcher/pkg/launcher"
-	"github.com/kolide/launcher/pkg/packagekit"
+	"github.com/kolide/launcher/v2/pkg/launcher"
+	"github.com/kolide/launcher/v2/pkg/packagekit"
 )
 
 //go:embed assets/*

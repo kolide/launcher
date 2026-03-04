@@ -49,7 +49,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/groob/plist"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 
 	howett "howett.net/plist"
 )

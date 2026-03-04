@@ -10,9 +10,9 @@ import (
 	"strconv"
 
 	comshim "github.com/NozomiNetworks/go-comshim"
-	"github.com/kolide/launcher/ee/tables/windowsupdatetable"
-	"github.com/kolide/launcher/pkg/log/multislogger"
-	"github.com/kolide/launcher/pkg/windows/windowsupdate"
+	"github.com/kolide/launcher/v2/ee/tables/windowsupdatetable"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/pkg/windows/windowsupdate"
 	"github.com/peterbourgon/ff/v3"
 )
 

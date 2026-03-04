@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/v2/ee/observability"
 	"github.com/shirou/gopsutil/v4/process"
 )
 

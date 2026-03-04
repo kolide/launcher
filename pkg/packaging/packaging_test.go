@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kolide/launcher/pkg/packagekit"
+	"github.com/kolide/launcher/v2/pkg/packagekit"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

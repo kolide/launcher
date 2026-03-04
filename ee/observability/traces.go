@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	instrumentationPkg        = "github.com/kolide/launcher/ee/observability"
+	instrumentationPkg        = "github.com/kolide/launcher/v2/ee/observability"
 	defaultSpanName           = "launcher/unknown"
 	defaultAttributeNamespace = "unknown"
 )

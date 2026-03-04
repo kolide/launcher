@@ -3,9 +3,9 @@ package startupsettings
 import (
 	"testing"
 
-	"github.com/kolide/launcher/ee/agent/flags/keys"
-	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/ee/agent/flags/keys"
+	agentsqlite "github.com/kolide/launcher/v2/ee/agent/storage/sqlite"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 )
 

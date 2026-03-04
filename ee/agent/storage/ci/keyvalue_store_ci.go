@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	agentbbolt "github.com/kolide/launcher/ee/agent/storage/bbolt"
-	"github.com/kolide/launcher/ee/agent/storage/inmemory"
-	"github.com/kolide/launcher/ee/agent/types"
+	agentbbolt "github.com/kolide/launcher/v2/ee/agent/storage/bbolt"
+	"github.com/kolide/launcher/v2/ee/agent/storage/inmemory"
+	"github.com/kolide/launcher/v2/ee/agent/types"
 	"github.com/stretchr/testify/require"
 	"go.etcd.io/bbolt"
 )

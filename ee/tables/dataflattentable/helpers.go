@@ -3,7 +3,7 @@ package dataflattentable
 import (
 	"maps"
 
-	"github.com/kolide/launcher/ee/dataflatten"
+	"github.com/kolide/launcher/v2/ee/dataflatten"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 

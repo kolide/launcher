@@ -9,9 +9,9 @@ import (
 	"log/slog"
 
 	"github.com/kolide/kit/version"
-	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
-	"github.com/kolide/launcher/pkg/launcher"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	agentsqlite "github.com/kolide/launcher/v2/ee/agent/storage/sqlite"
+	"github.com/kolide/launcher/v2/pkg/launcher"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/peterbourgon/ff/v3"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"

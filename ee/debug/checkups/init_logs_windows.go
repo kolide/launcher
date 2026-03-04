@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kolide/launcher/ee/allowedcmd"
+	"github.com/kolide/launcher/v2/ee/allowedcmd"
 )
 
 func writeInitLogs(ctx context.Context, logZip *zip.Writer) error {

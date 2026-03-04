@@ -4,7 +4,7 @@ import (
 	"context"
 	"os/user"
 
-	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/v2/ee/observability"
 )
 
 func CurrentUsers(ctx context.Context) ([]*user.User, error) {

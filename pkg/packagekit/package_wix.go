@@ -17,8 +17,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kolide/kit/version"
-	"github.com/kolide/launcher/pkg/packagekit/authenticode"
-	"github.com/kolide/launcher/pkg/packagekit/wix"
+	"github.com/kolide/launcher/v2/pkg/packagekit/authenticode"
+	"github.com/kolide/launcher/v2/pkg/packagekit/wix"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )

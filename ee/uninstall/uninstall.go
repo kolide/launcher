@@ -6,9 +6,9 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/kolide/launcher/ee/agent"
-	agentbbolt "github.com/kolide/launcher/ee/agent/storage/bbolt"
-	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/agent"
+	agentbbolt "github.com/kolide/launcher/v2/ee/agent/storage/bbolt"
+	"github.com/kolide/launcher/v2/ee/agent/types"
 )
 
 const (
