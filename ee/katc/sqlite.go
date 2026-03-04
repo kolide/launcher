@@ -4,10 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"io"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/observability"
 	"github.com/osquery/osquery-go/plugin/table"
 	_ "modernc.org/sqlite"
@@ -30,7 +33,6 @@ func sqliteData(ctx context.Context, slogger *slog.Logger, sourcePaths []string,
 		}
 
 		for _, sqliteDb := range sqliteDbs {
-			fmt.Println(sqliteDb)
 			// Check to make sure `db` adheres to pathConstraintsFromQuery. This is an
 			// optimization to avoid work, if osquery sqlite filtering is going to exclude it.
 			valid, err := checkPathConstraints(sqliteDb, pathConstraintsFromQuery)
@@ -73,7 +75,18 @@ func querySqliteDb(ctx context.Context, slogger *slog.Logger, path string, query
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
-	dsn := fmt.Sprintf("file:%s?mode=ro", path)
+	// If the database is in use, we won't be able to query it. So, copy it to a temporary location first.
+	tempDbCopyLocation, err := copySqliteDb(path)
+	if err != nil {
+		if tempDbCopyLocation != "" {
+			_ = os.RemoveAll(tempDbCopyLocation)
+		}
+		return nil, fmt.Errorf("unable to copy db: %w", err)
+	}
+	// The copy was successful -- make sure we clean it up after we're done
+	defer os.RemoveAll(filepath.Dir(tempDbCopyLocation))
+
+	dsn := fmt.Sprintf("file:%s?mode=ro", tempDbCopyLocation)
 	conn, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("opening sqlite db: %w", err)
@@ -123,7 +136,6 @@ func querySqliteDb(ctx context.Context, slogger *slog.Logger, path string, query
 
 	// Scan all rows
 	for rows.Next() {
-		fmt.Println("processing row...")
 		if err := rows.Scan(scanDest...); err != nil {
 			return nil, fmt.Errorf("scanning query results: %w", err)
 		}
@@ -137,4 +149,55 @@ func querySqliteDb(ctx context.Context, slogger *slog.Logger, path string, query
 	}
 
 	return results, nil
+}
+
+// copySqliteDb makes a temporary directory and copies the given db into it,
+// along with any WAL and SHM auxiliary files.
+func copySqliteDb(path string) (string, error) {
+	dbCopyDir, err := agent.MkdirTemp("sqlite-temp")
+	if err != nil {
+		return "", fmt.Errorf("making temporary directory: %w", err)
+	}
+
+	dbCopyDest, err := copyFile(path, dbCopyDir)
+	if err != nil {
+		return "", fmt.Errorf("copying %s: %w", path, err)
+	}
+
+	for _, suffix := range []string{"-wal", "-shm"} {
+		auxPath := path + suffix
+		if _, err := os.Stat(auxPath); err == nil {
+			if _, err := copyFile(auxPath, dbCopyDir); err != nil {
+				return dbCopyDest, fmt.Errorf("copying %s: %w", suffix, err)
+			}
+		}
+	}
+
+	return dbCopyDest, nil
+}
+
+// copyFile copies a single file into destDir, preserving the base filename.
+func copyFile(srcPath string, destDir string) (string, error) {
+	srcFh, err := os.Open(srcPath)
+	if err != nil {
+		return "", fmt.Errorf("opening %s: %w", srcPath, err)
+	}
+	defer srcFh.Close()
+
+	destPath := filepath.Join(destDir, filepath.Base(srcPath))
+	destFh, err := os.Create(destPath)
+	if err != nil {
+		return "", fmt.Errorf("creating %s: %w", destPath, err)
+	}
+
+	if _, err := io.Copy(destFh, srcFh); err != nil {
+		_ = destFh.Close()
+		return "", fmt.Errorf("copying %s to %s: %w", srcPath, destPath, err)
+	}
+
+	if err := destFh.Close(); err != nil {
+		return "", fmt.Errorf("writing %s to %s: %w", srcPath, destPath, err)
+	}
+
+	return destPath, nil
 }
