@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/kolide/launcher/ee/gowrapper"
+	"github.com/kolide/launcher/v2/ee/gowrapper"
 	"github.com/kolide/systray"
 )
 

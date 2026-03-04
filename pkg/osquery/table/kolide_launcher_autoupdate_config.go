@@ -4,9 +4,9 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -21,7 +21,9 @@ func LauncherAutoupdateConfigTable(slogger *slog.Logger, flags types.Flags) *tab
 		table.TextColumn("update_channel"),
 	}
 
-	return tablewrapper.New(flags, slogger, launcherAutoupdateConfigTableName, columns, generateLauncherAutoupdateConfigTable(flags))
+	return tablewrapper.New(flags, slogger, launcherAutoupdateConfigTableName, columns, generateLauncherAutoupdateConfigTable(flags),
+		tablewrapper.WithDescription("Launcher autoupdate settings including whether autoupdate is enabled, update server URLs, check interval, and update channel. Useful for verifying autoupdate configuration."),
+	)
 }
 
 func boolToString(in bool) string {

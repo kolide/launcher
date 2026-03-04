@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/kolide/launcher/ee/tables/execparsers/dsregcmd"
+	"github.com/kolide/launcher/v2/ee/tables/execparsers/dsregcmd"
 	"github.com/stretchr/testify/require"
 )
 

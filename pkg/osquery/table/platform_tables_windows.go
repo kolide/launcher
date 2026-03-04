@@ -5,17 +5,17 @@ package table
 import (
 	"log/slog"
 
-	json "github.com/kolide/launcher/ee/tables/execparsers/json"
+	json "github.com/kolide/launcher/v2/ee/tables/execparsers/json"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/allowedcmd"
-	"github.com/kolide/launcher/ee/tables/dataflattentable"
-	"github.com/kolide/launcher/ee/tables/dsim_default_associations"
-	"github.com/kolide/launcher/ee/tables/execparsers/dsregcmd"
-	"github.com/kolide/launcher/ee/tables/secedit"
-	"github.com/kolide/launcher/ee/tables/wifi_networks"
-	"github.com/kolide/launcher/ee/tables/windowsupdatetable"
-	"github.com/kolide/launcher/ee/tables/wmitable"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/allowedcmd"
+	"github.com/kolide/launcher/v2/ee/tables/dataflattentable"
+	"github.com/kolide/launcher/v2/ee/tables/dsim_default_associations"
+	"github.com/kolide/launcher/v2/ee/tables/execparsers/dsregcmd"
+	"github.com/kolide/launcher/v2/ee/tables/secedit"
+	"github.com/kolide/launcher/v2/ee/tables/wifi_networks"
+	"github.com/kolide/launcher/v2/ee/tables/windowsupdatetable"
+	"github.com/kolide/launcher/v2/ee/tables/wmitable"
 	osquery "github.com/osquery/osquery-go"
 )
 

@@ -17,9 +17,9 @@ import (
 	leveldbcomparer "github.com/kolide/goleveldb/leveldb/comparer"
 	leveldberrors "github.com/kolide/goleveldb/leveldb/errors"
 	"github.com/kolide/goleveldb/leveldb/opt"
-	"github.com/kolide/launcher/ee/agent"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/pkg/indexeddbcomparator"
+	"github.com/kolide/launcher/v2/ee/agent"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/pkg/indexeddbcomparator"
 )
 
 // maxNumberOfObjectStoresToCheck is the number of indices for object stores we will check

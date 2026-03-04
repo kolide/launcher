@@ -8,8 +8,8 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/pkg/contexts/ctxlog"
-	"github.com/kolide/launcher/pkg/packagekit"
+	"github.com/kolide/launcher/v2/pkg/contexts/ctxlog"
+	"github.com/kolide/launcher/v2/pkg/packagekit"
 )
 
 // sanitizeHostname will replace any ":" characters in a given hostname with "-"

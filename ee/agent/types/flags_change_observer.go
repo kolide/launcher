@@ -3,7 +3,7 @@ package types
 import (
 	"context"
 
-	"github.com/kolide/launcher/ee/agent/flags/keys"
+	"github.com/kolide/launcher/v2/ee/agent/flags/keys"
 )
 
 // FlagsChangeObserver is an interface to be notified of changes to flags.

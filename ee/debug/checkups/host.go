@@ -11,9 +11,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/kolide/launcher/ee/agent"
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/desktop/runner"
+	"github.com/kolide/launcher/v2/ee/agent"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/desktop/runner"
 	"github.com/shirou/gopsutil/v4/host"
 )
 

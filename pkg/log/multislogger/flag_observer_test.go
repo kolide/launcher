@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kolide/launcher/ee/agent/flags/keys"
-	"github.com/kolide/launcher/ee/agent/types/mocks"
+	"github.com/kolide/launcher/v2/ee/agent/flags/keys"
+	"github.com/kolide/launcher/v2/ee/agent/types/mocks"
 )
 
 func TestMultiSlogger_FlagsChanged_DuplicateLogWindow(t *testing.T) {

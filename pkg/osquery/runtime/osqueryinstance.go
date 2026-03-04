@@ -17,15 +17,14 @@ import (
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/kolide/kit/ulid"
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/errgroup"
-	"github.com/kolide/launcher/ee/gowrapper"
-	kolidelog "github.com/kolide/launcher/ee/log/osquerylogs"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/pkg/backoff"
-	launcherosq "github.com/kolide/launcher/pkg/osquery"
-	"github.com/kolide/launcher/pkg/osquery/table"
-	"github.com/kolide/launcher/pkg/service"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/errgroup"
+	"github.com/kolide/launcher/v2/ee/gowrapper"
+	kolidelog "github.com/kolide/launcher/v2/ee/log/osquerylogs"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/pkg/backoff"
+	launcherosq "github.com/kolide/launcher/v2/pkg/osquery"
+	"github.com/kolide/launcher/v2/pkg/osquery/table"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/config"
 	"github.com/osquery/osquery-go/plugin/distributed"
@@ -107,7 +106,6 @@ type OsqueryInstance struct {
 	enrollmentId     string
 	knapsack         types.Knapsack
 	slogger          *slog.Logger
-	serviceClient    service.KolideService
 	logPublishClient types.OsqueryPublisher
 	settingsWriter   settingsStoreWriter
 	// the following are instance artifacts that are created and held as a result
@@ -219,13 +217,12 @@ type osqueryOptions struct {
 	extensionSocketPath string
 }
 
-func newInstance(enrollmentId string, knapsack types.Knapsack, serviceClient service.KolideService, logPublishClient types.OsqueryPublisher, settingsWriter settingsStoreWriter, opts ...OsqueryInstanceOption) *OsqueryInstance {
+func newInstance(enrollmentId string, knapsack types.Knapsack, logPublishClient types.OsqueryPublisher, settingsWriter settingsStoreWriter, opts ...OsqueryInstanceOption) *OsqueryInstance {
 	runId := ulid.New()
 	i := &OsqueryInstance{
 		enrollmentId:            enrollmentId,
 		knapsack:                knapsack,
 		slogger:                 knapsack.Slogger().With("component", "osquery_instance", "enrollment_id", enrollmentId, "instance_run_id", runId),
-		serviceClient:           serviceClient,
 		logPublishClient:        logPublishClient,
 		settingsWriter:          settingsWriter,
 		runId:                   runId,
@@ -674,7 +671,7 @@ func (i *OsqueryInstance) startKolideSaasExtension(ctx context.Context) error {
 
 	// Create the extension
 	var err error
-	i.saasExtension, err = launcherosq.NewExtension(ctx, i.serviceClient, i.logPublishClient, i.settingsWriter, i.knapsack, i.enrollmentId, extOpts)
+	i.saasExtension, err = launcherosq.NewExtension(ctx, i.logPublishClient, i.settingsWriter, i.knapsack, i.enrollmentId, extOpts)
 	if err != nil {
 		return fmt.Errorf("creating new extension: %w", err)
 	}

@@ -9,7 +9,7 @@ import (
 	"errors"
 	"log/slog"
 
-	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/agent/types"
 )
 
 func makeTLSConfig(k types.Knapsack, rootPool *x509.CertPool) *tls.Config {

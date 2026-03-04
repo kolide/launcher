@@ -7,20 +7,23 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/kolide/launcher/ee/agent"
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/dataflatten"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/dataflattentable"
-	"github.com/kolide/launcher/ee/tables/tablehelpers"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/dataflatten"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/dataflattentable"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 	"go.etcd.io/bbolt"
 )
 
 func LauncherDbInfo(flags types.Flags, slogger *slog.Logger, db *bbolt.DB) *table.Plugin {
 	columns := dataflattentable.Columns()
-	return tablewrapper.New(flags, slogger, "kolide_launcher_db_info", columns, generateLauncherDbInfo(db))
+	return tablewrapper.New(flags, slogger, "kolide_launcher_db_info", columns, generateLauncherDbInfo(db),
+		tablewrapper.WithDescription("Internal launcher database statistics, including bucket sizes and key counts. Useful for debugging launcher storage health."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
+	)
 }
 
 func generateLauncherDbInfo(db *bbolt.DB) table.GenerateFunc {

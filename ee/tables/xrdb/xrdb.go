@@ -15,13 +15,13 @@ import (
 	"os/user"
 	"strings"
 
-	"github.com/kolide/launcher/ee/agent"
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/allowedcmd"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/tablehelpers"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/ee/agent"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/allowedcmd"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -48,7 +48,9 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		getBytes: execXRDB,
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_xrdb", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_xrdb", columns, t.generate,
+		tablewrapper.WithDescription("X11 resource database (xrdb) settings for a given user and display. Useful for checking X server preferences such as DPI, cursor size, font rendering, and other Xresources values. Requires a WHERE username = constraint."),
+	)
 }
 
 func (t *XRDBSettings) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

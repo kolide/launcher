@@ -5,7 +5,7 @@ package disclaim
 import (
 	"errors"
 
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 )
 
 func RunDisclaimed(_ *multislogger.MultiSlogger, args []string) error {

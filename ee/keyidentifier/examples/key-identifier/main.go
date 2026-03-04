@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/kolide/launcher/ee/keyidentifier"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/ee/keyidentifier"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 )
 
 func main() {

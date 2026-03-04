@@ -8,10 +8,10 @@ import (
 
 	"go.etcd.io/bbolt"
 
-	"github.com/kolide/launcher/ee/agent/storage"
-	agentbbolt "github.com/kolide/launcher/ee/agent/storage/bbolt"
-	"github.com/kolide/launcher/ee/agent/storage/inmemory"
-	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/agent/storage"
+	agentbbolt "github.com/kolide/launcher/v2/ee/agent/storage/bbolt"
+	"github.com/kolide/launcher/v2/ee/agent/storage/inmemory"
+	"github.com/kolide/launcher/v2/ee/agent/types"
 )
 
 // MakeStores creates all the KVStores used by launcher

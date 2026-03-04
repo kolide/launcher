@@ -15,13 +15,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/allowedcmd"
-	"github.com/kolide/launcher/ee/dataflatten"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/dataflattentable"
-	"github.com/kolide/launcher/ee/tables/tablehelpers"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/allowedcmd"
+	"github.com/kolide/launcher/v2/ee/dataflatten"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/dataflattentable"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -49,7 +49,10 @@ func CertTrustSettingsTablePlugin(flags types.Flags, slogger *slog.Logger) *tabl
 		slogger: slogger.With("name", tableName),
 	}
 
-	return tablewrapper.New(flags, slogger, c.name, columns, c.generate)
+	return tablewrapper.New(flags, slogger, c.name, columns, c.generate,
+		tablewrapper.WithDescription("macOS certificate trust settings from `security dump-trust-settings`, flattened as key-value pairs. Supports system and admin domain constraints. Useful for auditing custom certificate trust overrides."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
+	)
 }
 
 func (c *certTrustSettingsTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

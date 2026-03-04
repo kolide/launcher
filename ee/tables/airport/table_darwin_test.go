@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kolide/launcher/ee/tables/airport/mocks"
-	"github.com/kolide/launcher/ee/tables/tablehelpers"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/ee/tables/airport/mocks"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/osquery/osquery-go/plugin/table"
 
 	"github.com/stretchr/testify/assert"

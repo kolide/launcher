@@ -13,12 +13,12 @@ import (
 
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/ulid"
-	"github.com/kolide/launcher/ee/agent/startupsettings"
-	"github.com/kolide/launcher/ee/agent/storage"
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/pkg/augeas"
-	osqueryRuntime "github.com/kolide/launcher/pkg/osquery/runtime"
-	"github.com/kolide/launcher/pkg/osquery/table"
+	"github.com/kolide/launcher/v2/ee/agent/startupsettings"
+	"github.com/kolide/launcher/v2/ee/agent/storage"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/pkg/augeas"
+	osqueryRuntime "github.com/kolide/launcher/v2/pkg/osquery/runtime"
+	"github.com/kolide/launcher/v2/pkg/osquery/table"
 	osquery "github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/config"
 )

@@ -6,8 +6,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/kolide/launcher/ee/agent/flags/keys"
-	"github.com/kolide/launcher/pkg/service"
+	"github.com/kolide/launcher/v2/pkg/service"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	"github.com/osquery/osquery-go/plugin/logger"
 )
@@ -89,5 +88,3 @@ func (s *KolideService) CheckHealth(ctx context.Context) (int32, error) {
 	s.CheckHealthFuncInvoked = true
 	return s.CheckHealthFunc(ctx)
 }
-
-func (s *KolideService) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {}

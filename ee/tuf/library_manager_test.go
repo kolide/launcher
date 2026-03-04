@@ -13,8 +13,8 @@ import (
 	"testing"
 
 	"github.com/kolide/kit/ulid"
-	tufci "github.com/kolide/launcher/ee/tuf/ci"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	tufci "github.com/kolide/launcher/v2/ee/tuf/ci"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 	"github.com/theupdateframework/go-tuf/data"
 )
