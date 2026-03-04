@@ -9,11 +9,11 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/kolide/launcher/ee/agent/flags/keys"
-	"github.com/kolide/launcher/ee/agent/storage"
-	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/v2/ee/agent/flags/keys"
+	"github.com/kolide/launcher/v2/ee/agent/storage"
+	agentsqlite "github.com/kolide/launcher/v2/ee/agent/storage/sqlite"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/observability"
 )
 
 // startupSettingsWriter records agent flags and their current values,

@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/go-kit/kit/transport/http/jsonrpc"
-	"github.com/kolide/launcher/ee/agent/types/mocks"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/ee/agent/types/mocks"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/osquery/osquery-go/plugin/logger"
 	"github.com/stretchr/testify/require"
 )

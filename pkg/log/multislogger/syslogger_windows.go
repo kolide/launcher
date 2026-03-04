@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/kolide/launcher/pkg/log/eventlog"
+	"github.com/kolide/launcher/v2/pkg/log/eventlog"
 	"golang.org/x/sys/windows"
 )
 

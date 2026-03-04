@@ -6,7 +6,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/agent/types"
 )
 
 type launchdCheckup struct {

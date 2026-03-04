@@ -5,8 +5,8 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/kolide/launcher/ee/dataflatten"
-	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/v2/ee/dataflatten"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
 	"github.com/stretchr/testify/require"
 )
 

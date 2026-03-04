@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/kolide/launcher/ee/agent/flags/keys"
-	"github.com/kolide/launcher/ee/agent/startupsettings"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/pkg/launcher"
+	"github.com/kolide/launcher/v2/ee/agent/flags/keys"
+	"github.com/kolide/launcher/v2/ee/agent/startupsettings"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/pkg/launcher"
 	"github.com/peterbourgon/ff/v3"
 	"github.com/spf13/pflag"
 )

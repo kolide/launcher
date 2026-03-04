@@ -6,7 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/golang/snappy"
-	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/v2/ee/observability"
 )
 
 // snappyDecode is a dataProcessingStep that decodes data compressed with snappy.

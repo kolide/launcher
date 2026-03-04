@@ -13,10 +13,10 @@ import (
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/theupdateframework/go-tuf/data"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
-	"github.com/kolide/launcher/ee/tuf"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/tuf"
 )
 
 const tufReleaseVersionTableName = "kolide_tuf_release_version"

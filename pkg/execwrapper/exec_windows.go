@@ -12,7 +12,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/kolide/launcher/ee/gowrapper"
+	"github.com/kolide/launcher/v2/ee/gowrapper"
 )
 
 func Exec(ctx context.Context, slogger *slog.Logger, argv0 string, argv []string, envv []string, commandExpectedToExit bool) error {

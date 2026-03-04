@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
-	"github.com/kolide/launcher/pkg/log/multislogger"
-	"github.com/kolide/launcher/pkg/service"
+	typesmocks "github.com/kolide/launcher/v2/ee/agent/types/mocks"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/pkg/service"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )

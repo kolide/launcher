@@ -3,7 +3,7 @@ package ci
 import (
 	"testing"
 
-	"github.com/kolide/launcher/ee/performance"
+	"github.com/kolide/launcher/v2/ee/performance"
 	"github.com/stretchr/testify/require"
 )
 

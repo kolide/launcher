@@ -3,7 +3,7 @@ package menu
 import (
 	"runtime"
 
-	"github.com/kolide/launcher/ee/ui/assets"
+	"github.com/kolide/launcher/v2/ee/ui/assets"
 )
 
 // getIcon returns the appropriate embedded asset for the requested menu icon type

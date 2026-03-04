@@ -11,7 +11,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/env"
-	"github.com/kolide/launcher/pkg/contexts/ctxlog"
+	"github.com/kolide/launcher/v2/pkg/contexts/ctxlog"
 
 	"github.com/stretchr/testify/require"
 )

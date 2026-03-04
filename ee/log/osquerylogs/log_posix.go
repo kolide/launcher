@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/kolide/launcher/ee/allowedcmd"
+	"github.com/kolide/launcher/v2/ee/allowedcmd"
 )
 
 // runAndLogPs runs ps filtering on the given PID, and logs the output.

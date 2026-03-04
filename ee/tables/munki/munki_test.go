@@ -5,7 +5,7 @@ package munki
 import (
 	"testing"
 
-	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

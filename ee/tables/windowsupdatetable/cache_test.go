@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
-	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
-	"github.com/kolide/launcher/pkg/threadsafebuffer"
+	storageci "github.com/kolide/launcher/v2/ee/agent/storage/ci"
+	typesmocks "github.com/kolide/launcher/v2/ee/agent/types/mocks"
+	"github.com/kolide/launcher/v2/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )

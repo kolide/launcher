@@ -18,10 +18,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kolide/launcher/ee/agent"
-	"github.com/kolide/launcher/ee/desktop/user/notify"
-	"github.com/kolide/launcher/ee/presencedetection"
-	"github.com/kolide/launcher/pkg/backoff"
+	"github.com/kolide/launcher/v2/ee/agent"
+	"github.com/kolide/launcher/v2/ee/desktop/user/notify"
+	"github.com/kolide/launcher/v2/ee/presencedetection"
+	"github.com/kolide/launcher/v2/pkg/backoff"
 )
 
 type notificationSender interface {

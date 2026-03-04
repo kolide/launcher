@@ -27,7 +27,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/kolide/launcher/ee/gowrapper"
+	"github.com/kolide/launcher/v2/ee/gowrapper"
 )
 
 const (

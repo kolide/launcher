@@ -8,9 +8,9 @@ import (
 	"log/slog"
 	"net/url"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
-	"github.com/kolide/launcher/ee/desktop/user/notify"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	desktopRunner "github.com/kolide/launcher/v2/ee/desktop/runner"
+	"github.com/kolide/launcher/v2/ee/desktop/user/notify"
 )
 
 // Consumes notifications from control server

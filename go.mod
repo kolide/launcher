@@ -1,4 +1,4 @@
-module github.com/kolide/launcher
+module github.com/kolide/launcher/v2
 
 require (
 	github.com/Masterminds/semver v1.4.2

@@ -13,11 +13,11 @@ import (
 	"runtime"
 	"slices"
 
-	"github.com/kolide/launcher/ee/agent/flags"
-	"github.com/kolide/launcher/ee/agent/knapsack"
-	"github.com/kolide/launcher/pkg/launcher"
-	"github.com/kolide/launcher/pkg/log/multislogger"
-	"github.com/kolide/launcher/pkg/osquery/table"
+	"github.com/kolide/launcher/v2/ee/agent/flags"
+	"github.com/kolide/launcher/v2/ee/agent/knapsack"
+	"github.com/kolide/launcher/v2/pkg/launcher"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/pkg/osquery/table"
 	"github.com/peterbourgon/ff/v3"
 
 	osquery "github.com/osquery/osquery-go"

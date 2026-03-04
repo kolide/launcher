@@ -16,9 +16,9 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/version"
-	"github.com/kolide/launcher/pkg/contexts/ctxlog"
-	"github.com/kolide/launcher/pkg/packagekit/wix"
-	"github.com/kolide/launcher/pkg/packaging"
+	"github.com/kolide/launcher/v2/pkg/contexts/ctxlog"
+	"github.com/kolide/launcher/v2/pkg/packagekit/wix"
+	"github.com/kolide/launcher/v2/pkg/packaging"
 )
 
 func runVersion(args []string) error {

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kolide/launcher/ee/desktop/user/server"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/ee/desktop/user/server"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

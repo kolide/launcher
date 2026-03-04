@@ -6,7 +6,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/kolide/launcher/pkg/service"
+	"github.com/kolide/launcher/v2/pkg/service"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	"github.com/osquery/osquery-go/plugin/logger"
 )

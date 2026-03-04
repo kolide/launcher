@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/kolide/launcher/ee/performance"
+	"github.com/kolide/launcher/v2/ee/performance"
 )
 
 const (

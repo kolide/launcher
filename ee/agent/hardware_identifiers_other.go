@@ -5,7 +5,7 @@ package agent
 import (
 	"context"
 
-	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/agent/types"
 )
 
 // currentMachineGuid is only implemented for windows, where the hardware_uuid

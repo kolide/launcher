@@ -10,9 +10,9 @@ import (
 	"sync"
 
 	"github.com/fatih/semgroup"
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/tables/tablehelpers"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/spf13/viper"
 	"github.com/zricethezav/gitleaks/v8/config"

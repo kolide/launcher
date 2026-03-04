@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
-	tufci "github.com/kolide/launcher/ee/tuf/ci"
+	typesmocks "github.com/kolide/launcher/v2/ee/agent/types/mocks"
+	tufci "github.com/kolide/launcher/v2/ee/tuf/ci"
 	"github.com/stretchr/testify/require"
 )
 
