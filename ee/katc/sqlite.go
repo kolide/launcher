@@ -79,7 +79,7 @@ func querySqliteDb(ctx context.Context, slogger *slog.Logger, path string, query
 	tempDbCopyLocation, err := copySqliteDb(path)
 	if err != nil {
 		if tempDbCopyLocation != "" {
-			_ = os.RemoveAll(tempDbCopyLocation)
+			_ = os.RemoveAll(filepath.Dir(tempDbCopyLocation))
 		}
 		return nil, fmt.Errorf("unable to copy db: %w", err)
 	}
