@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/kolide/launcher/ee/gowrapper"
-	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/v2/ee/gowrapper"
+	"github.com/kolide/launcher/v2/ee/observability"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 )

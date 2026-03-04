@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/kolide/kit/fsutil"
-	"github.com/kolide/launcher/pkg/log/multislogger"
-	"github.com/kolide/launcher/pkg/packaging"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/pkg/packaging"
 )
 
 // runDownloadOsquery downloads the stable osquery to the provided path. It's meant for use in out CI pipeline.

@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	runnerserver "github.com/kolide/launcher/ee/desktop/runner/server"
-	"github.com/kolide/launcher/pkg/log/multislogger"
-	"github.com/kolide/launcher/pkg/threadsafebuffer"
+	runnerserver "github.com/kolide/launcher/v2/ee/desktop/runner/server"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/require"
 )
 

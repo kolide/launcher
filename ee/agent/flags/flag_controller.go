@@ -8,11 +8,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kolide/launcher/ee/agent/flags/keys"
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tuf"
-	"github.com/kolide/launcher/pkg/launcher"
+	"github.com/kolide/launcher/v2/ee/agent/flags/keys"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tuf"
+	"github.com/kolide/launcher/v2/pkg/launcher"
 	"golang.org/x/exp/maps"
 )
 

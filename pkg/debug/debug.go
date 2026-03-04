@@ -16,7 +16,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/kolide/launcher/ee/gowrapper"
+	"github.com/kolide/launcher/v2/ee/gowrapper"
 )
 
 const debugPrefix = "/debug/"

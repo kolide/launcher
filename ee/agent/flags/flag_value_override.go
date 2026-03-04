@@ -3,7 +3,7 @@ package flags
 import (
 	"time"
 
-	"github.com/kolide/launcher/ee/agent/flags/keys"
+	"github.com/kolide/launcher/v2/ee/agent/flags/keys"
 )
 
 // FlagValueOverride is an interface for an override which can be active for a duration of

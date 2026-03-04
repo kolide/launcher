@@ -4,10 +4,10 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
-	"github.com/kolide/launcher/pkg/osquery"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/pkg/osquery"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 

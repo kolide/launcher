@@ -9,7 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/kolide/launcher/ee/gowrapper"
+	"github.com/kolide/launcher/v2/ee/gowrapper"
 )
 
 const debugSignal = syscall.SIGUSR1

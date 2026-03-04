@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/kolide/kit/ulid"
-	"github.com/kolide/launcher/ee/desktop/user/notify"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/ee/desktop/user/notify"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )

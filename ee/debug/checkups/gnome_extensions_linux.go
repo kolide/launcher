@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"syscall"
 
-	"github.com/kolide/launcher/ee/allowedcmd"
-	"github.com/kolide/launcher/ee/consoleuser"
+	"github.com/kolide/launcher/v2/ee/allowedcmd"
+	"github.com/kolide/launcher/v2/ee/consoleuser"
 )
 
 type gnomeExtensions struct {

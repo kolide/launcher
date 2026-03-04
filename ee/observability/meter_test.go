@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kolide/launcher/pkg/threadsafebuffer"
+	"github.com/kolide/launcher/v2/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/stdout/stdoutmetric"

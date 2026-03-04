@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/kolide/kit/fsutil"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/stretchr/testify/require"
 )

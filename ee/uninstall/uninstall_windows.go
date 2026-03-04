@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/watchdog"
-	"github.com/kolide/launcher/pkg/launcher"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/watchdog"
+	"github.com/kolide/launcher/v2/pkg/launcher"
 	"golang.org/x/sys/windows/svc/mgr"
 )
 

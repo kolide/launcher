@@ -9,12 +9,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/kolide/launcher/ee/agent"
-	"github.com/kolide/launcher/ee/agent/storage/inmemory"
-	"github.com/kolide/launcher/ee/agent/types"
-	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
-	"github.com/kolide/launcher/ee/control"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/ee/agent"
+	"github.com/kolide/launcher/v2/ee/agent/storage/inmemory"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	typesMocks "github.com/kolide/launcher/v2/ee/agent/types/mocks"
+	"github.com/kolide/launcher/v2/ee/control"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

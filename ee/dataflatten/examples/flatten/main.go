@@ -7,8 +7,8 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/kolide/launcher/ee/dataflatten"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/ee/dataflatten"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/peterbourgon/ff/v3"
 )
 

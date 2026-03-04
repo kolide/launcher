@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/pkg/contexts/ctxlog"
+	"github.com/kolide/launcher/v2/pkg/contexts/ctxlog"
 )
 
 // signtoolOptions are the options for how we call signtool.exe. These

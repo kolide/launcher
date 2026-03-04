@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/agent/types"
 )
 
 type KeyValueConsumer struct {

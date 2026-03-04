@@ -5,8 +5,8 @@ package disclaim
 import (
 	"testing"
 
-	"github.com/kolide/launcher/ee/allowedcmd"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/ee/allowedcmd"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 )
 
