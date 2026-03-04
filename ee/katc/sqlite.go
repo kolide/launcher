@@ -30,6 +30,7 @@ func sqliteData(ctx context.Context, slogger *slog.Logger, sourcePaths []string,
 		}
 
 		for _, sqliteDb := range sqliteDbs {
+			fmt.Println(sqliteDb)
 			// Check to make sure `db` adheres to pathConstraintsFromQuery. This is an
 			// optimization to avoid work, if osquery sqlite filtering is going to exclude it.
 			valid, err := checkPathConstraints(sqliteDb, pathConstraintsFromQuery)
@@ -72,7 +73,7 @@ func querySqliteDb(ctx context.Context, slogger *slog.Logger, path string, query
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
-	dsn := fmt.Sprintf("file:%s?mode=ro&immutable=1", path)
+	dsn := fmt.Sprintf("file:%s?mode=ro", path)
 	conn, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("opening sqlite db: %w", err)
@@ -122,6 +123,7 @@ func querySqliteDb(ctx context.Context, slogger *slog.Logger, path string, query
 
 	// Scan all rows
 	for rows.Next() {
+		fmt.Println("processing row...")
 		if err := rows.Scan(scanDest...); err != nil {
 			return nil, fmt.Errorf("scanning query results: %w", err)
 		}
