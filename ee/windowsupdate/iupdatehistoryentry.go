@@ -124,4 +124,3 @@ func toIUpdateHistoryEntry(entryDisp *ole.IDispatch) (*IUpdateHistoryEntry, erro
 
 	return entry, nil
 }
-
