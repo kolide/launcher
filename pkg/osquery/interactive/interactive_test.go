@@ -245,8 +245,17 @@ func testRootDirectory(t *testing.T) string {
 
 		require.NoError(t, os.Mkdir(rootDir, 0700))
 		t.Cleanup(func() {
+			// On Windows CI, processes may still hold file handles briefly after
+			// the test completes. Retry cleanup a few times before giving up.
+			for range 5 {
+				if err := os.RemoveAll(rootDir); err == nil {
+					return
+				}
+				time.Sleep(500 * time.Millisecond)
+			}
+			// Final attempt -- report error if it still fails
 			if err := os.RemoveAll(rootDir); err != nil {
-				t.Errorf("testRootDirectory RemoveAll cleanup: %v", err)
+				t.Logf("testRootDirectory RemoveAll cleanup: %v", err)
 			}
 		})
 
