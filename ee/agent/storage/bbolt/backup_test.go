@@ -14,7 +14,12 @@ import (
 	"github.com/kolide/launcher/v2/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/require"
 	"go.etcd.io/bbolt"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func TestUseBackupDbIfNeeded(t *testing.T) {
 	t.Parallel()

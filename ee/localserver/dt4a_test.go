@@ -2,6 +2,7 @@ package localserver
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -56,6 +57,9 @@ func Test_requestDt4aInfoHandler(t *testing.T) {
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		ls.Interrupt(errors.New("test"))
+	})
 
 	// Make a request to our handler
 	request := httptest.NewRequest(http.MethodGet, "/dt4a", nil)
@@ -118,6 +122,9 @@ func Test_requestDt4aInfoHandlerWithDt4aIds(t *testing.T) {
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		ls.Interrupt(errors.New("test"))
+	})
 
 	// Make a request to our handler
 	request := httptest.NewRequest(http.MethodGet, "/dt4a", nil)
@@ -170,6 +177,9 @@ func Test_requestDt4aInfoHandlerWithDt4aIdsNoData(t *testing.T) {
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		ls.Interrupt(errors.New("test"))
+	})
 
 	// Make a request to our handler
 	request := httptest.NewRequest(http.MethodGet, "/dt4a", nil)
@@ -238,6 +248,9 @@ func Test_requestDt4aInfoHandler_allowsAllSafariWebExtensionOrigins(t *testing.T
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		ls.Interrupt(errors.New("test"))
+	})
 
 	// Make a request to our handler
 	request := httptest.NewRequest(http.MethodGet, "/dt4a", nil)
@@ -290,6 +303,9 @@ func Test_requestDt4aInfoHandler_allowsMissingOrigin(t *testing.T) {
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		ls.Interrupt(errors.New("test"))
+	})
 
 	// Make a request to our handler
 	request := httptest.NewRequest(http.MethodGet, "/dt4a", nil)
@@ -340,6 +356,9 @@ func Test_requestDt4aInfoHandler_allowsEmptyOrigin(t *testing.T) {
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		ls.Interrupt(errors.New("test"))
+	})
 
 	// Make a request to our handler
 	request := httptest.NewRequest(http.MethodGet, "/dt4a", nil)
@@ -400,6 +419,9 @@ func Test_requestDt4aInfoHandler_badRequest(t *testing.T) {
 			// Set up localserver
 			ls, err := New(t.Context(), k, nil)
 			require.NoError(t, err)
+			t.Cleanup(func() {
+				ls.Interrupt(errors.New("test"))
+			})
 
 			// Make a request to our handler
 			request := httptest.NewRequest(tt.httpMethod, "/dt4a", tt.requestBody)
@@ -447,6 +469,9 @@ func Test_requestDt4aInfoHandler_noDataAvailable(t *testing.T) {
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		ls.Interrupt(errors.New("test"))
+	})
 
 	// Make a request to our handler
 	request := httptest.NewRequest(http.MethodGet, "/dt4a", nil)
@@ -489,6 +514,9 @@ func Test_requestDt4aAccelerationHandler(t *testing.T) {
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		ls.Interrupt(errors.New("test"))
+	})
 
 	// Make a request to our handler
 	request := httptest.NewRequest(http.MethodGet, "/", nil)

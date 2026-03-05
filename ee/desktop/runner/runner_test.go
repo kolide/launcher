@@ -27,7 +27,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 	t.Parallel()
@@ -109,6 +114,10 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 				r.interruptTimeout = time.Millisecond
 				// wg will never be done, so we should time out
 				r.procsWg.Add(1)
+				// Ensure goroutine is cleaned up after test completes
+				t.Cleanup(func() {
+					r.procsWg.Done()
+				})
 			},
 			logContains: []string{
 				"timeout waiting for desktop processes to exit",
