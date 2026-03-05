@@ -106,7 +106,7 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger, dst DataSourceType) os
 			fileFn = func(file string, opts ...dataflatten.FlattenOpts) ([]dataflatten.Row, error) {
 				raw, err := os.ReadFile(file)
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("reading %s prior to flattening: %w", file, err)
 				}
 				return bytesFn(raw, opts...)
 			}

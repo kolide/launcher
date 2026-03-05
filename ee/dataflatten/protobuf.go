@@ -18,7 +18,7 @@ import (
 func ProtobufFile(file string, opts ...FlattenOpts) ([]Row, error) {
 	rawdata, err := os.ReadFile(file)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("reading protobuf file: %w", err)
 	}
 	return Protobuf(rawdata, opts...)
 }
