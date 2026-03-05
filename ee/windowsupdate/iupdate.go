@@ -100,23 +100,34 @@ func toIUpdatesIdentities(updatesDisp *ole.IDispatch) ([]*IUpdateIdentity, error
 
 	identities := make([]*IUpdateIdentity, count)
 	for i := 0; i < int(count); i++ {
-		updateDisp, err := getPropertyDispatch(updatesDisp, "Item", i)
+		id, err := extractUpdateIdentity(updatesDisp, i, int(count))
 		if err != nil {
-			return nil, fmt.Errorf("Item[%d/%d]: %w", i, count, err)
+			return nil, err
 		}
-		defer updateDisp.Release()
-
-		identityDisp, err := getPropertyDispatch(updateDisp, "Identity")
-		if err != nil {
-			return nil, fmt.Errorf("Identity[%d/%d]: %w", i, count, err)
-		}
-		if identityDisp != nil {
-			if identities[i], err = toIUpdateIdentity(identityDisp); err != nil {
-				return nil, fmt.Errorf("converting Identity[%d/%d]: %w", i, count, err)
-			}
-		}
+		identities[i] = id
 	}
 	return identities, nil
+}
+
+func extractUpdateIdentity(updatesDisp *ole.IDispatch, i, count int) (*IUpdateIdentity, error) {
+	updateDisp, err := getPropertyDispatch(updatesDisp, "Item", i)
+	if err != nil {
+		return nil, fmt.Errorf("Item[%d/%d]: %w", i, count, err)
+	}
+	defer updateDisp.Release()
+
+	identityDisp, err := getPropertyDispatch(updateDisp, "Identity")
+	if err != nil {
+		return nil, fmt.Errorf("Identity[%d/%d]: %w", i, count, err)
+	}
+	if identityDisp == nil {
+		return nil, nil
+	}
+	id, err := toIUpdateIdentity(identityDisp)
+	if err != nil {
+		return nil, fmt.Errorf("converting Identity[%d/%d]: %w", i, count, err)
+	}
+	return id, nil
 }
 
 func toIUpdate(updateDisp *ole.IDispatch) (*IUpdate, error) {
