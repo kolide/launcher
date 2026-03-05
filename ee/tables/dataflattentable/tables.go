@@ -22,7 +22,7 @@ type DataSourceType struct {
 	description string
 
 	// Required: factory returning the bytes flatten func. Receives QueryContext
-	// so types can vary behavior per-query (e.g., protobuf schema selection).
+	// so types can vary behavior per-query.
 	flattenBytesFunc func(table.QueryContext) dataflatten.DataFunc
 
 	// Optional: factory returning the file flatten func. When nil, the table
@@ -31,6 +31,8 @@ type DataSourceType struct {
 	// "read bytes, parse bytes" (e.g., JSON's UTF-16 fallback, XML's reader API).
 	flattenFileFunc func(table.QueryContext) dataflatten.DataFileFunc
 
+	// Optional: When not nil, these extra columns are included in the schema.
+	// This is required to be used if a table consumes data from the QueryContext.
 	extraColumns []table.ColumnDefinition
 }
 
