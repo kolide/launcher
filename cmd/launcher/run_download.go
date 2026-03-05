@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kolide/launcher/ee/tuf/simpleclient"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/ee/tuf/simpleclient"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 )
 
 // runDownload downloads launcher or osqueryd from the TUF repo with TUF verification
