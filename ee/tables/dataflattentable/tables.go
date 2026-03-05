@@ -76,8 +76,8 @@ type Table struct {
 	slogger   *slog.Logger
 	tableName string
 
-	flattenFileFunc  dataflatten.DataFileFunc
-	flattenBytesFunc dataflatten.DataFunc
+	flattenBytesFunc func(table.QueryContext) dataflatten.DataFunc
+	flattenFileFunc  func(table.QueryContext) dataflatten.DataFileFunc
 }
 
 // AllTablePlugins is a helper to return all the expected flattening tables.
@@ -95,40 +95,18 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger, dst DataSourceType) os
 		dst.extraColumns...,
 	)...)
 
-	tableSlogger := slogger.With("table", dst.tableName)
-
-	generate := func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-		bytesFn := dst.flattenBytesFunc(queryContext)
-
-		var fileFn dataflatten.DataFileFunc
-		if dst.flattenFileFunc != nil {
-			fileFn = dst.flattenFileFunc(queryContext)
-		} else {
-			fileFn = func(file string, opts ...dataflatten.FlattenOpts) ([]dataflatten.Row, error) {
-				raw, err := os.ReadFile(file)
-				if err != nil {
-					return nil, fmt.Errorf("reading %s prior to flattening: %w", file, err)
-				}
-				return bytesFn(raw, opts...)
-			}
-		}
-
-		t := &Table{
-			slogger:          tableSlogger,
-			tableName:        dst.tableName,
-			flattenBytesFunc: bytesFn,
-			flattenFileFunc:  fileFn,
-		}
-		return t.generate(ctx, queryContext)
+	t := &Table{
+		slogger:          slogger.With("table", dst.tableName),
+		tableName:        dst.tableName,
+		flattenBytesFunc: dst.flattenBytesFunc,
+		flattenFileFunc:  dst.flattenFileFunc,
 	}
 
 	var opts []tablewrapper.TablePluginOption
-	if dst.description != "" {
-		opts = append(opts, tablewrapper.WithDescription(dst.description))
-	}
+	opts = append(opts, tablewrapper.WithDescription(dst.description))
 	opts = append(opts, tablewrapper.WithNote(EAVNote))
 
-	return tablewrapper.New(flags, slogger, dst.tableName, columns, generate, opts...)
+	return tablewrapper.New(flags, slogger, dst.tableName, columns, t.generate, opts...)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
@@ -159,7 +137,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 		for _, filePath := range filePaths {
 			for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
-				subresults, err := t.generatePath(ctx, filePath, dataQuery, append(flattenOpts, dataflatten.WithQuery(strings.Split(dataQuery, "/")))...)
+				subresults, err := t.generatePath(ctx, queryContext, filePath, dataQuery, append(flattenOpts, dataflatten.WithQuery(strings.Split(dataQuery, "/")))...)
 				if err != nil {
 					t.slogger.Log(ctx, slog.LevelInfo,
 						"failed to get data for path",
@@ -176,7 +154,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	for _, rawdata := range requestedRawDatas {
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
-			subresults, err := t.generateRawData(ctx, rawdata, dataQuery, append(flattenOpts, dataflatten.WithQuery(strings.Split(dataQuery, "/")))...)
+			subresults, err := t.generateRawData(ctx, queryContext, rawdata, dataQuery, append(flattenOpts, dataflatten.WithQuery(strings.Split(dataQuery, "/")))...)
 			if err != nil {
 				t.slogger.Log(ctx, slog.LevelInfo,
 					"failed to generate for raw_data",
@@ -192,8 +170,8 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	return results, nil
 }
 
-func (t *Table) generateRawData(ctx context.Context, rawdata string, dataQuery string, flattenOpts ...dataflatten.FlattenOpts) ([]map[string]string, error) {
-	data, err := t.flattenBytesFunc([]byte(rawdata), flattenOpts...)
+func (t *Table) generateRawData(ctx context.Context, qc table.QueryContext, rawdata string, dataQuery string, flattenOpts ...dataflatten.FlattenOpts) ([]map[string]string, error) {
+	data, err := t.flattenBytesFunc(qc)([]byte(rawdata), flattenOpts...)
 	if err != nil {
 		t.slogger.Log(ctx, slog.LevelInfo,
 			"failure parsing raw data",
@@ -209,11 +187,21 @@ func (t *Table) generateRawData(ctx context.Context, rawdata string, dataQuery s
 	return ToMap(data, dataQuery, rowData), nil
 }
 
-func (t *Table) generatePath(ctx context.Context, filePath string, dataQuery string, flattenOpts ...dataflatten.FlattenOpts) ([]map[string]string, error) {
+func (t *Table) generatePath(ctx context.Context, qc table.QueryContext, filePath string, dataQuery string, flattenOpts ...dataflatten.FlattenOpts) ([]map[string]string, error) {
 	ctx, span := observability.StartSpan(ctx, "path", filePath)
 	defer span.End()
 
-	data, err := t.flattenFileFunc(filePath, flattenOpts...)
+	var data []dataflatten.Row
+	var err error
+	if t.flattenFileFunc != nil {
+		data, err = t.flattenFileFunc(qc)(filePath, flattenOpts...)
+	} else {
+		raw, readErr := os.ReadFile(filePath)
+		if readErr != nil {
+			return nil, fmt.Errorf("reading %s: %w", filePath, readErr)
+		}
+		data, err = t.flattenBytesFunc(qc)(raw, flattenOpts...)
+	}
 	if err != nil {
 		t.slogger.Log(ctx, slog.LevelInfo,
 			"failure parsing file",
