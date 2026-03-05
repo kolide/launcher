@@ -4,12 +4,11 @@ on:
   workflow_dispatch:
   push:
     branches: [main, master]
-    tags: '*'
+    tags: "*"
   pull_request:
-    branches: '**'
+    branches: "**"
   merge_group:
     types: [checks_requested]
-
 
 jobs:
   # Our non-containerized launcher builds -- macOS and Windows. Linux is handled separately
@@ -24,70 +23,70 @@ jobs:
           - macos-14
           - windows-latest
     steps:
-    - name: Check out code
-      id: checkout
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0 # need a full checkout for `git describe`
+      - name: Check out code
+        id: checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # need a full checkout for `git describe`
 
-    - name: Setup Go
-      uses: actions/setup-go@v6
-      with:
-        go-version-file: './go.mod'
-        check-latest: true
-        cache: false
-      id: go
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: "./go.mod"
+          check-latest: true
+          cache: false
+        id: go
 
-    # use bash, because the powershell syntax is different and this is a cross platform workflow
-    - id: go-cache-paths
-      shell: bash
-      run: |
-        echo "go-build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
-        echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+      # use bash, because the powershell syntax is different and this is a cross platform workflow
+      - id: go-cache-paths
+        shell: bash
+        run: |
+          echo "go-build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+          echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
 
-    - name: Go Build Cache
-      uses: actions/cache@v5
-      with:
-        path: ${{ steps.go-cache-paths.outputs.go-build }}
-        key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
+      - name: Go Build Cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ steps.go-cache-paths.outputs.go-build }}
+          key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
 
-    - name: Go Mod Cache
-      uses: actions/cache@v5
-      with:
-        path: ${{ steps.go-cache-paths.outputs.go-mod }}
-        key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
+      - name: Go Mod Cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ steps.go-cache-paths.outputs.go-mod }}
+          key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
 
-    - name: Get dependencies
-      run: make deps
+      - name: Get dependencies
+        run: make deps
 
-    - name: Build (debug)
-      if: github.ref_type != 'tag'
-      shell: bash
-      run: MAKE_debugsymbols=true make -j2 github-build
-    
-    - name: Build
-      if: github.ref_type == 'tag'
-      run: make -j2 github-build
+      - name: Build (debug)
+        if: github.ref_type != 'tag'
+        shell: bash
+        run: MAKE_debugsymbols=true make -j2 github-build
 
-    - name: Check macOS build target
-      if: contains(matrix.os, 'macos')
-      # this uses grep's exit code
-      run: otool -l build/launcher | grep -A1 "minos 11"
+      - name: Build
+        if: github.ref_type == 'tag'
+        run: make -j2 github-build
 
-    - name: Lipo
-      run: make github-lipo
-      if: ${{ contains(matrix.os, 'macos') }}
+      - name: Check macOS build target
+        if: contains(matrix.os, 'macos')
+        # this uses grep's exit code
+        run: otool -l build/launcher | grep -A1 "minos 11"
 
-    - name: App Bundle
-      run: make github-launcherapp
-      if: ${{ contains(matrix.os, 'macos') }}
+      - name: Lipo
+        run: make github-lipo
+        if: ${{ contains(matrix.os, 'macos') }}
 
-    - name: Cache build output
-      uses: actions/cache@v5
-      with:
-        path: ./build
-        key: ${{ runner.os }}-${{ github.run_id }}
-        enableCrossOsArchive: true
+      - name: App Bundle
+        run: make github-launcherapp
+        if: ${{ contains(matrix.os, 'macos') }}
+
+      - name: Cache build output
+        uses: actions/cache@v5
+        with:
+          path: ./build
+          key: ${{ runner.os }}-${{ github.run_id }}
+          enableCrossOsArchive: true
 
   # Our containerized launcher build -- we need to build launcher on Ubuntu 20.04
   # in order to continue to support that platform, but that GH runner has been EOL'ed --
@@ -97,67 +96,67 @@ jobs:
     runs-on: ubuntu-22.04
     container: ubuntu:20.04 # Required to support launcher on Ubuntu 20.04
     steps:
-    # zstd is needed so we can restore cache later -- see https://github.com/actions/cache/issues/1455#issuecomment-2328358604
-    - name: Install build dependencies
-      run: |
-        apt-get -y update
-        apt-get -y install build-essential ca-certificates openssl git zstd
-        update-ca-certificates
+      # zstd is needed so we can restore cache later -- see https://github.com/actions/cache/issues/1455#issuecomment-2328358604
+      - name: Install build dependencies
+        run: |
+          apt-get -y update
+          apt-get -y install build-essential ca-certificates openssl git zstd
+          update-ca-certificates
 
-    - name: Check out code
-      id: checkout
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0 # need a full checkout for `git describe`
-    
-    - name: Ignore dubious ownership
-      run: git config --global --add safe.directory /__w/launcher/launcher
+      - name: Check out code
+        id: checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # need a full checkout for `git describe`
 
-    - name: Setup Go
-      uses: actions/setup-go@v6
-      with:
-        go-version-file: './go.mod'
-        check-latest: true
-        cache: false
-      id: go
+      - name: Ignore dubious ownership
+        run: git config --global --add safe.directory /__w/launcher/launcher
 
-    - id: go-cache-paths
-      run: |
-        echo "go-build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
-        echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: "./go.mod"
+          check-latest: true
+          cache: false
+        id: go
 
-    - name: Go Build Cache
-      uses: actions/cache@v5
-      with:
-        path: ${{ steps.go-cache-paths.outputs.go-build }}
-        key: ${{ runner.os }}-go-build-${{ hashFiles('go.sum') }}
+      - id: go-cache-paths
+        run: |
+          echo "go-build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+          echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
 
-    - name: Go Mod Cache
-      uses: actions/cache@v5
-      with:
-        path: ${{ steps.go-cache-paths.outputs.go-mod }}
-        key: ${{ runner.os }}-go-mod-${{ hashFiles('go.sum') }}
+      - name: Go Build Cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ steps.go-cache-paths.outputs.go-build }}
+          key: ${{ runner.os }}-go-build-${{ hashFiles('go.sum') }}
 
-    - name: Get dependencies
-      run: make deps
+      - name: Go Mod Cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ steps.go-cache-paths.outputs.go-mod }}
+          key: ${{ runner.os }}-go-mod-${{ hashFiles('go.sum') }}
 
-    - name: Set up zig
-      uses: mlugg/setup-zig@v2
+      - name: Get dependencies
+        run: make deps
 
-    - name: Build (debug)
-      if: github.ref_type != 'tag'
-      run: MAKE_debugsymbols=true make -j2 github-build
+      - name: Set up zig
+        uses: mlugg/setup-zig@v2
 
-    - name: Build
-      if: github.ref_type == 'tag'
-      run: make -j2 github-build
+      - name: Build (debug)
+        if: github.ref_type != 'tag'
+        run: MAKE_debugsymbols=true make -j2 github-build
 
-    - name: Cache build output
-      uses: actions/cache@v5
-      with:
-        path: ./build
-        key: ${{ runner.os }}-${{ github.run_id }}
-        enableCrossOsArchive: true
+      - name: Build
+        if: github.ref_type == 'tag'
+        run: make -j2 github-build
+
+      - name: Cache build output
+        uses: actions/cache@v5
+        with:
+          path: ./build
+          key: ${{ runner.os }}-${{ github.run_id }}
+          enableCrossOsArchive: true
 
   # this job captures the version of launcher on one of the runners then that version is
   # compared to the version of all other runners during exec testing. This is to ensure
@@ -171,24 +170,24 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
-    # Needed so we can restore cache -- see https://github.com/actions/cache/issues/1455#issuecomment-2328358604
-    - name: Install zstd
-      run: |
-        apt-get -y update
-        apt-get -y install zstd
-    - name: cache restore build output
-      uses: actions/cache/restore@v5
-      with:
-        path: ./build
-        key: ${{ runner.os }}-${{ github.run_id }}
-        fail-on-cache-miss: true # Need launcher build from cache to run it below
-        enableCrossOsArchive: true
+      # Needed so we can restore cache -- see https://github.com/actions/cache/issues/1455#issuecomment-2328358604
+      - name: Install zstd
+        run: |
+          apt-get -y update
+          apt-get -y install zstd
+      - name: cache restore build output
+        uses: actions/cache/restore@v5
+        with:
+          path: ./build
+          key: ${{ runner.os }}-${{ github.run_id }}
+          fail-on-cache-miss: true # Need launcher build from cache to run it below
+          enableCrossOsArchive: true
 
-    - id: version
-      name: Launcher Version
-      working-directory: build
-      shell: bash
-      run: ./launcher --version 2>/dev/null | awk '/version /{print "version="$4}' >> "$GITHUB_OUTPUT"
+      - id: version
+        name: Launcher Version
+        working-directory: build
+        shell: bash
+        run: ./launcher --version 2>/dev/null | awk '/version /{print "version="$4}' >> "$GITHUB_OUTPUT"
 
   launcher_test:
     name: test
@@ -204,55 +203,55 @@ jobs:
           - macos-14
           - windows-latest
     steps:
-    - name: Check out code
-      id: checkout
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0 # need a full checkout for `git describe`
+      - name: Check out code
+        id: checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # need a full checkout for `git describe`
 
-    - name: Setup Go
-      uses: actions/setup-go@v6
-      with:
-        go-version-file: './go.mod'
-        check-latest: true
-        cache: false
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: "./go.mod"
+          check-latest: true
+          cache: false
 
-    - name: cache restore - build
-      uses: actions/cache/restore@v5
-      with:
-        path: ./build
-        key: ${{ runner.os }}-${{ github.run_id }}
-        enableCrossOsArchive: true
+      - name: cache restore - build
+        uses: actions/cache/restore@v5
+        with:
+          path: ./build
+          key: ${{ runner.os }}-${{ github.run_id }}
+          enableCrossOsArchive: true
 
-    - id: go-cache-paths
-      shell: bash
-      run: |
-        echo "go-build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
-        echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+      - id: go-cache-paths
+        shell: bash
+        run: |
+          echo "go-build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+          echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
 
-    - name: cache restore - GOCACHE
-      uses: actions/cache/restore@v5
-      with:
-        path: ${{ steps.go-cache-paths.outputs.go-build }}
-        key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
-        enableCrossOsArchive: true
+      - name: cache restore - GOCACHE
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ steps.go-cache-paths.outputs.go-build }}
+          key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
+          enableCrossOsArchive: true
 
-    - name: cache restore - GOMODCACHE
-      uses: actions/cache/restore@v5
-      with:
-        path: ${{ steps.go-cache-paths.outputs.go-mod }}
-        key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
-        enableCrossOsArchive: true
+      - name: cache restore - GOMODCACHE
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ steps.go-cache-paths.outputs.go-mod }}
+          key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
+          enableCrossOsArchive: true
 
-    - name: Test
-      run: make test
+      - name: Test
+        run: make test
 
-    - name: Upload coverage
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ runner.os }}-coverage.out
-        path: ./coverage.out
-        if-no-files-found: error
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ runner.os }}-coverage.out
+          path: ./coverage.out
+          if-no-files-found: error
 
   launcher_table_test:
     name: Launcher table performance test
@@ -268,113 +267,113 @@ jobs:
           - macos-14
           - windows-latest
     steps:
-    - name: Check out code
-      id: checkout
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0 # need a full checkout for `git describe`
+      - name: Check out code
+        id: checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # need a full checkout for `git describe`
 
-    - name: Setup Go
-      uses: actions/setup-go@v6
-      with:
-        go-version-file: './go.mod'
-        check-latest: true
-        cache: false
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: "./go.mod"
+          check-latest: true
+          cache: false
 
-    - name: cache restore - build
-      uses: actions/cache/restore@v5
-      with:
-        path: ./build
-        key: ${{ runner.os }}-${{ github.run_id }}
-        enableCrossOsArchive: true
+      - name: cache restore - build
+        uses: actions/cache/restore@v5
+        with:
+          path: ./build
+          key: ${{ runner.os }}-${{ github.run_id }}
+          enableCrossOsArchive: true
 
-    - id: go-cache-paths
-      shell: bash
-      run: |
-        echo "go-build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
-        echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+      - id: go-cache-paths
+        shell: bash
+        run: |
+          echo "go-build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+          echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
 
-    - name: cache restore - GOCACHE
-      uses: actions/cache/restore@v5
-      with:
-        path: ${{ steps.go-cache-paths.outputs.go-build }}
-        key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
-        enableCrossOsArchive: true
+      - name: cache restore - GOCACHE
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ steps.go-cache-paths.outputs.go-build }}
+          key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
+          enableCrossOsArchive: true
 
-    - name: cache restore - GOMODCACHE
-      uses: actions/cache/restore@v5
-      with:
-        path: ${{ steps.go-cache-paths.outputs.go-mod }}
-        key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
-        enableCrossOsArchive: true
+      - name: cache restore - GOMODCACHE
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ steps.go-cache-paths.outputs.go-mod }}
+          key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
+          enableCrossOsArchive: true
 
-    - name: Test
-      run: make test-bench-tables > benchmark.txt
+      - name: Test
+        run: make test-bench-tables > benchmark.txt
 
-    - name: Display results
-      shell: bash
-      run: cat ./benchmark.txt
+      - name: Display results
+        shell: bash
+        run: cat ./benchmark.txt
 
-    - name: Get run ID for last launcher table performance test on main
-      id: main-run-id
-      if: github.ref != 'refs/heads/main' && github.ref_type != 'tag'
-      shell: bash
-      env:
-        GH_TOKEN: ${{ github.token }}
-      run: |
-        echo "main-run-id=$(gh run list --repo kolide/launcher --branch main --workflow ci --limit 1 --json databaseId -q '.[].databaseId')" >> "$GITHUB_OUTPUT"
+      - name: Get run ID for last launcher table performance test on main
+        id: main-run-id
+        if: github.ref != 'refs/heads/main' && github.ref_type != 'tag'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "main-run-id=$(gh run list --repo kolide/launcher --branch main --workflow ci --limit 1 --json databaseId -q '.[].databaseId')" >> "$GITHUB_OUTPUT"
 
-    - name: Download benchmark from main
-      id: download-benchmark
-      if: github.ref != 'refs/heads/main' && github.ref_type != 'tag'
-      uses: actions/download-artifact@v4
-      continue-on-error: true
-      with:
-        name: ${{ runner.os }}-benchmark.txt
-        github-token: ${{ github.token }} # Grants permission to read from other workflow runs
-        run-id: ${{ steps.main-run-id.outputs.main-run-id }}
-        path: main
+      - name: Download benchmark from main
+        id: download-benchmark
+        if: github.ref != 'refs/heads/main' && github.ref_type != 'tag'
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: ${{ runner.os }}-benchmark.txt
+          github-token: ${{ github.token }} # Grants permission to read from other workflow runs
+          run-id: ${{ steps.main-run-id.outputs.main-run-id }}
+          path: main
 
-    - name: Install benchstat
-      if: github.ref != 'refs/heads/main' && github.ref_type != 'tag' && steps.download-benchmark.outcome == 'success'
-      run: go install golang.org/x/perf/cmd/benchstat@latest
+      - name: Install benchstat
+        if: github.ref != 'refs/heads/main' && github.ref_type != 'tag' && steps.download-benchmark.outcome == 'success'
+        run: go install golang.org/x/perf/cmd/benchstat@latest
 
-    - name: Compare performance against main
-      if: github.ref != 'refs/heads/main' && github.ref_type != 'tag' && steps.download-benchmark.outcome == 'success'
-      shell: bash
-      run: |
-        benchstat main/benchmark.txt ./benchmark.txt > benchstat.txt
-        cat ./benchstat.txt
+      - name: Compare performance against main
+        if: github.ref != 'refs/heads/main' && github.ref_type != 'tag' && steps.download-benchmark.outcome == 'success'
+        shell: bash
+        run: |
+          benchstat main/benchmark.txt ./benchmark.txt > benchstat.txt
+          cat ./benchstat.txt
 
-        # We want to check for performance regressions.
-        # The regex matches lines that look like:
-        # AppIcons-3         5.606m ± 10%   10012.759m ± 0%  +178505.57% (p=0.000 n=10)
-        # Format is: <Function name> <benchmark measurement from main> ± <confidence interval> <benchmark measurement from PR> ± <confidence interval> +<percent change versus main>
-        # We're capturing the percent change against main, whenever it is a performance regression (positive delta).
-        # We only care when it's at least a 1% change (so we ignore e.g. +0.02%).
-        # When it's a negative change (e.g. -178505.57%), that's a performance improvement.
-        # When there's no difference, benchstat outputs a ~ instead.
-        REGRESSIONS=$(grep -E '^.+-\d+\s+(?:\d+\.?\d*[a-zA-Z]*\s±\s\d+%\s+){2}(\+[1-9]+\.?\d*%)' ./benchstat.txt || :)
-        if [ -n "$REGRESSIONS" ]
-        then
-          echo "Performance regressions found:"
-          echo "$REGRESSIONS"
-          exit 1
-        fi
+          # We want to check for performance regressions.
+          # The regex matches lines that look like:
+          # AppIcons-3         5.606m ± 10%   10012.759m ± 0%  +178505.57% (p=0.000 n=10)
+          # Format is: <Function name> <benchmark measurement from main> ± <confidence interval> <benchmark measurement from PR> ± <confidence interval> +<percent change versus main>
+          # We're capturing the percent change against main, whenever it is a performance regression (positive delta).
+          # We only care when it's at least a 1% change (so we ignore e.g. +0.02%).
+          # When it's a negative change (e.g. -178505.57%), that's a performance improvement.
+          # When there's no difference, benchstat outputs a ~ instead.
+          REGRESSIONS=$(grep -E '^.+-\d+\s+(?:\d+\.?\d*[a-zA-Z]*\s±\s\d+%\s+){2}(\+[1-9]+\.?\d*%)' ./benchstat.txt || :)
+          if [ -n "$REGRESSIONS" ]
+          then
+            echo "Performance regressions found:"
+            echo "$REGRESSIONS"
+            exit 1
+          fi
 
-    - name: Skip benchmark comparison (no baseline)
-      if: github.ref != 'refs/heads/main' && github.ref_type != 'tag' && steps.download-benchmark.outcome != 'success'
-      shell: bash
-      run: |
-        echo "::notice::Skipping benchmark comparison - no baseline found on main branch. This is expected for new benchmarks."
+      - name: Skip benchmark comparison (no baseline)
+        if: github.ref != 'refs/heads/main' && github.ref_type != 'tag' && steps.download-benchmark.outcome != 'success'
+        shell: bash
+        run: |
+          echo "::notice::Skipping benchmark comparison - no baseline found on main branch. This is expected for new benchmarks."
 
-    - name: Save benchmark results for main
-      if: github.ref == 'refs/heads/main'
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ runner.os }}-benchmark.txt
-        path: ./benchmark.txt
-        if-no-files-found: error
+      - name: Save benchmark results for main
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ runner.os }}-benchmark.txt
+          path: ./benchmark.txt
+          if-no-files-found: error
 
   exec_testing:
     name: Exec Test
@@ -394,37 +393,49 @@ jobs:
       - version_baseline # version_baseline implies build_linux
       - build # need the other builds too
     steps:
-    - name: cache restore build output
-      uses: actions/cache/restore@v5
-      with:
-        path: ./build
-        key: ${{ runner.os }}-${{ github.run_id }}
-        fail-on-cache-miss: true # If we can't restore the cache, then we won't have a launcher binary to run below
-        enableCrossOsArchive: true
+      - name: cache restore build output
+        uses: actions/cache/restore@v5
+        with:
+          path: ./build
+          key: ${{ runner.os }}-${{ github.run_id }}
+          fail-on-cache-miss: true # If we can't restore the cache, then we won't have a launcher binary to run below
+          enableCrossOsArchive: true
 
-    - name: Launcher Version
-      working-directory: build
-      shell: bash
-      run: |
-        ./launcher --version
-        thisVersion=$(./launcher --version 2>/dev/null | grep "version" | awk '{print $4}')
-        baseVersion="${{ needs.version_baseline.outputs.version }}"
-        if [[ "$thisVersion" != "$baseVersion" ]]; then
-          printf "launcher version %s does not match baseline version %s" "$thisVersion" "$baseVersion"
-          exit 1
-        fi
+      - name: Launcher Version
+        working-directory: build
+        shell: bash
+        run: |
+          ./launcher --version
+          thisVersion=$(./launcher --version 2>/dev/null | grep "version" | awk '{print $4}')
+          baseVersion="${{ needs.version_baseline.outputs.version }}"
+          if [[ "$thisVersion" != "$baseVersion" ]]; then
+            printf "launcher version %s does not match baseline version %s" "$thisVersion" "$baseVersion"
+            exit 1
+          fi
 
-    - name: Download Osquery
-      working-directory: build
-      run: ./launcher download-osquery --directory .
+      - name: Download Osquery
+        working-directory: build
+        run: ./launcher download-osquery --directory osqueryd-download
 
-    - name: Osquery Version
-      working-directory: build
-      run: ./osqueryd --version
+      - name: Move Osquery (posix)
+        if: ${{ runner.os != 'Windows' }}
+        working-directory: build
+        run: mv ./osqueryd-download/osqueryd/osqueryd ./
 
-    - name: Launcher Doctor
-      working-directory: build
-      run: ./launcher doctor
+      - name: Move Osquery (windows)
+        if: ${{ runner.os == 'Windows' }}
+        working-directory: build
+        run: |
+          sleep 2
+          mv ./osqueryd-download/osqueryd/osqueryd.exe ./
+
+      - name: Osquery Version
+        working-directory: build
+        run: ./osqueryd --version
+
+      - name: Launcher Doctor
+        working-directory: build
+        run: ./launcher doctor
 
   container_exec_testing:
     name: Exec Test Containers
@@ -444,65 +455,66 @@ jobs:
       - version_baseline # version_baseline implies build_linux
       - build # need the other builds too
     steps:
+      - name: OS Info
+        run: |
+          echo uname:
+          uname -a
 
-    - name: OS Info
-      run: |
-        echo uname:
-        uname -a
+          for f in /etc/*release; do echo -e "\n\n$f:"; cat "$f" || true; done
 
-        for f in /etc/*release; do echo -e "\n\n$f:"; cat "$f" || true; done
+      # zstd is needed so we can restore cache -- see https://github.com/actions/cache/issues/1455#issuecomment-2328358604;
+      # ca-certificates and openssl are needed to download osquery.
+      - name: Install dependencies
+        run: |
+          if grep NAME /etc/os-release | grep -q centos; then
+            echo CentOS detected
 
-    # zstd is needed so we can restore cache -- see https://github.com/actions/cache/issues/1455#issuecomment-2328358604;
-    # ca-certificates and openssl are needed to download osquery.
-    - name: Install dependencies
-      run: |
-        if grep NAME /etc/os-release | grep -q centos; then
-          echo CentOS detected
+            sed -i 's/mirror.centos.org/vault.centos.org/g' /etc/yum.repos.d/CentOS-*.repo
+            sed -i 's/^#.*baseurl=http/baseurl=http/g' /etc/yum.repos.d/CentOS-*.repo
+            sed -i 's/^mirrorlist=http/#mirrorlist=http/g' /etc/yum.repos.d/CentOS-*.repo
 
-          sed -i 's/mirror.centos.org/vault.centos.org/g' /etc/yum.repos.d/CentOS-*.repo
-          sed -i 's/^#.*baseurl=http/baseurl=http/g' /etc/yum.repos.d/CentOS-*.repo
-          sed -i 's/^mirrorlist=http/#mirrorlist=http/g' /etc/yum.repos.d/CentOS-*.repo
+            dnf install -y zstd
+          elif command -v apt-get > /dev/null; then
+            echo apt-get detected
 
-          dnf install -y zstd
-        elif command -v apt-get > /dev/null; then
-          echo apt-get detected
+            apt-get -y update
+            apt-get -y install zstd ca-certificates openssl
+            update-ca-certificates
+          fi
 
-          apt-get -y update
-          apt-get -y install zstd ca-certificates openssl
-          update-ca-certificates
-        fi
+      - name: cache restore build output
+        uses: actions/cache/restore@v5
+        with:
+          path: ./build
+          key: ${{ runner.os }}-${{ github.run_id }}
+          fail-on-cache-miss: true # If we can't restore the cache, then we won't have a launcher binary to run below
+          enableCrossOsArchive: true
 
-    - name: cache restore build output
-      uses: actions/cache/restore@v5
-      with:
-        path: ./build
-        key: ${{ runner.os }}-${{ github.run_id }}
-        fail-on-cache-miss: true # If we can't restore the cache, then we won't have a launcher binary to run below
-        enableCrossOsArchive: true
+      - name: Launcher Version
+        working-directory: build
+        shell: bash
+        run: |
+          ./launcher --version
+          thisVersion=$(./launcher --version 2>/dev/null | grep "version" | awk '{print $4}')
+          baseVersion="${{ needs.version_baseline.outputs.version }}"
+          if [[ "$thisVersion" != "$baseVersion" ]]; then
+            printf "launcher version %s does not match baseline version %s" "$thisVersion" "$baseVersion"
+            exit 1
+          fi
 
-    - name: Launcher Version
-      working-directory: build
-      shell: bash
-      run: |
-        ./launcher --version
-        thisVersion=$(./launcher --version 2>/dev/null | grep "version" | awk '{print $4}')
-        baseVersion="${{ needs.version_baseline.outputs.version }}"
-        if [[ "$thisVersion" != "$baseVersion" ]]; then
-          printf "launcher version %s does not match baseline version %s" "$thisVersion" "$baseVersion"
-          exit 1
-        fi
+      - name: Download Osquery
+        working-directory: build
+        run: |
+          ./launcher download-osquery --directory osqueryd-download
+          mv ./osqueryd-download/osqueryd/osqueryd ./
 
-    - name: Download Osquery
-      working-directory: build
-      run: ./launcher download-osquery --directory .
+      - name: Osquery Version
+        working-directory: build
+        run: ./osqueryd --version
 
-    - name: Osquery Version
-      working-directory: build
-      run: ./osqueryd --version
-
-    - name: Launcher Doctor
-      working-directory: build
-      run: ./launcher doctor
+      - name: Launcher Doctor
+        working-directory: build
+        run: ./launcher doctor
 
   # If the prior exec tests suceeded, this grabs the cached things, and moves them to artifacts. We ought
   # be able to do this entirely on ubuntu, so let's try!
@@ -521,20 +533,20 @@ jobs:
       - exec_testing
       - container_exec_testing
     steps:
-    - name: cache restore build output
-      uses: actions/cache/restore@v5
-      with:
-        path: ./build
-        key: ${{ matrix.artifactos }}-${{ github.run_id }}
-        fail-on-cache-miss: true # If we can't restore the cache, then we won't have anything to upload
-        enableCrossOsArchive: true
+      - name: cache restore build output
+        uses: actions/cache/restore@v5
+        with:
+          path: ./build
+          key: ${{ matrix.artifactos }}-${{ github.run_id }}
+          fail-on-cache-miss: true # If we can't restore the cache, then we won't have anything to upload
+          enableCrossOsArchive: true
 
-    - name: Upload Build
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ matrix.artifactos }}-build
-        path: build/
-        if-no-files-found: error
+      - name: Upload Build
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifactos }}-build
+          path: build/
+          if-no-files-found: error
 
   package_builder_test:
     name: package_builder
@@ -547,57 +559,57 @@ jobs:
           - macos-14
           - windows-latest
     steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0 # need a full checkout for `git describe`
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # need a full checkout for `git describe`
 
-    - uses: actions/setup-go@v6
-      with:
-        go-version-file: './go.mod'
-        check-latest: true
-        cache: false
-      id: go
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: "./go.mod"
+          check-latest: true
+          cache: false
+        id: go
 
-    - id: go-cache-paths
-      shell: bash
-      run: |
-        echo "go-build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
-        echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+      - id: go-cache-paths
+        shell: bash
+        run: |
+          echo "go-build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+          echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
 
-    - name: Go Build Cache
-      uses: actions/cache@v5
-      with:
-        path: ${{ steps.go-cache-paths.outputs.go-build }}
-        key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
+      - name: Go Build Cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ steps.go-cache-paths.outputs.go-build }}
+          key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
 
-    - name: Go Mod Cache
-      uses: actions/cache@v5
-      with:
-        path: ${{ steps.go-cache-paths.outputs.go-mod }}
-        key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
+      - name: Go Mod Cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ steps.go-cache-paths.outputs.go-mod }}
+          key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
 
-    - run: make deps
+      - run: make deps
 
-    - id: build
-      run: make package-builder
+      - id: build
+        run: make package-builder
 
-    - name: package
-      id: run-package-builder
-      run: ${{ steps.build.outputs.binary }} make --i-am-a-kolide-customer --debug --hostname=localhost --enroll_secret=secret --launcher_version=nightly --osquery_version=nightly --output_dir=./
+      - name: package
+        id: run-package-builder
+        run: ${{ steps.build.outputs.binary }} make --i-am-a-kolide-customer --debug --hostname=localhost --enroll_secret=secret --launcher_version=nightly --osquery_version=nightly --output_dir=./
 
-    - name: Test install macOS
-      if: ${{ contains(matrix.os, 'macos') }}
-      run: |
-        # Check that we can install
-        sudo installer -dumplog -pkg ./launcher.darwin-launchd-pkg.pkg -target /
-        # Quick check that at least a couple of the files we expect now exist
-        if [ ! -f /Library/LaunchDaemons/com.launcher.launcher.plist ]; then echo "missing launchd entry" && exit 1; fi
-        if [ ! -f /usr/local/launcher/osquery.app/Contents/MacOS/osqueryd ]; then echo "missing osqueryd binary" && exit 1; fi
-        if [ ! -L /usr/local/launcher/bin/osqueryd ]; then echo "missing osquery symlink" && exit 1; fi
-        if [ ! -e /usr/local/launcher/bin/osqueryd ]; then echo "osquery symlink is present but broken" && exit 1; fi
-        if [ ! -f /usr/local/launcher/Kolide.app/Contents/MacOS/launcher ]; then echo "missing launcher binary" && exit 1; fi
-        if [ ! -L /usr/local/launcher/bin/launcher ]; then echo "missing launcher symlink" && exit 1; fi
-        if [ ! -e /usr/local/launcher/bin/launcher ]; then echo "launcher symlink is present but broken" && exit 1; fi
+      - name: Test install macOS
+        if: ${{ contains(matrix.os, 'macos') }}
+        run: |
+          # Check that we can install
+          sudo installer -dumplog -pkg ./launcher.darwin-launchd-pkg.pkg -target /
+          # Quick check that at least a couple of the files we expect now exist
+          if [ ! -f /Library/LaunchDaemons/com.launcher.launcher.plist ]; then echo "missing launchd entry" && exit 1; fi
+          if [ ! -f /usr/local/launcher/osquery.app/Contents/MacOS/osqueryd ]; then echo "missing osqueryd binary" && exit 1; fi
+          if [ ! -L /usr/local/launcher/bin/osqueryd ]; then echo "missing osquery symlink" && exit 1; fi
+          if [ ! -e /usr/local/launcher/bin/osqueryd ]; then echo "osquery symlink is present but broken" && exit 1; fi
+          if [ ! -f /usr/local/launcher/Kolide.app/Contents/MacOS/launcher ]; then echo "missing launcher binary" && exit 1; fi
+          if [ ! -L /usr/local/launcher/bin/launcher ]; then echo "missing launcher symlink" && exit 1; fi
+          if [ ! -e /usr/local/launcher/bin/launcher ]; then echo "launcher symlink is present but broken" && exit 1; fi
 
   # This job is here as a github status check -- it allows us to move
   # the merge dependency from being on all the jobs to this single
