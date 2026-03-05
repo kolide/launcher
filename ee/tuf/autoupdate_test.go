@@ -28,7 +28,12 @@ import (
 	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/theupdateframework/go-tuf/data"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func TestNewTufAutoupdater(t *testing.T) {
 	t.Parallel()
@@ -183,6 +188,11 @@ func TestExecute_GO20264348(t *testing.T) {
 			testMetadataServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Write([]byte(invalidMetadata))
 			}))
+
+			// Make sure we close the server at the end of our test
+			t.Cleanup(func() {
+				testMetadataServer.Close()
+			})
 
 			testRootDir := t.TempDir()
 			mockKnapsack := typesmocks.NewKnapsack(t)
@@ -972,6 +982,9 @@ func TestDo_WillNotExecuteDuringInitialDelay(t *testing.T) {
 
 	// Start the autoupdater, then make the control server request right away, during the initial delay
 	go autoupdater.Execute()
+	t.Cleanup(func() {
+		autoupdater.Interrupt(errors.New("test error"))
+	})
 	time.Sleep(100 * time.Millisecond)
 	require.NoError(t, autoupdater.Do(data), "should not have received error when performing request during initial delay")
 
