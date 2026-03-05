@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/kolide/launcher/ee/tables/tablehelpers"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,17 +20,21 @@ var es256_key string
 //go:embed testdata/ps256.pubkey
 var ps256_key string
 
+//go:embed testdata/rsa256.raw
+var rsa256_raw string
+
 func TestTransformOutput(t *testing.T) {
 	t.Parallel()
 
 	jwtTable := &Table{slogger: multislogger.NewNopLogger()}
 
 	var tests = []struct {
-		name string
-		path string
-		raw  []string
-		keys map[string]string
-		res  map[string]string
+		name    string
+		path    string
+		rawData []string
+		raw     []string
+		keys    map[string]string
+		res     map[string]string
 	}{
 		{
 			name: "empty token",
@@ -49,6 +53,7 @@ func TestTransformOutput(t *testing.T) {
 				"value":           "client_valid",
 				"query":           "*",
 				"path":            "testdata/rsa256.raw",
+				"raw_data":        "",
 				"include_raw_jwt": "false",
 				"signing_keys":    "{\"test\":" + strconv.Quote(rsa256_key) + "}",
 			},
@@ -66,6 +71,7 @@ func TestTransformOutput(t *testing.T) {
 				"value":           "client_valid",
 				"query":           "*",
 				"path":            "testdata/es256.raw",
+				"raw_data":        "",
 				"include_raw_jwt": "false",
 				"signing_keys":    "{\"US2\":" + strconv.Quote(es256_key) + "}",
 			},
@@ -83,6 +89,7 @@ func TestTransformOutput(t *testing.T) {
 				"value":           "client_valid",
 				"query":           "*",
 				"path":            "testdata/ps256.raw",
+				"raw_data":        "",
 				"include_raw_jwt": "false",
 				"signing_keys":    "{\"blahblah\":" + strconv.Quote(ps256_key) + "}",
 			},
@@ -100,6 +107,7 @@ func TestTransformOutput(t *testing.T) {
 				"value":           "invalid",
 				"query":           "*",
 				"path":            "testdata/rsa256.raw",
+				"raw_data":        "",
 				"include_raw_jwt": "false",
 				"signing_keys":    "{\"test\":\"\"}",
 			},
@@ -114,23 +122,58 @@ func TestTransformOutput(t *testing.T) {
 				"value":           "RS256",
 				"query":           "*",
 				"path":            "testdata/rsa256.raw",
+				"raw_data":        "",
 				"include_raw_jwt": "false",
 				"signing_keys":    "null",
 			},
 		},
 		{
-			name: "rsa256 JWT include raw",
+			name: "rsa256 JWT include raw populates raw_data",
 			path: "testdata/rsa256.raw",
 			raw:  []string{"true"},
 			res: map[string]string{
-				"parent":          "",
-				"key":             "raw_jwt",
-				"fullkey":         "raw_jwt",
-				"value":           "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3QiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.miA4Wn5C_uG7dEJYCeeNWk30kWTSREXAbPI55BX7OHtF4QHN4mFQOp3dE7cJO2H1VF0gN5ZuVLk5Pdz3J6sIZ9d-MAxwC7knmvOWvVZpOwOu7AglhQg6yPmktsEfJ6s13sMSGy11ChgmPGIwzKr08PVV1l-gKfsvpKTuMmNynyo44nZzyvk9fBkTEislWCKRvROHX0MYWmmrsb_V4PX1fRXKK2IaOZSEA1wnB1P_NS1YZdhW6nAfxpWrKwkKM3rCGuxdA9TYBcAYMHkET7VCbLcTD724J1XdtLfZVm8kPwQqek85f8tQnG9wQse8-gCahDQ0Pu4auLEYoXkOsJKbBQ",
+				"parent":          "header",
+				"key":             "alg",
+				"fullkey":         "header/alg",
+				"value":           "RS256",
 				"query":           "*",
 				"path":            "testdata/rsa256.raw",
+				"raw_data":        rsa256_raw,
 				"include_raw_jwt": "true",
 				"signing_keys":    "null",
+			},
+		},
+		{
+			name:    "rsa256 JWT via raw_data",
+			rawData: []string{rsa256_raw},
+			res: map[string]string{
+				"parent":          "header",
+				"key":             "alg",
+				"fullkey":         "header/alg",
+				"value":           "RS256",
+				"query":           "*",
+				"path":            "",
+				"raw_data":        rsa256_raw,
+				"include_raw_jwt": "false",
+				"signing_keys":    "null",
+			},
+		},
+		{
+			name:    "rsa256 JWT via raw_data with verification",
+			rawData: []string{rsa256_raw},
+			keys: map[string]string{
+				"test": rsa256_key,
+			},
+			res: map[string]string{
+				"parent":          "",
+				"key":             "verified",
+				"fullkey":         "verified",
+				"value":           "client_valid",
+				"query":           "*",
+				"path":            "",
+				"raw_data":        rsa256_raw,
+				"include_raw_jwt": "false",
+				"signing_keys":    "{\"test\":" + strconv.Quote(rsa256_key) + "}",
 			},
 		},
 	}
@@ -142,11 +185,17 @@ func TestTransformOutput(t *testing.T) {
 
 			keyJSON, _ := json.Marshal(tt.keys)
 
-			mockQC := tablehelpers.MockQueryContext(map[string][]string{
-				"path":            {tt.path},
+			constraints := map[string][]string{
 				"signing_keys":    {string(keyJSON)},
 				"include_raw_jwt": tt.raw,
-			})
+			}
+			if tt.path != "" {
+				constraints["path"] = []string{tt.path}
+			}
+			if len(tt.rawData) > 0 {
+				constraints["raw_data"] = tt.rawData
+			}
+			mockQC := tablehelpers.MockQueryContext(constraints)
 
 			rows, err := jwtTable.generate(t.Context(), mockQC)
 
@@ -171,4 +220,13 @@ func TestGenerateDoesNotPanicWithoutToken(t *testing.T) {
 	rows, err := jwtTable.generate(t.Context(), mockQC)
 	require.NoError(t, err)
 	require.Empty(t, rows, "the result should be empty for a non-parseable token")
+}
+
+func TestGenerateRequiresPathOrRawData(t *testing.T) {
+	t.Parallel()
+	jwtTable := &Table{slogger: multislogger.NewNopLogger()}
+	mockQC := tablehelpers.MockQueryContext(map[string][]string{})
+
+	_, err := jwtTable.generate(t.Context(), mockQC)
+	require.Error(t, err, "should error when neither path nor raw_data is specified")
 }

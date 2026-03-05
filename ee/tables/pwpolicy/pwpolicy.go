@@ -15,13 +15,13 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/allowedcmd"
-	"github.com/kolide/launcher/ee/dataflatten"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/dataflattentable"
-	"github.com/kolide/launcher/ee/tables/tablehelpers"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/allowedcmd"
+	"github.com/kolide/launcher/v2/ee/dataflatten"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/dataflattentable"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -45,7 +45,10 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		execCC:    allowedcmd.Pwpolicy,
 	}
 
-	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generate)
+	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generate,
+		tablewrapper.WithDescription("macOS password policy settings from `pwpolicy getaccountpolicies`, flattened as key-value pairs. Supports an optional username constraint. Useful for auditing password complexity, expiration, and lockout policies."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
+	)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

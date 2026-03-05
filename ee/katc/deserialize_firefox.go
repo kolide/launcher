@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/v2/ee/observability"
 	"golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/transform"
 )

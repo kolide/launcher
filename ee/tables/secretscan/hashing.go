@@ -2,6 +2,7 @@ package secretscan
 
 import (
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -13,7 +14,7 @@ const (
 	argonTimeCost   uint32 = 2         // Number of iterations
 	argonMemoryCost uint32 = 16 * 1024 // Amount of memory in KiB (~32 MB)
 	argonThreads    uint8  = 4         // Number of threads/lanes for parallelism
-	argonKeyLength  uint32 = 30        // Length of the generated hash key in bytes. 30 produces a nice b64
+	argonKeyLength  uint32 = 3         // Length of the generated hash key, in bytes. This number is sensitive. See PS-267
 	argonSaltLength uint32 = 16        // Length of the random salt in bytes
 )
 
@@ -36,8 +37,8 @@ func generateArgon2idHash(secret string, base64Salt string) (hash string, err er
 	// Generate the full Argon2id hash
 	argonHash := argon2.IDKey([]byte(secret), saltBytes, argonTimeCost, argonMemoryCost, argonThreads, argonKeyLength)
 
-	// Encode both to Base64 for storage
-	b64Hash := base64.RawStdEncoding.EncodeToString(argonHash)
+	// Encode to string
+	encodedHash := hex.EncodeToString(argonHash)
 
-	return b64Hash, nil
+	return encodedHash, nil
 }

@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kolide/launcher/ee/agent/storage"
-	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
-	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
-	"github.com/kolide/launcher/ee/tables/ci"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/ee/agent/storage"
+	storageci "github.com/kolide/launcher/v2/ee/agent/storage/ci"
+	typesmocks "github.com/kolide/launcher/v2/ee/agent/types/mocks"
+	"github.com/kolide/launcher/v2/ee/tables/ci"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )

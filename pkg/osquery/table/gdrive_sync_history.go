@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 
 	"github.com/kolide/kit/fsutil"
-	"github.com/kolide/launcher/ee/agent"
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 	_ "modernc.org/sqlite"
 )
@@ -27,7 +27,9 @@ func GDriveSyncHistoryInfo(flags types.Flags, slogger *slog.Logger) *table.Plugi
 		table.TextColumn("mtime"),
 		table.TextColumn("size"),
 	}
-	return tablewrapper.New(flags, slogger, "kolide_gdrive_sync_history", columns, g.generate)
+	return tablewrapper.New(flags, slogger, "kolide_gdrive_sync_history", columns, g.generate,
+		tablewrapper.WithDescription("Google Drive file sync history on macOS, including filenames, inodes, modification times, and sizes. Useful for auditing which files have been synced via Google Drive."),
+	)
 }
 
 type GDriveSyncHistory struct {

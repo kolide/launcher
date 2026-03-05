@@ -8,9 +8,9 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/kolide/launcher/ee/agent/listener"
-	"github.com/kolide/launcher/pkg/launcher"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/ee/agent/listener"
+	"github.com/kolide/launcher/v2/pkg/launcher"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/peterbourgon/ff/v3"
 )
 

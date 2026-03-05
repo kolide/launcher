@@ -7,9 +7,9 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -20,7 +20,9 @@ func MachoInfo(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		table.TextColumn("cpu"),
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_macho_info", columns, generateMacho)
+	return tablewrapper.New(flags, slogger, "kolide_macho_info", columns, generateMacho,
+		tablewrapper.WithDescription("Mach-O binary metadata including app name and CPU architecture. Requires a WHERE path = constraint. Useful for identifying binary architectures (arm64, x86_64) on macOS."),
+	)
 }
 
 func generateMacho(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

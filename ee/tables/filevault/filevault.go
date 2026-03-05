@@ -9,11 +9,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/allowedcmd"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/tablehelpers"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/allowedcmd"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 )
@@ -31,7 +31,9 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", "kolide_filevault"),
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_filevault", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_filevault", columns, t.generate,
+		tablewrapper.WithDescription("macOS FileVault full-disk encryption status from `fdesetup status`. Useful for verifying that FileVault disk encryption is enabled."),
+	)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

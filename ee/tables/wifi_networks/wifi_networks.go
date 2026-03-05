@@ -14,14 +14,14 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/kolide/launcher/ee/agent"
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/allowedcmd"
-	"github.com/kolide/launcher/ee/dataflatten"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/dataflattentable"
-	"github.com/kolide/launcher/ee/tables/tablehelpers"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/allowedcmd"
+	"github.com/kolide/launcher/v2/ee/dataflatten"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/dataflattentable"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -53,7 +53,10 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		getBytes: execPwsh(slogger),
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_wifi_networks", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_wifi_networks", columns, t.generate,
+		tablewrapper.WithDescription("Windows Wi-Fi network profiles and configuration, flattened as key-value pairs. Useful for auditing saved Wi-Fi networks and their security settings."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
+	)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

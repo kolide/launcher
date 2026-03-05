@@ -7,26 +7,27 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/kolide/launcher/ee/agent/startupsettings"
-	"github.com/kolide/launcher/ee/agent/storage"
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/allowedcmd"
-	"github.com/kolide/launcher/ee/filewalker"
-	"github.com/kolide/launcher/ee/katc"
-	"github.com/kolide/launcher/ee/tables/cryptoinfotable"
-	"github.com/kolide/launcher/ee/tables/dataflattentable"
-	"github.com/kolide/launcher/ee/tables/desktopprocs"
-	"github.com/kolide/launcher/ee/tables/dev_table_tooling"
-	json_parser "github.com/kolide/launcher/ee/tables/execparsers/json"
-	"github.com/kolide/launcher/ee/tables/firefox_preferences"
-	"github.com/kolide/launcher/ee/tables/jwt"
-	"github.com/kolide/launcher/ee/tables/launcher_db"
-	"github.com/kolide/launcher/ee/tables/osquery_instance_history"
-	"github.com/kolide/launcher/ee/tables/release_tracker_data"
-	"github.com/kolide/launcher/ee/tables/secretscan"
-	"github.com/kolide/launcher/ee/tables/sleeper"
-	"github.com/kolide/launcher/ee/tables/tdebug"
-	"github.com/kolide/launcher/ee/tables/tufinfo"
+	"github.com/kolide/launcher/v2/ee/agent/startupsettings"
+	"github.com/kolide/launcher/v2/ee/agent/storage"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/allowedcmd"
+	"github.com/kolide/launcher/v2/ee/filewalker"
+	"github.com/kolide/launcher/v2/ee/katc"
+	"github.com/kolide/launcher/v2/ee/tables/cryptoinfotable"
+	"github.com/kolide/launcher/v2/ee/tables/dataflattentable"
+	"github.com/kolide/launcher/v2/ee/tables/desktopprocs"
+	"github.com/kolide/launcher/v2/ee/tables/dev_table_tooling"
+	json_parser "github.com/kolide/launcher/v2/ee/tables/execparsers/json"
+	"github.com/kolide/launcher/v2/ee/tables/firefox_preferences"
+	"github.com/kolide/launcher/v2/ee/tables/jwt"
+	"github.com/kolide/launcher/v2/ee/tables/launcher_db"
+	"github.com/kolide/launcher/v2/ee/tables/osquery_instance_history"
+	"github.com/kolide/launcher/v2/ee/tables/release_tracker_data"
+	"github.com/kolide/launcher/v2/ee/tables/secretscan"
+	"github.com/kolide/launcher/v2/ee/tables/sleeper"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/tables/tdebug"
+	"github.com/kolide/launcher/v2/ee/tables/tufinfo"
 
 	osquery "github.com/osquery/osquery-go"
 )
@@ -38,8 +39,12 @@ func LauncherTables(k types.Knapsack, slogger *slog.Logger) []osquery.OsqueryPlu
 		LauncherConfigTable(k, slogger, k.ConfigStore(), k),
 		LauncherDbInfo(k, slogger, k.BboltDB()),
 		LauncherInfoTable(k, slogger, k.ConfigStore(), k.LauncherHistoryStore()),
-		launcher_db.TablePlugin(k, slogger, "kolide_server_data", k.ServerProvidedDataStore()),
-		launcher_db.TablePlugin(k, slogger, "kolide_control_flags", k.AgentFlagsStore()),
+		launcher_db.TablePlugin(k, slogger, "kolide_server_data", k.ServerProvidedDataStore(),
+			tablewrapper.WithDescription("Key-value data provided by the Kolide SaaS. Useful for inspecting server-pushed configuration or metadata."),
+		),
+		launcher_db.TablePlugin(k, slogger, "kolide_control_flags", k.AgentFlagsStore(),
+			tablewrapper.WithDescription("Agent control flags pushed by the Kolide SaaS, such as feature toggles and behavior overrides. Useful for debugging server-controlled agent settings."),
+		),
 		LauncherAutoupdateConfigTable(slogger, k),
 		osquery_instance_history.TablePlugin(k, slogger),
 		release_tracker_data.TablePlugin(k, slogger, k.ServerReleaseTrackerDataStore()),

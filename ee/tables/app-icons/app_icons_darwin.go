@@ -57,9 +57,9 @@ import (
 	"image/png"
 	"unsafe"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/nfnt/resize"
 	"github.com/osquery/osquery-go/plugin/table"
 
@@ -74,7 +74,9 @@ func AppIcons(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		table.TextColumn("icon"),
 		table.TextColumn("hash"),
 	}
-	return tablewrapper.New(flags, slogger, "kolide_app_icons", columns, generateAppIcons)
+	return tablewrapper.New(flags, slogger, "kolide_app_icons", columns, generateAppIcons,
+		tablewrapper.WithDescription("Application icons on macOS as base64-encoded PNG images with CRC64 hashes. Requires a WHERE path = constraint. Useful for identifying applications by their icon."),
+	)
 }
 
 func generateAppIcons(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

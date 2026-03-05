@@ -15,12 +15,12 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/dataflatten"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/dataflattentable"
-	"github.com/kolide/launcher/ee/tables/tablehelpers"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/dataflatten"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/dataflattentable"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -39,7 +39,10 @@ func RecommendedUpdates(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", tableName),
 	}
 
-	return tablewrapper.New(flags, slogger, tableName, columns, t.generate)
+	return tablewrapper.New(flags, slogger, tableName, columns, t.generate,
+		tablewrapper.WithDescription("macOS recommended software updates available for installation, flattened as key-value pairs. Useful for identifying pending OS and security updates."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
+	)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

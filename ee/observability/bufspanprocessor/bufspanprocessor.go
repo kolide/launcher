@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 

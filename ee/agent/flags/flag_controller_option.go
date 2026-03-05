@@ -1,6 +1,6 @@
 package flags
 
-import "github.com/kolide/launcher/pkg/launcher"
+import "github.com/kolide/launcher/v2/pkg/launcher"
 
 type Option func(*FlagController)
 

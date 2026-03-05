@@ -21,10 +21,10 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/tablehelpers"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -39,9 +39,11 @@ type Table struct {
 	tablename string
 }
 
+const userContextNote = "This table runs osquery in the context of each specified user via launchctl. Requires a WHERE user = constraint. Results may not be returned for users who are not logged in -- macOS is inconsistent about this."
+
 func TablePlugin(
 	flags types.Flags, slogger *slog.Logger, tablename string, osqueryd string,
-	osqueryQuery string, columns []table.ColumnDefinition,
+	osqueryQuery string, columns []table.ColumnDefinition, opts ...tablewrapper.TablePluginOption,
 ) *table.Plugin {
 	columns = append(columns, table.TextColumn("user"))
 
@@ -52,7 +54,9 @@ func TablePlugin(
 		tablename: tablename,
 	}
 
-	return tablewrapper.New(flags, slogger, t.tablename, columns, t.generate)
+	opts = append(opts, tablewrapper.WithNote(userContextNote))
+
+	return tablewrapper.New(flags, slogger, t.tablename, columns, t.generate, opts...)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

@@ -12,11 +12,11 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/allowedcmd"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/tablehelpers"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/allowedcmd"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -42,7 +42,9 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", "kolide_spotlight"),
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_spotlight", columns, t.generate)
+	desc := "Spotlight search results via the `mdfind` command, returning matching file paths. Requires a WHERE query = constraint. It is recommended that you use osquery's `mdfind` table instead."
+
+	return tablewrapper.New(flags, slogger, "kolide_spotlight", columns, t.generate, tablewrapper.WithDescription(desc))
 }
 
 func (t *spotlightTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

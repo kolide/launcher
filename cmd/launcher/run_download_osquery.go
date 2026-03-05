@@ -1,7 +1,17 @@
 package main
 
 import (
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"context"
+	"flag"
+	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
+	"time"
+
+	"github.com/kolide/kit/fsutil"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/pkg/packaging"
 )
 
 // runDownloadOsquery downloads the stable osquery to the provided path. It's meant for use in our CI pipeline.

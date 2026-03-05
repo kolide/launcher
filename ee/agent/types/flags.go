@@ -3,7 +3,7 @@ package types
 import (
 	"time"
 
-	"github.com/kolide/launcher/ee/agent/flags/keys"
+	"github.com/kolide/launcher/v2/ee/agent/flags/keys"
 )
 
 // Flags is an interface for setting and retrieving launcher agent flags.

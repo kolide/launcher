@@ -24,10 +24,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/consoleuser"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/pkg/backoff"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/consoleuser"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/pkg/backoff"
 )
 
 const (

@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/allowedcmd"
-	"github.com/kolide/launcher/pkg/launcher"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/allowedcmd"
+	"github.com/kolide/launcher/v2/pkg/launcher"
 )
 
 type BinaryDirectory struct {

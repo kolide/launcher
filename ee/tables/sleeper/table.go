@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/tables/tablehelpers"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -27,7 +27,10 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", "kolide_deadly_sleeper"),
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_deadly_sleeper", columns, t.generate, tablewrapper.WithTableGenerateTimeout(10*time.Minute))
+	return tablewrapper.New(flags, slogger, "kolide_deadly_sleeper", columns, t.generate,
+		tablewrapper.WithTableGenerateTimeout(10*time.Minute),
+		tablewrapper.WithDescription("Debug table that sleeps for a given duration before returning. Used to test query timeout behavior. Not recommended for use."),
+	)
 
 }
 

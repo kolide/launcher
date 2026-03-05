@@ -9,8 +9,8 @@ import (
 
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/logutil"
-	"github.com/kolide/launcher/pkg/contexts/ctxlog"
-	"github.com/kolide/launcher/pkg/make"
+	"github.com/kolide/launcher/v2/pkg/contexts/ctxlog"
+	"github.com/kolide/launcher/v2/pkg/make"
 	"github.com/peterbourgon/ff/v3"
 )
 

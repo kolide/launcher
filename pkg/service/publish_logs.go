@@ -67,10 +67,7 @@ func decodeJSONRPCPublishLogsResponse(_ context.Context, res jsonrpc.Response) (
 }
 
 // PublishLogs implements KolideService.PublishLogs
-func (e *Endpoints) PublishLogs(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error) {
-	e.endpointsLock.RLock()
-	defer e.endpointsLock.RUnlock()
-
+func (e Endpoints) PublishLogs(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error) {
 	newCtx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 	request := logCollection{NodeKey: nodeKey, LogType: logType, Logs: logs}

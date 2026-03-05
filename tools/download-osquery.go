@@ -8,7 +8,7 @@ import (
 
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/fsutil"
-	"github.com/kolide/launcher/pkg/packaging"
+	"github.com/kolide/launcher/v2/pkg/packaging"
 )
 
 func main() {

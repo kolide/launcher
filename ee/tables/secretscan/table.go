@@ -10,9 +10,9 @@ import (
 	"sync"
 
 	"github.com/fatih/semgroup"
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/tables/tablehelpers"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/spf13/viper"
 	"github.com/zricethezav/gitleaks/v8/config"
@@ -26,9 +26,6 @@ const (
 
 	// directoryScanConcurrency is the number of concurrent file scans when scanning a directory
 	directoryScanConcurrency = 4
-
-	// redactPrefixLength is the number of characters to show before redacting a secret
-	redactPrefixLength = 3
 )
 
 func newDefaultConfig() (config.Config, error) {
@@ -67,7 +64,6 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		table.IntegerColumn("column_start"),
 		table.IntegerColumn("column_end"),
 		table.TextColumn("entropy"),
-		table.TextColumn("redacted_secret"),
 		table.TextColumn("hash_argon2id"),
 		table.TextColumn("hash_argon2id_salt"),
 	}
@@ -76,7 +72,10 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", tableName),
 	}
 
-	return tablewrapper.New(flags, slogger, tableName, columns, t.generate)
+	return tablewrapper.New(flags, slogger, tableName, columns, t.generate,
+		tablewrapper.WithDescription("Scans files or raw content for leaked secrets using gitleaks rules. Requires a WHERE path = or raw_data = constraint. Returns rule matches with line numbers. Useful for detecting accidentally committed credentials or API keys."),
+		tablewrapper.WithNote("The hash_argon2id column provides a privacy-preserving way to track whether the same secret appears across devices without exposing the secret itself. It returns only 3 bytes (6 hex characters), which is enough for rough uniqueness comparison but not enough to reverse the secret. To enable hashing, provide a WHERE hash_argon2id_salt = constraint with a 16-byte random salt, base64-encoded. The salt should be unique per organization and not predictable. If no salt is provided, the hash column will be empty."),
+	)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
@@ -252,7 +251,6 @@ func (t *Table) findingsToRows(ctx context.Context, argon2idSalts []string, find
 			"column_start":       fmt.Sprintf("%d", f.StartColumn),
 			"column_end":         fmt.Sprintf("%d", f.EndColumn),
 			"entropy":            fmt.Sprintf("%.2f", f.Entropy),
-			"redacted_secret":    redact(f.Match),
 			"hash_argon2id":      argon2idHash,
 			"hash_argon2id_salt": argon2idSalt,
 		}
@@ -260,12 +258,4 @@ func (t *Table) findingsToRows(ctx context.Context, argon2idSalts []string, find
 	}
 
 	return results
-}
-
-func redact(secret string) string {
-	// Only show prefix if secret is long enough that we're not revealing too much
-	if len(secret) <= redactPrefixLength*2 {
-		return "***"
-	}
-	return secret[:redactPrefixLength] + "..."
 }

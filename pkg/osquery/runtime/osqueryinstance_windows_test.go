@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
-	"github.com/kolide/launcher/pkg/log/multislogger"
-	settingsstoremock "github.com/kolide/launcher/pkg/osquery/mocks"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	typesMocks "github.com/kolide/launcher/v2/ee/agent/types/mocks"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
+	settingsstoremock "github.com/kolide/launcher/v2/pkg/osquery/mocks"
 	"github.com/stretchr/testify/require"
 )
 
@@ -28,7 +28,7 @@ func TestCreateOsqueryCommandEnvVars(t *testing.T) {
 	setupHistory(t, k)
 	lpc := makeTestOsqLogPublisher(t, k)
 
-	i := newInstance(types.DefaultEnrollmentID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
+	i := newInstance(types.DefaultEnrollmentID, k, lpc, settingsstoremock.NewSettingsStoreWriter(t))
 	i.paths = &osqueryFilePaths{
 		pidfilePath:           "/foo/bar/osquery-abcd.pid",
 		databasePath:          "/foo/bar/osquery.db",

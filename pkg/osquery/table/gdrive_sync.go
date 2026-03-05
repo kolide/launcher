@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 
 	"github.com/kolide/kit/fsutil"
-	"github.com/kolide/launcher/ee/agent"
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 	_ "modernc.org/sqlite"
 )
@@ -26,7 +26,9 @@ func GDriveSyncConfig(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		table.TextColumn("user_email"),
 		table.TextColumn("local_sync_root_path"),
 	}
-	return tablewrapper.New(flags, slogger, "kolide_gdrive_sync_config", columns, g.generate)
+	return tablewrapper.New(flags, slogger, "kolide_gdrive_sync_config", columns, g.generate,
+		tablewrapper.WithDescription("Google Drive sync configuration on macOS, including the syncing user's email and local sync root path. Useful for identifying Google Drive accounts and sync locations."),
+	)
 }
 
 type gdrive struct {

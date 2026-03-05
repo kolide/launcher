@@ -401,6 +401,46 @@ func TestSanitizeUpdateChannel(t *testing.T) {
 	}
 }
 
+func TestIsKolideHostedServerURL(t *testing.T) {
+	t.Parallel()
+	var tests = []struct {
+		serverURL        string
+		expectedIsHosted bool
+	}{
+		{
+			serverURL:        "k2device.kolide.com",
+			expectedIsHosted: true,
+		},
+		{
+			serverURL:        "k2device.kolide.eu",
+			expectedIsHosted: true,
+		},
+		{
+			serverURL:        "k2device-preprod.kolide.com",
+			expectedIsHosted: true,
+		},
+		{
+			serverURL:        "kolide-k2-device.eu.svc.1infra.net",
+			expectedIsHosted: true,
+		},
+		{
+			serverURL:        "localhost",
+			expectedIsHosted: false,
+		},
+		{
+			serverURL:        "something-else.example.test",
+			expectedIsHosted: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.serverURL, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expectedIsHosted, IsKolideHostedServerURL(tt.serverURL))
+		})
+	}
+}
+
 // windowsAddExe appends ".exe" to the input string when running on Windows
 func windowsAddExe(in string) string {
 	if runtime.GOOS == "windows" {

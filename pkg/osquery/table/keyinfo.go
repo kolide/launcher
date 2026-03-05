@@ -6,10 +6,10 @@ import (
 	"log/slog"
 	"strconv"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/keyidentifier"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/keyidentifier"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -44,7 +44,9 @@ func KeyInfo(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		kIdentifer: kIdentifer,
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_keyinfo", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_keyinfo", columns, t.generate,
+		tablewrapper.WithDescription("Cryptographic key metadata for a given file path, including key type, encryption status, bit length, and fingerprints. Requires a WHERE path = constraint. Useful for auditing SSH keys, certificates, or other key material."),
+	)
 }
 
 func (t *KeyInfoTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

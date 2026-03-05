@@ -6,10 +6,10 @@ import (
 	"sync"
 	"testing"
 
-	agentbbolt "github.com/kolide/launcher/ee/agent/storage/bbolt"
-	"github.com/kolide/launcher/ee/agent/storage/inmemory"
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	agentbbolt "github.com/kolide/launcher/v2/ee/agent/storage/bbolt"
+	"github.com/kolide/launcher/v2/ee/agent/storage/inmemory"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

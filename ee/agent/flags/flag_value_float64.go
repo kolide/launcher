@@ -6,7 +6,7 @@ import (
 	"math"
 	"strconv"
 
-	"github.com/kolide/launcher/ee/agent/flags/keys"
+	"github.com/kolide/launcher/v2/ee/agent/flags/keys"
 )
 
 type float64Option func(*float64FlagValue)

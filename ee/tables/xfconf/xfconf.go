@@ -13,12 +13,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/dataflatten"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/dataflattentable"
-	"github.com/kolide/launcher/ee/tables/tablehelpers"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/dataflatten"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/dataflattentable"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 	"golang.org/x/exp/maps"
 )
@@ -38,7 +38,10 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", "kolide_xfconf"),
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_xfconf", dataflattentable.Columns(table.TextColumn("username"), table.TextColumn("path")), t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_xfconf", dataflattentable.Columns(table.TextColumn("username"), table.TextColumn("path")), t.generate,
+		tablewrapper.WithDescription("Linux XFCE desktop configuration from xfconf-query, flattened as key-value pairs. Useful for auditing XFCE desktop settings like screensaver lock and power management. Requires a WHERE username = constraint."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
+	)
 }
 
 func (t *xfconfTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

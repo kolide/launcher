@@ -6,7 +6,7 @@ import (
 
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
-	"github.com/kolide/launcher/pkg/windows/oleconv"
+	"github.com/kolide/launcher/v2/pkg/windows/oleconv"
 )
 
 // IUpdate contains the properties and methods that are available to an update.

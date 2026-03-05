@@ -6,9 +6,9 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/control"
-	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/control"
+	"github.com/kolide/launcher/v2/ee/observability"
 )
 
 func createHTTPClient(ctx context.Context, k types.Knapsack) (*control.HTTPClient, error) {

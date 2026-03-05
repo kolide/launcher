@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 
 	"github.com/kolide/kit/fsutil"
-	"github.com/kolide/launcher/ee/agent"
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 	_ "modernc.org/sqlite"
 )
@@ -27,7 +27,9 @@ func ChromeLoginKeychainInfo(flags types.Flags, slogger *slog.Logger) *table.Plu
 		table.TextColumn("action_url"),
 		table.TextColumn("username_value"),
 	}
-	return tablewrapper.New(flags, slogger, "kolide_chrome_login_keychain", columns, c.generate)
+	return tablewrapper.New(flags, slogger, "kolide_chrome_login_keychain", columns, c.generate,
+		tablewrapper.WithDescription("Saved login URLs and usernames from Chrome's Login Data database on macOS. Deprecated in favor of kolide_chrome_login_data_emails."),
+	)
 }
 
 type ChromeLoginKeychain struct {

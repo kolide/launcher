@@ -11,9 +11,9 @@ import (
 	"runtime"
 	"strconv"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -45,7 +45,9 @@ func SlackConfig(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", "kolide_slack_config"),
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_slack_config", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_slack_config", columns, t.generate,
+		tablewrapper.WithDescription("Slack workspace configuration from local storage, including team name, URL, login status, and user info. Requires a WHERE team_id = constraint. Useful for identifying which Slack workspaces are configured on a device."),
+	)
 }
 
 type SlackConfigTable struct {

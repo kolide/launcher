@@ -11,10 +11,10 @@ import (
 	"runtime"
 
 	"github.com/kolide/kit/fsutil"
-	"github.com/kolide/launcher/ee/agent"
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 	_ "modernc.org/sqlite"
 )
@@ -43,7 +43,9 @@ func OnePasswordAccounts(flags types.Flags, slogger *slog.Logger) *table.Plugin 
 		slogger: slogger.With("table", "kolide_onepassword_accounts"),
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_onepassword_accounts", columns, o.generate)
+	return tablewrapper.New(flags, slogger, "kolide_onepassword_accounts", columns, o.generate,
+		tablewrapper.WithDescription("1Password account information from local SQLite databases, including user email, team name, server, and account type. Useful for identifying 1Password accounts configured on a device."),
+	)
 }
 
 type onePasswordAccountsTable struct {

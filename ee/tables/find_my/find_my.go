@@ -15,9 +15,9 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -38,7 +38,9 @@ func FindMyDevice(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		tableName: tableName,
 	}
 
-	return tablewrapper.New(flags, slogger, tableName, columns, t.generate)
+	return tablewrapper.New(flags, slogger, tableName, columns, t.generate,
+		tablewrapper.WithDescription("macOS Find My Mac enabled/disabled status. Useful for verifying that Find My Mac is enabled for device recovery."),
+	)
 }
 
 func (f *findMyDeviceTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

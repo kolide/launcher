@@ -9,11 +9,11 @@ import (
 	"log/slog"
 	"regexp"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/allowedcmd"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/tablehelpers"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/allowedcmd"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -34,7 +34,9 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", tableName),
 	}
 
-	return tablewrapper.New(flags, slogger, tableName, columns, t.generate)
+	return tablewrapper.New(flags, slogger, tableName, columns, t.generate,
+		tablewrapper.WithDescription("CrowdStrike Falcon sensor kernel compatibility check. Reports whether the running kernel is supported by the installed Falcon sensor version. Useful for detecting issues after kernel upgrades where the sensor may stop functioning until updated."),
+	)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

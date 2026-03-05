@@ -62,19 +62,43 @@ jobs:
       - id: govulncheck
         run: govulncheck -C . -format json ./... > govulncheck.json
 
-      # Exclude GO-2024-3166 since we do not believe it applies to go-tuf before v2, and additionally
-      # because we do not believe it applies to our usage since we do not use delegates.
-      # Exclude GO-2026-4348, GO-2026-4377, and GO-2026-4349 because they do not apply to go-tuf before v2.
+      # If we need to exclude future go-tuf findings that do not apply to our version of go-tuf prior to v2,
+      # adding a final select to JQ will do the trick: `select(. != "GO-2024-3166")`
       - name: Evaluate govulncheck results
         shell: bash
         run: |
-          findingCount=$(jq -r '.finding | select ( . != null ) | .osv | select(. != "GO-2024-3166" and . != "GO-2026-4348" and . != "GO-2026-4377" and . != "GO-2026-4349")' govulncheck.json | wc -l)
+          findingCount=$(jq -r '.finding | select ( . != null ) | .osv ' govulncheck.json | wc -l)
           findingCount=$((findingCount + 0))
           if [[ $findingCount -ne 0 ]]; then
             printf "govulncheck reports %d findings" "$findingCount"
             jq -r '.finding | select ( . != null )' govulncheck.json
             exit 1
           fi
+
+  table_specs:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    name: table specs
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: './go.mod'
+          check-latest: true
+          cache: false
+
+      - run: make deps
+
+      - name: Build launcher
+        run: go build -o ./build/launcher ./cmd/launcher
+
+      - name: Check table specs
+        run: ./build/launcher specs --required description --required name --quiet
 
   # This job is here as a github status check -- it allows us to move
   # the merge dependency from being on all the jobs to this single
@@ -86,3 +110,4 @@ jobs:
     needs:
       - golangci
       - govulncheck
+      - table_specs

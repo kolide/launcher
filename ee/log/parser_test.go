@@ -27,28 +27,28 @@ func TestLogRawLogRecord(t *testing.T) {
 	}{
 		{
 			testCaseName:       "valid debug-level log",
-			rawLogRecord:       fmt.Appendf(nil, `{"time":"%s","level":"DEBUG","source":{"function":"github.com/kolide/launcher/ee/observability/exporter.(*TelemetryExporter).addAttributesFromEnrollmentDetails","file":"/Users/runner/work/launcher/launcher/ee/observability/exporter/exporter.go","line":%d},"msg":"added attributes from enrollment details"}`, logTimeString, fileLineInt),
+			rawLogRecord:       fmt.Appendf(nil, `{"time":"%s","level":"DEBUG","source":{"function":"github.com/kolide/launcher/v2/ee/observability/exporter.(*TelemetryExporter).addAttributesFromEnrollmentDetails","file":"/Users/runner/work/launcher/launcher/ee/observability/exporter/exporter.go","line":%d},"msg":"added attributes from enrollment details"}`, logTimeString, fileLineInt),
 			expectedLogMessage: "added attributes from enrollment details",
 			expectedLogLevel:   slog.LevelDebug,
 			expectedLogAttributes: []slog.Attr{
 				slog.String("original.time", logTimeString),
 				slog.Any("original.source", map[string]any{
 					"file":     "/Users/runner/work/launcher/launcher/ee/observability/exporter/exporter.go",
-					"function": "github.com/kolide/launcher/ee/observability/exporter.(*TelemetryExporter).addAttributesFromEnrollmentDetails",
+					"function": "github.com/kolide/launcher/v2/ee/observability/exporter.(*TelemetryExporter).addAttributesFromEnrollmentDetails",
 					"line":     fileLineAsFloat,
 				}),
 			},
 		},
 		{
 			testCaseName:       "valid info-level log",
-			rawLogRecord:       fmt.Appendf(nil, `{"time":"%s","level":"INFO","source":{"function":"github.com/kolide/launcher/ee/log/osquerylogs.(*OsqueryLogAdapter).Write","file":"/Users/runner/work/launcher/launcher/ee/log/osquerylogs/log.go","line":%d},"msg":"I0725 09:58:21.866813 1883975680 scheduler.cpp:201] Found results for query: pack:kolide_log_pipeline:example_noisy_pack:current_time","component":"osquery","osqlevel":"stderr","enrollment_id":"default","instance_run_id":"01K10511D8DCCGW37X8SR5WKC3","caller":"scheduler.cpp:201"}`, logTimeString, fileLineInt),
+			rawLogRecord:       fmt.Appendf(nil, `{"time":"%s","level":"INFO","source":{"function":"github.com/kolide/launcher/v2/ee/log/osquerylogs.(*OsqueryLogAdapter).Write","file":"/Users/runner/work/launcher/launcher/ee/log/osquerylogs/log.go","line":%d},"msg":"I0725 09:58:21.866813 1883975680 scheduler.cpp:201] Found results for query: pack:kolide_log_pipeline:example_noisy_pack:current_time","component":"osquery","osqlevel":"stderr","enrollment_id":"default","instance_run_id":"01K10511D8DCCGW37X8SR5WKC3","caller":"scheduler.cpp:201"}`, logTimeString, fileLineInt),
 			expectedLogMessage: "I0725 09:58:21.866813 1883975680 scheduler.cpp:201] Found results for query: pack:kolide_log_pipeline:example_noisy_pack:current_time",
 			expectedLogLevel:   slog.LevelInfo,
 			expectedLogAttributes: []slog.Attr{
 				slog.String("original.time", logTimeString),
 				slog.Any("original.source", map[string]any{
 					"file":     "/Users/runner/work/launcher/launcher/ee/log/osquerylogs/log.go",
-					"function": "github.com/kolide/launcher/ee/log/osquerylogs.(*OsqueryLogAdapter).Write",
+					"function": "github.com/kolide/launcher/v2/ee/log/osquerylogs.(*OsqueryLogAdapter).Write",
 					"line":     fileLineAsFloat,
 				}),
 				slog.String("original.component", "osquery"),
@@ -60,14 +60,14 @@ func TestLogRawLogRecord(t *testing.T) {
 		},
 		{
 			testCaseName:       "valid warn-level log",
-			rawLogRecord:       fmt.Appendf(nil, `{"time":"%s","level":"WARN","source":{"function":"github.com/kolide/launcher/pkg/osquery/runtime.(*OsqueryInstance).Launch.func4","file":"/Users/runner/work/launcher/launcher/pkg/osquery/runtime/osqueryinstance.go","line":%d},"msg":"error running osquery command","component":"osquery_instance","enrollment_id":"default","instance_run_id":"01K0YYVJK0G5A33RSC8VCKMK26","path":"/usr/local/kolide-nababe-k2/bin/osqueryd","err":"signal: killed"}`, logTimeString, fileLineInt),
+			rawLogRecord:       fmt.Appendf(nil, `{"time":"%s","level":"WARN","source":{"function":"github.com/kolide/launcher/v2/pkg/osquery/runtime.(*OsqueryInstance).Launch.func4","file":"/Users/runner/work/launcher/launcher/pkg/osquery/runtime/osqueryinstance.go","line":%d},"msg":"error running osquery command","component":"osquery_instance","enrollment_id":"default","instance_run_id":"01K0YYVJK0G5A33RSC8VCKMK26","path":"/usr/local/kolide-nababe-k2/bin/osqueryd","err":"signal: killed"}`, logTimeString, fileLineInt),
 			expectedLogMessage: "error running osquery command",
 			expectedLogLevel:   slog.LevelWarn,
 			expectedLogAttributes: []slog.Attr{
 				slog.String("original.time", logTimeString),
 				slog.Any("original.source", map[string]any{
 					"file":     "/Users/runner/work/launcher/launcher/pkg/osquery/runtime/osqueryinstance.go",
-					"function": "github.com/kolide/launcher/pkg/osquery/runtime.(*OsqueryInstance).Launch.func4",
+					"function": "github.com/kolide/launcher/v2/pkg/osquery/runtime.(*OsqueryInstance).Launch.func4",
 					"line":     fileLineAsFloat,
 				}),
 				slog.String("original.component", "osquery_instance"),
@@ -79,14 +79,14 @@ func TestLogRawLogRecord(t *testing.T) {
 		},
 		{
 			testCaseName:       "valid error-level log",
-			rawLogRecord:       fmt.Appendf(nil, `{"time":"%s","level":"ERROR","uid":"test","pid":968,"source":{"line":%d,"function":"github.com/kolide/launcher/ee/desktop/runner.(*DesktopUsersProcessesRunner).refreshMenu","file":"D:/a/launcher/launcher/ee/desktop/runner/runner.go"},"msg":"sending refresh command to user desktop process","err":"making request: Get \"http://unix/refresh\": open \\\\.\\pipe\\kolide_desktop_01K0ZRX5V7C2JK4S019TQ8GBB3: The system cannot find the file specified.","path":"C:\\ProgramData\\Kolide\\Launcher-kolide-k2\\data\\updates\\launcher\\1.23.1\\launcher.exe","component":"desktop_runner"}`, logTimeString, fileLineInt),
+			rawLogRecord:       fmt.Appendf(nil, `{"time":"%s","level":"ERROR","uid":"test","pid":968,"source":{"line":%d,"function":"github.com/kolide/launcher/v2/ee/desktop/runner.(*DesktopUsersProcessesRunner).refreshMenu","file":"D:/a/launcher/launcher/ee/desktop/runner/runner.go"},"msg":"sending refresh command to user desktop process","err":"making request: Get \"http://unix/refresh\": open \\\\.\\pipe\\kolide_desktop_01K0ZRX5V7C2JK4S019TQ8GBB3: The system cannot find the file specified.","path":"C:\\ProgramData\\Kolide\\Launcher-kolide-k2\\data\\updates\\launcher\\1.23.1\\launcher.exe","component":"desktop_runner"}`, logTimeString, fileLineInt),
 			expectedLogMessage: "sending refresh command to user desktop process",
 			expectedLogLevel:   slog.LevelError,
 			expectedLogAttributes: []slog.Attr{
 				slog.String("original.time", logTimeString),
 				slog.Any("original.source", map[string]any{
 					"file":     "D:/a/launcher/launcher/ee/desktop/runner/runner.go",
-					"function": "github.com/kolide/launcher/ee/desktop/runner.(*DesktopUsersProcessesRunner).refreshMenu",
+					"function": "github.com/kolide/launcher/v2/ee/desktop/runner.(*DesktopUsersProcessesRunner).refreshMenu",
 					"line":     fileLineAsFloat,
 				}),
 				slog.String("original.component", "desktop_runner"),
@@ -98,14 +98,14 @@ func TestLogRawLogRecord(t *testing.T) {
 		},
 		{
 			testCaseName:       "valid runner log",
-			rawLogRecord:       fmt.Appendf(nil, `{"time":"%s","level":"INFO","source":{"function":"github.com/kolide/launcher/pkg/rungroup.(*Group).Run","file":"/Users/runner/work/launcher/launcher/pkg/rungroup/rungroup.go","line":%d},"msg":"received interrupt error from first actor -- shutting down other actors","subprocess":"desktop","session_pid":57974,"uid":"501","component":"run_group","err":null,"error_source":"desktopServerShutdownListener"}`, logTimeString, fileLineInt),
+			rawLogRecord:       fmt.Appendf(nil, `{"time":"%s","level":"INFO","source":{"function":"github.com/kolide/launcher/v2/pkg/rungroup.(*Group).Run","file":"/Users/runner/work/launcher/launcher/pkg/rungroup/rungroup.go","line":%d},"msg":"received interrupt error from first actor -- shutting down other actors","subprocess":"desktop","session_pid":57974,"uid":"501","component":"run_group","err":null,"error_source":"desktopServerShutdownListener"}`, logTimeString, fileLineInt),
 			expectedLogMessage: "received interrupt error from first actor -- shutting down other actors",
 			expectedLogLevel:   slog.LevelInfo,
 			expectedLogAttributes: []slog.Attr{
 				slog.String("original.time", logTimeString),
 				slog.Any("original.source", map[string]any{
 					"file":     "/Users/runner/work/launcher/launcher/pkg/rungroup/rungroup.go",
-					"function": "github.com/kolide/launcher/pkg/rungroup.(*Group).Run",
+					"function": "github.com/kolide/launcher/v2/pkg/rungroup.(*Group).Run",
 					"line":     fileLineAsFloat,
 				}),
 				slog.String("original.subprocess", "desktop"),
@@ -117,14 +117,14 @@ func TestLogRawLogRecord(t *testing.T) {
 		},
 		{
 			testCaseName:       "stack trace preserved",
-			rawLogRecord:       fmt.Appendf(nil, `{"time":"%s","level":"ERROR","msg":"panic stack trace","source":{"file":"/Users/rebeccamahany-horton/Repos/launcher/ee/gowrapper/goroutine.go","function":"github.com/kolide/launcher/ee/gowrapper.GoWithRecoveryAction.func1.1","line":%d},"subprocess":"desktop","uid":"501","stack_trace":"runtime error: index out of range [4] with length 0\ngithub.com/kolide/launcher/ee/gowrapper.GoWithRecoveryAction.func1.1\n\t/Users/rebeccamahany-horton/Repos/launcher/ee/gowrapper/goroutine.go:31\nruntime.gopanic\n\t/opt/homebrew/Cellar/go/1.24.5/libexec/src/runtime/panic.go:792\nruntime.goPanicIndex\n\t/opt/homebrew/Cellar/go/1.24.5/libexec/src/runtime/panic.go:115\nmain.runDesktop.func3\n\t/Users/rebeccamahany-horton/Repos/launcher/cmd/launcher/desktop.go:135\ngithub.com/kolide/launcher/pkg/rungroup.(*Group).Run.func1\n\t/Users/rebeccamahany-horton/Repos/launcher/pkg/rungroup/rungroup.go:76\ngithub.com/kolide/launcher/ee/gowrapper.GoWithRecoveryAction.func1\n\t/Users/rebeccamahany-horton/Repos/launcher/ee/gowrapper/goroutine.go:39\nruntime.goexit\n\t/opt/homebrew/Cellar/go/1.24.5/libexec/src/runtime/asm_arm64.s:1223","session_pid":46329,"component":"run_group"}`, logTimeString, fileLineInt),
+			rawLogRecord:       fmt.Appendf(nil, `{"time":"%s","level":"ERROR","msg":"panic stack trace","source":{"file":"/Users/rebeccamahany-horton/Repos/launcher/ee/gowrapper/goroutine.go","function":"github.com/kolide/launcher/v2/ee/gowrapper.GoWithRecoveryAction.func1.1","line":%d},"subprocess":"desktop","uid":"501","stack_trace":"runtime error: index out of range [4] with length 0\ngithub.com/kolide/launcher/ee/gowrapper.GoWithRecoveryAction.func1.1\n\t/Users/rebeccamahany-horton/Repos/launcher/ee/gowrapper/goroutine.go:31\nruntime.gopanic\n\t/opt/homebrew/Cellar/go/1.24.5/libexec/src/runtime/panic.go:792\nruntime.goPanicIndex\n\t/opt/homebrew/Cellar/go/1.24.5/libexec/src/runtime/panic.go:115\nmain.runDesktop.func3\n\t/Users/rebeccamahany-horton/Repos/launcher/cmd/launcher/desktop.go:135\ngithub.com/kolide/launcher/pkg/rungroup.(*Group).Run.func1\n\t/Users/rebeccamahany-horton/Repos/launcher/pkg/rungroup/rungroup.go:76\ngithub.com/kolide/launcher/ee/gowrapper.GoWithRecoveryAction.func1\n\t/Users/rebeccamahany-horton/Repos/launcher/ee/gowrapper/goroutine.go:39\nruntime.goexit\n\t/opt/homebrew/Cellar/go/1.24.5/libexec/src/runtime/asm_arm64.s:1223","session_pid":46329,"component":"run_group"}`, logTimeString, fileLineInt),
 			expectedLogMessage: "panic stack trace",
 			expectedLogLevel:   slog.LevelError,
 			expectedLogAttributes: []slog.Attr{
 				slog.String("original.time", logTimeString),
 				slog.Any("original.source", map[string]any{
 					"file":     "/Users/rebeccamahany-horton/Repos/launcher/ee/gowrapper/goroutine.go",
-					"function": "github.com/kolide/launcher/ee/gowrapper.GoWithRecoveryAction.func1.1",
+					"function": "github.com/kolide/launcher/v2/ee/gowrapper.GoWithRecoveryAction.func1.1",
 					"line":     fileLineAsFloat,
 				}),
 				slog.String("original.component", "run_group"),

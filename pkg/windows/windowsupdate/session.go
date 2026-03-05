@@ -5,7 +5,7 @@ import (
 
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
-	"github.com/kolide/launcher/pkg/windows/oleconv"
+	"github.com/kolide/launcher/v2/pkg/windows/oleconv"
 )
 
 // IUpdateSession represents a session in which the caller can perform

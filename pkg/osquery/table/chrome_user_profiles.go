@@ -10,9 +10,9 @@ import (
 	"runtime"
 	"strconv"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -36,7 +36,9 @@ func ChromeUserProfiles(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		table.IntegerColumn("ephemeral"),
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_chrome_user_profiles", columns, c.generate)
+	return tablewrapper.New(flags, slogger, "kolide_chrome_user_profiles", columns, c.generate,
+		tablewrapper.WithDescription("Chrome browser user profiles from the Local State file, including profile name, email, and ephemeral status. Useful for enumerating Chrome user accounts on a device."),
+	)
 }
 
 type chromeUserProfilesTable struct {

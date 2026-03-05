@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
-	"github.com/kolide/launcher/pkg/efi"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/pkg/efi"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -26,7 +26,9 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", "kolide_secureboot"),
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_secureboot", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_secureboot", columns, t.generate,
+		tablewrapper.WithDescription("UEFI Secure Boot status from EFI variables. Reports whether Secure Boot is enabled and whether the system is in setup mode (setup mode means Secure Boot keys can be modified, indicating Secure Boot is not fully enforced)."),
+	)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

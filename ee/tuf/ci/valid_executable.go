@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/kolide/launcher/pkg/osquery/testutil"
+	"github.com/kolide/launcher/v2/pkg/osquery/testutil"
 	"github.com/stretchr/testify/require"
 )
 

@@ -60,8 +60,8 @@ import (
 	"os/user"
 	"unsafe"
 
-	"github.com/kolide/launcher/ee/allowedcmd"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/ee/allowedcmd"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 )
 
 type allowedCmdGenerator struct {

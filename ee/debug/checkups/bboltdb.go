@@ -8,9 +8,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/kolide/launcher/ee/agent"
-	agentbbolt "github.com/kolide/launcher/ee/agent/storage/bbolt"
-	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/agent"
+	agentbbolt "github.com/kolide/launcher/v2/ee/agent/storage/bbolt"
+	"github.com/kolide/launcher/v2/ee/agent/types"
 	"go.etcd.io/bbolt"
 )
 

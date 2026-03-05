@@ -8,15 +8,15 @@ import (
 	"os"
 	"strings"
 
-	"github.com/kolide/launcher/ee/agent"
-	"github.com/kolide/launcher/ee/agent/flags"
-	"github.com/kolide/launcher/ee/agent/knapsack"
-	"github.com/kolide/launcher/ee/agent/storage/inmemory"
-	"github.com/kolide/launcher/ee/tuf"
-	"github.com/kolide/launcher/pkg/launcher"
-	"github.com/kolide/launcher/pkg/log/multislogger"
-	"github.com/kolide/launcher/pkg/osquery"
-	"github.com/kolide/launcher/pkg/osquery/interactive"
+	"github.com/kolide/launcher/v2/ee/agent"
+	"github.com/kolide/launcher/v2/ee/agent/flags"
+	"github.com/kolide/launcher/v2/ee/agent/knapsack"
+	"github.com/kolide/launcher/v2/ee/agent/storage/inmemory"
+	"github.com/kolide/launcher/v2/ee/tuf"
+	"github.com/kolide/launcher/v2/pkg/launcher"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/pkg/osquery"
+	"github.com/kolide/launcher/v2/pkg/osquery/interactive"
 )
 
 func runInteractive(systemMultiSlogger *multislogger.MultiSlogger, args []string) error {

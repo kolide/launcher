@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/kolide/kit/version"
-	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/v2/ee/observability"
 )
 
 const (

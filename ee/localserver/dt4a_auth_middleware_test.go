@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/kolide/krypto/pkg/echelper"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/nacl/box"
 )
