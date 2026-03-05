@@ -101,8 +101,7 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger, dst DataSourceType) os
 		var fileFn dataflatten.DataFileFunc
 		if dst.flattenFileFunc != nil {
 			fileFn = dst.flattenFileFunc(queryContext)
-		}
-		if fileFn == nil {
+		} else {
 			fileFn = func(file string, opts ...dataflatten.FlattenOpts) ([]dataflatten.Row, error) {
 				raw, err := os.ReadFile(file)
 				if err != nil {
