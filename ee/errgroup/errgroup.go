@@ -182,7 +182,7 @@ func (l *LoggedErrgroup) Wait(ctx context.Context) error {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
-	errChan := make(chan error)
+	errChan := make(chan error, 1)
 	gowrapper.Go(ctx, l.slogger, func() {
 		errChan <- l.errgroup.Wait()
 	})
