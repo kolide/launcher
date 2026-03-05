@@ -68,6 +68,9 @@ func TestExecute(t *testing.T) {
 	require.NoError(t, err)
 	lastWalkTime := int64(binary.NativeEndian.Uint64(lastWalkTimeRaw))
 	require.LessOrEqual(t, walkStart, lastWalkTime)
+
+	// Shut down
+	filewalkManager.Interrupt(nil)
 }
 
 func TestPing(t *testing.T) {
@@ -177,6 +180,9 @@ func TestPing(t *testing.T) {
 	require.Contains(t, filewalkManager.filewalkers, firstTestTableName)
 	require.NotContains(t, filewalkManager.filewalkers, secondTestTableName)
 	filewalkManager.filewalkersLock.Unlock()
+
+	// Shut down
+	filewalkManager.Interrupt(nil)
 }
 
 func TestInterrupt_Multiple(t *testing.T) {
