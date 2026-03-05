@@ -62,13 +62,12 @@ jobs:
       - id: govulncheck
         run: govulncheck -C . -format json ./... > govulncheck.json
 
-      # Exclude GO-2024-3166 since we do not believe it applies to go-tuf before v2, and additionally
-      # because we do not believe it applies to our usage since we do not use delegates.
-      # Exclude GO-2026-4348, GO-2026-4377, and GO-2026-4349 because they do not apply to go-tuf before v2.
+      # If we need to exclude future go-tuf findings that do not apply to our version of go-tuf prior to v2,
+      # adding a final select to JQ will do the trick: `select(. != "GO-2024-3166")`
       - name: Evaluate govulncheck results
         shell: bash
         run: |
-          findingCount=$(jq -r '.finding | select ( . != null ) | .osv | select(. != "GO-2024-3166" and . != "GO-2026-4348" and . != "GO-2026-4377" and . != "GO-2026-4349")' govulncheck.json | wc -l)
+          findingCount=$(jq -r '.finding | select ( . != null ) | .osv ' govulncheck.json | wc -l)
           findingCount=$((findingCount + 0))
           if [[ $findingCount -ne 0 ]]; then
             printf "govulncheck reports %d findings" "$findingCount"
