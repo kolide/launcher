@@ -75,7 +75,7 @@ const (
 	DefaultCleanupInterval    = 1 * time.Minute
 	DefaultDuplicateLogWindow = 0
 
-	meterName = "github.com/kolide/launcher/pkg/log/dedup"
+	meterName = "github.com/kolide/launcher/v2/pkg/log/dedup"
 )
 
 // Package-level metrics for dedup observability. These use the global OTEL

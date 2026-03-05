@@ -6,8 +6,8 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/tpmrunner"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/tpmrunner"
 )
 
 // SetHardwareKeysRunner creates a tpm runner and sets it as the agent hardware key as it also implements the keyInt/cyrpto.Signer interface.

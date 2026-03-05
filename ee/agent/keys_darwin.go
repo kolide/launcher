@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/secureenclaverunner"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/secureenclaverunner"
 )
 
 // SetHardwareKeysRunner creates a secure enclave runner and sets it as the agent hardware key as it also implements the keyInt/crypto.Signer interface.

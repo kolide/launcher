@@ -3,10 +3,10 @@ package launcher_db
 import (
 	"testing"
 
-	"github.com/kolide/launcher/ee/agent/storage"
-	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/ee/agent/storage"
+	storageci "github.com/kolide/launcher/v2/ee/agent/storage/ci"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

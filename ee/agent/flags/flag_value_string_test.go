@@ -3,7 +3,7 @@ package flags
 import (
 	"testing"
 
-	"github.com/kolide/launcher/ee/agent/flags/mocks"
+	"github.com/kolide/launcher/v2/ee/agent/flags/mocks"
 	"github.com/stretchr/testify/assert"
 )
 

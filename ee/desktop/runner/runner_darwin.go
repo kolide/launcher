@@ -8,7 +8,7 @@ import (
 	"os/exec"
 	"os/user"
 
-	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/v2/ee/observability"
 	"golang.org/x/sys/unix"
 )
 

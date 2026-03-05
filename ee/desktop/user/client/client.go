@@ -13,10 +13,10 @@ import (
 	"time"
 
 	"github.com/kolide/krypto/pkg/echelper"
-	"github.com/kolide/launcher/ee/desktop/user/notify"
-	"github.com/kolide/launcher/ee/desktop/user/server"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/presencedetection"
+	"github.com/kolide/launcher/v2/ee/desktop/user/notify"
+	"github.com/kolide/launcher/v2/ee/desktop/user/server"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/presencedetection"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 

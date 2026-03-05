@@ -9,7 +9,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/v2/ee/observability"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -143,7 +143,9 @@ func (k *katcTable) generate(ctx context.Context, queryContext table.QueryContex
 						"path", s.path,
 						"err", err,
 					)
-					return nil, fmt.Errorf("running transform func %s: %w", step.name, err)
+					// if a single row fails the transformFunc, just log, omit, and continue.
+					// we've seen cases where rows may not have valid object data in them and fail header parsing
+					continue
 				}
 			}
 

@@ -9,7 +9,7 @@ import (
 
 	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
-	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/v2/ee/observability"
 	"github.com/osquery/osquery-go/plugin/distributed"
 )
 

@@ -6,9 +6,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/kolide/launcher/ee/agent/flags/keys"
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/pkg/log/dedup"
+	"github.com/kolide/launcher/v2/ee/agent/flags/keys"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/pkg/log/dedup"
 	slogmulti "github.com/samber/slog-multi"
 )
 

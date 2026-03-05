@@ -8,9 +8,9 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/kolide/launcher/ee/dataflatten"
-	"github.com/kolide/launcher/ee/tables/tablehelpers"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/ee/dataflatten"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/stretchr/testify/require"
 )

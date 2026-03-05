@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kolide/launcher/ee/agent/types/mocks"
-	servermocks "github.com/kolide/launcher/ee/desktop/runner/server/mocks"
-	"github.com/kolide/launcher/pkg/authedclient"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/ee/agent/types/mocks"
+	servermocks "github.com/kolide/launcher/v2/ee/desktop/runner/server/mocks"
+	"github.com/kolide/launcher/v2/pkg/authedclient"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )

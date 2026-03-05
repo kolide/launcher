@@ -9,9 +9,9 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/kolide/launcher/ee/agent/flags/keys"
-	"github.com/kolide/launcher/ee/agent/storage"
-	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/agent/flags/keys"
+	"github.com/kolide/launcher/v2/ee/agent/storage"
+	"github.com/kolide/launcher/v2/ee/agent/types"
 	mock "github.com/stretchr/testify/mock"
 	"go.etcd.io/bbolt"
 )

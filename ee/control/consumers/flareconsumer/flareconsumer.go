@@ -8,9 +8,9 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/debug/checkups"
-	"github.com/kolide/launcher/ee/debug/shipper"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/debug/checkups"
+	"github.com/kolide/launcher/v2/ee/debug/shipper"
 )
 
 const (

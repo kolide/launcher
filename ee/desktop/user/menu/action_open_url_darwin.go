@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/kolide/launcher/ee/allowedcmd"
+	"github.com/kolide/launcher/v2/ee/allowedcmd"
 )
 
 // open opens the specified URL in the default browser of the user

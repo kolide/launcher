@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/kolide/kit/version"
-	"github.com/kolide/launcher/pkg/launcher"
+	"github.com/kolide/launcher/v2/pkg/launcher"
 
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"

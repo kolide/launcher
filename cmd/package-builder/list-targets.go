@@ -5,7 +5,7 @@ import (
 	"os"
 	"text/tabwriter"
 
-	"github.com/kolide/launcher/pkg/packaging"
+	"github.com/kolide/launcher/v2/pkg/packaging"
 )
 
 func runListTargets(_args []string) error {

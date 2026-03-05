@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/kolide/kit/ulid"
-	settingsstoremock "github.com/kolide/launcher/pkg/osquery/mocks"
-	"github.com/kolide/launcher/pkg/service/mock"
+	settingsstoremock "github.com/kolide/launcher/v2/pkg/osquery/mocks"
+	"github.com/kolide/launcher/v2/pkg/service/mock"
 	"github.com/osquery/osquery-go/plugin/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

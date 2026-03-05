@@ -6,7 +6,7 @@ import (
 	"archive/zip"
 	"fmt"
 
-	"github.com/kolide/launcher/pkg/launcher"
+	"github.com/kolide/launcher/v2/pkg/launcher"
 )
 
 func gatherInstallerInfo(z *zip.Writer, _ string) error {

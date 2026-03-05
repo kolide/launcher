@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kolide/launcher/ee/presencedetection/mocks"
+	"github.com/kolide/launcher/v2/ee/presencedetection/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )

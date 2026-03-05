@@ -10,8 +10,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/kolide/launcher/ee/consoleuser"
-	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/v2/ee/consoleuser"
+	"github.com/kolide/launcher/v2/ee/observability"
 	"github.com/kolide/systray"
 )
 

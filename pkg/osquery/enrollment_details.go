@@ -13,12 +13,12 @@ import (
 	"time"
 
 	"github.com/kolide/kit/version"
-	"github.com/kolide/launcher/ee/agent"
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/pkg/backoff"
-	"github.com/kolide/launcher/pkg/osquery/runsimple"
-	"github.com/kolide/launcher/pkg/service"
+	"github.com/kolide/launcher/v2/ee/agent"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/pkg/backoff"
+	"github.com/kolide/launcher/v2/pkg/osquery/runsimple"
+	"github.com/kolide/launcher/v2/pkg/service"
 	"github.com/pkg/errors"
 )
 

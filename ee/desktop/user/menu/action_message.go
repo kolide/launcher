@@ -10,8 +10,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/kolide/launcher/ee/desktop/runner/server"
-	"github.com/kolide/launcher/pkg/authedclient"
+	"github.com/kolide/launcher/v2/ee/desktop/runner/server"
+	"github.com/kolide/launcher/v2/pkg/authedclient"
 )
 
 // Performs the Message action

@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
-	"github.com/kolide/launcher/pkg/log/multislogger"
-	"github.com/kolide/launcher/pkg/threadsafebuffer"
+	typesmocks "github.com/kolide/launcher/v2/ee/agent/types/mocks"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/require"
 	"go.etcd.io/bbolt"
 )

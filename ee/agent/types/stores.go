@@ -1,6 +1,6 @@
 package types
 
-import "github.com/kolide/launcher/ee/agent/storage"
+import "github.com/kolide/launcher/v2/ee/agent/storage"
 
 type Stores interface {
 	Stores() map[storage.Store]KVStore
