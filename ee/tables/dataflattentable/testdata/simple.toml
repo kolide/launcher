@@ -1,0 +1,10 @@
+# minimal TOML for dataflatten table tests
+title = "simple"
+
+[metadata]
+testing = true
+version = "1.0.1"
+
+[section]
+key1 = "value1"
+key2 = 42
