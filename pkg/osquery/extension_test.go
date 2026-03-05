@@ -39,7 +39,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 // makeKnapsack returns a types.Knapsack ready for use in most tests. Use this when your test
 // expects the extension to already be enrolled. If you need an unenrolled extension, use makeKnapsackUnenrolled.
