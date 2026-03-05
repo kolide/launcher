@@ -159,6 +159,7 @@ func (i *OsqueryInstance) Healthy() error {
 		extensionList, err := i.extensionManagerClient.ExtensionsContext(ctx)
 		if err != nil {
 			resultsChan <- fmt.Errorf("could not get extensions list via osquery extension client: %w", err)
+			return
 		}
 		for expectedExtensionName := range i.extensionManagerServers {
 			extFound := false
@@ -168,8 +169,11 @@ func (i *OsqueryInstance) Healthy() error {
 					break
 				}
 			}
+			// If any extension is missing, that's a healthcheck failure -- we return the error here
+			// and do not need to check further.
 			if !extFound {
 				resultsChan <- fmt.Errorf("missing extension %s", expectedExtensionName)
+				return
 			}
 		}
 
