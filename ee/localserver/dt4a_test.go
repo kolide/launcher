@@ -452,7 +452,7 @@ func Test_requestDt4aInfoHandler_badRequest(t *testing.T) {
 			})
 
 			// Make a request to our handler
-			request := httptest.NewRequestWithContext(t.Context(), tt.httpMethod, "/dt4a", tt.requestBody)
+			request := httptest.NewRequestWithContext(t.Context(), (tt.httpMethod, "/dt4a", tt.requestBody)
 			request.Header.Set("origin", tt.requestOrigin)
 			responseRecorder := httptest.NewRecorder()
 			ls.requestDt4aInfoHandler().ServeHTTP(responseRecorder, request)
