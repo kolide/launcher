@@ -154,7 +154,27 @@ func buildOsqueryFlags(socketPath, augeasLensesPath string, osqueryFlags []strin
 // loadExtensionsAndStartServer calls *osquery.ExtensionManagerServer.Start, which will block (while running the server)
 // until the user exits the process.
 func loadExtensionsAndStartServer(slogger *slog.Logger, socketPath string, plugins ...osquery.OsqueryPlugin) (*osquery.ExtensionManagerServer, error) {
-	client, err := osquery.NewClient(socketPath, 10*time.Second, osquery.MaxWaitTime(10*time.Second))
+	// On Windows, the named pipe may not be ready for connections immediately after
+	// it appears to exist (os.Stat succeeds). Unlike the Unix transport, which has
+	// a built-in waitForSocket retry loop, the Windows transport dials once and fails
+	// immediately if the pipe isn't ready. Retry with backoff to handle this.
+	var client *osquery.ExtensionManagerClient
+	var err error
+	const maxAttempts = 5
+	for attempt := range maxAttempts {
+		client, err = osquery.NewClient(socketPath, 10*time.Second, osquery.MaxWaitTime(10*time.Second))
+		if err == nil {
+			break
+		}
+		if attempt < maxAttempts-1 {
+			slogger.Log(context.TODO(), slog.LevelDebug,
+				"retrying osquery client creation",
+				"attempt", attempt+1,
+				"err", err,
+			)
+			time.Sleep(time.Duration(attempt+1) * 500 * time.Millisecond)
+		}
+	}
 	if err != nil {
 		return nil, fmt.Errorf("error creating osquery client: %w", err)
 	}

@@ -38,6 +38,14 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 	t.Parallel()
 	downloadOnceFunc()
 
+	// Pre-compute hardware serial and UUID once rather than in each parallel subtest.
+	// All subtests query the same hardware and get the same result, so running 16+
+	// simultaneous osquery processes just overwhelms slow CI runners.
+	setupKnapsack := typesmocks.NewKnapsack(t)
+	setupKnapsack.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
+	cachedSerial, cachedHardwareUUID, err := currentSerialAndHardwareUUID(t.Context(), setupKnapsack)
+	require.NoError(t, err, "expected no error querying osquery for hardware data at ", testOsqueryBinary)
+
 	testCases := []struct {
 		name                         string
 		serialSetInStore             bool
@@ -339,8 +347,8 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			var actualSerial, actualHardwareUUID string
 			if tt.osquerySuccess {
 				mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
-				actualSerial, actualHardwareUUID, err = currentSerialAndHardwareUUID(t.Context(), mockKnapsack)
-				require.NoError(t, err, "expected no error querying osquery at ", testOsqueryBinary)
+				actualSerial = cachedSerial
+				actualHardwareUUID = cachedHardwareUUID
 			} else {
 				mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(filepath.Join("not", "a", "real", "osqueryd", "binary"))
 				actualSerial = "test-serial"
