@@ -55,7 +55,7 @@ func Test_Dt4aAuthMiddleware(t *testing.T) {
 	t.Run("handles invalid origin", func(t *testing.T) {
 		t.Parallel()
 		rr := httptest.NewRecorder()
-		testRequest := httptest.NewRequest(http.MethodGet, "/", nil)
+		testRequest := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		testRequest.Header.Set("origin", "https://example.com")
 		handler.ServeHTTP(rr, testRequest)
 		require.Equal(t, http.StatusForbidden, rr.Code,
@@ -66,7 +66,7 @@ func Test_Dt4aAuthMiddleware(t *testing.T) {
 	t.Run("handles missing box param", func(t *testing.T) {
 		t.Parallel()
 		rr := httptest.NewRecorder()
-		handler.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/", nil))
+		handler.ServeHTTP(rr, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil))
 		require.Equal(t, http.StatusBadRequest, rr.Code,
 			"should return bad request when box param is missing",
 		)
@@ -75,7 +75,7 @@ func Test_Dt4aAuthMiddleware(t *testing.T) {
 	t.Run("handles bad b64", func(t *testing.T) {
 		t.Parallel()
 		rr := httptest.NewRecorder()
-		handler.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/?payload=badb64", nil))
+		handler.ServeHTTP(rr, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/?payload=badb64", nil))
 		require.Equal(t, http.StatusBadRequest, rr.Code,
 			"should return bad request when box param is not valid b64",
 		)
