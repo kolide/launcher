@@ -164,6 +164,8 @@ func BenchmarkQueryHistory(b *testing.B) {
 		session.Release()
 	}
 
+	ci.ReportNonGolangMemoryUsage(b, baselineStats)
+
 	// 64 KiB per op is generous — a leaking implementation easily exceeds
 	// this after the benchmark framework scales up b.N.
 	ci.RequireNonGolangMemoryBelowThreshold(b, baselineStats, 64*1024)
