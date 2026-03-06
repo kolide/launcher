@@ -229,7 +229,12 @@ generate: deps-go
 	go generate ./pkg/packagekit/... ./pkg/packaging/... ./ee/tables/... ./pkg/augeas/... ./ee/tuf/...
 
 test: generate
-	go test -cover -coverprofile=coverage.out -race ./...
+	@if command -v gotestsum >/dev/null 2>&1; then \
+		gotestsum --format testdox --junitfile test-results.xml --rerun-fails=2 --packages ./... -- -cover -coverprofile=coverage.out -race; \
+	else \
+		echo "WARNING: gotestsum not found, falling back to go test (install with: go install gotest.tools/gotestsum@latest)"; \
+		go test -cover -coverprofile=coverage.out -race ./...; \
+	fi
 
 # -run=^$ will never match any of our regular non-benchmark tests, ensuring those don't run during benchmarking
 test-bench-tables: generate
