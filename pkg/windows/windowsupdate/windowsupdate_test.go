@@ -6,10 +6,16 @@ package windowsupdate
 import (
 	"testing"
 
+	comshim "github.com/NozomiNetworks/go-comshim"
 	"github.com/kolide/launcher/v2/ee/tables/ci"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func initCOMBench(b *testing.B) {
+	b.Helper()
+	require.NoError(b, comshim.TryAdd(1), "initializing COM")
+	b.Cleanup(comshim.Done)
+}
 
 // BenchmarkQueryHistory exercises the full COM lifecycle path in a loop:
 // session creation, searcher creation, history query with real VARIANT
@@ -27,7 +33,6 @@ func BenchmarkQueryHistory(b *testing.B) {
 	require.NoError(b, err)
 	totalCount, err := searcher.GetTotalHistoryCount()
 	require.NoError(b, err)
-	session.Release()
 
 	if totalCount == 0 {
 		b.Skip("no update history entries on this machine")
@@ -52,8 +57,6 @@ func BenchmarkQueryHistory(b *testing.B) {
 		entries, err := searcher.QueryHistory(0, queryCount)
 		require.NoError(b, err)
 		require.NotEmpty(b, entries)
-
-		session.Release()
 	}
 
 	// 64 KiB per op is generous — a leaking implementation easily exceeds
