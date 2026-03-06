@@ -449,7 +449,7 @@ func Test_requestDt4aInfoHandler_noDataAvailable(t *testing.T) {
 	require.NoError(t, err)
 
 	// Make a request to our handler
-	request := httptest.NewRequest(http.MethodGet, "/dt4a", nil)
+	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/dt4a", nil)
 	request.Header.Set("origin", acceptableOrigin(t))
 	responseRecorder := httptest.NewRecorder()
 	ls.requestDt4aInfoHandler().ServeHTTP(responseRecorder, request)
@@ -491,7 +491,7 @@ func Test_requestDt4aAccelerationHandler(t *testing.T) {
 	require.NoError(t, err)
 
 	// Make a request to our handler
-	request := httptest.NewRequest(http.MethodGet, "/", nil)
+	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 	request.Header.Set("origin", acceptableOrigin(t))
 	responseRecorder := httptest.NewRecorder()
 	ls.requestDt4aAccelerationHandler().ServeHTTP(responseRecorder, request)
