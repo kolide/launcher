@@ -60,7 +60,7 @@ func Test_Dt4aAuthMiddleware(t *testing.T) {
 	t.Run("handles invalid origin", func(t *testing.T) {
 		t.Parallel()
 		rr := httptest.NewRecorder()
-		testRequest := httptest.NewRequest(http.MethodGet, "/", nil)
+		testRequest := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		testRequest.Header.Set("origin", "https://example.com")
 		handler.ServeHTTP(rr, testRequest)
 		require.Equal(t, http.StatusForbidden, rr.Code,
@@ -71,7 +71,7 @@ func Test_Dt4aAuthMiddleware(t *testing.T) {
 	t.Run("handles missing box param", func(t *testing.T) {
 		t.Parallel()
 		rr := httptest.NewRecorder()
-		handler.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/", nil))
+		handler.ServeHTTP(rr, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil))
 		require.Equal(t, http.StatusBadRequest, rr.Code,
 			"should return bad request when box param is missing",
 		)
@@ -80,7 +80,7 @@ func Test_Dt4aAuthMiddleware(t *testing.T) {
 	t.Run("handles bad b64", func(t *testing.T) {
 		t.Parallel()
 		rr := httptest.NewRecorder()
-		handler.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/?payload=badb64", nil))
+		handler.ServeHTTP(rr, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/?payload=badb64", nil))
 		require.Equal(t, http.StatusBadRequest, rr.Code,
 			"should return bad request when box param is not valid b64",
 		)
@@ -90,7 +90,7 @@ func Test_Dt4aAuthMiddleware(t *testing.T) {
 		t.Parallel()
 		rr := httptest.NewRecorder()
 		payload := base64.URLEncoding.EncodeToString([]byte("[]"))
-		handler.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, fmt.Sprintf("/?payload=%s", payload), http.NoBody))
+		handler.ServeHTTP(rr, httptest.NewRequestWithContext(t.Context(), http.MethodGet, fmt.Sprintf("/?payload=%s", payload), http.NoBody))
 		require.Equal(t, http.StatusUnauthorized, rr.Code,
 			"should return bad request when box param is valid b64 but empty",
 		)
@@ -100,7 +100,7 @@ func Test_Dt4aAuthMiddleware(t *testing.T) {
 		t.Parallel()
 		rr := httptest.NewRecorder()
 		encoded := base64.URLEncoding.EncodeToString([]byte("badchain"))
-		handler.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, fmt.Sprintf("/?payload=%s", encoded), nil))
+		handler.ServeHTTP(rr, httptest.NewRequestWithContext(t.Context(), http.MethodGet, fmt.Sprintf("/?payload=%s", encoded), nil))
 		require.Equal(t, http.StatusBadRequest, rr.Code,
 			"should return bad request when chain cannot be unmarshalled",
 		)
@@ -126,7 +126,7 @@ func Test_Dt4aAuthMiddleware(t *testing.T) {
 		b64 := base64.URLEncoding.EncodeToString(chainMarshalled)
 
 		rr := httptest.NewRecorder()
-		handler.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, fmt.Sprintf("/?payload=%s", url.QueryEscape(b64)), nil))
+		handler.ServeHTTP(rr, httptest.NewRequestWithContext(t.Context(), http.MethodGet, fmt.Sprintf("/?payload=%s", url.QueryEscape(b64)), nil))
 		require.Equal(t, http.StatusUnauthorized, rr.Code,
 			"should return unauthorized when chain cannot be validated",
 		)
@@ -154,7 +154,7 @@ func Test_Dt4aAuthMiddleware(t *testing.T) {
 		b64 := base64.URLEncoding.EncodeToString(chainMarshalled)
 
 		rr := httptest.NewRecorder()
-		handler.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, fmt.Sprintf("/?payload=%s", b64), nil))
+		handler.ServeHTTP(rr, httptest.NewRequestWithContext(t.Context(), http.MethodGet, fmt.Sprintf("/?payload=%s", b64), nil))
 		require.Equal(t, http.StatusOK, rr.Code,
 			"should return ok when chain is valid",
 		)
