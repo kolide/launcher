@@ -58,7 +58,7 @@ func Test_requestDt4aInfoHandler(t *testing.T) {
 	require.NoError(t, err)
 
 	// Make a request to our handler
-	request := httptest.NewRequest(http.MethodGet, "/dt4a", nil)
+	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/dt4a", nil)
 	request.Header.Set("origin", acceptableOrigin(t))
 	responseRecorder := httptest.NewRecorder()
 	ls.requestDt4aInfoHandler().ServeHTTP(responseRecorder, request)
@@ -120,7 +120,7 @@ func Test_requestDt4aInfoHandlerWithDt4aIds(t *testing.T) {
 	require.NoError(t, err)
 
 	// Make a request to our handler
-	request := httptest.NewRequest(http.MethodGet, "/dt4a", nil)
+	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/dt4a", nil)
 	request.Header.Set("origin", acceptableOrigin(t))
 	request.Header.Set(dt4aAccountUuidHeaderKey, dt4aAccountId)
 	request.Header.Set(dt4aUserUuidHeaderKey, dt4aUserId)
@@ -172,7 +172,7 @@ func Test_requestDt4aInfoHandlerWithDt4aIdsNoData(t *testing.T) {
 	require.NoError(t, err)
 
 	// Make a request to our handler
-	request := httptest.NewRequest(http.MethodGet, "/dt4a", nil)
+	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/dt4a", nil)
 	request.Header.Set("origin", acceptableOrigin(t))
 	request.Header.Set(dt4aAccountUuidHeaderKey, dt4aAccountId)
 	request.Header.Set(dt4aUserUuidHeaderKey, dt4aUserId)
@@ -240,7 +240,7 @@ func Test_requestDt4aInfoHandler_allowsAllSafariWebExtensionOrigins(t *testing.T
 	require.NoError(t, err)
 
 	// Make a request to our handler
-	request := httptest.NewRequest(http.MethodGet, "/dt4a", nil)
+	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/dt4a", nil)
 	request.Header.Set("origin", fmt.Sprintf("%sexample.com", safariWebExtensionScheme))
 	responseRecorder := httptest.NewRecorder()
 	ls.requestDt4aInfoHandler().ServeHTTP(responseRecorder, request)
@@ -292,7 +292,7 @@ func Test_requestDt4aInfoHandler_allowsMissingOrigin(t *testing.T) {
 	require.NoError(t, err)
 
 	// Make a request to our handler
-	request := httptest.NewRequest(http.MethodGet, "/dt4a", nil)
+	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/dt4a", nil)
 	responseRecorder := httptest.NewRecorder()
 	ls.requestDt4aInfoHandler().ServeHTTP(responseRecorder, request)
 
@@ -342,7 +342,7 @@ func Test_requestDt4aInfoHandler_allowsEmptyOrigin(t *testing.T) {
 	require.NoError(t, err)
 
 	// Make a request to our handler
-	request := httptest.NewRequest(http.MethodGet, "/dt4a", nil)
+	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/dt4a", nil)
 	request.Header.Set("origin", "")
 	responseRecorder := httptest.NewRecorder()
 	ls.requestDt4aInfoHandler().ServeHTTP(responseRecorder, request)
@@ -402,7 +402,7 @@ func Test_requestDt4aInfoHandler_badRequest(t *testing.T) {
 			require.NoError(t, err)
 
 			// Make a request to our handler
-			request := httptest.NewRequest(tt.httpMethod, "/dt4a", tt.requestBody)
+			request := httptest.NewRequestWithContext(t.Context(), tt.httpMethod, "/dt4a", tt.requestBody)
 			request.Header.Set("origin", tt.requestOrigin)
 			responseRecorder := httptest.NewRecorder()
 			ls.requestDt4aInfoHandler().ServeHTTP(responseRecorder, request)
@@ -449,7 +449,7 @@ func Test_requestDt4aInfoHandler_noDataAvailable(t *testing.T) {
 	require.NoError(t, err)
 
 	// Make a request to our handler
-	request := httptest.NewRequest(http.MethodGet, "/dt4a", nil)
+	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/dt4a", nil)
 	request.Header.Set("origin", acceptableOrigin(t))
 	responseRecorder := httptest.NewRecorder()
 	ls.requestDt4aInfoHandler().ServeHTTP(responseRecorder, request)
@@ -491,7 +491,7 @@ func Test_requestDt4aAccelerationHandler(t *testing.T) {
 	require.NoError(t, err)
 
 	// Make a request to our handler
-	request := httptest.NewRequest(http.MethodGet, "/", nil)
+	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 	request.Header.Set("origin", acceptableOrigin(t))
 	responseRecorder := httptest.NewRecorder()
 	ls.requestDt4aAccelerationHandler().ServeHTTP(responseRecorder, request)
