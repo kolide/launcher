@@ -17,6 +17,7 @@ import (
 	"github.com/kolide/launcher/v2/ee/agent/storage"
 	"github.com/kolide/launcher/v2/ee/agent/types"
 	"github.com/kolide/launcher/v2/pkg/augeas"
+	"github.com/kolide/launcher/v2/pkg/backoff"
 	osqueryRuntime "github.com/kolide/launcher/v2/pkg/osquery/runtime"
 	"github.com/kolide/launcher/v2/pkg/osquery/table"
 	osquery "github.com/osquery/osquery-go"
@@ -159,23 +160,11 @@ func loadExtensionsAndStartServer(slogger *slog.Logger, socketPath string, plugi
 	// a built-in waitForSocket retry loop, the Windows transport dials once and fails
 	// immediately if the pipe isn't ready. Retry with backoff to handle this.
 	var client *osquery.ExtensionManagerClient
-	var err error
-	const maxAttempts = 5
-	for attempt := range maxAttempts {
-		client, err = osquery.NewClient(socketPath, 10*time.Second, osquery.MaxWaitTime(10*time.Second))
-		if err == nil {
-			break
-		}
-		if attempt < maxAttempts-1 {
-			slogger.Log(context.TODO(), slog.LevelDebug,
-				"retrying osquery client creation",
-				"attempt", attempt+1,
-				"err", err,
-			)
-			time.Sleep(time.Duration(attempt+1) * 500 * time.Millisecond)
-		}
-	}
-	if err != nil {
+	if err := backoff.WaitFor(func() error {
+		var clientErr error
+		client, clientErr = osquery.NewClient(socketPath, 10*time.Second, osquery.MaxWaitTime(10*time.Second))
+		return clientErr
+	}, 10*time.Second, 1*time.Second); err != nil {
 		return nil, fmt.Errorf("error creating osquery client: %w", err)
 	}
 

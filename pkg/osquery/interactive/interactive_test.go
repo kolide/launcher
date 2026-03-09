@@ -15,6 +15,7 @@ import (
 
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/v2/ee/agent/flags/keys"
+	"github.com/kolide/launcher/v2/pkg/backoff"
 	"github.com/kolide/launcher/v2/ee/agent/storage"
 	storageci "github.com/kolide/launcher/v2/ee/agent/storage/ci"
 	"github.com/kolide/launcher/v2/ee/agent/storage/inmemory"
@@ -247,14 +248,9 @@ func testRootDirectory(t *testing.T) string {
 		t.Cleanup(func() {
 			// On Windows CI, processes may still hold file handles briefly after
 			// the test completes. Retry cleanup a few times before giving up.
-			for range 5 {
-				if err := os.RemoveAll(rootDir); err == nil {
-					return
-				}
-				time.Sleep(500 * time.Millisecond)
-			}
-			// Final attempt -- report error if it still fails
-			if err := os.RemoveAll(rootDir); err != nil {
+			if err := backoff.WaitFor(func() error {
+				return os.RemoveAll(rootDir)
+			}, 5*time.Second, 500*time.Millisecond); err != nil {
 				t.Logf("testRootDirectory RemoveAll cleanup: %v", err)
 			}
 		})
