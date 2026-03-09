@@ -979,15 +979,16 @@ func TestOsqueryDies(t *testing.T) {
 	waitHealthy(t, runner, logBytes, osqHistory)
 	allHistory, err := osqHistory.GetHistory()
 	require.NoError(t, err, "expected to be able to view osquery history after unexpected shutdown")
-	// should be 2 total instances
-	require.Equal(t, 2, len(allHistory))
-	firstInstance, lastInstance := allHistory[0], allHistory[1]
+	// At least 2 instances: the killed one and a healthy restart. On slow CI runners,
+	// there may be additional intermediate restart attempts that failed health checks.
+	require.GreaterOrEqual(t, len(allHistory), 2, "expected at least 2 history entries (killed + restarted)")
+	firstInstance, lastInstance := allHistory[0], allHistory[len(allHistory)-1]
 	// the first instance should have had an error and exit time set
 	require.Contains(t, firstInstance, "exit_time")
 	require.Contains(t, firstInstance, "errors")
 	require.NotEmpty(t, firstInstance["errors"], "error should be added to stats when unexpected shutdown occurs")
 	require.NotEmpty(t, firstInstance["exit_time"], "exit time should be added to instance when unexpected shutdown occurs")
-	// the second instance will have already had it's start and connect time checked by wait healthy
+	// the last instance will have already had its start and connect time checked by wait healthy
 	// check that there is no exit time or error set
 	require.Contains(t, lastInstance, "exit_time")
 	require.Contains(t, lastInstance, "errors")

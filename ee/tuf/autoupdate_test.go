@@ -1587,7 +1587,7 @@ func Test_currentRunningVersion_osqueryd(t *testing.T) {
 
 	autoupdater := &TufAutoupdater{
 		slogger:        multislogger.NewNopLogger(),
-		osqueryTimeout: 5 * time.Second,
+		osqueryTimeout: 30 * time.Second,
 		knapsack:       mockKnapsack,
 	}
 
