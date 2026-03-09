@@ -15,12 +15,12 @@ import (
 
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/v2/ee/agent/flags/keys"
-	"github.com/kolide/launcher/v2/pkg/backoff"
 	"github.com/kolide/launcher/v2/ee/agent/storage"
 	storageci "github.com/kolide/launcher/v2/ee/agent/storage/ci"
 	"github.com/kolide/launcher/v2/ee/agent/storage/inmemory"
 	agentsqlite "github.com/kolide/launcher/v2/ee/agent/storage/sqlite"
 	"github.com/kolide/launcher/v2/ee/agent/types/mocks"
+	"github.com/kolide/launcher/v2/pkg/backoff"
 	"github.com/kolide/launcher/v2/pkg/osquery/testutil"
 	"github.com/kolide/launcher/v2/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/mock"
