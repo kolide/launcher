@@ -194,7 +194,9 @@ func TestSendBufferConcurrent(t *testing.T) {
 				WithSendInterval(1*time.Millisecond),
 			)
 
+			runDone := make(chan struct{})
 			go func() {
+				defer close(runDone)
 				sb.Run(t.Context())
 			}()
 
@@ -245,6 +247,15 @@ func TestSendBufferConcurrent(t *testing.T) {
 			expected := []rune(expectedAggregatedReceives)
 			actual := []rune(string(testSender.aggregateAllReceived()))
 			require.ElementsMatch(t, expected, actual)
+
+			// Wait for Run to finish its cleanup after t.Context() is cancelled
+			t.Cleanup(func() {
+				select {
+				case <-runDone:
+				case <-time.After(5 * time.Second):
+					t.Error("Run did not return after context cancellation")
+				}
+			})
 		})
 	}
 }
