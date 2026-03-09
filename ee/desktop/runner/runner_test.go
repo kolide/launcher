@@ -31,7 +31,9 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
+	// ioCompletionProcessor will continue to run forever until the process (go test in this case) exits,
+	// so we need goleak to ignore that one.
+	goleak.VerifyTestMain(m, goleak.IgnoreTopFunction("github.com/Microsoft/go-winio.ioCompletionProcessor"))
 }
 
 func TestDesktopUserProcessRunner_Execute(t *testing.T) {
