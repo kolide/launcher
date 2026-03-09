@@ -51,7 +51,11 @@ func Test_requestDt4aInfoHandler(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore)
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+	client := &http.Client{}
+	t.Cleanup(func() {
+		client.CloseIdleConnections()
+	})
+	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 
 	// Set up localserver
@@ -116,7 +120,11 @@ func Test_requestDt4aInfoHandlerWithDt4aIds(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore)
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+	client := &http.Client{}
+	t.Cleanup(func() {
+		client.CloseIdleConnections()
+	})
+	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 
 	// Set up localserver
@@ -171,7 +179,11 @@ func Test_requestDt4aInfoHandlerWithDt4aIdsNoData(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore)
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+	client := &http.Client{}
+	t.Cleanup(func() {
+		client.CloseIdleConnections()
+	})
+	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 
 	// Set up localserver
@@ -242,7 +254,11 @@ func Test_requestDt4aInfoHandler_allowsAllSafariWebExtensionOrigins(t *testing.T
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore)
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+	client := &http.Client{}
+	t.Cleanup(func() {
+		client.CloseIdleConnections()
+	})
+	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 
 	// Set up localserver
@@ -297,7 +313,11 @@ func Test_requestDt4aInfoHandler_allowsMissingOrigin(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore)
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+	client := &http.Client{}
+	t.Cleanup(func() {
+		client.CloseIdleConnections()
+	})
+	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 
 	// Set up localserver
@@ -351,7 +371,11 @@ func Test_requestDt4aInfoHandler_allowsEmptyOrigin(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore)
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+	client := &http.Client{}
+	t.Cleanup(func() {
+		client.CloseIdleConnections()
+	})
+	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
@@ -413,7 +437,11 @@ func Test_requestDt4aInfoHandler_badRequest(t *testing.T) {
 			tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 			require.NoError(t, err)
 			k.On("TokenStore").Return(tokenStore)
-			osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+			client := &http.Client{}
+			t.Cleanup(func() {
+				client.CloseIdleConnections()
+			})
+			osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 			k.On("OsqueryPublisher").Return(osqPublisher)
 
 			// Set up localserver
@@ -463,7 +491,11 @@ func Test_requestDt4aInfoHandler_noDataAvailable(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore)
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+	client := &http.Client{}
+	t.Cleanup(func() {
+		client.CloseIdleConnections()
+	})
+	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 
 	// Set up localserver
@@ -508,7 +540,11 @@ func Test_requestDt4aAccelerationHandler(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore)
-	osqPublisher := osquerypublisher.NewLogPublisherClient(multislogger.NewNopLogger(), k, http.DefaultClient)
+	client := &http.Client{}
+	t.Cleanup(func() {
+		client.CloseIdleConnections()
+	})
+	osqPublisher := osquerypublisher.NewLogPublisherClient(multislogger.NewNopLogger(), k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 
 	// Set up localserver

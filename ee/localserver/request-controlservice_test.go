@@ -35,7 +35,11 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 		tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 		require.NoError(t, err)
 		m.On("TokenStore").Return(tokenStore)
-		osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, m, http.DefaultClient)
+		client := &http.Client{}
+		t.Cleanup(func() {
+			client.CloseIdleConnections()
+		})
+		osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, m, client)
 		m.On("OsqueryPublisher").Return(osqPublisher).Maybe()
 		return m
 	}
@@ -71,7 +75,11 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 				tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 				require.NoError(t, err)
 				m.On("TokenStore").Return(tokenStore)
-				osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, m, http.DefaultClient)
+				client := &http.Client{}
+				t.Cleanup(func() {
+					client.CloseIdleConnections()
+				})
+				osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, m, client)
 				m.On("OsqueryPublisher").Return(osqPublisher).Maybe()
 				return m
 			},

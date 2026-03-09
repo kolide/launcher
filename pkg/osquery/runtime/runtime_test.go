@@ -75,7 +75,11 @@ func makeTestOsqLogPublisher(t *testing.T, mk *typesMocks.Knapsack) types.Osquer
 	require.NoError(t, err)
 	mk.On("TokenStore").Return(tokenStore).Maybe()
 	slogger := multislogger.NewNopLogger()
-	return osquerypublisher.NewLogPublisherClient(slogger, mk, http.DefaultClient)
+	client := &http.Client{}
+	t.Cleanup(func() {
+		client.CloseIdleConnections()
+	})
+	return osquerypublisher.NewLogPublisherClient(slogger, mk, client)
 }
 
 func TestBadBinaryPath(t *testing.T) {

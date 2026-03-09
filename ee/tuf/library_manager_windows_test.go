@@ -26,7 +26,11 @@ func TestAddToLibrary_WindowsACLs(t *testing.T) {
 	testBaseDir := t.TempDir()
 	testReleaseVersion := "1.2.4"
 	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
-	metadataClient, err := initMetadataClient(t.Context(), testBaseDir, tufServerUrl, http.DefaultClient)
+	client := &http.Client{}
+	t.Cleanup(func() {
+		client.CloseIdleConnections()
+	})
+	metadataClient, err := initMetadataClient(t.Context(), testBaseDir, tufServerUrl, client)
 	require.NoError(t, err, "creating metadata client")
 	// Re-initialize the metadata client with our test root JSON
 	require.NoError(t, metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
@@ -62,7 +66,11 @@ func TestAddToLibrary_WindowsACLs(t *testing.T) {
 			t.Parallel()
 
 			// Set up test library manager
-			testLibraryManager, err := newUpdateLibraryManager(tufServerUrl, http.DefaultClient, testBaseDir, multislogger.NewNopLogger())
+			client := &http.Client{}
+			t.Cleanup(func() {
+				client.CloseIdleConnections()
+			})
+			testLibraryManager, err := newUpdateLibraryManager(tufServerUrl, client, testBaseDir, multislogger.NewNopLogger())
 			require.NoError(t, err, "unexpected error creating new update library manager")
 
 			// Request download -- make a couple concurrent requests to confirm that the lock works.

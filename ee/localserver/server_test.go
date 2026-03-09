@@ -36,7 +36,11 @@ func TestInterrupt_Multiple(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore)
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+	client := &http.Client{}
+	t.Cleanup(func() {
+		client.CloseIdleConnections()
+	})
+	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 
 	// Override the poll and recalculate interval for the test so we can be sure that the async workers
