@@ -7,7 +7,7 @@ import (
 // historicalComparer is a wrapper around the default bytewise comparer to allow us
 // return previous versions of keys, and keys that would otherwise be skipped based on
 // their insertion/sort orders. It does this by overridding the Compare method to
-// to return a positive result that would otherwise be skipped by the bytewise comparer.
+// return a positive result that would otherwise be skipped by the bytewise comparer.
 // This is a bit of a hack, because it is unclear why the insertion order used by some of
 // the leveldbs we're seeing is causing keys to be skipped. But it will allow cloud to see
 // all active keys in the database for these cases, and perform further analysis and filtering as needed.
