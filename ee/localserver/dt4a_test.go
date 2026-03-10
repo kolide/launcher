@@ -2,6 +2,7 @@ package localserver
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -50,12 +51,19 @@ func Test_requestDt4aInfoHandler(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore)
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+	client := &http.Client{}
+	t.Cleanup(func() {
+		client.CloseIdleConnections()
+	})
+	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		ls.Interrupt(errors.New("test"))
+	})
 
 	// Make a request to our handler
 	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/dt4a", nil)
@@ -112,12 +120,19 @@ func Test_requestDt4aInfoHandlerWithDt4aIds(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore)
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+	client := &http.Client{}
+	t.Cleanup(func() {
+		client.CloseIdleConnections()
+	})
+	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		ls.Interrupt(errors.New("test"))
+	})
 
 	// Make a request to our handler
 	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/dt4a", nil)
@@ -164,12 +179,19 @@ func Test_requestDt4aInfoHandlerWithDt4aIdsNoData(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore)
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+	client := &http.Client{}
+	t.Cleanup(func() {
+		client.CloseIdleConnections()
+	})
+	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		ls.Interrupt(errors.New("test"))
+	})
 
 	// Make a request to our handler
 	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/dt4a", nil)
@@ -232,12 +254,19 @@ func Test_requestDt4aInfoHandler_allowsAllSafariWebExtensionOrigins(t *testing.T
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore)
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+	client := &http.Client{}
+	t.Cleanup(func() {
+		client.CloseIdleConnections()
+	})
+	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		ls.Interrupt(errors.New("test"))
+	})
 
 	// Make a request to our handler
 	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/dt4a", nil)
@@ -284,12 +313,19 @@ func Test_requestDt4aInfoHandler_allowsMissingOrigin(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore)
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+	client := &http.Client{}
+	t.Cleanup(func() {
+		client.CloseIdleConnections()
+	})
+	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		ls.Interrupt(errors.New("test"))
+	})
 
 	// Make a request to our handler
 	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/dt4a", nil)
@@ -335,11 +371,18 @@ func Test_requestDt4aInfoHandler_allowsEmptyOrigin(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore)
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+	client := &http.Client{}
+	t.Cleanup(func() {
+		client.CloseIdleConnections()
+	})
+	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		ls.Interrupt(errors.New("test"))
+	})
 
 	// Make a request to our handler
 	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/dt4a", nil)
@@ -394,12 +437,19 @@ func Test_requestDt4aInfoHandler_badRequest(t *testing.T) {
 			tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 			require.NoError(t, err)
 			k.On("TokenStore").Return(tokenStore)
-			osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+			client := &http.Client{}
+			t.Cleanup(func() {
+				client.CloseIdleConnections()
+			})
+			osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 			k.On("OsqueryPublisher").Return(osqPublisher)
 
 			// Set up localserver
 			ls, err := New(t.Context(), k, nil)
 			require.NoError(t, err)
+			t.Cleanup(func() {
+				ls.Interrupt(errors.New("test"))
+			})
 
 			// Make a request to our handler
 			request := httptest.NewRequestWithContext(t.Context(), tt.httpMethod, "/dt4a", tt.requestBody)
@@ -441,12 +491,19 @@ func Test_requestDt4aInfoHandler_noDataAvailable(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore)
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+	client := &http.Client{}
+	t.Cleanup(func() {
+		client.CloseIdleConnections()
+	})
+	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		ls.Interrupt(errors.New("test"))
+	})
 
 	// Make a request to our handler
 	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/dt4a", nil)
@@ -483,12 +540,19 @@ func Test_requestDt4aAccelerationHandler(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore)
-	osqPublisher := osquerypublisher.NewLogPublisherClient(multislogger.NewNopLogger(), k, http.DefaultClient)
+	client := &http.Client{}
+	t.Cleanup(func() {
+		client.CloseIdleConnections()
+	})
+	osqPublisher := osquerypublisher.NewLogPublisherClient(multislogger.NewNopLogger(), k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		ls.Interrupt(errors.New("test"))
+	})
 
 	// Make a request to our handler
 	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)

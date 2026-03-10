@@ -147,6 +147,10 @@ func TestKryptoEcMiddleware(t *testing.T) {
 				w.WriteHeader(http.StatusOK)
 			}))
 
+			t.Cleanup(func() {
+				callbackServer.Close()
+			})
+
 			cmdReq := v2CmdRequestType{
 				Path:            "whatevs",
 				Body:            []byte(randomStringWithSqlCharacters(t, 100000)),
@@ -212,11 +216,18 @@ func TestKryptoEcMiddleware(t *testing.T) {
 					tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 					require.NoError(t, err)
 					k.On("TokenStore").Return(tokenStore)
-					osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+					client := &http.Client{}
+					t.Cleanup(func() {
+						client.CloseIdleConnections()
+					})
+					osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 					k.On("OsqueryPublisher").Return(osqPublisher)
 
 					// set up middlewares
 					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, k, localServerPrivateKey, remoteServerPrivateKey.PublicKey, mockPresenceDetector, "test-munemo")
+					t.Cleanup(func() {
+						kryptoEcMiddleware.Close()
+					})
 					kryptoEcMiddleware.presenceDetectionStatusUpdateInterval = presenceDetectionCallbackInterval
 
 					rr := httptest.NewRecorder()
@@ -358,13 +369,20 @@ func TestKryptoEcMiddlewareErrors(t *testing.T) {
 					tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 					require.NoError(t, err)
 					k.On("TokenStore").Return(tokenStore)
-					osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+					client := &http.Client{}
+					t.Cleanup(func() {
+						client.CloseIdleConnections()
+					})
+					osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 					k.On("OsqueryPublisher").Return(osqPublisher)
 					// set up middlewares
 					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, k, localServerPrivateKey, remoteServerPrivateKey.PublicKey, mockPresenceDetector, "test-munemo")
 					if tt.middlewareOpt != nil {
 						tt.middlewareOpt(kryptoEcMiddleware)
 					}
+					t.Cleanup(func() {
+						kryptoEcMiddleware.Close()
+					})
 
 					rr := httptest.NewRecorder()
 
@@ -495,11 +513,18 @@ func Test_AllowedOrigin(t *testing.T) {
 			tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 			require.NoError(t, err)
 			k.On("TokenStore").Return(tokenStore)
-			osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+			client := &http.Client{}
+			t.Cleanup(func() {
+				client.CloseIdleConnections()
+			})
+			osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 			k.On("OsqueryPublisher").Return(osqPublisher)
 
 			// set up middlewares
 			kryptoEcMiddleware := newKryptoEcMiddleware(slogger, k, mustGenEcdsaKey(t), counterpartyKey.PublicKey, mockPresenceDetector, "")
+			t.Cleanup(func() {
+				kryptoEcMiddleware.Close()
+			})
 
 			h := kryptoEcMiddleware.Wrap(testHandler)
 
@@ -701,10 +726,17 @@ func TestMunemoCheck(t *testing.T) {
 			tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 			require.NoError(t, err)
 			k.On("TokenStore").Return(tokenStore)
-			osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+			client := &http.Client{}
+			t.Cleanup(func() {
+				client.CloseIdleConnections()
+			})
+			osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 			k.On("OsqueryPublisher").Return(osqPublisher)
 
 			e := newKryptoEcMiddleware(slogger, k, nil, mustGenEcdsaKey(t).PublicKey, nil, munemo)
+			t.Cleanup(func() {
+				e.Close()
+			})
 			err = e.checkMunemo(tt.headers)
 			if tt.expectMiddleWareCheckErr {
 				require.Error(t, err)
@@ -739,11 +771,18 @@ func Test_sendCallback(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore)
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+	client := &http.Client{}
+	t.Cleanup(func() {
+		client.CloseIdleConnections()
+	})
+	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 
 	requestsQueued := &atomic.Int64{}
 	mw := newKryptoEcMiddleware(slogger, k, nil, mustGenEcdsaKey(t).PublicKey, nil, "test-munemo")
+	t.Cleanup(func() {
+		mw.Close()
+	})
 	for range callbackQueueCapacity {
 		go func() {
 			req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, testCallbackServer.URL, nil)
@@ -796,9 +835,16 @@ func Test_sendCallback_handlesEnrollment(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore)
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+	client := &http.Client{}
+	t.Cleanup(func() {
+		client.CloseIdleConnections()
+	})
+	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 	mw := newKryptoEcMiddleware(slogger, k, nil, mustGenEcdsaKey(t).PublicKey, nil, "")
+	t.Cleanup(func() {
+		mw.Close()
+	})
 
 	// Confirm we do not have a munemo set
 	require.Equal(t, "", mw.tenantMunemo.Load())
@@ -855,9 +901,16 @@ func Test_sendCallback_handlesEnrollmentWithAgentIngesterToken(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore)
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+	client := &http.Client{}
+	t.Cleanup(func() {
+		client.CloseIdleConnections()
+	})
+	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 	mw := newKryptoEcMiddleware(slogger, k, nil, mustGenEcdsaKey(t).PublicKey, nil, "")
+	t.Cleanup(func() {
+		mw.Close()
+	})
 
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, testCallbackServer.URL, nil)
 	require.NoError(t, err)
@@ -911,10 +964,17 @@ func Test_sendCallback_handlesRegionURLUpdates(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore)
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+	client := &http.Client{}
+	t.Cleanup(func() {
+		client.CloseIdleConnections()
+	})
+	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 
 	mw := newKryptoEcMiddleware(slogger, k, nil, mustGenEcdsaKey(t).PublicKey, nil, "")
+	t.Cleanup(func() {
+		mw.Close()
+	})
 
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, testCallbackServer.URL, nil)
 	require.NoError(t, err)

@@ -3,6 +3,7 @@ package localserver
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -38,7 +39,11 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	mockKnapsack.On("TokenStore").Return(tokenStore)
-	osqPublisher := osquerypublisher.NewLogPublisherClient(multislogger.NewNopLogger(), mockKnapsack, http.DefaultClient)
+	client := &http.Client{}
+	t.Cleanup(func() {
+		client.CloseIdleConnections()
+	})
+	osqPublisher := osquerypublisher.NewLogPublisherClient(multislogger.NewNopLogger(), mockKnapsack, client)
 	mockKnapsack.On("OsqueryPublisher").Return(osqPublisher)
 
 	var logBytes bytes.Buffer
@@ -74,5 +79,8 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 func testServer(t *testing.T, k types.Knapsack) *localServer {
 	server, err := New(t.Context(), k, nil)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		server.Interrupt(errors.New("test error"))
+	})
 	return server
 }

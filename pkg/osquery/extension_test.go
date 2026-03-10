@@ -39,7 +39,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	// ioCompletionProcessor will continue to run forever until the process (go test in this case) exits,
+	// so we need goleak to ignore that one.
+	goleak.VerifyTestMain(m, goleak.IgnoreAnyFunction("github.com/Microsoft/go-winio.ioCompletionProcessor"))
+}
 
 // makeKnapsack returns a types.Knapsack ready for use in most tests. Use this when your test
 // expects the extension to already be enrolled. If you need an unenrolled extension, use makeKnapsackUnenrolled.
@@ -76,9 +83,13 @@ func makeKnapsack(t *testing.T) types.Knapsack {
 	return m
 }
 
-func makeTestOsqLogPublisher(k types.Knapsack) types.OsqueryPublisher {
+func makeTestOsqLogPublisher(t *testing.T, k types.Knapsack) types.OsqueryPublisher {
 	slogger := multislogger.NewNopLogger()
-	return osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+	client := &http.Client{}
+	t.Cleanup(func() {
+		client.CloseIdleConnections()
+	})
+	return osquerypublisher.NewLogPublisherClient(slogger, k, client)
 }
 
 // makeKnapsackUnenrolled returns a types.Knapsack ready for use in any test that requires
@@ -163,7 +174,7 @@ func makeKnapsackWithInvalidEnrollment(t *testing.T, expectedNodeKey string) typ
 
 func TestNewExtensionEmptyEnrollSecret(t *testing.T) {
 	m := makeKnapsack(t)
-	lpc := makeTestOsqLogPublisher(m)
+	lpc := makeTestOsqLogPublisher(t, m)
 
 	// We should be able to make an extension despite an empty enroll secret
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), m, ulid.New(), ExtensionOpts{})
@@ -173,7 +184,7 @@ func TestNewExtensionEmptyEnrollSecret(t *testing.T) {
 
 func TestGetHostIdentifier(t *testing.T) {
 	k := makeKnapsack(t)
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 
@@ -200,7 +211,7 @@ func TestGetHostIdentifier(t *testing.T) {
 func TestGetHostIdentifierCorruptedData(t *testing.T) {
 	// Put bad data in the DB and ensure we can still generate a fresh UUID
 	k := makeKnapsack(t)
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 
@@ -226,7 +237,7 @@ func TestExtensionEnrollTransportError(t *testing.T) {
 	}
 
 	k := makeKnapsackUnenrolled(t)
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, types.DefaultEnrollmentID, ExtensionOpts{})
 	require.Nil(t, err)
 	e.serviceClient = m
@@ -247,7 +258,7 @@ func TestExtensionEnrollSecretInvalid(t *testing.T) {
 		},
 	}
 	k := makeKnapsackUnenrolled(t)
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
@@ -298,7 +309,7 @@ func TestExtensionEnrollValidNodeEmptyResponse(t *testing.T) {
 		},
 	}
 	k := makeKnapsackUnenrolled(t)
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
@@ -348,7 +359,7 @@ func TestExtensionEnrollInvalidRegion(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore).Maybe()
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
 	// We should attempt to fetch the node key once during enrollment, and we shouldn't have a node key yet
 	k.On("NodeKey", types.DefaultEnrollmentID).Return("", nil).Once()
@@ -407,7 +418,7 @@ func TestExtensionEnrollInvalidRegion_DoesNotSetMissingUrls(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore).Maybe()
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
 	// We should attempt to fetch the node key once during enrollment, and we shouldn't have a node key yet
 	k.On("NodeKey", types.DefaultEnrollmentID).Return("", nil).Once()
@@ -460,7 +471,7 @@ func TestExtensionEnroll(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore).Maybe()
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
 	e, err := NewExtension(t.Context(), lpc, s, k, types.DefaultEnrollmentID, ExtensionOpts{})
 	require.Nil(t, err)
@@ -577,7 +588,7 @@ func TestFlagsChanged(t *testing.T) {
 	require.NoError(t, err)
 	m.On("TokenStore").Return(tokenStore).Maybe()
 
-	lpc := makeTestOsqLogPublisher(m)
+	lpc := makeTestOsqLogPublisher(t, m)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), m, types.DefaultEnrollmentID, ExtensionOpts{})
 	require.NoError(t, err)
 
@@ -605,7 +616,7 @@ func TestExtensionGenerateConfigsTransportError(t *testing.T) {
 		},
 	}
 	k := makeKnapsack(t)
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, types.DefaultEnrollmentID, ExtensionOpts{})
 	require.Nil(t, err)
 	e.serviceClient = m
@@ -625,7 +636,7 @@ func TestExtensionGenerateConfigsCaching(t *testing.T) {
 		},
 	}
 	k := makeKnapsack(t)
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
 	e, err := NewExtension(t.Context(), lpc, s, k, ulid.New(), ExtensionOpts{})
@@ -668,7 +679,7 @@ func TestExtensionGenerateConfigsEnrollmentInvalid(t *testing.T) {
 	}
 	// Set up our knapsack
 	k := makeKnapsackWithInvalidEnrollment(t, expectedNodeKey)
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.serviceClient = m
@@ -717,7 +728,7 @@ func TestGenerateConfigs_CannotEnrollYet(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore).Maybe()
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsStore, k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.serviceClient = s
@@ -803,7 +814,7 @@ func TestGenerateConfigs_WorksAfterSecretlessEnrollment(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore).Maybe()
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
 	e, err := NewExtension(t.Context(), lpc, settingsStore, k, types.DefaultEnrollmentID, ExtensionOpts{})
 	require.Nil(t, err)
@@ -848,7 +859,7 @@ func TestExtensionGenerateConfigs(t *testing.T) {
 	k := makeKnapsack(t)
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, s, k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.serviceClient = m
@@ -866,7 +877,7 @@ func TestExtensionWriteLogsTransportError(t *testing.T) {
 		},
 	}
 	k := makeKnapsack(t)
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.serviceClient = m
@@ -894,7 +905,7 @@ func TestExtensionWriteLogsEnrollmentInvalid(t *testing.T) {
 	}
 	// Set up our knapsack
 	k := makeKnapsackWithInvalidEnrollment(t, expectedNodeKey)
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.serviceClient = m
@@ -945,7 +956,7 @@ func TestExtensionWriteLogs(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore).Maybe()
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.serviceClient = m
@@ -1029,7 +1040,7 @@ func TestExtensionWriteBufferedLogsEmpty(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore).Maybe()
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
@@ -1083,7 +1094,7 @@ func TestExtensionWriteBufferedLogs(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore).Maybe()
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 	store := inmemory.NewStore()
 	osqHistory, err := history.InitHistory(store)
 	require.NoError(t, err)
@@ -1191,7 +1202,7 @@ func TestExtensionWriteBufferedLogsEnrollmentInvalid(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore).Maybe()
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.serviceClient = m
@@ -1262,7 +1273,7 @@ func TestExtensionWriteBufferedLogsLimit(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore).Maybe()
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 	store := inmemory.NewStore()
 	osqHistory, err := history.InitHistory(store)
 	require.NoError(t, err)
@@ -1366,7 +1377,7 @@ func TestExtensionWriteBufferedLogsDropsBigLog(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore).Maybe()
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 	store := inmemory.NewStore()
 	osqHistory, err := history.InitHistory(store)
 	require.NoError(t, err)
@@ -1478,7 +1489,7 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore).Maybe()
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 	store := inmemory.NewStore()
 	osqHistory, err := history.InitHistory(store)
 	require.NoError(t, err)
@@ -1626,7 +1637,7 @@ func TestExtensionPurgeBufferedLogs(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore).Maybe()
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 	store := inmemory.NewStore()
 	osqHistory, err := history.InitHistory(store)
 	require.NoError(t, err)
@@ -1681,7 +1692,7 @@ func TestExtensionGetQueriesTransportError(t *testing.T) {
 		},
 	}
 	k := makeKnapsack(t)
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.serviceClient = m
@@ -1712,7 +1723,7 @@ func TestExtensionGetQueriesEnrollmentInvalid(t *testing.T) {
 
 	// Set up our knapsack
 	k := makeKnapsackWithInvalidEnrollment(t, expectedNodeKey)
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
@@ -1739,7 +1750,7 @@ func TestExtensionGetQueries(t *testing.T) {
 		},
 	}
 	k := makeKnapsack(t)
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.serviceClient = m
@@ -1763,7 +1774,7 @@ func TestGetQueries_Forwarding(t *testing.T) {
 		},
 	}
 	k := makeKnapsack(t)
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.serviceClient = m
@@ -1813,7 +1824,7 @@ func TestGetQueries_Forwarding_RespondsToAccelerationRequest(t *testing.T) {
 		},
 	}
 	k := makeKnapsack(t)
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.serviceClient = m
@@ -1884,7 +1895,7 @@ func TestGetQueries_WorksWithSecretlessEnrollment(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore).Maybe()
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
 	e, err := NewExtension(t.Context(), lpc, settingsStore, k, types.DefaultEnrollmentID, ExtensionOpts{})
 	require.Nil(t, err)
@@ -1944,7 +1955,7 @@ func TestExtensionWriteResultsTransportError(t *testing.T) {
 		},
 	}
 	k := makeKnapsack(t)
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.serviceClient = m
@@ -1993,7 +2004,7 @@ func TestExtensionWriteResultsEnrollmentInvalid(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore).Maybe()
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
@@ -2027,7 +2038,7 @@ func TestExtensionWriteResults(t *testing.T) {
 		},
 	}
 	k := makeKnapsack(t)
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.serviceClient = m

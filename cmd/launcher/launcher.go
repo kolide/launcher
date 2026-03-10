@@ -583,10 +583,10 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 
 	// If autoupdating is enabled, run the autoupdater
 	if k.Autoupdate() {
-		metadataClient := http.DefaultClient
+		metadataClient := &http.Client{}
 		metadataClient.Timeout = 30 * time.Second
 		metadataClient.Transport = otelhttp.NewTransport(metadataClient.Transport)
-		mirrorClient := http.DefaultClient
+		mirrorClient := &http.Client{}
 		mirrorClient.Timeout = 8 * time.Minute // gives us extra time to avoid a timeout on download
 		mirrorClient.Transport = otelhttp.NewTransport(mirrorClient.Transport)
 		tufAutoupdater, err := tuf.NewTufAutoupdater(

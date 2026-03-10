@@ -23,7 +23,12 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/attribute"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 // NB - Tests that result in calls to `setNewGlobalProvider` should not be run in parallel
 // to avoid race condition complaints.
@@ -384,6 +389,9 @@ func TestFlagsChanged_ExportTraces(t *testing.T) { //nolint:paralleltest
 				ctx:                       ctx,
 				cancel:                    cancel,
 			}
+			t.Cleanup(func() {
+				traceExporter.Interrupt(errors.New("test"))
+			})
 
 			traceExporter.FlagsChanged(ctx, keys.ExportTraces)
 
@@ -458,6 +466,9 @@ func TestFlagsChanged_TraceSamplingRate(t *testing.T) { //nolint:paralleltest
 				ctx:                       ctx,
 				cancel:                    cancel,
 			}
+			t.Cleanup(func() {
+				traceExporter.Interrupt(errors.New("test"))
+			})
 
 			traceExporter.FlagsChanged(ctx, keys.TraceSamplingRate)
 
@@ -530,6 +541,9 @@ func TestFlagsChanged_TraceIngestServerURL(t *testing.T) { //nolint:paralleltest
 				ctx:                       ctx,
 				cancel:                    cancel,
 			}
+			t.Cleanup(func() {
+				traceExporter.Interrupt(errors.New("test"))
+			})
 
 			traceExporter.FlagsChanged(ctx, keys.TraceIngestServerURL)
 
@@ -607,6 +621,9 @@ func TestFlagsChanged_DisableTraceIngestTLS(t *testing.T) { //nolint:paralleltes
 				ctx:                       ctx,
 				cancel:                    cancel,
 			}
+			t.Cleanup(func() {
+				traceExporter.Interrupt(errors.New("test"))
+			})
 
 			traceExporter.FlagsChanged(ctx, keys.DisableTraceIngestTLS)
 
@@ -684,6 +701,9 @@ func TestFlagsChanged_TraceBatchTimeout(t *testing.T) { //nolint:paralleltest
 				ctx:                       ctx,
 				cancel:                    cancel,
 			}
+			t.Cleanup(func() {
+				traceExporter.Interrupt(errors.New("test"))
+			})
 
 			traceExporter.FlagsChanged(ctx, keys.TraceBatchTimeout)
 
@@ -761,6 +781,9 @@ func TestFlagsChanged_LauncherGoMaxProcs(t *testing.T) { //nolint:paralleltest
 				ctx:                       ctx,
 				cancel:                    cancel,
 			}
+			t.Cleanup(func() {
+				traceExporter.Interrupt(errors.New("test"))
+			})
 			traceExporter.gomaxprocsAttrValue.Store(int64(tt.currentGomaxprocs))
 
 			traceExporter.FlagsChanged(ctx, keys.LauncherGoMaxProcs)

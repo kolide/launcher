@@ -23,7 +23,7 @@ func TestExtensionLogPublicationHappyPath(t *testing.T) {
 		},
 	}
 	k := makeKnapsack(t)
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
 		MaxBytesPerBatch: startingBatchLimitBytes,
 	})
@@ -59,7 +59,7 @@ func TestExtensionLogPublicationRespondsToNetworkTimeouts(t *testing.T) {
 		},
 	}
 	k := makeKnapsack(t)
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
 		MaxBytesPerBatch: startingBatchLimitBytes,
 	})
@@ -110,7 +110,7 @@ func TestExtensionLogPublicationIgnoresNonTimeoutErrors(t *testing.T) {
 		},
 	}
 	k := makeKnapsack(t)
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
 		MaxBytesPerBatch: startingBatchLimitBytes,
 	})

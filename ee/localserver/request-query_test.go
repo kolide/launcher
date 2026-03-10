@@ -70,7 +70,11 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 			tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 			require.NoError(t, err)
 			mockKnapsack.On("TokenStore").Return(tokenStore)
-			osqPublisher := osquerypublisher.NewLogPublisherClient(multislogger.NewNopLogger(), mockKnapsack, http.DefaultClient)
+			client := &http.Client{}
+			t.Cleanup(func() {
+				client.CloseIdleConnections()
+			})
+			osqPublisher := osquerypublisher.NewLogPublisherClient(multislogger.NewNopLogger(), mockKnapsack, client)
 			mockKnapsack.On("OsqueryPublisher").Return(osqPublisher)
 			mockQuerier := mocks.NewQuerier(t)
 
@@ -245,7 +249,11 @@ func Test_localServer_requestRunScheduledQueryHandler(t *testing.T) {
 			tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 			require.NoError(t, err)
 			mockKnapsack.On("TokenStore").Return(tokenStore)
-			osqPublisher := osquerypublisher.NewLogPublisherClient(multislogger.NewNopLogger(), mockKnapsack, http.DefaultClient)
+			client := &http.Client{}
+			t.Cleanup(func() {
+				client.CloseIdleConnections()
+			})
+			osqPublisher := osquerypublisher.NewLogPublisherClient(multislogger.NewNopLogger(), mockKnapsack, client)
 			mockKnapsack.On("OsqueryPublisher").Return(osqPublisher)
 
 			// set up mock querier
