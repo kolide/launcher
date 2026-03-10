@@ -10,20 +10,22 @@ import (
 // to return a positive result that would otherwise be skipped by the bytewise comparer.
 // This is a bit of a hack, because it is unclear why the insertion order used by some of
 // the leveldbs we're seeing is causing keys to be skipped. But it will allow cloud to see
-// all active keys in the database for these cases, and perform analysis and filtering as needed.
+// all active keys in the database for these cases, and perform further analysis and filtering as needed.
 type historicalComparer struct {
 	bytewiseComparer comparer.Comparer
 }
 
-func newHistoricalComparer() *historicalComparer {
+// HistoricalBytewiseComparer returns a comparer that yields historical/duplicate key versions
+// (used when comparer config is "historical_bytewise"). It implements comparer.Comparer.
+func HistoricalBytewiseComparer() comparer.Comparer {
 	return &historicalComparer{
 		bytewiseComparer: comparer.DefaultComparer,
 	}
 }
 
 // Compare defers to the default bytewaise comparer logic, but return a positive result if the compared keys are equal
-// (would return 0). This causes historical versions of the same key to be yielded by the iterator, and prevents keys
-// from being filtered out if they were inserted in a different order than would be yielded (based on key comparisons).
+// (would return 0). This causes historical versions of the same key to be yielded by the iterator, and prevents some keys
+// from being filtered out based on insertion order.
 func (hc *historicalComparer) Compare(a, b []byte) int {
 	ret := hc.bytewiseComparer.Compare(a, b)
 	if ret == 0 {
