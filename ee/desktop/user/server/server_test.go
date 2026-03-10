@@ -19,7 +19,9 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
+	// ioCompletionProcessor will continue to run forever until the process (go test in this case) exits,
+	// so we need goleak to ignore that one.
+	goleak.VerifyTestMain(m, goleak.IgnoreAnyFunction("github.com/Microsoft/go-winio.ioCompletionProcessor"))
 }
 
 const validAuthHeader = "test-auth-header"
