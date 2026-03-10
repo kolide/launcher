@@ -17,10 +17,15 @@ async function main() {
 
   const db = new Level(outDir, { valueEncoding: "utf8" });
 
+  // create 4 unique entries, each of which is written twice so we can test our historical bytewise comparer logic
   const entries = [
     ["test-stringvalue-key1", "test-stringvalue1"],
+    ["test-stringvalue-key1", "test-stringvalue1"],
+    ["test-intvalue-key2", 2],
     ["test-intvalue-key2", 2],
     ["test-floatvalue-key3", 3.3],
+    ["test-floatvalue-key3", 3.3],
+    ["test-booleanvalue-key4", true],
     ["test-booleanvalue-key4", true],
   ];
 
@@ -28,6 +33,7 @@ async function main() {
     await db.put(k, v);
   }
 
+  await db.compactRange(null, null);
   await db.close();
 
   console.log("Successfully created bytewise LevelDB at:", outDir);
