@@ -27,7 +27,7 @@ var downloadOnceFunc = sync.OnceFunc(func() {
 func Test_runLauncher(t *testing.T) {
 	t.Parallel()
 
-	for _, tt := range []struct {
+	for _, tt := range []struct { //nolint:paralleltest
 		testCaseName    string
 		startupDuration time.Duration
 	}{
@@ -40,9 +40,10 @@ func Test_runLauncher(t *testing.T) {
 			startupDuration: rungroup.InterruptTimeout / 2,
 		},
 	} {
+		// Tests don't run in parallel to avoid data races with global variable manipulation
+		// (e.g. tracer providers, thrift.ServerConnectivityCheckInterval). We don't worry about these
+		// data races for production because we only ever expect a single invocation of runLauncher.
 		t.Run(tt.testCaseName, func(t *testing.T) {
-			t.Parallel()
-
 			// Set up opts
 			testRootDir := t.TempDir()
 			downloadOnceFunc() // get an osquery binary

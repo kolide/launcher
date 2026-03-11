@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
@@ -84,6 +85,13 @@ const (
 	localizationsSubsystemName            = "localizations"
 )
 
+// setThriftInterval ensures we modify the thrift.ServerConnectivityCheckInterval global variable
+// only once. It exists largely to avoid data races in tests -- in production usage, we only ever
+// expect it to be called once.
+var setThriftInterval = sync.OnceFunc(func() {
+	thrift.ServerConnectivityCheckInterval = 100 * time.Millisecond
+})
+
 // runLauncher is the entry point into running launcher. It creates a
 // rungroups with the various options, and goes! If autoupdate is
 // enabled, the finalizers will trigger various restarts.
@@ -91,7 +99,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	initialTraceBuffer := exporter.NewInitialTraceBuffer()
 	ctx, startupSpan := observability.StartSpan(ctx)
 
-	thrift.ServerConnectivityCheckInterval = 100 * time.Millisecond
+	setThriftInterval()
 
 	logger := ctxlog.FromContext(ctx)
 	logger = log.With(logger, "caller", log.DefaultCaller, "session_pid", os.Getpid())
