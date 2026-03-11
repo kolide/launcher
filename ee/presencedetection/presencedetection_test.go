@@ -9,7 +9,12 @@ import (
 	"github.com/kolide/launcher/v2/ee/presencedetection/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func TestPresenceDetector_DetectPresence(t *testing.T) {
 	t.Parallel()

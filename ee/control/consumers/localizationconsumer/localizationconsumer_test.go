@@ -7,9 +7,14 @@ import (
 	"testing"
 
 	"github.com/kolide/launcher/v2/ee/agent/storage/inmemory"
+	"go.uber.org/goleak"
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func TestLocalizationConsumer(t *testing.T) {
 

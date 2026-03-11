@@ -6,7 +6,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 //go:embed test-data/pacman_upgradeable.txt
 var pacman_upgradeable []byte

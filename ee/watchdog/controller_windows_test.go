@@ -16,7 +16,12 @@ import (
 	"github.com/kolide/launcher/v2/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 // mockTaskManager is a testing helper which adheres to the taskManager interface.
 // this allows us to unit test a bunch of the Controller logic without actually

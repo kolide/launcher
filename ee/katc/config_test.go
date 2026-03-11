@@ -190,6 +190,73 @@ func TestConstructKATCTables(t *testing.T) {
 			},
 			expectedPluginCount: 0,
 		},
+		{
+			testCaseName: "with historical bytewise comparer option",
+			katcConfig: map[string]string{
+				"kolide_leveldb_test": `{
+					"source_type": "leveldb",
+					"columns": ["key", "value"],
+					"source_paths": ["/some/path/to/db.leveldb"],
+					"source_query": "",
+					"row_transform_steps": [],
+					"comparer": "historical_bytewise",
+					"overlays": []
+				}`,
+			},
+			expectedPluginCount: 1,
+		},
+		{
+			testCaseName: "with historical bytewise comparer option overridden in overlay",
+			katcConfig: map[string]string{
+				"kolide_leveldb_test": fmt.Sprintf(`{
+					"source_type": "leveldb",
+					"columns": ["key", "value"],
+					"source_paths": ["/some/path/to/db.leveldb"],
+					"source_query": "",
+					"row_transform_steps": [],
+					"comparer": "default_bytewise",
+					"overlays": [
+						{
+							"filters": {
+								"goos": "%s"
+							},
+							"comparer": "historical_bytewise"
+						}
+					]
+				}`, runtime.GOOS),
+			},
+			expectedPluginCount: 1,
+		},
+		{
+			testCaseName: "comparer can be safely ignored by sqlite datasource",
+			katcConfig: map[string]string{
+				"kolide_sqlite_test": `{
+					"source_type": "sqlite",
+					"columns": ["data"],
+					"source_paths": ["/some/path/to/db.sqlite"],
+					"source_query": "SELECT QUOTE(value) FROM data;",
+					"row_transform_steps": ["hex"],
+					"overlays": [],
+					"comparer": "idb_cmp1"
+				}`,
+			},
+			expectedPluginCount: 1,
+		},
+		{
+			testCaseName: "invalid comparer option",
+			katcConfig: map[string]string{
+				"kolide_leveldb_test": `{
+					"source_type": "leveldb",
+					"columns": ["key", "value"],
+					"source_paths": ["/some/path/to/db.leveldb"],
+					"source_query": "",
+					"row_transform_steps": [],
+					"comparer": "invalid_comparer",
+					"overlays": []
+				}`,
+			},
+			expectedPluginCount: 0,
+		},
 	} {
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()

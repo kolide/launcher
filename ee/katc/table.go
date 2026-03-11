@@ -22,6 +22,7 @@ type katcTable struct {
 	sourceType        katcSourceType
 	sourcePaths       []string
 	sourceQuery       string
+	comparer          string
 	rowTransformSteps []rowTransformStep
 	columnLookup      map[string]struct{}
 	slogger           *slog.Logger
@@ -61,6 +62,11 @@ func newKatcTable(tableName string, cfg katcTableConfig, slogger *slog.Logger) (
 	if cfg.SourceQuery != nil {
 		k.sourceQuery = *cfg.SourceQuery
 	}
+	if cfg.Comparer != nil {
+		k.comparer = string(*cfg.Comparer)
+	} else {
+		k.comparer = "idb_cmp1"
+	}
 	if cfg.RowTransformSteps != nil {
 		k.rowTransformSteps = *cfg.RowTransformSteps
 	}
@@ -80,6 +86,9 @@ func newKatcTable(tableName string, cfg katcTableConfig, slogger *slog.Logger) (
 		}
 		if overlay.SourceQuery != nil {
 			k.sourceQuery = *overlay.SourceQuery
+		}
+		if overlay.Comparer != nil {
+			k.comparer = string(*overlay.Comparer)
 		}
 		if overlay.RowTransformSteps != nil {
 			k.rowTransformSteps = *overlay.RowTransformSteps
@@ -115,7 +124,7 @@ func (k *katcTable) generate(ctx context.Context, queryContext table.QueryContex
 	}
 
 	// Fetch data from our table source
-	dataRaw, err := k.sourceType.dataFunc(ctx, k.slogger, k.sourcePaths, k.sourceQuery, queryContext)
+	dataRaw, err := k.sourceType.dataFunc(ctx, k.slogger, k.sourcePaths, k.comparer, k.sourceQuery, queryContext)
 	if err != nil {
 		k.slogger.Log(ctx, slog.LevelWarn,
 			"running data func",
