@@ -173,9 +173,11 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		return fmt.Errorf("detecting platform: %w", err)
 	}
 
-	debugAddrPath := filepath.Join(rootDirectory, "debug_addr")
-	debug.AttachDebugHandler(debugAddrPath, slogger)
-	defer os.Remove(debugAddrPath)
+	if opts.Debug {
+		debugAddrPath := filepath.Join(rootDirectory, "debug_addr")
+		debug.AttachDebugHandler(debugAddrPath, slogger)
+		defer os.Remove(debugAddrPath)
+	}
 
 	// open the database for storing launcher data, we do it here
 	// because it's passed to multiple actors. Add a timeout to
@@ -237,8 +239,12 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	gowrapper.Go(ctx, slogger, func() {
 		// Wait a little bit before adding exclusions -- some osquery files get created right after
 		// startup and we want to let that settle before handling exclusions.
-		time.Sleep(2 * time.Minute)
-		timemachine.AddExclusions(ctx, k)
+		select {
+		case <-ctx.Done():
+			// launcher shut down before our sleep finished -- nothing to do here but exit.
+		case <-time.After(2 * time.Minute):
+			timemachine.AddExclusions(ctx, k)
+		}
 	})
 
 	if k.Debug() && runtime.GOOS != "windows" {
