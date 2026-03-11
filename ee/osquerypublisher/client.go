@@ -251,6 +251,12 @@ func (lpc *LogPublisherClient) Ping() {
 // in the future we will iterate the TokenStorage and grab everything with corresponding key prefixes to
 // populate any configured enrollments.
 func (lpc *LogPublisherClient) refreshTokenCache() {
+	// if we're not configured to publish logs, don't bother refreshing the token cache.
+	// these keys being sent down are gated by the same feature flag server-side so this will not be successful.
+	if lpc.knapsack.OsqueryPublisherURL() == "" || lpc.knapsack.OsqueryPublisherPercentEnabled() == 0 {
+		return
+	}
+
 	lpc.tokensMutex.Lock()
 	defer lpc.tokensMutex.Unlock()
 
