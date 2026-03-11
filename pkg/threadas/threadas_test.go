@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
 
 const (
@@ -19,6 +20,10 @@ const (
 	targetUid = 501
 	targetGid = 20
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func TestThreadNoPermission(t *testing.T) {
 	t.Parallel()
