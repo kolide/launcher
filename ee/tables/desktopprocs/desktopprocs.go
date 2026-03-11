@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/desktop/runner"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/desktop/runner"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -19,7 +19,9 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		table.TextColumn("start_time"),
 		table.TextColumn("last_health_check"),
 	}
-	return tablewrapper.New(flags, slogger, "kolide_desktop_procs", columns, generate())
+	return tablewrapper.New(flags, slogger, "kolide_desktop_procs", columns, generate(),
+		tablewrapper.WithDescription("Running Kolide Desktop UI processes, including PID, UID, start time, and last health check. Useful for verifying the desktop component is running."),
+	)
 }
 
 func generate() table.GenerateFunc {

@@ -8,11 +8,17 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func TestSendBuffer(t *testing.T) {
 	t.Parallel()
@@ -122,20 +128,23 @@ func TestSendAndPurgeHandlesLogBufferFullPurge(t *testing.T) {
 	// kind of an ugly test, but it was the simplest way to reproduce the issue
 	// if the issue is present, we'll get a panic: runtime error: index out of range [x] with length x
 
+	testCompleted := &atomic.Bool{}
 	go func() {
-		for {
+		for !testCompleted.Load() {
 			sb.Write([]byte("1"))
 		}
 	}()
 
 	go func() {
-		for {
+		for !testCompleted.Load() {
 			time.Sleep(50 * time.Millisecond)
 			sb.sendAndPurge()
 		}
 	}()
 
 	time.Sleep(1 * time.Second)
+
+	testCompleted.Store(true)
 }
 
 func testStringArray(size int) []string {
@@ -185,7 +194,9 @@ func TestSendBufferConcurrent(t *testing.T) {
 				WithSendInterval(1*time.Millisecond),
 			)
 
+			runDone := make(chan struct{})
 			go func() {
+				defer close(runDone)
 				sb.Run(t.Context())
 			}()
 
@@ -236,6 +247,15 @@ func TestSendBufferConcurrent(t *testing.T) {
 			expected := []rune(expectedAggregatedReceives)
 			actual := []rune(string(testSender.aggregateAllReceived()))
 			require.ElementsMatch(t, expected, actual)
+
+			// Wait for Run to finish its cleanup after t.Context() is cancelled
+			t.Cleanup(func() {
+				select {
+				case <-runDone:
+				case <-time.After(5 * time.Second):
+					t.Error("Run did not return after context cancellation")
+				}
+			})
 		})
 	}
 }

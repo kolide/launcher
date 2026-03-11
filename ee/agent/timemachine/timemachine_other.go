@@ -5,7 +5,7 @@ package timemachine
 import (
 	"context"
 
-	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/agent/types"
 )
 
 // AddExclusions adds specific launcher time machine exclusions for

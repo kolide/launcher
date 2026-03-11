@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"os/exec"
 
-	"github.com/kolide/launcher/ee/allowedcmd"
+	"github.com/kolide/launcher/v2/ee/allowedcmd"
 )
 
 // Disclaimed (darwin only) replaces the cmd path and args for use via

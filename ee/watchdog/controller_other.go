@@ -5,8 +5,8 @@ package watchdog
 import (
 	"context"
 
-	"github.com/kolide/launcher/ee/agent/flags/keys"
-	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/agent/flags/keys"
+	"github.com/kolide/launcher/v2/ee/agent/types"
 )
 
 type WatchdogController struct{}

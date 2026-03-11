@@ -11,10 +11,10 @@ import (
 	"time"
 
 	"github.com/groob/plist"
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/allowedcmd"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/allowedcmd"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -33,7 +33,9 @@ func MDMInfo(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		table.TextColumn("installed_from_dep"),
 		table.TextColumn("user_approved"),
 	}
-	return tablewrapper.New(flags, slogger, "kolide_mdm_info", columns, generateMDMInfo)
+	return tablewrapper.New(flags, slogger, "kolide_mdm_info", columns, generateMDMInfo,
+		tablewrapper.WithDescription("macOS MDM enrollment status and configuration, including server URL, enrollment method (DEP or user-approved), and payload details. Useful for verifying MDM enrollment and compliance."),
+	)
 }
 
 func generateMDMInfo(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

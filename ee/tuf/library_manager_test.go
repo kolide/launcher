@@ -13,8 +13,8 @@ import (
 	"testing"
 
 	"github.com/kolide/kit/ulid"
-	tufci "github.com/kolide/launcher/ee/tuf/ci"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	tufci "github.com/kolide/launcher/v2/ee/tuf/ci"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 	"github.com/theupdateframework/go-tuf/data"
 )
@@ -94,7 +94,11 @@ func TestAddToLibrary(t *testing.T) {
 			testBaseDir := t.TempDir()
 			testReleaseVersion := "1.2.4"
 			tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
-			metadataClient, err := initMetadataClient(t.Context(), testBaseDir, tufServerUrl, http.DefaultClient)
+			client := &http.Client{}
+			t.Cleanup(func() {
+				client.CloseIdleConnections()
+			})
+			metadataClient, err := initMetadataClient(t.Context(), testBaseDir, tufServerUrl, client)
 			require.NoError(t, err, "creating metadata client")
 
 			// Re-initialize the metadata client with our test root JSON
@@ -109,7 +113,7 @@ func TestAddToLibrary(t *testing.T) {
 			targetFile := fmt.Sprintf("%s-%s.tar.gz", b, testReleaseVersion)
 
 			// Set up test library manager
-			testLibraryManager, err := newUpdateLibraryManager(tufServerUrl, http.DefaultClient, testBaseDir, multislogger.NewNopLogger())
+			testLibraryManager, err := newUpdateLibraryManager(tufServerUrl, client, testBaseDir, multislogger.NewNopLogger())
 			require.NoError(t, err, "unexpected error creating new update library manager")
 
 			// Request download -- make a couple concurrent requests to confirm that the lock works.
@@ -148,9 +152,13 @@ func TestAddToLibrary_alreadyRunning(t *testing.T) {
 				t.Fatalf("mirror should not have been called for download, but was: %s", r.URL.String())
 			}))
 			defer testMirror.Close()
+			client := &http.Client{}
+			t.Cleanup(func() {
+				client.CloseIdleConnections()
+			})
 			testLibraryManager := &updateLibraryManager{
 				mirrorUrl:    testMirror.URL,
-				mirrorClient: http.DefaultClient,
+				mirrorClient: client,
 				slogger:      multislogger.NewNopLogger(),
 				baseDir:      testBaseDir,
 				lock:         newLibraryLock(),
@@ -186,9 +194,13 @@ func TestAddToLibrary_alreadyAdded(t *testing.T) {
 				t.Fatalf("mirror should not have been called for download, but was: %s", r.URL.String())
 			}))
 			defer testMirror.Close()
+			client := &http.Client{}
+			t.Cleanup(func() {
+				client.CloseIdleConnections()
+			})
 			testLibraryManager := &updateLibraryManager{
 				mirrorUrl:    testMirror.URL,
-				mirrorClient: http.DefaultClient,
+				mirrorClient: client,
 				slogger:      multislogger.NewNopLogger(),
 				baseDir:      testBaseDir,
 				lock:         newLibraryLock(),
@@ -226,7 +238,11 @@ func TestAddToLibrary_verifyStagedUpdate_handlesInvalidFiles(t *testing.T) {
 	testBaseDir := t.TempDir()
 	testReleaseVersion := "0.3.5"
 	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
-	metadataClient, err := initMetadataClient(t.Context(), testBaseDir, tufServerUrl, http.DefaultClient)
+	client := &http.Client{}
+	t.Cleanup(func() {
+		client.CloseIdleConnections()
+	})
+	metadataClient, err := initMetadataClient(t.Context(), testBaseDir, tufServerUrl, client)
 	require.NoError(t, err, "creating metadata client")
 	// Re-initialize the metadata client with our test root JSON
 	require.NoError(t, metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
@@ -273,7 +289,11 @@ func TestAddToLibrary_verifyStagedUpdate_handlesInvalidFiles(t *testing.T) {
 			defer testMaliciousMirror.Close()
 
 			// Set up test library manager
-			testLibraryManager, err := newUpdateLibraryManager(testMaliciousMirror.URL, http.DefaultClient, testBaseDir, multislogger.NewNopLogger())
+			client := &http.Client{}
+			t.Cleanup(func() {
+				client.CloseIdleConnections()
+			})
+			testLibraryManager, err := newUpdateLibraryManager(testMaliciousMirror.URL, client, testBaseDir, multislogger.NewNopLogger())
 			require.NoError(t, err, "unexpected error creating new update library manager")
 
 			// Request download

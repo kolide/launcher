@@ -7,11 +7,11 @@ import (
 	"os/user"
 	"strings"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/allowedcmd"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/tablehelpers"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/allowedcmd"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -28,7 +28,9 @@ func TouchIDUserConfig(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		table.IntegerColumn("effective_applepay"),
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_touchid_user_config", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_touchid_user_config", columns, t.generate,
+		tablewrapper.WithDescription("Per-user Touch ID configuration on macOS, including number of enrolled fingerprints and whether Touch ID is enabled for unlock and Apple Pay. Requires a WHERE uid = constraint. Useful for auditing biometric authentication settings."),
+	)
 }
 
 type touchIDUserConfigTable struct {

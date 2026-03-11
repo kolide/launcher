@@ -11,10 +11,10 @@ import (
 	"strings"
 
 	"github.com/kolide/kit/fsutil"
-	"github.com/kolide/launcher/ee/agent"
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 	_ "modernc.org/sqlite"
 )
@@ -34,7 +34,9 @@ func ChromeLoginDataEmails(flags types.Flags, slogger *slog.Logger) *table.Plugi
 		table.TextColumn("email"),
 		table.BigIntColumn("count"),
 	}
-	return tablewrapper.New(flags, slogger, "kolide_chrome_login_data_emails", columns, c.generate)
+	return tablewrapper.New(flags, slogger, "kolide_chrome_login_data_emails", columns, c.generate,
+		tablewrapper.WithDescription("Email addresses found in Chrome's saved login data, grouped by OS user and email with a login count. Useful for identifying which accounts are saved in Chrome profiles."),
+	)
 }
 
 type ChromeLoginDataEmailsTable struct {

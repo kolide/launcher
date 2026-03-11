@@ -12,10 +12,15 @@ import (
 	"time"
 
 	"github.com/kolide/kit/ulid"
-	"github.com/kolide/launcher/ee/agent/types/mocks"
-	"github.com/kolide/launcher/ee/allowedcmd"
+	"github.com/kolide/launcher/v2/ee/agent/types/mocks"
+	"github.com/kolide/launcher/v2/ee/allowedcmd"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func TestAddExclusions(t *testing.T) {
 	t.Parallel()

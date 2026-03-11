@@ -10,16 +10,21 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/ulid"
-	"github.com/kolide/launcher/ee/agent/flags/keys"
-	"github.com/kolide/launcher/ee/agent/storage"
-	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/agent/types/mocks"
-	"github.com/kolide/launcher/pkg/log/multislogger"
-	"github.com/kolide/launcher/pkg/threadsafebuffer"
+	"github.com/kolide/launcher/v2/ee/agent/flags/keys"
+	"github.com/kolide/launcher/v2/ee/agent/storage"
+	storageci "github.com/kolide/launcher/v2/ee/agent/storage/ci"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/agent/types/mocks"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func TestLogShipper(t *testing.T) {
 	t.Parallel()
@@ -47,14 +52,14 @@ func TestLogShipper(t *testing.T) {
 
 			// no auth token
 			ls := New(knapsack, log.NewNopLogger())
-			require.False(t, ls.isShippingStarted, "shipping should not have stared since there is no auth token")
+			require.False(t, ls.isShippingStarted.Load(), "shipping should not have stared since there is no auth token")
 
 			// no ingest server url
 			authToken := ulid.New()
 			tokenStore.Set(storage.ObservabilityIngestAuthTokenKey, []byte(authToken))
 			knapsack.On("LogIngestServerURL").Return("").Once()
 			ls.Ping()
-			require.False(t, ls.isShippingStarted, "shipping should not have stared since there is no ingest server url")
+			require.False(t, ls.isShippingStarted.Load(), "shipping should not have stared since there is no ingest server url")
 			require.Equal(t, authToken, ls.sender.authtoken)
 
 			// no device identifying attributes
@@ -62,7 +67,7 @@ func TestLogShipper(t *testing.T) {
 			knapsack.On("LogIngestServerURL").Return(logIngestUrl).Times(4)
 			knapsack.On("ServerProvidedDataStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), "test")).Once()
 			ls.Ping()
-			require.False(t, ls.isShippingStarted, "shipping should not have stared since there are no device identifying attributes")
+			require.False(t, ls.isShippingStarted.Load(), "shipping should not have stared since there are no device identifying attributes")
 			require.Equal(t, authToken, ls.sender.authtoken)
 			require.Equal(t, logIngestUrl, ls.sender.endpoint)
 
@@ -79,7 +84,7 @@ func TestLogShipper(t *testing.T) {
 				HardwareSerial: testSerialNumber,
 			})
 			ls.Ping()
-			require.True(t, ls.isShippingStarted, "shipping should now be enabled")
+			require.True(t, ls.isShippingStarted.Load(), "shipping should now be enabled")
 			require.Equal(t, authToken, ls.sender.authtoken)
 			require.Equal(t, logIngestUrl, ls.sender.endpoint)
 
@@ -156,7 +161,10 @@ func TestStop_Multiple(t *testing.T) {
 
 	ls := New(knapsack, log.NewNopLogger())
 
-	go ls.Run()
+	runReturned := make(chan error, 1)
+	go func() {
+		runReturned <- ls.Run()
+	}()
 	time.Sleep(3 * time.Second)
 	interruptStart := time.Now()
 	ls.Stop(errors.New("test error"))
@@ -184,6 +192,14 @@ func TestStop_Multiple(t *testing.T) {
 	}
 
 	require.Equal(t, expectedInterrupts, receivedInterrupts)
+
+	select {
+	case err := <-runReturned:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Errorf("Run did not return after Stop: %s", logBytes.String())
+		t.FailNow()
+	}
 }
 
 func TestStopWithoutRun(t *testing.T) {

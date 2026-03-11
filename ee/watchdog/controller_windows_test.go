@@ -10,13 +10,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kolide/launcher/ee/agent/flags/keys"
-	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
-	"github.com/kolide/launcher/pkg/log/multislogger"
-	"github.com/kolide/launcher/pkg/threadsafebuffer"
+	"github.com/kolide/launcher/v2/ee/agent/flags/keys"
+	typesmocks "github.com/kolide/launcher/v2/ee/agent/types/mocks"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 // mockTaskManager is a testing helper which adheres to the taskManager interface.
 // this allows us to unit test a bunch of the Controller logic without actually

@@ -16,18 +16,25 @@ import (
 	"time"
 
 	"github.com/kolide/kit/ulid"
-	"github.com/kolide/launcher/ee/agent/flags/keys"
-	"github.com/kolide/launcher/ee/agent/types/mocks"
-	"github.com/kolide/launcher/ee/consoleuser"
-	"github.com/kolide/launcher/ee/desktop/user/notify"
-	"github.com/kolide/launcher/ee/presencedetection"
-	"github.com/kolide/launcher/pkg/backoff"
-	"github.com/kolide/launcher/pkg/log/multislogger"
-	"github.com/kolide/launcher/pkg/threadsafebuffer"
+	"github.com/kolide/launcher/v2/ee/agent/flags/keys"
+	"github.com/kolide/launcher/v2/ee/agent/types/mocks"
+	"github.com/kolide/launcher/v2/ee/consoleuser"
+	"github.com/kolide/launcher/v2/ee/desktop/user/notify"
+	"github.com/kolide/launcher/v2/ee/presencedetection"
+	"github.com/kolide/launcher/v2/pkg/backoff"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	// ioCompletionProcessor will continue to run forever until the process (go test in this case) exits,
+	// so we need goleak to ignore that one.
+	goleak.VerifyTestMain(m, goleak.IgnoreAnyFunction("github.com/Microsoft/go-winio.ioCompletionProcessor"))
+}
 
 func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 	t.Parallel()
@@ -109,6 +116,10 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 				r.interruptTimeout = time.Millisecond
 				// wg will never be done, so we should time out
 				r.procsWg.Add(1)
+				// Ensure goroutine is cleaned up after test completes
+				t.Cleanup(func() {
+					r.procsWg.Done()
+				})
 			},
 			logContains: []string{
 				"timeout waiting for desktop processes to exit",

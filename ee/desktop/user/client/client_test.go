@@ -5,14 +5,23 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 
-	"github.com/kolide/launcher/ee/desktop/user/server"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/ee/desktop/user/server"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	// ioCompletionProcessor will continue to run forever until the process (go test in this case) exits,
+	// so we need goleak to ignore that one.
+	goleak.VerifyTestMain(m, goleak.IgnoreAnyFunction("github.com/Microsoft/go-winio.ioCompletionProcessor"))
+}
 
 func TestClient_GetAndShutdown(t *testing.T) {
 	t.Parallel()
@@ -43,13 +52,20 @@ func TestClient_GetAndShutdown(t *testing.T) {
 			server, err := server.New(multislogger.NewNopLogger(), validAuthToken, socketPath, shutdownChan, make(chan<- struct{}), nil)
 			require.NoError(t, err)
 
+			// Start server
 			go func() {
 				server.Serve()
 			}()
 
-			go func() {
-				<-shutdownChan
-			}()
+			// If this test will include a call to /shutdown, listen on `shutdownChan`
+			shutdownExpected := slices.Contains(tt.paths, "shutdown")
+			receivedShutdown := &atomic.Bool{}
+			if shutdownExpected {
+				go func() {
+					<-shutdownChan
+					receivedShutdown.Store(true)
+				}()
+			}
 
 			client := New(validAuthToken, socketPath)
 			for _, path := range tt.paths {
@@ -61,6 +77,9 @@ func TestClient_GetAndShutdown(t *testing.T) {
 				}
 
 				require.NoError(t, err)
+			}
+			if shutdownExpected {
+				require.True(t, receivedShutdown.Load())
 			}
 			assert.NoError(t, server.Shutdown(t.Context()))
 		})

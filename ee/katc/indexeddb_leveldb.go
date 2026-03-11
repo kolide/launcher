@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/kolide/launcher/ee/indexeddb"
-	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/v2/ee/indexeddb"
+	"github.com/kolide/launcher/v2/ee/observability"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -16,7 +16,7 @@ import (
 // found at the filepath in `sourcePattern`. It retrieves all rows from the database
 // and object store specified in `query`, which it expects to be in the format
 // `<db name>.<object store name>`.
-func indexeddbLeveldbData(ctx context.Context, slogger *slog.Logger, sourcePaths []string, query string, queryContext table.QueryContext) ([]sourceData, error) {
+func indexeddbLeveldbData(ctx context.Context, slogger *slog.Logger, sourcePaths []string, comparer string, query string, queryContext table.QueryContext) ([]sourceData, error) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -49,7 +49,7 @@ func indexeddbLeveldbData(ctx context.Context, slogger *slog.Logger, sourcePaths
 				continue
 			}
 
-			rowsFromDb, err := indexeddb.QueryIndexeddbObjectStore(ctx, slogger, db, dbName, objectStoreName)
+			rowsFromDb, err := indexeddb.QueryIndexeddbObjectStore(ctx, slogger, db, dbName, objectStoreName, comparer)
 			if err != nil {
 				return nil, fmt.Errorf("querying %s: %w", db, err)
 			}

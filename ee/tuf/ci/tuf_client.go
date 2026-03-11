@@ -23,7 +23,11 @@ func SeedLocalTufRepo(t *testing.T, testTargetVersion string, testRootDir string
 	remoteOpts := client.HTTPRemoteOptions{
 		MetadataPath: "/repository",
 	}
-	remoteStore, err := client.HTTPRemoteStore(serverUrl, &remoteOpts, http.DefaultClient)
+	c := &http.Client{}
+	t.Cleanup(func() {
+		c.CloseIdleConnections()
+	})
+	remoteStore, err := client.HTTPRemoteStore(serverUrl, &remoteOpts, c)
 	require.NoError(t, err, "could not set up remote store")
 
 	metadataClient := client.NewClient(localStore, remoteStore)

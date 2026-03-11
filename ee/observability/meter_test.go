@@ -1,16 +1,22 @@
 package observability
 
 import (
+	"context"
 	"testing"
 	"time"
 
-	"github.com/kolide/launcher/pkg/threadsafebuffer"
+	"github.com/kolide/launcher/v2/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/stdout/stdoutmetric"
 	"go.opentelemetry.io/otel/metric"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 // TestReinitializeMetrics does not run in parallel to avoid setting a global meter provider
 // too early during the test run.
@@ -96,6 +102,9 @@ func Test_int64GaugeOrNoop(t *testing.T) { //nolint:paralleltest
 	require.NoError(t, err)
 	testProvider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(sdkmetric.NewPeriodicReader(testExporter, sdkmetric.WithInterval(writeInterval))))
 	otel.SetMeterProvider(testProvider)
+	t.Cleanup(func() {
+		testProvider.Shutdown(context.Background())
+	})
 
 	// We should still be able to use our test gauge -- write data and wait
 	// for it to be written to our exporter.
@@ -124,6 +133,9 @@ func Test_float64GaugeOrNoop(t *testing.T) { //nolint:paralleltest
 	require.NoError(t, err)
 	testProvider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(sdkmetric.NewPeriodicReader(testExporter, sdkmetric.WithInterval(writeInterval))))
 	otel.SetMeterProvider(testProvider)
+	t.Cleanup(func() {
+		testProvider.Shutdown(context.Background())
+	})
 
 	// We should still be able to use our test gauge -- write data and wait
 	// for it to be written to our exporter.
@@ -152,6 +164,9 @@ func Test_int64HistogramOrNoop(t *testing.T) { //nolint:paralleltest
 	require.NoError(t, err)
 	testProvider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(sdkmetric.NewPeriodicReader(testExporter, sdkmetric.WithInterval(writeInterval))))
 	otel.SetMeterProvider(testProvider)
+	t.Cleanup(func() {
+		testProvider.Shutdown(context.Background())
+	})
 
 	// We should still be able to use our test gauge -- write data and wait
 	// for it to be written to our exporter.
@@ -180,6 +195,9 @@ func Test_float64HistogramOrNoop(t *testing.T) { //nolint:paralleltest
 	require.NoError(t, err)
 	testProvider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(sdkmetric.NewPeriodicReader(testExporter, sdkmetric.WithInterval(writeInterval))))
 	otel.SetMeterProvider(testProvider)
+	t.Cleanup(func() {
+		testProvider.Shutdown(context.Background())
+	})
 
 	// We should still be able to use our test gauge -- write data and wait
 	// for it to be written to our exporter.
@@ -208,6 +226,9 @@ func Test_int64CounterOrNoop(t *testing.T) { //nolint:paralleltest
 	require.NoError(t, err)
 	testProvider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(sdkmetric.NewPeriodicReader(testExporter, sdkmetric.WithInterval(writeInterval))))
 	otel.SetMeterProvider(testProvider)
+	t.Cleanup(func() {
+		testProvider.Shutdown(context.Background())
+	})
 
 	// We should still be able to use our test gauge -- write data and wait
 	// for it to be written to our exporter.

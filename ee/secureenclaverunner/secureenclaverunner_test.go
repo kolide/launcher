@@ -10,13 +10,18 @@ import (
 	"time"
 
 	"github.com/kolide/krypto/pkg/echelper"
-	"github.com/kolide/launcher/ee/agent/storage/inmemory"
-	"github.com/kolide/launcher/ee/secureenclaverunner/mocks"
-	"github.com/kolide/launcher/pkg/log/multislogger"
-	"github.com/kolide/launcher/pkg/threadsafebuffer"
+	"github.com/kolide/launcher/v2/ee/agent/storage/inmemory"
+	"github.com/kolide/launcher/v2/ee/secureenclaverunner/mocks"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func Test_secureEnclaveRunner(t *testing.T) {
 	t.Parallel()

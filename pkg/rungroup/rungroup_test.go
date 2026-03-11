@@ -7,9 +7,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kolide/launcher/pkg/threadsafebuffer"
+	"github.com/kolide/launcher/v2/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func TestRun_NoActors(t *testing.T) {
 	t.Parallel()
@@ -165,6 +170,9 @@ func TestRun_MultipleActors_InterruptTimeout(t *testing.T) {
 
 	// We only want two interrupts -- we should not be waiting on the blocking actor
 	require.Equal(t, 2, receivedInterrupts, "unexpected number of interrupts: logs:", logBytes.String())
+
+	// Wait for all goroutines to exit
+	time.Sleep(4 * InterruptTimeout)
 }
 
 func TestRun_MultipleActors_ExecuteReturnTimeout(t *testing.T) {
@@ -246,6 +254,9 @@ func TestRun_MultipleActors_ExecuteReturnTimeout(t *testing.T) {
 	require.True(t, gotRunCompleted, "rungroup.Run did not terminate within time limit")
 	require.Equal(t, 3, receivedInterrupts, "unexpected number of interrupts: logs:", logBytes.String())
 	require.Equal(t, 2, receivedExecuteReturns)
+
+	// Clean up goroutine
+	blockingActorInterrupt <- struct{}{}
 }
 
 func TestRun_RecoversAndLogsPanic(t *testing.T) {

@@ -13,12 +13,13 @@ import (
 
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/ulid"
-	"github.com/kolide/launcher/ee/agent/startupsettings"
-	"github.com/kolide/launcher/ee/agent/storage"
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/pkg/augeas"
-	osqueryRuntime "github.com/kolide/launcher/pkg/osquery/runtime"
-	"github.com/kolide/launcher/pkg/osquery/table"
+	"github.com/kolide/launcher/v2/ee/agent/startupsettings"
+	"github.com/kolide/launcher/v2/ee/agent/storage"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/pkg/augeas"
+	"github.com/kolide/launcher/v2/pkg/backoff"
+	osqueryRuntime "github.com/kolide/launcher/v2/pkg/osquery/runtime"
+	"github.com/kolide/launcher/v2/pkg/osquery/table"
 	osquery "github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/config"
 )
@@ -154,8 +155,16 @@ func buildOsqueryFlags(socketPath, augeasLensesPath string, osqueryFlags []strin
 // loadExtensionsAndStartServer calls *osquery.ExtensionManagerServer.Start, which will block (while running the server)
 // until the user exits the process.
 func loadExtensionsAndStartServer(slogger *slog.Logger, socketPath string, plugins ...osquery.OsqueryPlugin) (*osquery.ExtensionManagerServer, error) {
-	client, err := osquery.NewClient(socketPath, 10*time.Second, osquery.MaxWaitTime(10*time.Second))
-	if err != nil {
+	// On Windows, the named pipe may not be ready for connections immediately after
+	// it appears to exist (os.Stat succeeds). Unlike the Unix transport, which has
+	// a built-in waitForSocket retry loop, the Windows transport dials once and fails
+	// immediately if the pipe isn't ready. Retry with backoff to handle this.
+	var client *osquery.ExtensionManagerClient
+	if err := backoff.WaitFor(func() error {
+		var clientErr error
+		client, clientErr = osquery.NewClient(socketPath, 10*time.Second, osquery.MaxWaitTime(10*time.Second))
+		return clientErr
+	}, 10*time.Second, 1*time.Second); err != nil {
 		return nil, fmt.Errorf("error creating osquery client: %w", err)
 	}
 

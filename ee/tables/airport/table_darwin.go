@@ -11,13 +11,13 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/allowedcmd"
-	"github.com/kolide/launcher/ee/dataflatten"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/dataflattentable"
-	"github.com/kolide/launcher/ee/tables/tablehelpers"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/allowedcmd"
+	"github.com/kolide/launcher/v2/ee/dataflatten"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/dataflattentable"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -42,7 +42,10 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("name", tableName),
 	}
 
-	return tablewrapper.New(flags, slogger, t.name, columns, t.generate)
+	return tablewrapper.New(flags, slogger, t.name, columns, t.generate,
+		tablewrapper.WithDescription("macOS Wi-Fi information from the `airport` utility, including current network info (--getinfo) and scan results (--scan). Useful for checking Wi-Fi connection status, signal strength, and nearby networks. Requires a WHERE option = constraint (e.g. 'getinfo' or 'scan')."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
+	)
 }
 
 type airportExecutor struct {

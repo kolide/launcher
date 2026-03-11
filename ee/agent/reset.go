@@ -13,10 +13,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/kolide/launcher/ee/agent/storage"
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/pkg/osquery/runsimple"
+	"github.com/kolide/launcher/v2/ee/agent/storage"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/pkg/osquery/runsimple"
 )
 
 type dbResetRecord struct {
@@ -261,7 +261,7 @@ func currentSerialAndHardwareUUID(ctx context.Context, k types.Knapsack) (string
 		return "", "", fmt.Errorf("could not create osquery process to determine hardware UUID or serial: %w", err)
 	}
 
-	osqCtx, osqCancel := context.WithTimeout(ctx, 10*time.Second)
+	osqCtx, osqCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer osqCancel()
 
 	if sqlErr := osqProc.RunSql(osqCtx, []byte(query)); osqCtx.Err() != nil {

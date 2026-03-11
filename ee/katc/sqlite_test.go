@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/stretchr/testify/require"
 )
@@ -59,7 +59,7 @@ func Test_sqliteData(t *testing.T) {
 	}
 
 	// Query data
-	results, err := sqliteData(t.Context(), multislogger.NewNopLogger(), []string{filepath.Join(sqliteDir, "*.sqlite")}, "SELECT uuid, value FROM test_data;", table.QueryContext{})
+	results, err := sqliteData(t.Context(), multislogger.NewNopLogger(), []string{filepath.Join(sqliteDir, "*.sqlite")}, "", "SELECT uuid, value FROM test_data;", table.QueryContext{})
 	require.NoError(t, err)
 
 	// Confirm we have the correct number of `sourceData` returned (one per db)
@@ -89,7 +89,7 @@ func Test_sqliteData_noSourcesFound(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	results, err := sqliteData(t.Context(), multislogger.NewNopLogger(), []string{filepath.Join(tmpDir, "db.sqlite")}, "SELECT * FROM data;", table.QueryContext{})
+	results, err := sqliteData(t.Context(), multislogger.NewNopLogger(), []string{filepath.Join(tmpDir, "db.sqlite")}, "idb_cmp1", "SELECT * FROM data;", table.QueryContext{})
 	require.NoError(t, err)
 	require.Equal(t, 0, len(results))
 }

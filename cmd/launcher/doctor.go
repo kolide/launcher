@@ -5,11 +5,11 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/kolide/launcher/ee/agent/flags"
-	"github.com/kolide/launcher/ee/agent/knapsack"
-	"github.com/kolide/launcher/ee/debug/checkups"
-	"github.com/kolide/launcher/pkg/launcher"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/ee/agent/flags"
+	"github.com/kolide/launcher/v2/ee/agent/knapsack"
+	"github.com/kolide/launcher/v2/ee/debug/checkups"
+	"github.com/kolide/launcher/v2/pkg/launcher"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 )
 
 func runDoctor(systemMultiSlogger *multislogger.MultiSlogger, args []string) error {

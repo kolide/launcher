@@ -6,11 +6,11 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/allowedcmd"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/tablehelpers"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/allowedcmd"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -25,7 +25,9 @@ func TouchIDSystemConfig(flags types.Flags, slogger *slog.Logger) *table.Plugin 
 		table.IntegerColumn("touchid_unlock"),
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_touchid_system_config", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_touchid_system_config", columns, t.generate,
+		tablewrapper.WithDescription("System-wide Touch ID and Secure Enclave configuration on macOS, including hardware compatibility and whether Touch ID is enabled. Useful for checking biometric hardware support."),
+	)
 }
 
 type touchIDSystemConfigTable struct {

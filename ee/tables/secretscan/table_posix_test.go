@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
@@ -31,7 +31,7 @@ func TestScanPathFIFO(t *testing.T) {
 	require.NoError(t, err, "creating FIFO")
 
 	// Scanning a FIFO should return an error
-	_, err = tbl.scanPath(t.Context(), fifoPath)
+	_, err = tbl.scanPath(t.Context(), nil, fifoPath)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unsupported file type")
 }

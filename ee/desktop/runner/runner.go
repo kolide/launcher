@@ -23,21 +23,21 @@ import (
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/krypto/pkg/echelper"
-	"github.com/kolide/launcher/ee/agent"
-	"github.com/kolide/launcher/ee/agent/flags/keys"
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/consoleuser"
-	runnerserver "github.com/kolide/launcher/ee/desktop/runner/server"
-	"github.com/kolide/launcher/ee/desktop/user/client"
-	"github.com/kolide/launcher/ee/desktop/user/menu"
-	"github.com/kolide/launcher/ee/desktop/user/notify"
-	"github.com/kolide/launcher/ee/gowrapper"
-	"github.com/kolide/launcher/ee/log"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/presencedetection"
-	"github.com/kolide/launcher/ee/ui/assets"
-	"github.com/kolide/launcher/pkg/backoff"
-	"github.com/kolide/launcher/pkg/rungroup"
+	"github.com/kolide/launcher/v2/ee/agent"
+	"github.com/kolide/launcher/v2/ee/agent/flags/keys"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/consoleuser"
+	runnerserver "github.com/kolide/launcher/v2/ee/desktop/runner/server"
+	"github.com/kolide/launcher/v2/ee/desktop/user/client"
+	"github.com/kolide/launcher/v2/ee/desktop/user/menu"
+	"github.com/kolide/launcher/v2/ee/desktop/user/notify"
+	"github.com/kolide/launcher/v2/ee/gowrapper"
+	"github.com/kolide/launcher/v2/ee/log"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/presencedetection"
+	"github.com/kolide/launcher/v2/ee/ui/assets"
+	"github.com/kolide/launcher/v2/pkg/backoff"
+	"github.com/kolide/launcher/v2/pkg/rungroup"
 	"github.com/shirou/gopsutil/v4/process"
 	"go.uber.org/atomic"
 	"golang.org/x/exp/maps"
@@ -214,14 +214,6 @@ func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUser
 	}
 
 	runner.runnerServer = rs
-	gowrapper.Go(context.TODO(), runner.slogger, func() {
-		if err := runner.runnerServer.Serve(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			runner.slogger.Log(context.TODO(), slog.LevelError,
-				"running monitor server",
-				"err", err,
-			)
-		}
-	})
 
 	if runtime.GOOS == "darwin" {
 		runner.osVersion, err = osversion()
@@ -240,6 +232,15 @@ func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUser
 // Execute immediately checks if the current console user has a desktop process running. If not, it will start a new one.
 // Then repeats based on the executionInterval.
 func (r *DesktopUsersProcessesRunner) Execute() error {
+	gowrapper.Go(context.TODO(), r.slogger, func() {
+		if err := r.runnerServer.Serve(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			r.slogger.Log(context.TODO(), slog.LevelError,
+				"running monitor server",
+				"err", err,
+			)
+		}
+	})
+
 	defer r.updateTicker.Stop()
 	menuRefreshTicker := time.NewTicker(r.menuRefreshInterval)
 	defer menuRefreshTicker.Stop()

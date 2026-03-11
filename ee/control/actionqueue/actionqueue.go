@@ -10,8 +10,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/kolide/launcher/ee/agent/storage/inmemory"
-	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/agent/storage/inmemory"
+	"github.com/kolide/launcher/v2/ee/agent/types"
 )
 
 const (

@@ -5,7 +5,7 @@ package main
 import (
 	"errors"
 
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 )
 
 func runQueryWindowsUpdates(systemMultiSlogger *multislogger.MultiSlogger, args []string) error {

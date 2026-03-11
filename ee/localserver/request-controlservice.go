@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/v2/ee/observability"
 )
 
 func (ls *localServer) requestAccelerateControlHandler() http.Handler {

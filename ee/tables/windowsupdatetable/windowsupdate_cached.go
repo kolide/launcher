@@ -10,12 +10,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/dataflatten"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/dataflattentable"
-	"github.com/kolide/launcher/ee/tables/tablehelpers"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/dataflatten"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/dataflattentable"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -41,7 +41,10 @@ func CachedWindowsUpdatesTablePlugin(flags types.Flags, slogger *slog.Logger, ca
 		name:       "kolide_windows_updates_cached",
 	}
 
-	return tablewrapper.New(flags, slogger, t.name, columns, t.generateFromCachedData)
+	return tablewrapper.New(flags, slogger, t.name, columns, t.generateFromCachedData,
+		tablewrapper.WithDescription("Available and installed Windows Updates from a periodically refreshed cache, flattened as key-value pairs. This is the recommended table for querying Windows Update status -- it returns quickly, unlike kolide_windows_updates, which queries the API directly. Includes an age column showing how old the cached data is in seconds."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
+	)
 }
 
 func (c *CachedWindowsUpdatesTable) generateFromCachedData(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

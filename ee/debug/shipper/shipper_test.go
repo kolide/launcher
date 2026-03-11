@@ -9,15 +9,20 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/kolide/launcher/ee/agent"
-	"github.com/kolide/launcher/ee/agent/storage/inmemory"
-	"github.com/kolide/launcher/ee/agent/types"
-	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
-	"github.com/kolide/launcher/ee/control"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/ee/agent"
+	"github.com/kolide/launcher/v2/ee/agent/storage/inmemory"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	typesMocks "github.com/kolide/launcher/v2/ee/agent/types/mocks"
+	"github.com/kolide/launcher/v2/ee/control"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func TestShip(t *testing.T) { //nolint:paralleltest
 	tests := []struct {
@@ -91,6 +96,9 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 	for _, tt := range tests { //nolint:paralleltest
 		t.Run(tt.name, func(t *testing.T) {
 			testServer := httptest.NewServer(nil)
+			t.Cleanup(func() {
+				testServer.Close()
+			})
 
 			mux := http.NewServeMux()
 			mux.Handle("/api/agent/flare", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -229,6 +237,9 @@ func TestShipToS3(t *testing.T) { //nolint:paralleltest
 	for _, tt := range tests { //nolint:paralleltest
 		t.Run(tt.name, func(t *testing.T) {
 			testServer := httptest.NewServer(nil)
+			t.Cleanup(func() {
+				testServer.Close()
+			})
 
 			mux := http.NewServeMux()
 			mux.Handle("/api/agent/flare", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

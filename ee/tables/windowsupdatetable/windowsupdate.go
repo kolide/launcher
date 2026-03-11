@@ -11,14 +11,14 @@ import (
 	"strings"
 
 	comshim "github.com/NozomiNetworks/go-comshim"
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/allowedcmd"
-	"github.com/kolide/launcher/ee/dataflatten"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/dataflattentable"
-	"github.com/kolide/launcher/ee/tables/tablehelpers"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
-	"github.com/kolide/launcher/pkg/windows/windowsupdate"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/allowedcmd"
+	"github.com/kolide/launcher/v2/ee/dataflatten"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/dataflattentable"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/pkg/windows/windowsupdate"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -57,18 +57,24 @@ func TablePlugin(mode tableMode, flags types.Flags, slogger *slog.Logger) *table
 		mode: mode,
 	}
 
+	var description string
 	switch mode {
 	case UpdatesTable:
 		t.queryFunc = queryUpdates
 		t.name = "kolide_windows_updates"
+		description = "Available and installed Windows Updates from the Windows Update API, flattened as key-value pairs. WARNING: this table queries the Windows Update API directly and may take over 5 minutes to return. Prefer kolide_windows_updates_cached for most use cases."
 	case HistoryTable:
 		t.queryFunc = queryHistory
 		t.name = "kolide_windows_update_history"
+		description = "Windows Update installation history, flattened as key-value pairs. Each entry represents a past update operation with its result, timestamp, and details. Useful for auditing which updates have been installed or failed."
 	}
 
 	t.slogger = slogger.With("name", t.name)
 
-	return tablewrapper.New(flags, slogger, t.name, columns, t.generateWithLauncherExec)
+	return tablewrapper.New(flags, slogger, t.name, columns, t.generateWithLauncherExec,
+		tablewrapper.WithDescription(description),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
+	)
 }
 
 func queryUpdates(searcher *windowsupdate.IUpdateSearcher) (interface{}, error) {

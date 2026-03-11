@@ -6,13 +6,18 @@ import (
 	"sync"
 	"testing"
 
-	agentbbolt "github.com/kolide/launcher/ee/agent/storage/bbolt"
-	"github.com/kolide/launcher/ee/agent/storage/inmemory"
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	agentbbolt "github.com/kolide/launcher/v2/ee/agent/storage/bbolt"
+	"github.com/kolide/launcher/v2/ee/agent/storage/inmemory"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func getStores(t *testing.T) []types.KVStore {
 	db := SetupDB(t)

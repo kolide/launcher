@@ -13,12 +13,12 @@ import (
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/dataflatten"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/dataflattentable"
-	"github.com/kolide/launcher/ee/tables/tablehelpers"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/dataflatten"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/dataflattentable"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -51,6 +51,7 @@ type Table struct {
 func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
 		table.TextColumn("path"),
+		table.TextColumn("raw_data"),
 		table.TextColumn("signing_keys"),
 		table.TextColumn("include_raw_jwt"),
 	)
@@ -59,7 +60,10 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", "kolide_jwt"),
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_jwt", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_jwt", columns, t.generate,
+		tablewrapper.WithDescription("Parses JWTs and returns flattened claims and header data, with optional signature verification via signing keys. Requires at least one WHERE path or raw_data constraint."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
+	)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
@@ -69,84 +73,100 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	var results []map[string]string
 
 	paths := tablehelpers.GetConstraints(queryContext, "path")
-	if len(paths) < 1 {
-		return nil, errors.New("kolide_jwt requires at least one path to be specified")
+	rawDatas := tablehelpers.GetConstraints(queryContext, "raw_data")
+
+	if len(paths) < 1 && len(rawDatas) < 1 {
+		return nil, errors.New("kolide_jwt requires at least one path or raw_data to be specified")
 	}
 
-	for _, path := range paths {
-		for _, keyJSON := range tablehelpers.GetConstraints(queryContext, "signing_keys", tablehelpers.WithDefaults("")) {
-			for _, includeRawJWT := range tablehelpers.GetConstraints(queryContext, "include_raw_jwt", tablehelpers.WithAllowedValues(allowedIncludeValues), tablehelpers.WithDefaults("false")) {
-				for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
-					rawData, err := os.ReadFile(path)
-					if len(rawData) == 0 || err != nil {
+	for _, keyJSON := range tablehelpers.GetConstraints(queryContext, "signing_keys", tablehelpers.WithDefaults("")) {
+		for _, includeRawJWT := range tablehelpers.GetConstraints(queryContext, "include_raw_jwt", tablehelpers.WithAllowedValues(allowedIncludeValues), tablehelpers.WithDefaults("false")) {
+			for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
+				for _, path := range paths {
+					fileData, err := os.ReadFile(path)
+					if len(fileData) == 0 || err != nil {
 						t.slogger.Log(ctx, slog.LevelInfo, "error reading JWT data file", "err", err)
 						continue
 					}
 
-					// Parse provided JWT signing keys into an map for verification in the JWT parser
-					var keyMap map[string]string
-					if err := json.Unmarshal([]byte(keyJSON), &keyMap); err != nil {
-						t.slogger.Log(ctx, slog.LevelInfo, "error unmarshaling JWT signing keys", "err", err)
-					}
-
-					data := map[string]any{}
-					token, err := jwt.ParseWithClaims(string(rawData), jwt.MapClaims{}, JWTKeyFunc(keyMap))
-					if err != nil {
-						t.slogger.Log(ctx, slog.LevelInfo, "error parsing token", "err", err)
-
-						if errors.Is(err, ErrParsingPemBlock) || errors.Is(err, ErrParsingPublicKey) {
-							data["verified"] = Invalid
-						}
-					} else {
-						data["verified"] = Valid
-					}
-
-					if token == nil {
-						// error will have been logged above, but if there is no token
-						// at all (not just a verification issue) there is nothing else we can do
-						continue
-					}
-
-					claims, ok := token.Claims.(jwt.MapClaims)
-					if !ok {
-						t.slogger.Log(ctx, slog.LevelInfo, "error parsing JWT claims")
-						continue
-					}
-
-					parsedClaims := map[string]any{}
-					maps.Copy(parsedClaims, claims)
-
-					data["header"] = token.Header
-					data["claims"] = parsedClaims
-
+					rawDataOutput := ""
 					if includeRawJWT != "false" {
-						data["raw_jwt"] = string(rawData)
-					}
-
-					flattenOpts := []dataflatten.FlattenOpts{
-						dataflatten.WithSlogger(t.slogger),
-						dataflatten.WithQuery(strings.Split(dataQuery, "/")),
-					}
-
-					flattened, err := dataflatten.Flatten(data, flattenOpts...)
-					if err != nil {
-						t.slogger.Log(ctx, slog.LevelInfo, "failure flattening JWT data", "err", err)
-						continue
+						rawDataOutput = string(fileData)
 					}
 
 					rowData := map[string]string{
 						"path":            path,
+						"raw_data":        rawDataOutput,
 						"signing_keys":    keyJSON,
 						"include_raw_jwt": includeRawJWT,
 					}
 
-					results = append(results, dataflattentable.ToMap(flattened, dataQuery, rowData)...)
+					results = append(results, t.processJWT(ctx, fileData, keyJSON, dataQuery, rowData)...)
+				}
+
+				for _, rawData := range rawDatas {
+					rowData := map[string]string{
+						"path":            "",
+						"raw_data":        rawData,
+						"signing_keys":    keyJSON,
+						"include_raw_jwt": includeRawJWT,
+					}
+
+					results = append(results, t.processJWT(ctx, []byte(rawData), keyJSON, dataQuery, rowData)...)
 				}
 			}
 		}
 	}
 
 	return results, nil
+}
+
+func (t *Table) processJWT(ctx context.Context, rawData []byte, keyJSON string, dataQuery string, rowData map[string]string) []map[string]string {
+	var keyMap map[string]string
+	if err := json.Unmarshal([]byte(keyJSON), &keyMap); err != nil {
+		t.slogger.Log(ctx, slog.LevelInfo, "error unmarshaling JWT signing keys", "err", err)
+	}
+
+	data := map[string]any{}
+	token, err := jwt.ParseWithClaims(string(rawData), jwt.MapClaims{}, JWTKeyFunc(keyMap))
+	if err != nil {
+		t.slogger.Log(ctx, slog.LevelInfo, "error parsing token", "err", err)
+
+		if errors.Is(err, ErrParsingPemBlock) || errors.Is(err, ErrParsingPublicKey) {
+			data["verified"] = Invalid
+		}
+	} else {
+		data["verified"] = Valid
+	}
+
+	if token == nil {
+		return nil
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		t.slogger.Log(ctx, slog.LevelInfo, "error parsing JWT claims")
+		return nil
+	}
+
+	parsedClaims := map[string]any{}
+	maps.Copy(parsedClaims, claims)
+
+	data["header"] = token.Header
+	data["claims"] = parsedClaims
+
+	flattenOpts := []dataflatten.FlattenOpts{
+		dataflatten.WithSlogger(t.slogger),
+		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
+	}
+
+	flattened, err := dataflatten.Flatten(data, flattenOpts...)
+	if err != nil {
+		t.slogger.Log(ctx, slog.LevelInfo, "failure flattening JWT data", "err", err)
+		return nil
+	}
+
+	return dataflattentable.ToMap(flattened, dataQuery, rowData)
 }
 
 // JWTKeyFunc handles taking in an array of public keys to validate against the JWT signature.

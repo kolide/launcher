@@ -9,7 +9,7 @@ import (
 	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
-	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/v2/ee/observability"
 	"github.com/osquery/osquery-go/plugin/distributed"
 )
 
@@ -83,12 +83,9 @@ func MakeRequestQueriesEndpoint(svc KolideService) endpoint.Endpoint {
 }
 
 // RequestQueries implements KolideService.RequestQueries
-func (e *Endpoints) RequestQueries(ctx context.Context, nodeKey string) (*distributed.GetQueriesResult, bool, error) {
+func (e Endpoints) RequestQueries(ctx context.Context, nodeKey string) (*distributed.GetQueriesResult, bool, error) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
-
-	e.endpointsLock.RLock()
-	defer e.endpointsLock.RUnlock()
 
 	newCtx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()

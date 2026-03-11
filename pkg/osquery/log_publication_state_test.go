@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/kolide/kit/ulid"
-	settingsstoremock "github.com/kolide/launcher/pkg/osquery/mocks"
-	"github.com/kolide/launcher/pkg/service/mock"
+	settingsstoremock "github.com/kolide/launcher/v2/pkg/osquery/mocks"
+	"github.com/kolide/launcher/v2/pkg/service/mock"
 	"github.com/osquery/osquery-go/plugin/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,11 +23,12 @@ func TestExtensionLogPublicationHappyPath(t *testing.T) {
 		},
 	}
 	k := makeKnapsack(t)
-	lpc := makeTestOsqLogPublisher(k)
-	e, err := NewExtension(t.Context(), m, lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
+	lpc := makeTestOsqLogPublisher(t, k)
+	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
 		MaxBytesPerBatch: startingBatchLimitBytes,
 	})
 	require.Nil(t, err)
+	e.serviceClient = m
 
 	// issue a few successful calls, expect that the batch limit is unchanged from the original opts
 	for range 3 {
@@ -58,11 +59,12 @@ func TestExtensionLogPublicationRespondsToNetworkTimeouts(t *testing.T) {
 		},
 	}
 	k := makeKnapsack(t)
-	lpc := makeTestOsqLogPublisher(k)
-	e, err := NewExtension(t.Context(), m, lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
+	lpc := makeTestOsqLogPublisher(t, k)
+	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
 		MaxBytesPerBatch: startingBatchLimitBytes,
 	})
 	require.Nil(t, err)
+	e.serviceClient = m
 
 	// expect each subsequent failed call to reduce the batch size until the min threshold is reached
 	expectedMaxValue := e.Opts.MaxBytesPerBatch
@@ -108,11 +110,12 @@ func TestExtensionLogPublicationIgnoresNonTimeoutErrors(t *testing.T) {
 		},
 	}
 	k := makeKnapsack(t)
-	lpc := makeTestOsqLogPublisher(k)
-	e, err := NewExtension(t.Context(), m, lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
+	lpc := makeTestOsqLogPublisher(t, k)
+	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
 		MaxBytesPerBatch: startingBatchLimitBytes,
 	})
 	require.Nil(t, err)
+	e.serviceClient = m
 
 	// issue a few calls that error immediately, expect that the batch limit is unchanged from the original opts
 	for range 3 {

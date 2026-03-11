@@ -4,11 +4,11 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/dataflatten"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/dataflattentable"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/dataflatten"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/dataflattentable"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -25,7 +25,10 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger, store types.KVStore) *
 		tableName: "kolide_sourced_data",
 	}
 
-	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generateKolideReleaseTrackerDataTable(store))
+	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generateKolideReleaseTrackerDataTable(store),
+		tablewrapper.WithDescription("Third party release metadata from the Kolide's release tracker, flattened as key-value pairs. Useful for inspecting available software release information."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
+	)
 }
 
 func (t *Table) generateKolideReleaseTrackerDataTable(store types.KVStore) table.GenerateFunc {

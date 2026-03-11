@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/kolide/kit/contexts/uuid"
-	"github.com/kolide/launcher/ee/agent/storage"
-	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/agent/storage"
+	"github.com/kolide/launcher/v2/ee/agent/types"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	osqlog "github.com/osquery/osquery-go/plugin/logger"
 )

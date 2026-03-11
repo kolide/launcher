@@ -15,10 +15,10 @@ import (
 	"time"
 
 	"github.com/kolide/krypto/pkg/echelper"
-	"github.com/kolide/launcher/ee/agent"
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/gowrapper"
-	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/v2/ee/agent"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/gowrapper"
+	"github.com/kolide/launcher/v2/ee/observability"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.uber.org/atomic"
 	"golang.org/x/time/rate"
@@ -380,7 +380,9 @@ func (ls *localServer) Interrupt(_ error) {
 		)
 	}
 
-	ls.cancel()
+	if ls.cancel != nil {
+		ls.cancel()
+	}
 
 	ls.kryptoMiddleware.Close()
 }

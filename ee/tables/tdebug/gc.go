@@ -8,12 +8,12 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/dataflatten"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/dataflattentable"
-	"github.com/kolide/launcher/ee/tables/tablehelpers"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/dataflatten"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/dataflattentable"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -33,7 +33,10 @@ func LauncherGcInfo(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", gcTableName),
 	}
 
-	return tablewrapper.New(flags, slogger, gcTableName, columns, t.generate)
+	return tablewrapper.New(flags, slogger, gcTableName, columns, t.generate,
+		tablewrapper.WithDescription("Go runtime garbage collection statistics for the launcher process, including pause times and GC counts. Useful for debugging launcher memory and performance issues."),
+		tablewrapper.WithNote(dataflattentable.EAVNote),
+	)
 }
 
 func (t *gcTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

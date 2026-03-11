@@ -11,13 +11,15 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/kolide/goleveldb/leveldb"
+	leveldbcomparer "github.com/kolide/goleveldb/leveldb/comparer"
 	leveldberrors "github.com/kolide/goleveldb/leveldb/errors"
 	"github.com/kolide/goleveldb/leveldb/opt"
-	"github.com/kolide/launcher/ee/agent"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/pkg/indexeddbcomparator"
+	"github.com/kolide/launcher/v2/ee/agent"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/pkg/indexeddbcomparator"
 )
 
 // maxNumberOfObjectStoresToCheck is the number of indices for object stores we will check
@@ -31,7 +33,7 @@ const maxNumberOfObjectStoresToCheck = 100
 
 // QueryIndexeddbObjectStore queries the indexeddb at the given location `dbLocation`,
 // returning all objects in the given database that live in the given object store.
-func QueryIndexeddbObjectStore(ctx context.Context, slogger *slog.Logger, dbLocation string, dbName string, objectStoreName string) ([]map[string][]byte, error) {
+func QueryIndexeddbObjectStore(ctx context.Context, slogger *slog.Logger, dbLocation string, dbName string, objectStoreName string, comparer string) ([]map[string][]byte, error) {
 	ctx, span := observability.StartSpan(ctx, "db_name", dbName, "object_store_name", objectStoreName)
 	defer span.End()
 
@@ -48,7 +50,7 @@ func QueryIndexeddbObjectStore(ctx context.Context, slogger *slog.Logger, dbLoca
 
 	objs := make([]map[string][]byte, 0)
 
-	db, err := OpenLeveldb(ctx, slogger, tempDbCopyLocation)
+	db, err := OpenLeveldb(ctx, slogger, tempDbCopyLocation, comparer)
 	if err != nil {
 		return nil, fmt.Errorf("opening leveldb: %w", err)
 	}
@@ -181,18 +183,29 @@ func copyFile(ctx context.Context, src string, dest string) error {
 	return nil
 }
 
-func OpenLeveldb(ctx context.Context, slogger *slog.Logger, dbLocation string) (*leveldb.DB, error) {
+func OpenLeveldb(ctx context.Context, slogger *slog.Logger, dbLocation string, comparer string) (*leveldb.DB, error) {
 	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
-	comparer := indexeddbcomparator.NewIdbCmp1Comparer(slogger)
 	opts := &opt.Options{
-		Comparer:               comparer,
+		Comparer:               comparerFromType(comparer, slogger),
 		DisableSeeksCompaction: true,               // no need to perform compaction
 		Strict:                 opt.StrictRecovery, // we prefer to drop corrupted data rather than fail to open the db altogether
 	}
 	db, dbOpenErr := leveldb.OpenFile(dbLocation, opts)
 	if dbOpenErr != nil {
+		// TODO we should update goleveldb to return a specific, checkable error type for this case so we don't have to do this gross string check
+		// error looks like- leveldb: manifest corrupted (field 'comparer'): mismatch: want 'idb_cmp1', got 'leveldb.BytewiseComparator'
+		if strings.Contains(dbOpenErr.Error(), "mismatch: want 'idb_cmp1', got 'leveldb.BytewiseComparator'") {
+			// try again with the default comparer
+			opts.Comparer = leveldbcomparer.DefaultComparer
+			db, dbOpenErr = leveldb.OpenFile(dbLocation, opts)
+			// if this fixed the issue, return the db. otherwise continue on to try recovery,
+			// we know that we're better off in this scenario with the bytewise comparator anyway
+			if dbOpenErr == nil {
+				return db, nil
+			}
+		}
 		// ensure we log this error so we can investigate. we don't think we're seeing any non-idb_cmp1
 		// leveldbs, but when that is the case we still get a valid db returned, and then no errors from
 		// the RecoverFile call, so it is possible that this is a valid corruption error which recovery wouldn't have actually fixed.
@@ -211,4 +224,19 @@ func OpenLeveldb(ctx context.Context, slogger *slog.Logger, dbLocation string) (
 	}
 
 	return db, nil
+}
+
+// comparerFromType returns the appropriate comparer for the given comparer type.
+// if unset or invalid, it returns our default comparer, idb_cmp1.
+func comparerFromType(comparerType string, slogger *slog.Logger) leveldbcomparer.Comparer {
+	switch comparerType {
+	case "historical_bytewise":
+		return HistoricalBytewiseComparer()
+	case "default_bytewise":
+		return leveldbcomparer.DefaultComparer
+	case "", "idb_cmp1":
+		return indexeddbcomparator.NewIdbCmp1Comparer(slogger)
+	default:
+		return indexeddbcomparator.NewIdbCmp1Comparer(slogger)
+	}
 }

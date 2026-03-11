@@ -14,16 +14,21 @@ import (
 	"time"
 
 	"github.com/kolide/krypto/pkg/echelper"
-	"github.com/kolide/launcher/ee/agent/storage"
-	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
-	"github.com/kolide/launcher/ee/agent/types"
-	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
-	"github.com/kolide/launcher/pkg/log/multislogger"
-	"github.com/kolide/launcher/pkg/osquery/testutil"
-	"github.com/kolide/launcher/pkg/threadsafebuffer"
+	"github.com/kolide/launcher/v2/ee/agent/storage"
+	storageci "github.com/kolide/launcher/v2/ee/agent/storage/ci"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	typesmocks "github.com/kolide/launcher/v2/ee/agent/types/mocks"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/pkg/osquery/testutil"
+	"github.com/kolide/launcher/v2/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 var testOsqueryBinary string
 
@@ -37,6 +42,14 @@ var downloadOnceFunc = sync.OnceFunc(func() {
 func TestDetectAndRemediateHardwareChange(t *testing.T) {
 	t.Parallel()
 	downloadOnceFunc()
+
+	// Pre-compute hardware serial and UUID once rather than in each parallel subtest.
+	// All subtests query the same hardware and get the same result, so running 16+
+	// simultaneous osquery processes just overwhelms slow CI runners.
+	setupKnapsack := typesmocks.NewKnapsack(t)
+	setupKnapsack.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
+	cachedSerial, cachedHardwareUUID, err := currentSerialAndHardwareUUID(t.Context(), setupKnapsack)
+	require.NoError(t, err, "expected no error querying osquery for hardware data at ", testOsqueryBinary)
 
 	testCases := []struct {
 		name                         string
@@ -339,8 +352,8 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			var actualSerial, actualHardwareUUID string
 			if tt.osquerySuccess {
 				mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
-				actualSerial, actualHardwareUUID, err = currentSerialAndHardwareUUID(t.Context(), mockKnapsack)
-				require.NoError(t, err, "expected no error querying osquery at ", testOsqueryBinary)
+				actualSerial = cachedSerial
+				actualHardwareUUID = cachedHardwareUUID
 			} else {
 				mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(filepath.Join("not", "a", "real", "osqueryd", "binary"))
 				actualSerial = "test-serial"

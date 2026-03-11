@@ -4,10 +4,10 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
-	"github.com/kolide/launcher/pkg/osquery"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/pkg/osquery"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -16,7 +16,9 @@ func LauncherConfigTable(flags types.Flags, slogger *slog.Logger, store types.Ge
 		table.TextColumn("config"),
 		table.TextColumn("enrollment_id"),
 	}
-	return tablewrapper.New(flags, slogger, "kolide_launcher_config", columns, generateLauncherConfig(store, enrollmentTracker))
+	return tablewrapper.New(flags, slogger, "kolide_launcher_config", columns, generateLauncherConfig(store, enrollmentTracker),
+		tablewrapper.WithDescription("The current osquery configuration for each enrollment, including scheduled queries and options. Useful for verifying what queries are configured to run."),
+	)
 }
 
 func generateLauncherConfig(store types.Getter, enrollmentTracker types.EnrollmentTracker) table.GenerateFunc {

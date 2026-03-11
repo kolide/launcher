@@ -6,12 +6,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kolide/launcher/ee/observability/bufspanprocessor/mocks"
+	"github.com/kolide/launcher/v2/ee/observability/bufspanprocessor/mocks"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func TestBufSpanProcessor(t *testing.T) {
 	t.Parallel()

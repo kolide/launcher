@@ -7,12 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kolide/launcher/ee/agent/storage"
-	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/agent/types/mocks"
-	"github.com/kolide/launcher/ee/osquerypublisher"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/ee/agent/storage"
+	storageci "github.com/kolide/launcher/v2/ee/agent/storage/ci"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/agent/types/mocks"
+	"github.com/kolide/launcher/v2/ee/osquerypublisher"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 
 	"github.com/stretchr/testify/require"
 )
@@ -35,7 +35,11 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 		tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 		require.NoError(t, err)
 		m.On("TokenStore").Return(tokenStore)
-		osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, m, http.DefaultClient)
+		client := &http.Client{}
+		t.Cleanup(func() {
+			client.CloseIdleConnections()
+		})
+		osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, m, client)
 		m.On("OsqueryPublisher").Return(osqPublisher).Maybe()
 		return m
 	}
@@ -71,7 +75,11 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 				tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 				require.NoError(t, err)
 				m.On("TokenStore").Return(tokenStore)
-				osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, m, http.DefaultClient)
+				client := &http.Client{}
+				t.Cleanup(func() {
+					client.CloseIdleConnections()
+				})
+				osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, m, client)
 				m.On("OsqueryPublisher").Return(osqPublisher).Maybe()
 				return m
 			},

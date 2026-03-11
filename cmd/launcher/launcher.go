@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/x509"
 	"fmt"
 	"log/slog"
 	"net"
@@ -20,53 +19,52 @@ import (
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/kit/version"
-	"github.com/kolide/launcher/cmd/launcher/internal"
-	"github.com/kolide/launcher/ee/agent"
-	"github.com/kolide/launcher/ee/agent/flags"
-	"github.com/kolide/launcher/ee/agent/flags/keys"
-	"github.com/kolide/launcher/ee/agent/knapsack"
-	"github.com/kolide/launcher/ee/agent/listener"
-	"github.com/kolide/launcher/ee/agent/startupsettings"
-	"github.com/kolide/launcher/ee/agent/storage"
-	agentbbolt "github.com/kolide/launcher/ee/agent/storage/bbolt"
-	"github.com/kolide/launcher/ee/agent/timemachine"
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/control"
-	"github.com/kolide/launcher/ee/control/actionqueue"
-	"github.com/kolide/launcher/ee/control/consumers/acceleratecontrolconsumer"
-	"github.com/kolide/launcher/ee/control/consumers/flareconsumer"
-	"github.com/kolide/launcher/ee/control/consumers/keyvalueconsumer"
-	"github.com/kolide/launcher/ee/control/consumers/localizationconsumer"
-	"github.com/kolide/launcher/ee/control/consumers/notificationconsumer"
-	"github.com/kolide/launcher/ee/control/consumers/remoterestartconsumer"
-	"github.com/kolide/launcher/ee/control/consumers/uninstallconsumer"
-	performancedebug "github.com/kolide/launcher/ee/debug"
-	"github.com/kolide/launcher/ee/debug/checkups"
-	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
-	"github.com/kolide/launcher/ee/filewalker"
-	"github.com/kolide/launcher/ee/gowrapper"
-	"github.com/kolide/launcher/ee/localserver"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/observability/exporter"
-	"github.com/kolide/launcher/ee/osquerypublisher"
-	"github.com/kolide/launcher/ee/powereventwatcher"
-	"github.com/kolide/launcher/ee/tables/windowsupdatetable"
-	"github.com/kolide/launcher/ee/tuf"
-	"github.com/kolide/launcher/ee/watchdog"
-	"github.com/kolide/launcher/pkg/augeas"
-	"github.com/kolide/launcher/pkg/backoff"
-	"github.com/kolide/launcher/pkg/contexts/ctxlog"
-	"github.com/kolide/launcher/pkg/debug"
-	"github.com/kolide/launcher/pkg/launcher"
-	"github.com/kolide/launcher/pkg/log/logshipper"
-	"github.com/kolide/launcher/pkg/log/multislogger"
-	"github.com/kolide/launcher/pkg/log/teelogger"
-	"github.com/kolide/launcher/pkg/osquery"
-	"github.com/kolide/launcher/pkg/osquery/runsimple"
-	osqueryruntime "github.com/kolide/launcher/pkg/osquery/runtime"
-	osqueryInstanceHistory "github.com/kolide/launcher/pkg/osquery/runtime/history"
-	"github.com/kolide/launcher/pkg/rungroup"
-	"github.com/kolide/launcher/pkg/service"
+	"github.com/kolide/launcher/v2/cmd/launcher/internal"
+	"github.com/kolide/launcher/v2/ee/agent"
+	"github.com/kolide/launcher/v2/ee/agent/flags"
+	"github.com/kolide/launcher/v2/ee/agent/flags/keys"
+	"github.com/kolide/launcher/v2/ee/agent/knapsack"
+	"github.com/kolide/launcher/v2/ee/agent/listener"
+	"github.com/kolide/launcher/v2/ee/agent/startupsettings"
+	"github.com/kolide/launcher/v2/ee/agent/storage"
+	agentbbolt "github.com/kolide/launcher/v2/ee/agent/storage/bbolt"
+	"github.com/kolide/launcher/v2/ee/agent/timemachine"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/control"
+	"github.com/kolide/launcher/v2/ee/control/actionqueue"
+	"github.com/kolide/launcher/v2/ee/control/consumers/acceleratecontrolconsumer"
+	"github.com/kolide/launcher/v2/ee/control/consumers/flareconsumer"
+	"github.com/kolide/launcher/v2/ee/control/consumers/keyvalueconsumer"
+	"github.com/kolide/launcher/v2/ee/control/consumers/localizationconsumer"
+	"github.com/kolide/launcher/v2/ee/control/consumers/notificationconsumer"
+	"github.com/kolide/launcher/v2/ee/control/consumers/remoterestartconsumer"
+	"github.com/kolide/launcher/v2/ee/control/consumers/uninstallconsumer"
+	performancedebug "github.com/kolide/launcher/v2/ee/debug"
+	"github.com/kolide/launcher/v2/ee/debug/checkups"
+	desktopRunner "github.com/kolide/launcher/v2/ee/desktop/runner"
+	"github.com/kolide/launcher/v2/ee/filewalker"
+	"github.com/kolide/launcher/v2/ee/gowrapper"
+	"github.com/kolide/launcher/v2/ee/localserver"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/observability/exporter"
+	"github.com/kolide/launcher/v2/ee/osquerypublisher"
+	"github.com/kolide/launcher/v2/ee/powereventwatcher"
+	"github.com/kolide/launcher/v2/ee/tables/windowsupdatetable"
+	"github.com/kolide/launcher/v2/ee/tuf"
+	"github.com/kolide/launcher/v2/ee/watchdog"
+	"github.com/kolide/launcher/v2/pkg/augeas"
+	"github.com/kolide/launcher/v2/pkg/backoff"
+	"github.com/kolide/launcher/v2/pkg/contexts/ctxlog"
+	"github.com/kolide/launcher/v2/pkg/debug"
+	"github.com/kolide/launcher/v2/pkg/launcher"
+	"github.com/kolide/launcher/v2/pkg/log/logshipper"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/pkg/log/teelogger"
+	"github.com/kolide/launcher/v2/pkg/osquery"
+	"github.com/kolide/launcher/v2/pkg/osquery/runsimple"
+	osqueryruntime "github.com/kolide/launcher/v2/pkg/osquery/runtime"
+	osqueryInstanceHistory "github.com/kolide/launcher/v2/pkg/osquery/runtime/history"
+	"github.com/kolide/launcher/v2/pkg/rungroup"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"go.etcd.io/bbolt"
@@ -326,19 +324,6 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	dbBackupSaver := agentbbolt.NewDatabaseBackupSaver(k)
 	runGroup.Add("dbBackupSaver", dbBackupSaver.Execute, dbBackupSaver.Interrupt)
 
-	// create the certificate pool
-	var rootPool *x509.CertPool
-	if k.RootPEM() != "" {
-		rootPool = x509.NewCertPool()
-		pemContents, err := os.ReadFile(k.RootPEM())
-		if err != nil {
-			return fmt.Errorf("reading root certs PEM at path: %s: %w", k.RootPEM(), err)
-		}
-		if ok := rootPool.AppendCertsFromPEM(pemContents); !ok {
-			return fmt.Errorf("found no valid certs in PEM at path: %s", k.RootPEM())
-		}
-	}
-
 	// Add the log checkpoints to the rungroup, and run it once early, to try to get data into the logs.
 	// The checkpointer can take up to 5 seconds to run, so do this in the background.
 	checkpointer := checkups.NewCheckupLogger(slogger, k)
@@ -388,8 +373,6 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	windowsUpdatesCacher := windowsupdatetable.NewWindowsUpdatesCacher(k, k.WindowsUpdatesCacheStore(), 1*time.Hour, k.Slogger())
 	runGroup.Add("windowsUpdatesCacher", windowsUpdatesCacher.Execute, windowsUpdatesCacher.Interrupt)
 
-	client := service.NewJSONRPCClient(k, rootPool)
-
 	// make sure keys exist -- we expect these keys to exist before rungroup starts
 	if err := agent.SetupKeys(ctx, k.Slogger(), k.ConfigStore()); err != nil {
 		return fmt.Errorf("setting up agent keys: %w", err)
@@ -417,7 +400,6 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	// create the runner that will launch osquery
 	osqueryRunner := osqueryruntime.New(
 		k,
-		client,
 		logPublishClient,
 		startupSettingsWriter,
 		osqueryruntime.WithAugeasLensFunction(augeas.InstallLenses),
@@ -601,10 +583,10 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 
 	// If autoupdating is enabled, run the autoupdater
 	if k.Autoupdate() {
-		metadataClient := http.DefaultClient
+		metadataClient := &http.Client{}
 		metadataClient.Timeout = 30 * time.Second
 		metadataClient.Transport = otelhttp.NewTransport(metadataClient.Transport)
-		mirrorClient := http.DefaultClient
+		mirrorClient := &http.Client{}
 		mirrorClient.Timeout = 8 * time.Minute // gives us extra time to avoid a timeout on download
 		mirrorClient.Transport = otelhttp.NewTransport(mirrorClient.Transport)
 		tufAutoupdater, err := tuf.NewTufAutoupdater(

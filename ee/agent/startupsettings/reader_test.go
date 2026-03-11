@@ -3,11 +3,16 @@ package startupsettings
 import (
 	"testing"
 
-	"github.com/kolide/launcher/ee/agent/flags/keys"
-	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/ee/agent/flags/keys"
+	agentsqlite "github.com/kolide/launcher/v2/ee/agent/storage/sqlite"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func TestGet(t *testing.T) {
 	t.Parallel()

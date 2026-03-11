@@ -9,7 +9,7 @@ import (
 	"os/exec"
 	"runtime"
 
-	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/v2/ee/observability"
 )
 
 // osqueryProcess is a very simple osquery runtime manager. It's designed to start and stop osquery. It has

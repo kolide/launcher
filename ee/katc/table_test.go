@@ -13,8 +13,8 @@ import (
 	"testing"
 
 	"github.com/kolide/goleveldb/leveldb/opt"
-	"github.com/kolide/launcher/ee/indexeddb"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/ee/indexeddb"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/stretchr/testify/require"
 
@@ -26,6 +26,9 @@ var basicFirefoxIndexeddb []byte
 
 //go:embed test_data/indexeddbs/file__0.indexeddb.leveldb.zip
 var basicChromeIndexeddb []byte
+
+//go:embed test_data/indexeddbs/bytewise.leveldb.zip
+var bytewiseLeveldb []byte
 
 func TestQueryFirefoxIndexedDB(t *testing.T) {
 	t.Parallel()
@@ -453,7 +456,7 @@ func TestQueryLevelDB(t *testing.T) {
 
 	// Create a level db to query
 	tempDir := t.TempDir()
-	db, err := indexeddb.OpenLeveldb(t.Context(), multislogger.NewNopLogger(), tempDir)
+	db, err := indexeddb.OpenLeveldb(t.Context(), multislogger.NewNopLogger(), tempDir, "idb_cmp1")
 	require.NoError(t, err)
 
 	// Add some data
@@ -513,6 +516,166 @@ func TestQueryLevelDB(t *testing.T) {
 	require.Equal(t, expectedValue, results[0]["value"])
 	require.Contains(t, results[0], "path")
 	require.Equal(t, tempDir, results[0]["path"])
+}
+
+// TestQueryBytewiseLevelDB uses the embedded bytewise.leveldb.zip (created with the default
+// bytewise comparator, not idb_cmp1). Opening it exercises the fallback in indexeddb.OpenLeveldb
+// that retries with leveldbcomparer.DefaultComparer when the manifest reports leveldb.BytewiseComparator.
+// unfortunately there does not appear to be a good way to verify the actual comparer used from the db returned
+// by OpenLeveldb, and we don't yet understand what causes keys to be found by bytewiseComparator but not idb_cmp1,
+// so I've verified this behavior manually via debugging this test, we should update the test fixture if we can get
+// a known problematic set of keys that are found by bytewiseComparator but not idb_cmp1.
+func TestQueryBytewiseLevelDB(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	zipFile := filepath.Join(tempDir, "bytewise.leveldb.zip")
+	require.NoError(t, os.WriteFile(zipFile, bytewiseLeveldb, 0755), "writing zip to temp dir")
+
+	zipReader, err := zip.OpenReader(zipFile)
+	require.NoError(t, err, "opening zip")
+	defer zipReader.Close()
+	for _, fileInZip := range zipReader.File {
+		unzipFile(t, fileInZip, tempDir)
+	}
+
+	// zip was created with path test_data/bytewise_leveldb/... so unzip yields tempDir/test_data/bytewise_leveldb
+	leveldbDir := filepath.Join(tempDir, "test_data", "bytewise_leveldb")
+	sourceQuery := "" // empty: return all keys
+
+	cfg := katcTableConfig{
+		Columns: []string{"key", "value"},
+		katcTableDefinition: katcTableDefinition{
+			SourceType: &katcSourceType{
+				name:     leveldbSourceType,
+				dataFunc: leveldbData,
+			},
+			SourcePaths:       &[]string{filepath.Join("some", "incorrect", "path")},
+			SourceQuery:       &sourceQuery,
+			RowTransformSteps: &[]rowTransformStep{},
+		},
+		Overlays: []katcTableConfigOverlay{
+			{
+				Filters: map[string]string{
+					"goos": runtime.GOOS,
+				},
+				katcTableDefinition: katcTableDefinition{
+					SourcePaths: &[]string{leveldbDir},
+				},
+			},
+		},
+	}
+	testTable, _ := newKatcTable("test_katc_table", cfg, multislogger.NewNopLogger())
+
+	queryContext := table.QueryContext{
+		Constraints: map[string]table.ConstraintList{
+			pathColumnName: {
+				Constraints: []table.Constraint{
+					{Operator: table.OperatorEquals, Expression: leveldbDir},
+				},
+			},
+		},
+	}
+
+	results, err := testTable.generate(t.Context(), queryContext)
+	require.NoError(t, err)
+
+	// fixture from create_bytewise_leveldb.js has 4 entries
+	require.Len(t, results, 4)
+
+	keysSeen := make(map[string]string)
+	for _, row := range results {
+		require.Contains(t, row, "key")
+		require.Contains(t, row, "value")
+		require.Contains(t, row, "path")
+		keysSeen[row["key"]] = row["value"]
+		require.Equal(t, leveldbDir, row["path"])
+	}
+
+	// all entries are coerced to basic string values
+	require.Equal(t, "test-stringvalue1", keysSeen["test-stringvalue-key1"])
+	require.Equal(t, "2", keysSeen["test-intvalue-key2"])
+	require.Equal(t, "3.3", keysSeen["test-floatvalue-key3"])
+	require.Equal(t, "true", keysSeen["test-booleanvalue-key4"])
+}
+
+func TestQueryBytewiseLevelDBWithHistoricalComparer(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	zipFile := filepath.Join(tempDir, "bytewise.leveldb.zip")
+	require.NoError(t, os.WriteFile(zipFile, bytewiseLeveldb, 0755), "writing zip to temp dir")
+
+	zipReader, err := zip.OpenReader(zipFile)
+	require.NoError(t, err, "opening zip")
+	defer zipReader.Close()
+	for _, fileInZip := range zipReader.File {
+		unzipFile(t, fileInZip, tempDir)
+	}
+
+	// zip was created with path test_data/bytewise_leveldb/... so unzip yields tempDir/test_data/bytewise_leveldb
+	leveldbDir := filepath.Join(tempDir, "test_data", "bytewise_leveldb")
+	sourceQuery := "" // empty: return all keys
+	comparer := comparerHistoricalBytewise
+	cfg := katcTableConfig{
+		Columns: []string{"key", "value"},
+		katcTableDefinition: katcTableDefinition{
+			SourceType: &katcSourceType{
+				name:     leveldbSourceType,
+				dataFunc: leveldbData,
+			},
+			SourcePaths:       &[]string{filepath.Join("some", "incorrect", "path")},
+			SourceQuery:       &sourceQuery,
+			RowTransformSteps: &[]rowTransformStep{},
+			Comparer:          &comparer,
+		},
+		Overlays: []katcTableConfigOverlay{
+			{
+				Filters: map[string]string{
+					"goos": runtime.GOOS,
+				},
+				katcTableDefinition: katcTableDefinition{
+					SourcePaths: &[]string{leveldbDir},
+				},
+			},
+		},
+	}
+	testTable, _ := newKatcTable("test_katc_table", cfg, multislogger.NewNopLogger())
+
+	queryContext := table.QueryContext{
+		Constraints: map[string]table.ConstraintList{
+			pathColumnName: {
+				Constraints: []table.Constraint{
+					{Operator: table.OperatorEquals, Expression: leveldbDir},
+				},
+			},
+		},
+	}
+
+	results, err := testTable.generate(t.Context(), queryContext)
+	require.NoError(t, err)
+
+	// fixture from create_bytewise_leveldb.js has 4 unique entries,
+	// each of which is written twice. with the historical comparer, we should see 8 rows.
+	require.Len(t, results, 8)
+
+	keysSeen := make(map[string]string)
+	for _, row := range results {
+		require.Contains(t, row, "key")
+		require.Contains(t, row, "value")
+		require.Contains(t, row, "path")
+		keysSeen[row["key"]] = row["value"]
+		require.Equal(t, leveldbDir, row["path"])
+	}
+
+	// these rows should only contain 4 unique entries, each written twice
+	require.Len(t, keysSeen, 4)
+
+	// all entries are coerced to basic string values
+	require.Equal(t, "test-stringvalue1", keysSeen["test-stringvalue-key1"])
+	require.Equal(t, "2", keysSeen["test-intvalue-key2"])
+	require.Equal(t, "3.3", keysSeen["test-floatvalue-key3"])
+	require.Equal(t, "true", keysSeen["test-booleanvalue-key4"])
 }
 
 func Test_checkSourcePathConstraints(t *testing.T) {

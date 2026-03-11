@@ -603,6 +603,8 @@ jobs:
   # the merge dependency from being on all the jobs to this single
   # one.
   ci_mergeable:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - run: true

@@ -10,18 +10,19 @@ import (
 	"net/url"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/kit/version"
-	"github.com/kolide/launcher/ee/agent/flags/keys"
-	"github.com/kolide/launcher/ee/agent/storage"
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/gowrapper"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/pkg/sendbuffer"
+	"github.com/kolide/launcher/v2/ee/agent/flags/keys"
+	"github.com/kolide/launcher/v2/ee/agent/storage"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/gowrapper"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/pkg/sendbuffer"
 	slogmulti "github.com/samber/slog-multi"
 )
 
@@ -41,7 +42,7 @@ type LogShipper struct {
 	knapsack            types.Knapsack
 	stopFunc            context.CancelFunc
 	stopFuncMutex       sync.Mutex
-	isShippingStarted   bool
+	isShippingStarted   *atomic.Bool
 	slogLevel           *slog.LevelVar
 	additionalSlogAttrs []slog.Attr
 	startShippingChan   chan struct{}
@@ -63,8 +64,9 @@ func New(k types.Knapsack, baseLogger log.Logger) *LogShipper {
 		baseLogger:          log.With(baseLogger, "component", "logshipper"),
 		knapsack:            k,
 		stopFuncMutex:       sync.Mutex{},
+		isShippingStarted:   &atomic.Bool{},
 		additionalSlogAttrs: make([]slog.Attr, 0),
-		startShippingChan:   make(chan struct{}),
+		startShippingChan:   make(chan struct{}, 1), // Buffer in case Ping is called before Run
 	}
 
 	ls.slogLevel = new(slog.LevelVar)
@@ -114,11 +116,10 @@ func (ls *LogShipper) Ping() {
 		return
 	}
 
-	if ls.isShippingStarted {
+	if ls.isShippingStarted.Swap(true) {
 		return
 	}
 
-	ls.isShippingStarted = true
 	gowrapper.Go(context.TODO(), ls.knapsack.Slogger(), func() {
 		ls.startShippingChan <- struct{}{}
 	})
@@ -238,7 +239,7 @@ func (ls *LogShipper) updateDevideIdentifyingAttributes() error {
 	ls.additionalSlogAttrs = additionalSlogAttrs
 
 	// if we are already shipping, dont update send buffer data
-	if ls.isShippingStarted {
+	if ls.isShippingStarted.Load() {
 		return nil
 	}
 

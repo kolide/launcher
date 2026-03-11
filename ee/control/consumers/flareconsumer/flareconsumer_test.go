@@ -6,11 +6,16 @@ import (
 	"log/slog"
 	"testing"
 
-	knapsackMock "github.com/kolide/launcher/ee/agent/types/mocks"
-	"github.com/kolide/launcher/ee/control/consumers/flareconsumer/mocks"
+	knapsackMock "github.com/kolide/launcher/v2/ee/agent/types/mocks"
+	"github.com/kolide/launcher/v2/ee/control/consumers/flareconsumer/mocks"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func TestFlareConsumer(t *testing.T) {
 	t.Parallel()

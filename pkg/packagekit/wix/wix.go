@@ -15,7 +15,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/ulid"
-	"github.com/kolide/launcher/pkg/contexts/ctxlog"
+	"github.com/kolide/launcher/v2/pkg/contexts/ctxlog"
 )
 
 type wixTool struct {

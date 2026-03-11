@@ -4,6 +4,19 @@ Handcrafting data to test deserialization byte-by-byte is time-consuming and err
 The JavaScript in this directory creates an IndexedDB database seeded with data
 for use in tests.
 
+## Generating standard (bytewise) LevelDB test data
+
+[create_bytewise_leveldb.js](./create_bytewise_leveldb.js) creates a standard LevelDB using the default bytewise comparator (not the idb_cmp1 comparator used by Chrome's IndexedDB). This script runs in **Node.js**, not the browser.
+
+1. Install dependencies once: `npm install` (in this directory, `ee/katc/test_data`).
+2. Run: `node create_bytewise_leveldb.js [outputDir]`. If you omit `outputDir`, the database is created at `./bytewise_leveldb` in this directory.
+3. To use as a test fixture: zip the output directory and place it in [indexeddbs](./indexeddbs) (e.g. `bytewise.leveldb.zip`) for use in leveldb source-type tests.
+
+```
+cd ee/katc/test_data && npm install && rm -rf bytewise_leveldb && node create_bytewise_leveldb.js
+cd .. && zip -r test_data/indexeddbs/bytewise.leveldb.zip test_data/bytewise_leveldb
+```
+
 ## Instructions for generating new test IndexedDBs
 
 Edit [main.js](./main.js) as desired. Open [index.html](./index.html) using Chrome or Firefox,

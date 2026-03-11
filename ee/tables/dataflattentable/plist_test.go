@@ -5,15 +5,15 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/kolide/launcher/ee/dataflatten"
-	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/v2/ee/dataflatten"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
 	"github.com/stretchr/testify/require"
 )
 
 // TestPlist runs some real-world tests against sample plist data.
 func TestPlist(t *testing.T) {
 	t.Parallel()
-	plistTable := Table{flattenFileFunc: dataflatten.PlistFile}
+	plistTable := Table{flattenFileFunc: staticFile(dataflatten.PlistFile)}
 
 	var tests = []struct {
 		paths    []string

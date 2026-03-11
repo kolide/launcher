@@ -1,0 +1,3 @@
+node_modules/
+bytewise_leveldb/
+package-lock.json

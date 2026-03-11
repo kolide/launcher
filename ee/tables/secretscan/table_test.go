@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
-	"github.com/kolide/launcher/ee/tables/ci"
-	"github.com/kolide/launcher/ee/tables/tablehelpers"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	typesmocks "github.com/kolide/launcher/v2/ee/agent/types/mocks"
+	"github.com/kolide/launcher/v2/ee/tables/ci"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -171,9 +171,7 @@ func TestSecretScan(t *testing.T) {
 				// Verify columns are properly populated
 				assert.NotEmpty(t, row["rule_id"], "rule_id should be populated")
 				assert.NotEmpty(t, row["description"], "description should be populated")
-				assert.NotEmpty(t, row["redacted_secret"], "redacted_secret should be populated")
 				assert.NotEqual(t, "0", row["line_number"], "line_number should be > 0")
-				assert.Len(t, row["secret_hash"], 64, "secret_hash should be a 64-char hex SHA-256")
 
 				// For raw_data scans, verify the original input is returned (for SQLite filtering to work)
 				if tt.scanType == "raw_data" {
@@ -202,62 +200,61 @@ func TestSecretScan(t *testing.T) {
 	}
 }
 
-func TestHashSecret(t *testing.T) {
+func TestHashing(t *testing.T) {
 	t.Parallel()
 
-	hash1 := hashSecret("mysecret", "key=mysecret")
-	hash2 := hashSecret("mysecret", "key=mysecret")
-	hash3 := hashSecret("different", "key=different")
-
-	assert.Len(t, hash1, 64, "SHA-256 hex should be 64 chars")
-	assert.Equal(t, hash1, hash2, "same input should produce same hash")
-	assert.NotEqual(t, hash1, hash3, "different inputs should produce different hashes")
-	assert.Equal(t, "652c7dc687d98c9889304ed2e408c74b611e86a40caa51c4b43f1dd5913c5cd0", hashSecret("mysecret", "ignored"))
-
-	// Falls back to match when secret is empty
-	fallback := hashSecret("", "the-match-value")
-	direct := hashSecret("the-match-value", "ignored")
-	assert.Equal(t, fallback, direct, "empty secret should fall back to match")
-}
-
-func TestRedact(t *testing.T) {
-	t.Parallel()
-
-	for _, tt := range []struct {
-		name     string
-		input    string
-		expected string
+	tests := []struct {
+		name              string
+		input             string
+		argonSalt         string
+		expectedArgonHash string
 	}{
 		{
-			name:     "long secret",
-			input:    "AKIAIOSFODNN7EXAMPLE",
-			expected: "AKI...",
+			name:              "have salt1 expect hash",
+			input:             `slack_bot_token: "xoxb-9876543210-9876543210-zyxwvutsrqponmlk"`,
+			argonSalt:         "Hxx5g0dYT4OVzrVc1iskyA==",
+			expectedArgonHash: "b22083",
 		},
 		{
-			name:     "short secret",
-			input:    "abc",
-			expected: "***",
+			name:              "have salt2 expect hash2",
+			input:             `slack_bot_token: "xoxb-9876543210-9876543210-zyxwvutsrqponmlk"`,
+			argonSalt:         "yg9UwWbxYpxawmjNRTl4Cw==",
+			expectedArgonHash: "942613",
 		},
 		{
-			name:     "exactly 6 chars redacts fully",
-			input:    "abcdef",
-			expected: "***",
+			name:              "no salt no hash",
+			input:             `slack_bot_token: "xoxb-9876543210-9876543210-zyxwvutsrqponmlk"`,
+			argonSalt:         "",
+			expectedArgonHash: "",
 		},
 		{
-			name:     "7 chars shows prefix",
-			input:    "abcdefg",
-			expected: "abc...",
+			name:              "short salt no hash",
+			input:             `slack_bot_token: "xoxb-9876543210-9876543210-zyxwvutsrqponmlk"`,
+			argonSalt:         "8vWnXlDI6adqBAFMwkmo",
+			expectedArgonHash: "",
 		},
-		{
-			name:     "empty string",
-			input:    "",
-			expected: "***",
-		},
-	} {
+	}
+
+	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := redact(tt.input)
-			assert.Equal(t, tt.expected, result)
+			mockQC := tablehelpers.MockQueryContext(map[string][]string{
+				"raw_data":           {tt.input},
+				"hash_argon2id_salt": {tt.argonSalt},
+			})
+
+			tbl := &Table{
+				slogger: multislogger.NewNopLogger(),
+			}
+
+			results, err := tbl.generate(t.Context(), mockQC)
+			require.NoError(t, err)
+			require.Equal(t, 1, len(results))
+			result := results[0]
+
+			require.Contains(t, result["description"], "Slack Bot token")
+			require.Equal(t, tt.expectedArgonHash, result["hash_argon2id"])
+
 		})
 	}
 }

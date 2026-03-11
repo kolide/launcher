@@ -2,8 +2,6 @@ package secretscan
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"os"
@@ -12,9 +10,9 @@ import (
 	"sync"
 
 	"github.com/fatih/semgroup"
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/tables/tablehelpers"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/spf13/viper"
 	"github.com/zricethezav/gitleaks/v8/config"
@@ -28,9 +26,6 @@ const (
 
 	// directoryScanConcurrency is the number of concurrent file scans when scanning a directory
 	directoryScanConcurrency = 4
-
-	// redactPrefixLength is the number of characters to show before redacting a secret
-	redactPrefixLength = 3
 )
 
 func newDefaultConfig() (config.Config, error) {
@@ -69,15 +64,18 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		table.IntegerColumn("column_start"),
 		table.IntegerColumn("column_end"),
 		table.TextColumn("entropy"),
-		table.TextColumn("redacted_secret"),
-		table.TextColumn("secret_hash"),
+		table.TextColumn("hash_argon2id"),
+		table.TextColumn("hash_argon2id_salt"),
 	}
 
 	t := &Table{
 		slogger: slogger.With("table", tableName),
 	}
 
-	return tablewrapper.New(flags, slogger, tableName, columns, t.generate)
+	return tablewrapper.New(flags, slogger, tableName, columns, t.generate,
+		tablewrapper.WithDescription("Scans files or raw content for leaked secrets using gitleaks rules. Requires a WHERE path = or raw_data = constraint. Returns rule matches with line numbers. Useful for detecting accidentally committed credentials or API keys."),
+		tablewrapper.WithNote("The hash_argon2id column provides a privacy-preserving way to track whether the same secret appears across devices without exposing the secret itself. It returns only 3 bytes (6 hex characters), which is enough for rough uniqueness comparison but not enough to reverse the secret. To enable hashing, provide a WHERE hash_argon2id_salt = constraint with a 16-byte random salt, base64-encoded. The salt should be unique per organization and not predictable. If no salt is provided, the hash column will be empty."),
+	)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
@@ -95,6 +93,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	var results []map[string]string
 
+	argon2idSalts := tablehelpers.GetConstraints(queryContext, "hash_argon2id_salt", tablehelpers.WithDefaults(""))
 	requestedPaths := tablehelpers.GetConstraints(queryContext, "path")
 	requestedRawDatas := tablehelpers.GetConstraints(queryContext, "raw_data")
 
@@ -114,7 +113,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		}
 
 		for _, targetPath := range expandedPaths {
-			pathResults, err := t.scanPath(ctx, targetPath)
+			pathResults, err := t.scanPath(ctx, argon2idSalts, targetPath)
 			if err != nil {
 				t.slogger.Log(ctx, slog.LevelWarn,
 					"failed to scan path",
@@ -128,7 +127,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	}
 
 	for _, rawData := range requestedRawDatas {
-		rawResults, err := t.scanContent(ctx, []byte(rawData))
+		rawResults, err := t.scanContent(ctx, argon2idSalts, []byte(rawData))
 		if err != nil {
 			t.slogger.Log(ctx, slog.LevelWarn,
 				"failed to scan content",
@@ -146,7 +145,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	return results, nil
 }
 
-func (t *Table) scanPath(ctx context.Context, targetPath string) ([]map[string]string, error) {
+func (t *Table) scanPath(ctx context.Context, argon2idSalts []string, targetPath string) ([]map[string]string, error) {
 	info, err := os.Stat(targetPath)
 	if err != nil {
 		return nil, fmt.Errorf("stat path: %w", err)
@@ -191,10 +190,10 @@ func (t *Table) scanPath(ctx context.Context, targetPath string) ([]map[string]s
 		return nil, fmt.Errorf("scanning path: %w", err)
 	}
 
-	return t.findingsToRows(findings, findingsPath), nil
+	return t.findingsToRows(ctx, argon2idSalts, findings, findingsPath), nil
 }
 
-func (t *Table) scanContent(ctx context.Context, content []byte) ([]map[string]string, error) {
+func (t *Table) scanContent(ctx context.Context, argon2idSalts []string, content []byte) ([]map[string]string, error) {
 	// Fresh detector per scan - gitleaks accumulates findings internally
 	detector := detect.NewDetector(*t.defaultConfig)
 
@@ -208,48 +207,55 @@ func (t *Table) scanContent(ctx context.Context, content []byte) ([]map[string]s
 		return nil, fmt.Errorf("scanning content: %w", err)
 	}
 
-	return t.findingsToRows(findings, ""), nil
+	return t.findingsToRows(ctx, argon2idSalts, findings, ""), nil
 }
 
-func (t *Table) findingsToRows(findings []report.Finding, path string) []map[string]string {
+func (t *Table) findingsToRows(ctx context.Context, argon2idSalts []string, findings []report.Finding, path string) []map[string]string {
 	results := make([]map[string]string, 0, len(findings))
 
+	keepHashing := true
+	argon2idSalt := ""
+	if len(argon2idSalts) == 1 {
+		argon2idSalt = argon2idSalts[0]
+	} else {
+		t.slogger.Log(ctx, slog.LevelWarn,
+			"got unexpected number of salts, only support 1",
+			"count", len(argon2idSalts),
+		)
+		keepHashing = false
+	}
+
 	for _, f := range findings {
+		// Get the hash of this secret. If there's an error, log it, and allow the rest of the data to be returned.
+		// But note that there's an error, since it's probably a salting issue, and we don't need to log a billion times.
+		var argon2idHash string
+		if keepHashing {
+			var err error
+			argon2idHash, err = generateArgon2idHash(f.Match, argon2idSalt)
+			if err != nil {
+				keepHashing = false
+				t.slogger.Log(ctx, slog.LevelWarn, "error hashing", "err", err)
+			}
+		}
+
 		filePath := path
 		if filePath == "" {
 			filePath = f.File
 		}
 		row := map[string]string{
-			"path":            filePath,
-			"raw_data":        "",
-			"rule_id":         f.RuleID,
-			"description":     f.Description,
-			"line_number":     fmt.Sprintf("%d", f.StartLine),
-			"column_start":    fmt.Sprintf("%d", f.StartColumn),
-			"column_end":      fmt.Sprintf("%d", f.EndColumn),
-			"entropy":         fmt.Sprintf("%.2f", f.Entropy),
-			"redacted_secret": redact(f.Match),
-			"secret_hash":     hashSecret(f.Secret, f.Match),
+			"path":               filePath,
+			"raw_data":           "",
+			"rule_id":            f.RuleID,
+			"description":        f.Description,
+			"line_number":        fmt.Sprintf("%d", f.StartLine),
+			"column_start":       fmt.Sprintf("%d", f.StartColumn),
+			"column_end":         fmt.Sprintf("%d", f.EndColumn),
+			"entropy":            fmt.Sprintf("%.2f", f.Entropy),
+			"hash_argon2id":      argon2idHash,
+			"hash_argon2id_salt": argon2idSalt,
 		}
 		results = append(results, row)
 	}
 
 	return results
-}
-
-func hashSecret(secret, match string) string {
-	value := secret
-	if value == "" {
-		value = match
-	}
-	sum := sha256.Sum256([]byte(value))
-	return hex.EncodeToString(sum[:])
-}
-
-func redact(secret string) string {
-	// Only show prefix if secret is long enough that we're not revealing too much
-	if len(secret) <= redactPrefixLength*2 {
-		return "***"
-	}
-	return secret[:redactPrefixLength] + "..."
 }

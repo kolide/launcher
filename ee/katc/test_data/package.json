@@ -1,0 +1,9 @@
+{
+  "name": "katc-test-data",
+  "version": "1.0.0",
+  "description": "Scripts to generate test data for KATC (LevelDB and IndexedDB).",
+  "private": true,
+  "dependencies": {
+    "level": "^8.0.0"
+  }
+}

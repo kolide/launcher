@@ -15,12 +15,12 @@ import (
 	"os/user"
 	"strings"
 
-	"github.com/kolide/launcher/ee/agent"
-	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/allowedcmd"
-	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/tablehelpers"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/v2/ee/agent"
+	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/allowedcmd"
+	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -48,7 +48,9 @@ func Settings(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		getBytes: execGsettings,
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_gsettings", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_gsettings", columns, t.generate,
+		tablewrapper.WithDescription("GNOME desktop environment settings (gsettings/dconf) for a given user. Useful for checking desktop configuration such as screen lock timeout, idle delay, proxy settings, and other GNOME preferences. Requires a WHERE username = constraint."),
+	)
 }
 
 func (t *GsettingsValues) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

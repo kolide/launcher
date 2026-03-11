@@ -1,4 +1,4 @@
-module github.com/kolide/launcher
+module github.com/kolide/launcher/v2
 
 require (
 	github.com/Masterminds/semver v1.4.2
@@ -18,7 +18,7 @@ require (
 	github.com/kolide/krypto v0.1.1-0.20251209172506-7738d1f5d7c1
 	github.com/mat/besticon v3.9.0+incompatible
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
-	github.com/osquery/osquery-go v0.0.0-20260210222056-f77b3a1e15cc
+	github.com/osquery/osquery-go v0.0.0-20260226222546-0cc22f415e57
 	github.com/peterbourgon/ff/v3 v3.1.2
 	github.com/pkg/errors v0.9.1
 	github.com/serenize/snaker v0.0.0-20171204205717-a683aaf2d516
@@ -63,6 +63,7 @@ require (
 	go.opentelemetry.io/otel/exporters/stdout/stdoutmetric v1.35.0
 	go.opentelemetry.io/otel/sdk/metric v1.40.0
 	go.uber.org/atomic v1.9.0
+	go.uber.org/goleak v1.3.0
 	modernc.org/sqlite v1.37.1
 )
 
@@ -167,11 +168,11 @@ require (
 	go.opentelemetry.io/otel/metric v1.40.0
 	go.opentelemetry.io/otel/sdk v1.40.0
 	go.opentelemetry.io/otel/trace v1.40.0
-	google.golang.org/protobuf v1.36.5 // indirect
+	google.golang.org/protobuf v1.36.5
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-go 1.25.7
+go 1.25.8
 
 replace github.com/go-ole/go-ole v1.3.0 => github.com/kolide/go-ole v0.0.0-20241008210444-65130153c767
