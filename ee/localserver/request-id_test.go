@@ -43,6 +43,8 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 	t.Cleanup(func() {
 		client.CloseIdleConnections()
 	})
+	mockKnapsack.On("OsqueryPublisherURL").Return("").Maybe()
+	mockKnapsack.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 	osqPublisher := osquerypublisher.NewLogPublisherClient(multislogger.NewNopLogger(), mockKnapsack, client)
 	mockKnapsack.On("OsqueryPublisher").Return(osqPublisher)
 

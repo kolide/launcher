@@ -220,6 +220,8 @@ func TestKryptoEcMiddleware(t *testing.T) {
 					t.Cleanup(func() {
 						client.CloseIdleConnections()
 					})
+					k.On("OsqueryPublisherURL").Return("").Maybe()
+					k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 					osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 					k.On("OsqueryPublisher").Return(osqPublisher)
 
@@ -373,6 +375,8 @@ func TestKryptoEcMiddlewareErrors(t *testing.T) {
 					t.Cleanup(func() {
 						client.CloseIdleConnections()
 					})
+					k.On("OsqueryPublisherURL").Return("").Maybe()
+					k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 					osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 					k.On("OsqueryPublisher").Return(osqPublisher)
 					// set up middlewares
@@ -517,6 +521,8 @@ func Test_AllowedOrigin(t *testing.T) {
 			t.Cleanup(func() {
 				client.CloseIdleConnections()
 			})
+			k.On("OsqueryPublisherURL").Return("").Maybe()
+			k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 			osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 			k.On("OsqueryPublisher").Return(osqPublisher)
 
@@ -730,6 +736,8 @@ func TestMunemoCheck(t *testing.T) {
 			t.Cleanup(func() {
 				client.CloseIdleConnections()
 			})
+			k.On("OsqueryPublisherURL").Return("").Maybe()
+			k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 			osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 			k.On("OsqueryPublisher").Return(osqPublisher)
 
@@ -775,6 +783,8 @@ func Test_sendCallback(t *testing.T) {
 	t.Cleanup(func() {
 		client.CloseIdleConnections()
 	})
+	k.On("OsqueryPublisherURL").Return("").Maybe()
+	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 
@@ -839,6 +849,8 @@ func Test_sendCallback_handlesEnrollment(t *testing.T) {
 	t.Cleanup(func() {
 		client.CloseIdleConnections()
 	})
+	k.On("OsqueryPublisherURL").Return("").Maybe()
+	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 	mw := newKryptoEcMiddleware(slogger, k, nil, mustGenEcdsaKey(t).PublicKey, nil, "")
@@ -909,6 +921,8 @@ func Test_sendCallback_handlesEnrollmentWithAgentIngesterKeys(t *testing.T) {
 	t.Cleanup(func() {
 		client.CloseIdleConnections()
 	})
+	k.On("OsqueryPublisherURL").Return("").Maybe()
+	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 	mw := newKryptoEcMiddleware(slogger, k, nil, mustGenEcdsaKey(t).PublicKey, nil, "")
@@ -971,6 +985,7 @@ func Test_sendCallback_handlesRegionURLUpdates(t *testing.T) {
 	k.On("ControlServerURL").Return("old.control.example.test")
 	k.On("SetControlServerURL", expectedControlUrl).Return(nil)
 	k.On("OsqueryPublisherURL").Return("old.pub.example.test")
+	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 	k.On("SetOsqueryPublisherURL", expectedOsqueryPublisherUrl).Return(nil)
 
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())

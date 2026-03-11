@@ -74,6 +74,8 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 			t.Cleanup(func() {
 				client.CloseIdleConnections()
 			})
+			mockKnapsack.On("OsqueryPublisherURL").Return("").Maybe()
+			mockKnapsack.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 			osqPublisher := osquerypublisher.NewLogPublisherClient(multislogger.NewNopLogger(), mockKnapsack, client)
 			mockKnapsack.On("OsqueryPublisher").Return(osqPublisher)
 			mockQuerier := mocks.NewQuerier(t)
@@ -253,6 +255,8 @@ func Test_localServer_requestRunScheduledQueryHandler(t *testing.T) {
 			t.Cleanup(func() {
 				client.CloseIdleConnections()
 			})
+			mockKnapsack.On("OsqueryPublisherURL").Return("").Maybe()
+			mockKnapsack.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 			osqPublisher := osquerypublisher.NewLogPublisherClient(multislogger.NewNopLogger(), mockKnapsack, client)
 			mockKnapsack.On("OsqueryPublisher").Return(osqPublisher)
 

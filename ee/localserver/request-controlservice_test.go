@@ -39,6 +39,8 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 		t.Cleanup(func() {
 			client.CloseIdleConnections()
 		})
+		m.On("OsqueryPublisherURL").Return("").Maybe()
+		m.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 		osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, m, client)
 		m.On("OsqueryPublisher").Return(osqPublisher).Maybe()
 		return m
@@ -79,6 +81,8 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 				t.Cleanup(func() {
 					client.CloseIdleConnections()
 				})
+				m.On("OsqueryPublisherURL").Return("").Maybe()
+				m.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 				osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, m, client)
 				m.On("OsqueryPublisher").Return(osqPublisher).Maybe()
 				return m
