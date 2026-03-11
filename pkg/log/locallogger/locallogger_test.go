@@ -9,7 +9,13 @@ import (
 	"github.com/kolide/kit/stringutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	// This is a known goroutine leak in lumberjack: https://github.com/natefinch/lumberjack/issues/56
+	goleak.VerifyTestMain(m, goleak.IgnoreTopFunction("gopkg.in/natefinch/lumberjack%2ev2.(*Logger).millRun"))
+}
 
 var (
 	reallyLongString    = stringutil.RandomString(200)
@@ -46,8 +52,6 @@ func TestKitLogging(t *testing.T) {
 		"one":     "two",
 		"results": truncatedLongString,
 	}
-	//	expectedJson, err := json.Marshal(expected)
-	//require.NoError(t, err, "json marshal expected")
 
 	tmpfile, err := os.CreateTemp(t.TempDir(), "test-locallogger")
 	require.NoError(t, err, "make temp file")

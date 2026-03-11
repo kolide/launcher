@@ -12,7 +12,12 @@ import (
 	"github.com/kolide/kit/stringutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func TestConfigFilePath(t *testing.T) {
 	t.Parallel()
