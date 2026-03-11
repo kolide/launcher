@@ -27,38 +27,56 @@ var downloadOnceFunc = sync.OnceFunc(func() {
 func Test_runLauncher(t *testing.T) {
 	t.Parallel()
 
-	// Set up opts
-	testRootDir := t.TempDir()
-	downloadOnceFunc() // get an osquery binary
-	defaultOpts, err := launcher.ParseOptions("launcher", []string{
-		"--root_directory", testRootDir,
-		"--osqueryd_path", testOsqueryBinary,
-	})
-	require.NoError(t, err)
+	for _, tt := range []struct {
+		testCaseName    string
+		startupDuration time.Duration
+	}{
+		{
+			testCaseName:    "long",
+			startupDuration: rungroup.InterruptTimeout * 2,
+		},
+		{
+			testCaseName:    "short",
+			startupDuration: rungroup.InterruptTimeout / 2,
+		},
+	} {
+		t.Run(tt.testCaseName, func(t *testing.T) {
+			t.Parallel()
 
-	// runLauncher, if able to start up without error, will run until stopped by
-	// an autoupdate requiring reload, a sigterm, or a rungroup actor error.
-	// So, start it up in the background.
-	ctx, cancel := context.WithCancel(t.Context())
-	runLauncherErr := make(chan error)
-	go func() {
-		runLauncherErr <- runLauncher(ctx, cancel, multislogger.New(), multislogger.New(), defaultOpts)
-	}()
+			// Set up opts
+			testRootDir := t.TempDir()
+			downloadOnceFunc() // get an osquery binary
+			defaultOpts, err := launcher.ParseOptions("launcher", []string{
+				"--root_directory", testRootDir,
+				"--osqueryd_path", testOsqueryBinary,
+			})
+			require.NoError(t, err)
 
-	// launcher should run successfully, not immediately return an error.
-	select {
-	case err := <-runLauncherErr:
-		t.Errorf("runLauncher did not start up successfully: returned %v", err)
-	case <-time.After(rungroup.InterruptTimeout * 2):
-		// launcher started up and stayed up
-	}
+			// runLauncher, if able to start up without error, will run until stopped by
+			// an autoupdate requiring reload, a sigterm, or a rungroup actor error.
+			// So, start it up in the background.
+			ctx, cancel := context.WithCancel(t.Context())
+			runLauncherErr := make(chan error)
+			go func() {
+				runLauncherErr <- runLauncher(ctx, cancel, multislogger.New(), multislogger.New(), defaultOpts)
+			}()
 
-	// Now, call cancel() to shut down runLauncher.
-	cancel()
-	select {
-	case <-runLauncherErr:
-		// launcher shut down successfully
-	case <-time.After(rungroup.InterruptTimeout):
-		t.Error("runLauncher did not return within interrupt timeout")
+			// launcher should run successfully, not immediately return an error.
+			select {
+			case err := <-runLauncherErr:
+				t.Errorf("runLauncher did not start up successfully: returned %v", err)
+			case <-time.After(tt.startupDuration):
+				// launcher started up and stayed up
+			}
+
+			// Now, call cancel() to shut down runLauncher.
+			cancel()
+			select {
+			case <-runLauncherErr:
+				// launcher shut down successfully
+			case <-time.After(rungroup.InterruptTimeout):
+				t.Error("runLauncher did not return within interrupt timeout")
+			}
+		})
 	}
 }
