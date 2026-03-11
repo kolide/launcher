@@ -8,8 +8,13 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 	"golang.org/x/text/encoding/unicode"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func Test_databaseIdKey(t *testing.T) {
 	t.Parallel()

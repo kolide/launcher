@@ -11,10 +11,18 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	// ioCompletionProcessor will continue to run forever until the process (go test in this case) exits,
+	// so we need goleak to ignore that one.
+	goleak.VerifyTestMain(m, goleak.IgnoreAnyFunction("github.com/Microsoft/go-winio.ioCompletionProcessor"))
+}
 
 const validAuthHeader = "test-auth-header"
 
@@ -64,6 +72,8 @@ func TestUserServer_authMiddleware(t *testing.T) {
 			}
 
 			require.NoError(t, server.Shutdown(t.Context()))
+
+			time.Sleep(5 * time.Second) // wait for removeSocket to finish
 		})
 	}
 }
@@ -100,6 +110,8 @@ func TestUserServer_shutdownHandler(t *testing.T) {
 			assert.Equal(t, http.StatusOK, rr.Code)
 
 			require.NoError(t, server.Shutdown(t.Context()))
+
+			time.Sleep(5 * time.Second) // wait for removeSocket to finish
 		})
 	}
 }

@@ -8,7 +8,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 //go:embed test-data/beta-update-available-noscan.txt
 var beta_update_available_noscan []byte

@@ -11,7 +11,12 @@ import (
 	"github.com/kolide/launcher/v2/ee/agent/flags/keys"
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func TestOpenRO_DatabaseExists(t *testing.T) {
 	t.Parallel()
