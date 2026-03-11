@@ -7,7 +7,13 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 // captureHandler removed; tests now capture emissions via nextCapture only.
 
