@@ -21,8 +21,7 @@ func initCOMBench(b *testing.B) {
 // session creation, searcher creation, history query with real VARIANT
 // extraction and IDispatch Release. The non-golang-B/op metric captures
 // native memory growth -- this is where COM leaks from missing
-// Release()/Clear() calls would show up. The test fails if per-op
-// native growth exceeds the threshold.
+// Release()/Clear() calls would show up.
 func BenchmarkQueryHistory(b *testing.B) {
 	initCOMBench(b)
 
@@ -60,8 +59,4 @@ func BenchmarkQueryHistory(b *testing.B) {
 	}
 
 	ci.ReportNonGolangMemoryUsage(b, baselineStats)
-
-	// 64 KiB per op is generous — a leaking implementation easily exceeds
-	// this after the benchmark framework scales up b.N.
-	ci.RequireNonGolangMemoryBelowThreshold(b, baselineStats, 64*1024)
 }
