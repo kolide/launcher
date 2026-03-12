@@ -25,7 +25,8 @@ func createHTTPClient(ctx context.Context, k types.Knapsack) (*control.HTTPClien
 	}
 
 	logger := k.Slogger().With("component", "control_http_client")
-	client, err := control.NewControlHTTPClient(http.DefaultClient, k, logger, clientOpts...)
+	c := &http.Client{}
+	client, err := control.NewControlHTTPClient(c, k, logger, clientOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("creating control http client: %w", err)
 	}
