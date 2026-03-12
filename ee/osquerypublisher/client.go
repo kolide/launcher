@@ -164,12 +164,12 @@ func (lpc *LogPublisherClient) publish(ctx context.Context, slogger *slog.Logger
 
 	hpkeKey := lpc.getHPKEKeyForEnrollment(enrollmentID)
 	if hpkeKey == nil {
-		return nil, fmt.Errorf("no HPKE key available for enrollment '%s': %w", enrollmentID, err)
+		return nil, fmt.Errorf("no HPKE key available for enrollment '%s'", enrollmentID)
 	}
 
 	psk := lpc.getPSKForEnrollment(enrollmentID)
 	if psk == nil {
-		return nil, fmt.Errorf("no PSK available for enrollment '%s': %w", enrollmentID, err)
+		return nil, fmt.Errorf("no PSK available for enrollment '%s'", enrollmentID)
 	}
 
 	jsonData, err := json.Marshal(payload)
