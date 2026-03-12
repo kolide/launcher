@@ -55,6 +55,8 @@ func Test_requestDt4aInfoHandler(t *testing.T) {
 	t.Cleanup(func() {
 		client.CloseIdleConnections()
 	})
+	k.On("OsqueryPublisherURL").Return("").Maybe()
+	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 
@@ -124,6 +126,8 @@ func Test_requestDt4aInfoHandlerWithDt4aIds(t *testing.T) {
 	t.Cleanup(func() {
 		client.CloseIdleConnections()
 	})
+	k.On("OsqueryPublisherURL").Return("").Maybe()
+	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 
@@ -183,6 +187,8 @@ func Test_requestDt4aInfoHandlerWithDt4aIdsNoData(t *testing.T) {
 	t.Cleanup(func() {
 		client.CloseIdleConnections()
 	})
+	k.On("OsqueryPublisherURL").Return("").Maybe()
+	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 
@@ -258,6 +264,8 @@ func Test_requestDt4aInfoHandler_allowsAllSafariWebExtensionOrigins(t *testing.T
 	t.Cleanup(func() {
 		client.CloseIdleConnections()
 	})
+	k.On("OsqueryPublisherURL").Return("").Maybe()
+	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 
@@ -317,6 +325,8 @@ func Test_requestDt4aInfoHandler_allowsMissingOrigin(t *testing.T) {
 	t.Cleanup(func() {
 		client.CloseIdleConnections()
 	})
+	k.On("OsqueryPublisherURL").Return("").Maybe()
+	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 
@@ -375,6 +385,8 @@ func Test_requestDt4aInfoHandler_allowsEmptyOrigin(t *testing.T) {
 	t.Cleanup(func() {
 		client.CloseIdleConnections()
 	})
+	k.On("OsqueryPublisherURL").Return("").Maybe()
+	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 	// Set up localserver
@@ -441,6 +453,8 @@ func Test_requestDt4aInfoHandler_badRequest(t *testing.T) {
 			t.Cleanup(func() {
 				client.CloseIdleConnections()
 			})
+			k.On("OsqueryPublisherURL").Return("").Maybe()
+			k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 			osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 			k.On("OsqueryPublisher").Return(osqPublisher)
 
@@ -495,6 +509,8 @@ func Test_requestDt4aInfoHandler_noDataAvailable(t *testing.T) {
 	t.Cleanup(func() {
 		client.CloseIdleConnections()
 	})
+	k.On("OsqueryPublisherURL").Return("").Maybe()
+	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 
@@ -544,6 +560,8 @@ func Test_requestDt4aAccelerationHandler(t *testing.T) {
 	t.Cleanup(func() {
 		client.CloseIdleConnections()
 	})
+	k.On("OsqueryPublisherURL").Return("").Maybe()
+	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 	osqPublisher := osquerypublisher.NewLogPublisherClient(multislogger.NewNopLogger(), k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 

@@ -220,6 +220,8 @@ func TestKryptoEcMiddleware(t *testing.T) {
 					t.Cleanup(func() {
 						client.CloseIdleConnections()
 					})
+					k.On("OsqueryPublisherURL").Return("").Maybe()
+					k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 					osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 					k.On("OsqueryPublisher").Return(osqPublisher)
 
@@ -373,6 +375,8 @@ func TestKryptoEcMiddlewareErrors(t *testing.T) {
 					t.Cleanup(func() {
 						client.CloseIdleConnections()
 					})
+					k.On("OsqueryPublisherURL").Return("").Maybe()
+					k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 					osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 					k.On("OsqueryPublisher").Return(osqPublisher)
 					// set up middlewares
@@ -517,6 +521,8 @@ func Test_AllowedOrigin(t *testing.T) {
 			t.Cleanup(func() {
 				client.CloseIdleConnections()
 			})
+			k.On("OsqueryPublisherURL").Return("").Maybe()
+			k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 			osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 			k.On("OsqueryPublisher").Return(osqPublisher)
 
@@ -730,6 +736,8 @@ func TestMunemoCheck(t *testing.T) {
 			t.Cleanup(func() {
 				client.CloseIdleConnections()
 			})
+			k.On("OsqueryPublisherURL").Return("").Maybe()
+			k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 			osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 			k.On("OsqueryPublisher").Return(osqPublisher)
 
@@ -775,6 +783,8 @@ func Test_sendCallback(t *testing.T) {
 	t.Cleanup(func() {
 		client.CloseIdleConnections()
 	})
+	k.On("OsqueryPublisherURL").Return("").Maybe()
+	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 
@@ -839,6 +849,8 @@ func Test_sendCallback_handlesEnrollment(t *testing.T) {
 	t.Cleanup(func() {
 		client.CloseIdleConnections()
 	})
+	k.On("OsqueryPublisherURL").Return("").Maybe()
+	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 	mw := newKryptoEcMiddleware(slogger, k, nil, mustGenEcdsaKey(t).PublicKey, nil, "")
@@ -872,17 +884,21 @@ func Test_sendCallback_handlesEnrollment(t *testing.T) {
 	k.AssertExpectations(t)
 }
 
-func Test_sendCallback_handlesEnrollmentWithAgentIngesterToken(t *testing.T) {
+func Test_sendCallback_handlesEnrollmentWithAgentIngesterKeys(t *testing.T) {
 	t.Parallel()
 
 	// Set up a test server to receive callback requests and return enrollment info with ingester auth token
 	expectedNodeKey := "test-node-key"
 	expectedMunemo := "test-munemo"
 	expectedAgentIngesterToken := "test-agent-ingester-token"
+	expectedAgentIngesterHPKEPublicKey := "hpke-key-id:test-agent-ingester-hpke-public-key"
+	expectedAgentIngesterHPKEPresharedKey := "psk-key-id:test-agent-ingester-hpke-preshared-key"
 	resp := callbackResponse{
-		NodeKey:            expectedNodeKey,
-		Munemo:             expectedMunemo,
-		AgentIngesterToken: expectedAgentIngesterToken,
+		NodeKey:                       expectedNodeKey,
+		Munemo:                        expectedMunemo,
+		AgentIngesterToken:            expectedAgentIngesterToken,
+		AgentIngesterHPKEPublicKey:    expectedAgentIngesterHPKEPublicKey,
+		AgentIngesterHPKEPresharedKey: expectedAgentIngesterHPKEPresharedKey,
 	}
 	respRaw, err := json.Marshal(resp)
 	require.NoError(t, err)
@@ -905,6 +921,8 @@ func Test_sendCallback_handlesEnrollmentWithAgentIngesterToken(t *testing.T) {
 	t.Cleanup(func() {
 		client.CloseIdleConnections()
 	})
+	k.On("OsqueryPublisherURL").Return("").Maybe()
+	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 	mw := newKryptoEcMiddleware(slogger, k, nil, mustGenEcdsaKey(t).PublicKey, nil, "")
@@ -922,6 +940,14 @@ func Test_sendCallback_handlesEnrollmentWithAgentIngesterToken(t *testing.T) {
 	setToken, err := tokenStore.Get(storage.AgentIngesterAuthTokenKey)
 	require.NoError(t, err)
 	require.Equal(t, expectedAgentIngesterToken, string(setToken), "expected agent ingester token to be set")
+	// confirm we set the HPKE public key
+	setHPKEPublicKey, err := tokenStore.Get(storage.AgentIngesterHPKEPublicKey)
+	require.NoError(t, err)
+	require.Equal(t, expectedAgentIngesterHPKEPublicKey, string(setHPKEPublicKey), "expected agent ingester HPKE public key to be set")
+	// confirm we set the HPKE preshared key
+	setHPKEPresharedKey, err := tokenStore.Get(storage.AgentIngesterHPKEPresharedKey)
+	require.NoError(t, err)
+	require.Equal(t, expectedAgentIngesterHPKEPresharedKey, string(setHPKEPresharedKey), "expected agent ingester HPKE preshared key to be set")
 
 	// We should have called SaveEnrollment
 	k.AssertExpectations(t)
@@ -959,6 +985,7 @@ func Test_sendCallback_handlesRegionURLUpdates(t *testing.T) {
 	k.On("ControlServerURL").Return("old.control.example.test")
 	k.On("SetControlServerURL", expectedControlUrl).Return(nil)
 	k.On("OsqueryPublisherURL").Return("old.pub.example.test")
+	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 	k.On("SetOsqueryPublisherURL", expectedOsqueryPublisherUrl).Return(nil)
 
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())

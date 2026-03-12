@@ -40,6 +40,8 @@ func TestInterrupt_Multiple(t *testing.T) {
 	t.Cleanup(func() {
 		client.CloseIdleConnections()
 	})
+	k.On("OsqueryPublisherURL").Return("").Maybe()
+	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
 
