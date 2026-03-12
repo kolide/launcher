@@ -31,34 +31,35 @@ const (
 // PackageOptions encapsulates the launcher build options. It's
 // populated by callers, such as command line flags. It may change.
 type PackageOptions struct {
-	PackageVersion    string // What version in this package. If unset, autodetection will be attempted.
-	OsqueryVersion    string
-	OsqueryFlags      []string // Additional flags to pass to the runtime osquery instance
-	ContainerTool     string
-	LauncherVersion   string
-	LauncherPath      string
-	LauncherArmPath   string
-	ExtensionVersion  string
-	Hostname          string
-	Secret            string
-	Transport         string
-	Insecure          bool
-	InsecureTransport bool
-	UpdateChannel     string
-	InitialRunner     bool
-	Identifier        string
-	Title             string
-	OmitSecret        bool
-	CertPins          string
-	RootPEM           string
-	BinRootDir        string
-	CacheDir          string
-	TufServerURL      string
-	MirrorURL         string
-	WixPath           string
-	MSIUI             bool
-	WixSkipCleanup    bool
-	DisableService    bool
+	PackageVersion       string // What version in this package. If unset, autodetection will be attempted.
+	OsqueryVersion       string
+	OsqueryFlags         []string // Additional flags to pass to the runtime osquery instance
+	ContainerTool        string
+	LauncherVersion      string
+	LauncherPath         string
+	LauncherArmPath      string
+	ExtensionVersion     string
+	Hostname             string
+	Secret               string
+	Transport            string
+	Insecure             bool
+	InsecureTransport    bool
+	UpdateChannel        string
+	InitialRunner        bool
+	Identifier           string
+	Title                string
+	OmitSecret           bool
+	CertPins             string
+	RootPEM              string
+	BinRootDir           string
+	PosixRootDirOverride string // controls location of root directory for Linux/macOS, instead of setting based on Hostname
+	CacheDir             string
+	TufServerURL         string
+	MirrorURL            string
+	WixPath              string
+	MSIUI                bool
+	WixSkipCleanup       bool
+	DisableService       bool
 
 	AppleNotarizeAccountId   string   // The 10 character apple account id
 	AppleNotarizeAppPassword string   // app password for notarization service
@@ -760,7 +761,11 @@ func (p *PackageOptions) setupDirectories() error {
 	case Linux, Darwin:
 		p.binDir = filepath.Join(p.BinRootDir, p.Identifier, "bin")
 		p.confDir = filepath.Join("/etc", p.Identifier)
-		p.rootDir = filepath.Join("/var", p.Identifier, sanitizeHostname(p.Hostname))
+		if p.PosixRootDirOverride != "" {
+			p.rootDir = p.PosixRootDirOverride
+		} else {
+			p.rootDir = filepath.Join("/var", p.Identifier, sanitizeHostname(p.Hostname))
+		}
 	case Windows:
 		// On Windows, these paths end up rooted not at `c:`, but instead
 		// where the WiX template says. In our case, that's `c:\Program
