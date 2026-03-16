@@ -756,6 +756,10 @@ if [ "$1" = remove -o "$1" = "0" ] ; then
 fi`
 }
 
+func GeneratePosixRootDir(identifier string, hostname string) string {
+	return filepath.Join("/var", identifier, sanitizeHostname(hostname))
+}
+
 func (p *PackageOptions) setupDirectories() error {
 	switch p.target.Platform {
 	case Linux, Darwin:
@@ -764,7 +768,7 @@ func (p *PackageOptions) setupDirectories() error {
 		if p.PosixRootDirOverride != "" {
 			p.rootDir = p.PosixRootDirOverride
 		} else {
-			p.rootDir = filepath.Join("/var", p.Identifier, sanitizeHostname(p.Hostname))
+			p.rootDir = GeneratePosixRootDir(p.Identifier, p.Hostname)
 		}
 	case Windows:
 		// On Windows, these paths end up rooted not at `c:`, but instead

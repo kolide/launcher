@@ -459,3 +459,46 @@ func Test_setupDirectories(t *testing.T) {
 		})
 	}
 }
+
+func TestGeneratePosixRootDir(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		testCaseName    string
+		identifier      string
+		hostname        string
+		expectedRootDir string
+	}{
+		{
+			testCaseName:    "default identifier, k2device",
+			identifier:      launcher.DefaultLauncherIdentifier,
+			hostname:        "k2device.kolide.com",
+			expectedRootDir: "/var/kolide-k2/k2device.kolide.com",
+		},
+		{
+			testCaseName:    "default identifier, k2device-preprod",
+			identifier:      launcher.DefaultLauncherIdentifier,
+			hostname:        "k2device-preprod.kolide.com",
+			expectedRootDir: "/var/kolide-k2/k2device-preprod.kolide.com",
+		},
+		{
+			testCaseName:    "non-default identifier, k2device",
+			identifier:      "kolide-test-k2",
+			hostname:        "k2device.kolide.com",
+			expectedRootDir: "/var/kolide-test-k2/k2device.kolide.com",
+		},
+		{
+			testCaseName:    "non-default identifier, k2device-preprod",
+			identifier:      "kolide-test-k2",
+			hostname:        "k2device-preprod.kolide.com",
+			expectedRootDir: "/var/kolide-test-k2/k2device-preprod.kolide.com",
+		},
+	} {
+		t.Run(tt.testCaseName, func(t *testing.T) {
+			t.Parallel()
+
+			rootDir := GeneratePosixRootDir(tt.identifier, tt.hostname)
+			require.Equal(t, tt.expectedRootDir, rootDir)
+		})
+	}
+}
