@@ -166,6 +166,7 @@ func makeKnapsackWithInvalidEnrollment(t *testing.T, expectedNodeKey string) typ
 	// we've settled on a cutover plan and desired behaviors
 	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 	k.On("OsqueryPublisherURL").Return("").Maybe()
+	k.On("PersistAgentIngesterKeys", testifymock.Anything, testifymock.Anything, testifymock.Anything, testifymock.Anything).Return().Maybe()
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore).Maybe()
@@ -477,6 +478,7 @@ func TestExtensionEnroll(t *testing.T) {
 	k.On("TokenStore").Return(tokenStore).Maybe()
 	k.On("OsqueryPublisherURL").Return("").Maybe()
 	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
+	k.On("PersistAgentIngesterKeys", testifymock.Anything, testifymock.Anything, testifymock.Anything, testifymock.Anything).Return().Maybe()
 	lpc := makeTestOsqLogPublisher(t, k)
 
 	e, err := NewExtension(t.Context(), lpc, s, k, types.DefaultEnrollmentID, ExtensionOpts{})
@@ -736,6 +738,7 @@ func TestGenerateConfigs_CannotEnrollYet(t *testing.T) {
 	k.On("TokenStore").Return(tokenStore).Maybe()
 	k.On("OsqueryPublisherURL").Return("").Maybe()
 	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
+	k.On("PersistAgentIngesterKeys", testifymock.Anything, testifymock.Anything, testifymock.Anything, testifymock.Anything).Return().Maybe()
 	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsStore, k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
@@ -1216,6 +1219,7 @@ func TestExtensionWriteBufferedLogsEnrollmentInvalid(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore).Maybe()
+	k.On("PersistAgentIngesterKeys", testifymock.Anything, testifymock.Anything, testifymock.Anything, testifymock.Anything).Return().Maybe()
 	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
@@ -2024,6 +2028,7 @@ func TestExtensionWriteResultsEnrollmentInvalid(t *testing.T) {
 	k.On("TokenStore").Return(tokenStore).Maybe()
 	k.On("OsqueryPublisherURL").Return("").Maybe()
 	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
+	k.On("PersistAgentIngesterKeys", testifymock.Anything, testifymock.Anything, testifymock.Anything, testifymock.Anything).Return().Maybe()
 	lpc := makeTestOsqLogPublisher(t, k)
 
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})

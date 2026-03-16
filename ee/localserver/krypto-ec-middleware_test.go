@@ -853,6 +853,7 @@ func Test_sendCallback_handlesEnrollment(t *testing.T) {
 	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
 	k.On("OsqueryPublisher").Return(osqPublisher)
+	k.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 	mw := newKryptoEcMiddleware(slogger, k, nil, mustGenEcdsaKey(t).PublicKey, nil, "")
 	t.Cleanup(func() {
 		mw.Close()
