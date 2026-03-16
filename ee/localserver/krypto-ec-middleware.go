@@ -87,8 +87,6 @@ type kryptoEcMiddleware struct {
 	callbackQueue         chan *http.Request
 	enrollmentTracker     types.EnrollmentTracker
 	knapsack              types.Knapsack
-	tokenStore            types.KVStore
-	osqueryPublisher      types.OsqueryPublisher
 	flags                 types.Flags
 
 	// presenceDetectionStatusUpdateInterval is the interval at which the presence detection
@@ -116,8 +114,6 @@ func newKryptoEcMiddleware(slogger *slog.Logger, knapsack types.Knapsack,
 		callbackQueue:                         callbackQueue,
 		enrollmentTracker:                     knapsack,
 		knapsack:                              knapsack,
-		tokenStore:                            knapsack.TokenStore(),
-		osqueryPublisher:                      knapsack.OsqueryPublisher(),
 		flags:                                 knapsack,
 	}
 
