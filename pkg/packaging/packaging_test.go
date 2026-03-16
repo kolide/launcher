@@ -463,6 +463,10 @@ func Test_setupDirectories(t *testing.T) {
 func TestGeneratePosixRootDir(t *testing.T) {
 	t.Parallel()
 
+	if runtime.GOOS == "windows" {
+		t.Skip("posix-only")
+	}
+
 	for _, tt := range []struct {
 		testCaseName    string
 		identifier      string
