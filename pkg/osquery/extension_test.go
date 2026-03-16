@@ -75,11 +75,10 @@ func makeKnapsack(t *testing.T) types.Knapsack {
 	// we've settled on a cutover plan and desired behaviors
 	m.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 	m.On("OsqueryPublisherURL").Return("").Maybe()
+	m.On("PersistAgentIngesterKeys", testifymock.Anything, testifymock.Anything, testifymock.Anything, testifymock.Anything).Return().Maybe()
 	m.On("KolideServerURL").Return("").Maybe()
 	m.On("InsecureTransportTLS").Return(true).Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	m.On("TokenStore").Return(tokenStore).Maybe()
+
 	return m
 }
 
@@ -119,11 +118,10 @@ func makeKnapsackUnenrolled(t *testing.T) types.Knapsack {
 	// we've settled on a cutover plan and desired behaviors
 	m.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 	m.On("OsqueryPublisherURL").Return("").Maybe()
+	m.On("PersistAgentIngesterKeys", testifymock.Anything, testifymock.Anything, testifymock.Anything, testifymock.Anything).Return().Maybe()
 	m.On("KolideServerURL").Return("").Maybe()
 	m.On("InsecureTransportTLS").Return(true).Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	m.On("TokenStore").Return(tokenStore).Maybe()
+
 	return m
 }
 
@@ -167,9 +165,7 @@ func makeKnapsackWithInvalidEnrollment(t *testing.T, expectedNodeKey string) typ
 	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 	k.On("OsqueryPublisherURL").Return("").Maybe()
 	k.On("PersistAgentIngesterKeys", testifymock.Anything, testifymock.Anything, testifymock.Anything, testifymock.Anything).Return().Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore).Maybe()
+
 	return k
 }
 
@@ -473,9 +469,6 @@ func TestExtensionEnroll(t *testing.T) {
 	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
 	k.On("KolideServerURL").Return("").Maybe()
 	k.On("InsecureTransportTLS").Return(true).Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore).Maybe()
 	k.On("OsqueryPublisherURL").Return("").Maybe()
 	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 	k.On("PersistAgentIngesterKeys", testifymock.Anything, testifymock.Anything, testifymock.Anything, testifymock.Anything).Return().Maybe()
@@ -733,9 +726,6 @@ func TestGenerateConfigs_CannotEnrollYet(t *testing.T) {
 	k.On("InsecureTransportTLS").Return(true).Maybe()
 	settingsStore := settingsstoremock.NewSettingsStoreWriter(t)
 	settingsStore.On("WriteSettings").Return(nil)
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore).Maybe()
 	k.On("OsqueryPublisherURL").Return("").Maybe()
 	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 	k.On("PersistAgentIngesterKeys", testifymock.Anything, testifymock.Anything, testifymock.Anything, testifymock.Anything).Return().Maybe()
@@ -966,9 +956,6 @@ func TestExtensionWriteLogs(t *testing.T) {
 	// Set our node key
 	expectedNodeKey := "node_key"
 	k.On("NodeKey", testifymock.Anything).Return(expectedNodeKey, nil)
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore).Maybe()
 	k.On("OsqueryPublisherURL").Return("").Maybe()
 	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 	lpc := makeTestOsqLogPublisher(t, k)
@@ -1216,9 +1203,6 @@ func TestExtensionWriteBufferedLogsEnrollmentInvalid(t *testing.T) {
 	statusLogsStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.StatusLogsStore.String())
 	require.NoError(t, err)
 	k.On("StatusLogsStore").Return(statusLogsStore)
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore).Maybe()
 	k.On("PersistAgentIngesterKeys", testifymock.Anything, testifymock.Anything, testifymock.Anything, testifymock.Anything).Return().Maybe()
 	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
@@ -2023,9 +2007,6 @@ func TestExtensionWriteResultsEnrollmentInvalid(t *testing.T) {
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	k.On("KolideServerURL").Return("").Maybe()
 	k.On("InsecureTransportTLS").Return(true).Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore).Maybe()
 	k.On("OsqueryPublisherURL").Return("").Maybe()
 	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 	k.On("PersistAgentIngesterKeys", testifymock.Anything, testifymock.Anything, testifymock.Anything, testifymock.Anything).Return().Maybe()
