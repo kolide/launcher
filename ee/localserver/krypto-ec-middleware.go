@@ -21,7 +21,6 @@ import (
 	"github.com/kolide/krypto"
 	"github.com/kolide/krypto/pkg/challenge"
 	"github.com/kolide/launcher/v2/ee/agent"
-	"github.com/kolide/launcher/v2/ee/agent/storage"
 	"github.com/kolide/launcher/v2/ee/agent/types"
 	"github.com/kolide/launcher/v2/ee/gowrapper"
 	"github.com/kolide/launcher/v2/ee/observability"
@@ -87,6 +86,7 @@ type kryptoEcMiddleware struct {
 	tenantMunemo          *atomic.String
 	callbackQueue         chan *http.Request
 	enrollmentTracker     types.EnrollmentTracker
+	knapsack              types.Knapsack
 	tokenStore            types.KVStore
 	osqueryPublisher      types.OsqueryPublisher
 	flags                 types.Flags
@@ -115,6 +115,7 @@ func newKryptoEcMiddleware(slogger *slog.Logger, knapsack types.Knapsack,
 		tenantMunemo:                          atomicMunemo,
 		callbackQueue:                         callbackQueue,
 		enrollmentTracker:                     knapsack,
+		knapsack:                              knapsack,
 		tokenStore:                            knapsack.TokenStore(),
 		osqueryPublisher:                      knapsack.OsqueryPublisher(),
 		flags:                                 knapsack,
@@ -267,7 +268,7 @@ func (e *kryptoEcMiddleware) callbackWorker() {
 				return fmt.Errorf("saving enrollment: %w", err)
 			}
 
-			e.persistAgentIngesterKeys(req.Context(), &r)
+			e.knapsack.PersistAgentIngesterKeys(req.Context(), r.AgentIngesterToken, r.AgentIngesterHPKEPublicKey, r.AgentIngesterHPKEPresharedKey)
 
 			e.slogger.Log(req.Context(), slog.LevelInfo,
 				"launcher performed secretless enrollment",
@@ -286,68 +287,6 @@ func (e *kryptoEcMiddleware) callbackWorker() {
 	e.slogger.Log(context.TODO(), slog.LevelInfo,
 		"callback worker shut down",
 	)
-}
-
-// persistAgentIngesterKeys persists the agent ingester keys from an enrollment response to the token store
-// and pings the osquery publisher to update its token cache if any updates were made.
-// Any errors here are logged but this is all a best effort approach to avoid interrupting the enrollment flow-
-// this data is also returned via control server, so we can retry if needed later.
-func (e *kryptoEcMiddleware) persistAgentIngesterKeys(ctx context.Context, resp *callbackResponse) {
-	// osqueryPublisher and tokenStore are always expected to be set at this point, but sanity check here in case
-	if e.osqueryPublisher == nil || e.tokenStore == nil {
-		e.slogger.Log(ctx, slog.LevelError,
-			"osquery publisher and token store are required to persist agent ingester keys",
-		)
-		return
-	}
-
-	// track any changes made to the token store so we can ping the osquery publisher to update its token cache
-	updatesMade := false
-	if resp.AgentIngesterToken != "" {
-		if err := e.tokenStore.Set(storage.AgentIngesterAuthTokenKey, []byte(resp.AgentIngesterToken)); err != nil {
-			e.slogger.Log(ctx, slog.LevelError,
-				"could not save agent ingester auth token",
-				"err", err,
-			)
-		} else {
-			updatesMade = true
-			e.slogger.Log(ctx, slog.LevelInfo,
-				"agent ingester token set from secretless enrollment flow",
-			)
-		}
-	}
-
-	if resp.AgentIngesterHPKEPublicKey != "" {
-		if err := e.tokenStore.Set(storage.AgentIngesterHPKEPublicKey, []byte(resp.AgentIngesterHPKEPublicKey)); err != nil {
-			e.slogger.Log(ctx, slog.LevelError,
-				"unable to save agent ingester HPKE public key",
-				"err", err,
-			)
-		} else {
-			updatesMade = true
-			e.slogger.Log(ctx, slog.LevelInfo,
-				"agent ingester HPKE public key set from secretless enrollment flow",
-			)
-		}
-	}
-
-	if resp.AgentIngesterHPKEPresharedKey != "" {
-		if err := e.tokenStore.Set(storage.AgentIngesterHPKEPresharedKey, []byte(resp.AgentIngesterHPKEPresharedKey)); err != nil {
-			e.slogger.Log(ctx, slog.LevelError,
-				"unable to save agent ingester HPKE preshared key",
-				"err", err,
-			)
-		} else {
-			updatesMade = true
-			e.slogger.Log(ctx, slog.LevelInfo,
-				"agent ingester HPKE preshared key set from secretless enrollment flow",
-			)
-		}
-	}
-
-	if updatesMade {
-		e.osqueryPublisher.Ping()
-	}
 }
 
 // sendCallback is a command to allow launcher to callback to the SaaS side with krypto responses. As the URL it inside

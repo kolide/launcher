@@ -917,6 +917,12 @@ func Test_sendCallback_handlesEnrollmentWithAgentIngesterKeys(t *testing.T) {
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	k.On("TokenStore").Return(tokenStore)
+	k.On("PersistAgentIngesterKeys", mock.Anything, expectedAgentIngesterToken, expectedAgentIngesterHPKEPublicKey, expectedAgentIngesterHPKEPresharedKey).
+		Run(func(args mock.Arguments) {
+			tokenStore.Set(storage.AgentIngesterAuthTokenKey, []byte(args.Get(1).(string)))
+			tokenStore.Set(storage.AgentIngesterHPKEPublicKey, []byte(args.Get(2).(string)))
+			tokenStore.Set(storage.AgentIngesterHPKEPresharedKey, []byte(args.Get(3).(string)))
+		}).Return()
 	client := &http.Client{}
 	t.Cleanup(func() {
 		client.CloseIdleConnections()
