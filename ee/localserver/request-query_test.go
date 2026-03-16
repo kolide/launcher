@@ -14,9 +14,9 @@ import (
 	"github.com/kolide/launcher/v2/ee/agent/types"
 	typesMocks "github.com/kolide/launcher/v2/ee/agent/types/mocks"
 	"github.com/kolide/launcher/v2/ee/localserver/mocks"
-	"github.com/kolide/launcher/v2/ee/osquerypublisher"
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/osquery/osquery-go/plugin/distributed"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -67,17 +67,7 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 			testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 			require.NoError(t, err, "could not create test config store")
 			mockKnapsack.On("ConfigStore").Return(testConfigStore).Maybe()
-			tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-			require.NoError(t, err)
-			mockKnapsack.On("TokenStore").Return(tokenStore)
-			client := &http.Client{}
-			t.Cleanup(func() {
-				client.CloseIdleConnections()
-			})
-			mockKnapsack.On("OsqueryPublisherURL").Return("").Maybe()
-			mockKnapsack.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
-			osqPublisher := osquerypublisher.NewLogPublisherClient(multislogger.NewNopLogger(), mockKnapsack, client)
-			mockKnapsack.On("OsqueryPublisher").Return(osqPublisher)
+			mockKnapsack.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 			mockQuerier := mocks.NewQuerier(t)
 
 			if tt.mockQueryResult != nil {
@@ -248,17 +238,7 @@ func Test_localServer_requestRunScheduledQueryHandler(t *testing.T) {
 			testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 			require.NoError(t, err, "could not create test config store")
 			mockKnapsack.On("ConfigStore").Return(testConfigStore).Maybe()
-			tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-			require.NoError(t, err)
-			mockKnapsack.On("TokenStore").Return(tokenStore)
-			client := &http.Client{}
-			t.Cleanup(func() {
-				client.CloseIdleConnections()
-			})
-			mockKnapsack.On("OsqueryPublisherURL").Return("").Maybe()
-			mockKnapsack.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
-			osqPublisher := osquerypublisher.NewLogPublisherClient(multislogger.NewNopLogger(), mockKnapsack, client)
-			mockKnapsack.On("OsqueryPublisher").Return(osqPublisher)
+			mockKnapsack.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 			// set up mock querier
 			mockQuerier := mocks.NewQuerier(t)

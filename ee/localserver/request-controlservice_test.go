@@ -11,9 +11,9 @@ import (
 	storageci "github.com/kolide/launcher/v2/ee/agent/storage/ci"
 	"github.com/kolide/launcher/v2/ee/agent/types"
 	"github.com/kolide/launcher/v2/ee/agent/types/mocks"
-	"github.com/kolide/launcher/v2/ee/osquerypublisher"
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -32,17 +32,7 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 		testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 		require.NoError(t, err, "could not create test config store")
 		m.On("ConfigStore").Return(testConfigStore).Maybe()
-		tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-		require.NoError(t, err)
-		m.On("TokenStore").Return(tokenStore)
-		client := &http.Client{}
-		t.Cleanup(func() {
-			client.CloseIdleConnections()
-		})
-		m.On("OsqueryPublisherURL").Return("").Maybe()
-		m.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
-		osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, m, client)
-		m.On("OsqueryPublisher").Return(osqPublisher).Maybe()
+		m.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 		return m
 	}
 
@@ -74,17 +64,7 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 				testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 				require.NoError(t, err, "could not create test config store")
 				m.On("ConfigStore").Return(testConfigStore).Maybe()
-				tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-				require.NoError(t, err)
-				m.On("TokenStore").Return(tokenStore)
-				client := &http.Client{}
-				t.Cleanup(func() {
-					client.CloseIdleConnections()
-				})
-				m.On("OsqueryPublisherURL").Return("").Maybe()
-				m.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
-				osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, m, client)
-				m.On("OsqueryPublisher").Return(osqPublisher).Maybe()
+				m.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 				return m
 			},
 		},

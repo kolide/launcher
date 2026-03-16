@@ -3,7 +3,6 @@ package localserver
 import (
 	"errors"
 	"log/slog"
-	"net/http"
 	"testing"
 	"time"
 
@@ -11,7 +10,6 @@ import (
 	storageci "github.com/kolide/launcher/v2/ee/agent/storage/ci"
 	"github.com/kolide/launcher/v2/ee/agent/types"
 	typesmocks "github.com/kolide/launcher/v2/ee/agent/types/mocks"
-	"github.com/kolide/launcher/v2/ee/osquerypublisher"
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/kolide/launcher/v2/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/mock"
@@ -33,17 +31,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 	require.NoError(t, err, "could not create test config store")
 	k.On("ConfigStore").Return(testConfigStore).Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore)
-	client := &http.Client{}
-	t.Cleanup(func() {
-		client.CloseIdleConnections()
-	})
-	k.On("OsqueryPublisherURL").Return("").Maybe()
-	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
-	k.On("OsqueryPublisher").Return(osqPublisher)
+	k.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 	// Override the poll and recalculate interval for the test so we can be sure that the async workers
 	// do run, but then stop running on shutdown
