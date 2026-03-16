@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kolide/launcher/v2/pkg/launcher"
 	"github.com/kolide/launcher/v2/pkg/packagekit"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -334,6 +335,174 @@ func Test_fullPathToBareBinary(t *testing.T) {
 
 			actualPath := p.fullPathToBareBinary(tt.binaryName)
 			require.Equal(t, tt.expectedPath, actualPath)
+		})
+	}
+}
+
+func Test_setupDirectories(t *testing.T) {
+	t.Parallel()
+
+	type testCase struct {
+		testCaseName    string
+		opts            *PackageOptions
+		expectedBinDir  string
+		expectedConfDir string
+		expectedRootDir string
+	}
+
+	testCases := make([]testCase, 0)
+
+	switch runtime.GOOS {
+	case "windows":
+		testCases = append(testCases,
+			testCase{
+				testCaseName: "Windows, standard identifier",
+				opts: &PackageOptions{
+					Identifier: launcher.DefaultLauncherIdentifier,
+					target: Target{
+						Platform: Windows,
+					},
+				},
+				expectedBinDir:  `Launcher-kolide-k2\bin`,
+				expectedConfDir: `Launcher-kolide-k2\conf`,
+				expectedRootDir: `Launcher-kolide-k2\data`,
+			},
+			testCase{
+				testCaseName: "Windows, custom identifier",
+				opts: &PackageOptions{
+					Identifier: "kolide-nababe-k2",
+					target: Target{
+						Platform: Windows,
+					},
+				},
+				expectedBinDir:  `Launcher-kolide-nababe-k2\bin`,
+				expectedConfDir: `Launcher-kolide-nababe-k2\conf`,
+				expectedRootDir: `Launcher-kolide-nababe-k2\data`,
+			},
+		)
+	case "linux", "darwin":
+		testCases = append(testCases,
+			testCase{
+				testCaseName: "posix, standard identifier, no override",
+				opts: &PackageOptions{
+					BinRootDir: `/usr/local`,
+					Hostname:   "k2device.kolide.com",
+					Identifier: launcher.DefaultLauncherIdentifier,
+					target: Target{
+						Platform: Linux,
+					},
+				},
+				expectedBinDir:  `/usr/local/kolide-k2/bin`,
+				expectedConfDir: `/etc/kolide-k2`,
+				expectedRootDir: `/var/kolide-k2/k2device.kolide.com`,
+			},
+			testCase{
+				testCaseName: "posix, custom identifier, no override",
+				opts: &PackageOptions{
+					BinRootDir: `/usr/local`,
+					Hostname:   "k2device.kolide.com",
+					Identifier: "kolide-nababe-k2",
+					target: Target{
+						Platform: Darwin,
+					},
+				},
+				expectedBinDir:  `/usr/local/kolide-nababe-k2/bin`,
+				expectedConfDir: `/etc/kolide-nababe-k2`,
+				expectedRootDir: `/var/kolide-nababe-k2/k2device.kolide.com`,
+			},
+			testCase{
+				testCaseName: "posix, standard identifier, override",
+				opts: &PackageOptions{
+					BinRootDir:           `/usr/local`,
+					PosixRootDirOverride: `/var/kolide-k2/k2device-preprod.kolide.com`,
+					Hostname:             "k2device.kolide.com",
+					Identifier:           launcher.DefaultLauncherIdentifier,
+					target: Target{
+						Platform: Darwin,
+					},
+				},
+				expectedBinDir:  `/usr/local/kolide-k2/bin`,
+				expectedConfDir: `/etc/kolide-k2`,
+				expectedRootDir: `/var/kolide-k2/k2device-preprod.kolide.com`,
+			},
+			testCase{
+				testCaseName: "posix, custom identifier, override",
+				opts: &PackageOptions{
+					BinRootDir:           `/usr/local`,
+					PosixRootDirOverride: `/var/kolide-k2/k2device.kolide.com`,
+					Hostname:             "k2device.kolide.eu",
+					Identifier:           "kolide-nababe-k2",
+					target: Target{
+						Platform: Linux,
+					},
+				},
+				expectedBinDir:  `/usr/local/kolide-nababe-k2/bin`,
+				expectedConfDir: `/etc/kolide-nababe-k2`,
+				expectedRootDir: `/var/kolide-k2/k2device.kolide.com`,
+			},
+		)
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.testCaseName, func(t *testing.T) {
+			t.Parallel()
+
+			// Set the package root to a temp directory
+			tt.opts.packageRoot = t.TempDir()
+
+			err := tt.opts.setupDirectories()
+			require.NoError(t, err)
+
+			require.Equal(t, tt.expectedBinDir, tt.opts.binDir)
+			require.Equal(t, tt.expectedConfDir, tt.opts.confDir)
+			require.Equal(t, tt.expectedRootDir, tt.opts.rootDir)
+		})
+	}
+}
+
+func TestGeneratePosixRootDir(t *testing.T) {
+	t.Parallel()
+
+	if runtime.GOOS == "windows" {
+		t.Skip("posix-only")
+	}
+
+	for _, tt := range []struct {
+		testCaseName    string
+		identifier      string
+		hostname        string
+		expectedRootDir string
+	}{
+		{
+			testCaseName:    "default identifier, k2device",
+			identifier:      launcher.DefaultLauncherIdentifier,
+			hostname:        "k2device.kolide.com",
+			expectedRootDir: "/var/kolide-k2/k2device.kolide.com",
+		},
+		{
+			testCaseName:    "default identifier, k2device-preprod",
+			identifier:      launcher.DefaultLauncherIdentifier,
+			hostname:        "k2device-preprod.kolide.com",
+			expectedRootDir: "/var/kolide-k2/k2device-preprod.kolide.com",
+		},
+		{
+			testCaseName:    "non-default identifier, k2device",
+			identifier:      "kolide-test-k2",
+			hostname:        "k2device.kolide.com",
+			expectedRootDir: "/var/kolide-test-k2/k2device.kolide.com",
+		},
+		{
+			testCaseName:    "non-default identifier, k2device-preprod",
+			identifier:      "kolide-test-k2",
+			hostname:        "k2device-preprod.kolide.com",
+			expectedRootDir: "/var/kolide-test-k2/k2device-preprod.kolide.com",
+		},
+	} {
+		t.Run(tt.testCaseName, func(t *testing.T) {
+			t.Parallel()
+
+			rootDir := GeneratePosixRootDir(tt.identifier, tt.hostname)
+			require.Equal(t, tt.expectedRootDir, rootDir)
 		})
 	}
 }
