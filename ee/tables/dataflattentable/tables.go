@@ -74,6 +74,7 @@ var allTypes = []DataSourceType{
 		tableName:        "kolide_yaml",
 		description:      "Parses YAML files or raw YAML data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading any YAML configuration or data file.",
 		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Yaml },
+		flattenFileFunc:  func(_ table.QueryContext) dataflatten.DataFileFunc { return dataflatten.YamlFile },
 	},
 }
 

@@ -4,13 +4,28 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
 
 	"go.yaml.in/yaml/v4"
 )
 
+func YamlFile(file string, opts ...FlattenOpts) ([]Row, error) {
+	fh, err := os.Open(file)
+	if err != nil {
+		return nil, err
+	}
+	defer fh.Close()
+
+	return yamlFromReader(fh, opts...)
+}
+
 func Yaml(rawdata []byte, opts ...FlattenOpts) ([]Row, error) {
-	// We use the loader to accommodate multiple documents per single yaml file
 	reader := bytes.NewReader(rawdata)
+	return yamlFromReader(reader, opts...)
+}
+
+func yamlFromReader(reader io.Reader, opts ...FlattenOpts) ([]Row, error) {
+	// We use the loader to accommodate multiple documents per single yaml file
 	loader, err := yaml.NewLoader(reader)
 	if err != nil {
 		return nil, fmt.Errorf("loading yaml: %w", err)
