@@ -89,10 +89,14 @@ var (
 )
 
 func init() {
-	initMetrics()
+	ReinitializeMetrics()
 }
 
-func initMetrics() {
+// ReinitializeMetrics creates or re-creates the dedup metrics from the current
+// global OTEL meter provider. It must be called any time the meter provider is
+// replaced (see ee/observability/exporter) so that the metrics are bound to the
+// active provider instead of a stale, shut-down one.
+func ReinitializeMetrics() {
 	m := otel.Meter(meterName)
 
 	var err error
