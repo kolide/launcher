@@ -36,6 +36,7 @@ func TestDataFlattenTablePlist_Animals(t *testing.T) {
 		"plist": {slogger: slogger, flattenFileFunc: staticFile(dataflatten.PlistFile), flattenBytesFunc: staticBytes(dataflatten.Plist)},
 		"xml":   {slogger: slogger, flattenFileFunc: staticFile(dataflatten.PlistFile), flattenBytesFunc: staticBytes(dataflatten.Plist)},
 		"json":  {slogger: slogger, flattenFileFunc: staticFile(dataflatten.JsonFile), flattenBytesFunc: staticBytes(dataflatten.Json)},
+		"yaml":  {slogger: slogger, flattenFileFunc: staticFile(dataflatten.YamlFile), flattenBytesFunc: staticBytes(dataflatten.Yaml)},
 	}
 
 	var tests = []struct {
