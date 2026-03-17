@@ -14,6 +14,7 @@ import (
 	"github.com/kolide/launcher/v2/ee/gowrapper"
 	"github.com/kolide/launcher/v2/ee/observability"
 	"github.com/kolide/launcher/v2/ee/observability/bufspanprocessor"
+	"github.com/kolide/launcher/v2/pkg/log/dedup"
 	osquerygotraces "github.com/osquery/osquery-go/traces"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -353,6 +354,7 @@ func (t *TelemetryExporter) setNewGlobalMeterProvider(launcherResource *resource
 	t.meterProvider = newMeterProvider
 
 	observability.ReinitializeMetrics()
+	dedup.ReinitializeMetrics()
 }
 
 // Execute begins exporting telemetry if exporting is enabled.
