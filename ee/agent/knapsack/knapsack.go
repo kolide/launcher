@@ -680,6 +680,61 @@ func (k *knapsack) SetOsqueryPublisher(p types.OsqueryPublisher) {
 	k.osqueryPublisher = p
 }
 
+// PersistAgentIngesterKeys persists the agent ingester keys to the token store and
+// pings the osquery publisher to update its token cache if any updates were made.
+func (k *knapsack) PersistAgentIngesterKeys(ctx context.Context, authToken, hpkePublicKey, hpkePresharedKey string) {
+	tokenStore := k.TokenStore()
+	osqueryPublisher := k.OsqueryPublisher()
+
+	if tokenStore == nil || osqueryPublisher == nil {
+		k.Slogger().Log(ctx, slog.LevelError,
+			"token store and osquery publisher are required to persist agent ingester keys",
+		)
+		return
+	}
+
+	updatesMade := false
+	if authToken != "" {
+		if err := tokenStore.Set(storage.AgentIngesterAuthTokenKey, []byte(authToken)); err != nil {
+			k.Slogger().Log(ctx, slog.LevelError,
+				"encountered error saving agent ingester auth token",
+				"err", err,
+			)
+		} else {
+			updatesMade = true
+			k.Slogger().Log(ctx, slog.LevelInfo, "stored new agent ingester auth token")
+		}
+	}
+
+	if hpkePublicKey != "" {
+		if err := tokenStore.Set(storage.AgentIngesterHPKEPublicKey, []byte(hpkePublicKey)); err != nil {
+			k.Slogger().Log(ctx, slog.LevelError,
+				"encountered error saving agent ingester HPKE public key",
+				"err", err,
+			)
+		} else {
+			updatesMade = true
+			k.Slogger().Log(ctx, slog.LevelInfo, "stored new agent ingester HPKE public key")
+		}
+	}
+
+	if hpkePresharedKey != "" {
+		if err := tokenStore.Set(storage.AgentIngesterHPKEPresharedKey, []byte(hpkePresharedKey)); err != nil {
+			k.Slogger().Log(ctx, slog.LevelError,
+				"encountered error saving agent ingester HPKE preshared key",
+				"err", err,
+			)
+		} else {
+			updatesMade = true
+			k.Slogger().Log(ctx, slog.LevelInfo, "stored new agent ingester HPKE preshared key")
+		}
+	}
+
+	if updatesMade {
+		osqueryPublisher.Ping()
+	}
+}
+
 // DesktopRunner interface methods
 func (k *knapsack) RequestProfile(ctx context.Context, profileType string) ([]string, error) {
 	if k.desktopRunner == nil {

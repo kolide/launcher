@@ -14,7 +14,6 @@ import (
 	storageci "github.com/kolide/launcher/v2/ee/agent/storage/ci"
 	"github.com/kolide/launcher/v2/ee/agent/types"
 	typesmocks "github.com/kolide/launcher/v2/ee/agent/types/mocks"
-	"github.com/kolide/launcher/v2/ee/osquerypublisher"
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -48,17 +47,7 @@ func Test_requestDt4aInfoHandler(t *testing.T) {
 	testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 	require.NoError(t, err, "could not create test config store")
 	k.On("ConfigStore").Return(testConfigStore).Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore)
-	client := &http.Client{}
-	t.Cleanup(func() {
-		client.CloseIdleConnections()
-	})
-	k.On("OsqueryPublisherURL").Return("").Maybe()
-	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
-	k.On("OsqueryPublisher").Return(osqPublisher)
+	k.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
@@ -119,17 +108,7 @@ func Test_requestDt4aInfoHandlerWithDt4aIds(t *testing.T) {
 	testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 	require.NoError(t, err, "could not create test config store")
 	k.On("ConfigStore").Return(testConfigStore).Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore)
-	client := &http.Client{}
-	t.Cleanup(func() {
-		client.CloseIdleConnections()
-	})
-	k.On("OsqueryPublisherURL").Return("").Maybe()
-	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
-	k.On("OsqueryPublisher").Return(osqPublisher)
+	k.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
@@ -180,17 +159,7 @@ func Test_requestDt4aInfoHandlerWithDt4aIdsNoData(t *testing.T) {
 	testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 	require.NoError(t, err, "could not create test config store")
 	k.On("ConfigStore").Return(testConfigStore).Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore)
-	client := &http.Client{}
-	t.Cleanup(func() {
-		client.CloseIdleConnections()
-	})
-	k.On("OsqueryPublisherURL").Return("").Maybe()
-	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
-	k.On("OsqueryPublisher").Return(osqPublisher)
+	k.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
@@ -257,17 +226,7 @@ func Test_requestDt4aInfoHandler_allowsAllSafariWebExtensionOrigins(t *testing.T
 	testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 	require.NoError(t, err, "could not create test config store")
 	k.On("ConfigStore").Return(testConfigStore).Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore)
-	client := &http.Client{}
-	t.Cleanup(func() {
-		client.CloseIdleConnections()
-	})
-	k.On("OsqueryPublisherURL").Return("").Maybe()
-	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
-	k.On("OsqueryPublisher").Return(osqPublisher)
+	k.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
@@ -318,17 +277,7 @@ func Test_requestDt4aInfoHandler_allowsMissingOrigin(t *testing.T) {
 	testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 	require.NoError(t, err, "could not create test config store")
 	k.On("ConfigStore").Return(testConfigStore).Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore)
-	client := &http.Client{}
-	t.Cleanup(func() {
-		client.CloseIdleConnections()
-	})
-	k.On("OsqueryPublisherURL").Return("").Maybe()
-	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
-	k.On("OsqueryPublisher").Return(osqPublisher)
+	k.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
@@ -378,17 +327,7 @@ func Test_requestDt4aInfoHandler_allowsEmptyOrigin(t *testing.T) {
 	testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 	require.NoError(t, err, "could not create test config store")
 	k.On("ConfigStore").Return(testConfigStore).Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore)
-	client := &http.Client{}
-	t.Cleanup(func() {
-		client.CloseIdleConnections()
-	})
-	k.On("OsqueryPublisherURL").Return("").Maybe()
-	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
-	k.On("OsqueryPublisher").Return(osqPublisher)
+	k.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
 	require.NoError(t, err)
@@ -446,17 +385,7 @@ func Test_requestDt4aInfoHandler_badRequest(t *testing.T) {
 			testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 			require.NoError(t, err, "could not create test config store")
 			k.On("ConfigStore").Return(testConfigStore).Maybe()
-			tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-			require.NoError(t, err)
-			k.On("TokenStore").Return(tokenStore)
-			client := &http.Client{}
-			t.Cleanup(func() {
-				client.CloseIdleConnections()
-			})
-			k.On("OsqueryPublisherURL").Return("").Maybe()
-			k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
-			osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
-			k.On("OsqueryPublisher").Return(osqPublisher)
+			k.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 			// Set up localserver
 			ls, err := New(t.Context(), k, nil)
@@ -502,17 +431,7 @@ func Test_requestDt4aInfoHandler_noDataAvailable(t *testing.T) {
 	testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 	require.NoError(t, err, "could not create test config store")
 	k.On("ConfigStore").Return(testConfigStore).Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore)
-	client := &http.Client{}
-	t.Cleanup(func() {
-		client.CloseIdleConnections()
-	})
-	k.On("OsqueryPublisherURL").Return("").Maybe()
-	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
-	k.On("OsqueryPublisher").Return(osqPublisher)
+	k.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
@@ -553,17 +472,7 @@ func Test_requestDt4aAccelerationHandler(t *testing.T) {
 	testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 	require.NoError(t, err, "could not create test config store")
 	k.On("ConfigStore").Return(testConfigStore).Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore)
-	client := &http.Client{}
-	t.Cleanup(func() {
-		client.CloseIdleConnections()
-	})
-	k.On("OsqueryPublisherURL").Return("").Maybe()
-	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
-	osqPublisher := osquerypublisher.NewLogPublisherClient(multislogger.NewNopLogger(), k, client)
-	k.On("OsqueryPublisher").Return(osqPublisher)
+	k.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)

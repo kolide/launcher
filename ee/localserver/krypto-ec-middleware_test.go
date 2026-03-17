@@ -24,7 +24,6 @@ import (
 	"github.com/kolide/krypto/pkg/challenge"
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/v2/ee/localserver/mocks"
-	"github.com/kolide/launcher/v2/ee/osquerypublisher"
 
 	"github.com/kolide/launcher/v2/ee/agent/storage"
 	storageci "github.com/kolide/launcher/v2/ee/agent/storage/ci"
@@ -213,17 +212,7 @@ func TestKryptoEcMiddleware(t *testing.T) {
 					}
 
 					k := typesmocks.NewKnapsack(t)
-					tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-					require.NoError(t, err)
-					k.On("TokenStore").Return(tokenStore)
-					client := &http.Client{}
-					t.Cleanup(func() {
-						client.CloseIdleConnections()
-					})
-					k.On("OsqueryPublisherURL").Return("").Maybe()
-					k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
-					osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
-					k.On("OsqueryPublisher").Return(osqPublisher)
+					k.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 					// set up middlewares
 					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, k, localServerPrivateKey, remoteServerPrivateKey.PublicKey, mockPresenceDetector, "test-munemo")
@@ -368,17 +357,7 @@ func TestKryptoEcMiddlewareErrors(t *testing.T) {
 					mockPresenceDetector.On("DetectPresence", mock.AnythingOfType("string"), mock.AnythingOfType("Duration")).Return(0*time.Second, nil).Maybe()
 
 					k := typesmocks.NewKnapsack(t)
-					tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-					require.NoError(t, err)
-					k.On("TokenStore").Return(tokenStore)
-					client := &http.Client{}
-					t.Cleanup(func() {
-						client.CloseIdleConnections()
-					})
-					k.On("OsqueryPublisherURL").Return("").Maybe()
-					k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
-					osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
-					k.On("OsqueryPublisher").Return(osqPublisher)
+					k.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 					// set up middlewares
 					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, k, localServerPrivateKey, remoteServerPrivateKey.PublicKey, mockPresenceDetector, "test-munemo")
 					if tt.middlewareOpt != nil {
@@ -514,17 +493,7 @@ func Test_AllowedOrigin(t *testing.T) {
 			mockPresenceDetector.On("DetectPresence", mock.AnythingOfType("string"), mock.AnythingOfType("Duration")).Return(0*time.Second, nil).Maybe()
 
 			k := typesmocks.NewKnapsack(t)
-			tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-			require.NoError(t, err)
-			k.On("TokenStore").Return(tokenStore)
-			client := &http.Client{}
-			t.Cleanup(func() {
-				client.CloseIdleConnections()
-			})
-			k.On("OsqueryPublisherURL").Return("").Maybe()
-			k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
-			osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
-			k.On("OsqueryPublisher").Return(osqPublisher)
+			k.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 			// set up middlewares
 			kryptoEcMiddleware := newKryptoEcMiddleware(slogger, k, mustGenEcdsaKey(t), counterpartyKey.PublicKey, mockPresenceDetector, "")
@@ -555,7 +524,7 @@ func Test_AllowedOrigin(t *testing.T) {
 			}
 
 			outerRespnse := mustUnmarshallOuterResponse(t, rr.Body.String())
-			_, err = outerRespnse.Open(privateEncryptionKey)
+			_, err := outerRespnse.Open(privateEncryptionKey)
 			require.NoError(t, err)
 		})
 	}
@@ -729,17 +698,7 @@ func TestMunemoCheck(t *testing.T) {
 			require.NoError(t, err)
 
 			slogger := multislogger.NewNopLogger()
-			tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-			require.NoError(t, err)
-			k.On("TokenStore").Return(tokenStore)
-			client := &http.Client{}
-			t.Cleanup(func() {
-				client.CloseIdleConnections()
-			})
-			k.On("OsqueryPublisherURL").Return("").Maybe()
-			k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
-			osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
-			k.On("OsqueryPublisher").Return(osqPublisher)
+			k.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 			e := newKryptoEcMiddleware(slogger, k, nil, mustGenEcdsaKey(t).PublicKey, nil, munemo)
 			t.Cleanup(func() {
@@ -776,17 +735,7 @@ func Test_sendCallback(t *testing.T) {
 		Level:     slog.LevelDebug,
 	}))
 	k := typesmocks.NewKnapsack(t)
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore)
-	client := &http.Client{}
-	t.Cleanup(func() {
-		client.CloseIdleConnections()
-	})
-	k.On("OsqueryPublisherURL").Return("").Maybe()
-	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
-	k.On("OsqueryPublisher").Return(osqPublisher)
+	k.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 	requestsQueued := &atomic.Int64{}
 	mw := newKryptoEcMiddleware(slogger, k, nil, mustGenEcdsaKey(t).PublicKey, nil, "test-munemo")
@@ -842,17 +791,7 @@ func Test_sendCallback_handlesEnrollment(t *testing.T) {
 	}))
 	k := typesmocks.NewKnapsack(t)
 	k.On("SaveEnrollment", types.DefaultEnrollmentID, expectedMunemo, expectedNodeKey, "").Return(nil)
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore)
-	client := &http.Client{}
-	t.Cleanup(func() {
-		client.CloseIdleConnections()
-	})
-	k.On("OsqueryPublisherURL").Return("").Maybe()
-	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
-	k.On("OsqueryPublisher").Return(osqPublisher)
+	k.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 	mw := newKryptoEcMiddleware(slogger, k, nil, mustGenEcdsaKey(t).PublicKey, nil, "")
 	t.Cleanup(func() {
 		mw.Close()
@@ -916,15 +855,12 @@ func Test_sendCallback_handlesEnrollmentWithAgentIngesterKeys(t *testing.T) {
 	k.On("SaveEnrollment", types.DefaultEnrollmentID, expectedMunemo, expectedNodeKey, "").Return(nil)
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore)
-	client := &http.Client{}
-	t.Cleanup(func() {
-		client.CloseIdleConnections()
-	})
-	k.On("OsqueryPublisherURL").Return("").Maybe()
-	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
-	k.On("OsqueryPublisher").Return(osqPublisher)
+	k.On("PersistAgentIngesterKeys", mock.Anything, expectedAgentIngesterToken, expectedAgentIngesterHPKEPublicKey, expectedAgentIngesterHPKEPresharedKey).
+		Run(func(args mock.Arguments) {
+			tokenStore.Set(storage.AgentIngesterAuthTokenKey, []byte(args.Get(1).(string)))
+			tokenStore.Set(storage.AgentIngesterHPKEPublicKey, []byte(args.Get(2).(string)))
+			tokenStore.Set(storage.AgentIngesterHPKEPresharedKey, []byte(args.Get(3).(string)))
+		}).Return()
 	mw := newKryptoEcMiddleware(slogger, k, nil, mustGenEcdsaKey(t).PublicKey, nil, "")
 	t.Cleanup(func() {
 		mw.Close()
@@ -987,16 +923,7 @@ func Test_sendCallback_handlesRegionURLUpdates(t *testing.T) {
 	k.On("OsqueryPublisherURL").Return("old.pub.example.test")
 	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 	k.On("SetOsqueryPublisherURL", expectedOsqueryPublisherUrl).Return(nil)
-
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore)
-	client := &http.Client{}
-	t.Cleanup(func() {
-		client.CloseIdleConnections()
-	})
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, client)
-	k.On("OsqueryPublisher").Return(osqPublisher)
+	k.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 	mw := newKryptoEcMiddleware(slogger, k, nil, mustGenEcdsaKey(t).PublicKey, nil, "")
 	t.Cleanup(func() {
