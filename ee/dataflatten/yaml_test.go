@@ -116,11 +116,11 @@ func TestYaml(t *testing.T) {
 			fileName:     filepath.Join("testdata", "multiple-docs.yaml"),
 			expectedRows: []Row{
 				{
-					Path:  []string{"document"},
+					Path:  []string{"0", "document"},
 					Value: "1",
 				},
 				{
-					Path:  []string{"document"},
+					Path:  []string{"1", "document"},
 					Value: "2",
 				},
 			},

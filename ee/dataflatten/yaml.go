@@ -16,7 +16,7 @@ func Yaml(rawdata []byte, opts ...FlattenOpts) ([]Row, error) {
 		return nil, fmt.Errorf("loading yaml: %w", err)
 	}
 
-	rows := make([]Row, 0)
+	docs := make([]any, 0)
 	for {
 		var data any
 		err := loader.Load(&data)
@@ -28,12 +28,13 @@ func Yaml(rawdata []byte, opts ...FlattenOpts) ([]Row, error) {
 			return nil, fmt.Errorf("parsing document: %w", err)
 		}
 
-		newRows, err := Flatten(data, opts...)
-		if err != nil {
-			return nil, fmt.Errorf("flattening document: %w", err)
-		}
-		rows = append(rows, newRows...)
+		docs = append(docs, data)
 	}
 
-	return rows, nil
+	// If we only have one document, no need to prepend an index of 0 to the path.
+	if len(docs) == 1 {
+		return Flatten(docs[0], opts...)
+	}
+
+	return Flatten(docs, opts...)
 }
