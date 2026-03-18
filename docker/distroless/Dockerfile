@@ -1,5 +1,5 @@
 ARG FAKE
-FROM launcher${FAKE}-build as stage1
+FROM launcher${FAKE}-build AS stage1
 
 FROM --platform=linux/amd64 gcr.io/distroless/base
 LABEL maintainer="engineering@kolide.co"

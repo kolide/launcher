@@ -64,6 +64,7 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.40.0
 	go.uber.org/atomic v1.9.0
 	go.uber.org/goleak v1.3.0
+	go.yaml.in/yaml/v4 v4.0.0-rc.4
 	modernc.org/sqlite v1.37.1
 )
 

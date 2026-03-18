@@ -15,6 +15,7 @@ func main() {
 	var (
 		flVersion  = flag.String("version", env.String("VERSION", "stable"), "the osqueryd version to download")
 		flPlatform = flag.String("platform", env.String("PLATFORM", ""), "the platform to download osqueryd for (ie: darwin, linux)")
+		flArch     = flag.String("arch", env.String("ARCH", ""), "the arch to download osqueryd for (arm64, amd64, universal)")
 		flOutput   = flag.String("output", env.String("OUTPUT", ""), "the path where the binary should be output")
 		flCacheDir = flag.String("cache_dir", env.String("CACHE_DIR", ""), "Directory to cache downloads in (default: random)")
 	)
@@ -29,6 +30,13 @@ func main() {
 	if err := target.PlatformFromString(*flPlatform); err != nil {
 		fmt.Printf("Error parsing platform: %v\n", err)
 		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit outside of launcher proper
+	}
+
+	if *flArch != "" {
+		if err := target.ArchFromString(*flArch); err != nil {
+			fmt.Printf("Error parsing arch: %v\n", err)
+			os.Exit(1) //nolint:forbidigo // Fine to use os.Exit outside of launcher proper
+		}
 	}
 
 	// If we have a cacheDir, use it. Otherwise. set something random.
