@@ -192,6 +192,14 @@ func OpenLeveldb(ctx context.Context, slogger *slog.Logger, dbLocation string, c
 		DisableSeeksCompaction: true,               // no need to perform compaction
 		Strict:                 opt.StrictRecovery, // we prefer to drop corrupted data rather than fail to open the db altogether
 	}
+
+	// we've seen a failure when querying some leveldbs with the historical bytewise comparer like:
+	// opening leveldb: opening db: `leveldb/table: Writer: keys are not in increasing order
+	// this is expected and not an issue for historical bytewise, so we force the db into read-only mode to avoid this
+	if comparer == "historical_bytewise" {
+		opts.ReadOnly = true
+	}
+
 	db, dbOpenErr := leveldb.OpenFile(dbLocation, opts)
 	if dbOpenErr != nil {
 		// TODO we should update goleveldb to return a specific, checkable error type for this case so we don't have to do this gross string check
