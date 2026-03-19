@@ -20,7 +20,7 @@ jobs:
       fail-fast: false # Consider changing this sometime
       matrix:
         os:
-          - macos-14
+          - macos-15
           - windows-latest
     steps:
       - name: Check out code
@@ -200,7 +200,7 @@ jobs:
       matrix:
         os:
           - ubuntu-22.04
-          - macos-14
+          - macos-15
           - windows-latest
     steps:
       - name: Check out code
@@ -264,7 +264,7 @@ jobs:
       matrix:
         os:
           - ubuntu-22.04
-          - macos-14
+          - macos-15
           - windows-latest
     steps:
       - name: Check out code
@@ -386,6 +386,7 @@ jobs:
           - ubuntu-24.04
           - macos-14
           - macos-15
+          - macos-26
           - windows-2022
           - windows-2025
     needs:
@@ -541,7 +542,7 @@ jobs:
       matrix:
         os:
           - ubuntu-22.04
-          - macos-14
+          - macos-15
           - windows-latest
     steps:
       - uses: actions/checkout@v4
