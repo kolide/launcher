@@ -367,7 +367,7 @@ jobs:
         run: |
           echo "::notice::Skipping benchmark comparison - no baseline found on main branch. This is expected for new benchmarks."
 
-      - name: Save benchmark results for main
+      - name: Save benchmark results
         uses: actions/upload-artifact@v4
         with:
           name: ${{ runner.os }}-benchmark.txt
