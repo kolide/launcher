@@ -336,7 +336,7 @@ func (i *OsqueryInstance) startKatcExtensionManagerServer(ctx context.Context, c
 
 	// We start this server with allowRestart=true so that we can restart it in the future
 	// if the KATC configuration changes, without shutting down the entire errgroup.
-	if err := i.StartOsqueryExtensionManagerServer(katcExtensionName, client, katcTables, true); err != nil {
+	if err := i.StartOsqueryExtensionManagerServer(ctx, katcExtensionName, client, katcTables, true); err != nil {
 		i.slogger.Log(ctx, slog.LevelInfo,
 			"unable to create KATC extension manager server",
 			"err", err,
@@ -506,11 +506,14 @@ func (i *OsqueryInstance) Launch() error {
 
 	// Start an extension manager for the extensions that osquery
 	// needs for config/log/etc.
-	i.extensionManagerClient, err = i.StartOsqueryClient()
+	i.extensionManagerClient, err = i.StartOsqueryClient(ctx)
 	if err != nil {
 		observability.SetError(span, fmt.Errorf("could not create an extension client: %w", err))
 		return fmt.Errorf("could not create an extension client: %w", err)
 	}
+	i.slogger.Log(ctx, slog.LevelDebug,
+		"created osquery extension client",
+	)
 	span.AddEvent("extension_client_created")
 
 	kolideSaasPlugins := []osquery.OsqueryPlugin{
@@ -521,7 +524,7 @@ func (i *OsqueryInstance) Launch() error {
 	kolideSaasPlugins = append(kolideSaasPlugins, table.PlatformTables(i.knapsack, i.enrollmentId, i.knapsack.Slogger().With("component", "platform_tables"), currentOsquerydBinaryPath)...)
 	kolideSaasPlugins = append(kolideSaasPlugins, table.LauncherTables(i.knapsack, i.knapsack.Slogger().With("component", "launcher_tables"))...)
 
-	if err := i.StartOsqueryExtensionManagerServer(KolideSaasExtensionName, i.extensionManagerClient, kolideSaasPlugins, false); err != nil {
+	if err := i.StartOsqueryExtensionManagerServer(ctx, KolideSaasExtensionName, i.extensionManagerClient, kolideSaasPlugins, false); err != nil {
 		i.slogger.Log(ctx, slog.LevelInfo,
 			"unable to create Kolide SaaS extension server, stopping",
 			"err", err,
@@ -890,7 +893,10 @@ func (i *OsqueryInstance) createOsquerydCommand(osquerydBinary string) (*exec.Cm
 // StartOsqueryClient will create and return a new osquery client with a connection
 // over the socket at the provided path. It will retry for up to 10 seconds to create
 // the connection in the event of a failure.
-func (i *OsqueryInstance) StartOsqueryClient() (*osquery.ExtensionManagerClient, error) {
+func (i *OsqueryInstance) StartOsqueryClient(ctx context.Context) (*osquery.ExtensionManagerClient, error) {
+	_, span := observability.StartSpan(ctx)
+	defer span.End()
+
 	var client *osquery.ExtensionManagerClient
 	if err := backoff.WaitFor(func() error {
 		var newErr error
@@ -909,7 +915,10 @@ func (i *OsqueryInstance) StartOsqueryClient() (*osquery.ExtensionManagerClient,
 // starting the server will not return an error when the `Start` function
 // returns, allowing the server to be restarted without triggering a full
 // shutdown of the goroutine.
-func (i *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, client *osquery.ExtensionManagerClient, plugins []osquery.OsqueryPlugin, allowRestart bool) error {
+func (i *OsqueryInstance) StartOsqueryExtensionManagerServer(ctx context.Context, name string, client *osquery.ExtensionManagerClient, plugins []osquery.OsqueryPlugin, allowRestart bool) error {
+	_, span := observability.StartSpan(ctx)
+	defer span.End()
+
 	var extensionManagerServer *osquery.ExtensionManagerServer
 	if err := backoff.WaitFor(func() error {
 		var newErr error
