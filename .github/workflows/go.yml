@@ -386,6 +386,7 @@ jobs:
           - ubuntu-24.04
           - macos-14
           - macos-15
+          - macos-26
           - windows-2022
           - windows-2025
     needs:
@@ -541,7 +542,7 @@ jobs:
       matrix:
         os:
           - ubuntu-22.04
-          - macos-14
+          - macos-15
           - windows-latest
     steps:
       - uses: actions/checkout@v4
