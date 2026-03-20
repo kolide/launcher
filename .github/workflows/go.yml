@@ -143,7 +143,7 @@ jobs:
       - name: Set up zig
         uses: mlugg/setup-zig@v2
         with:
-          mirror: 'https://zigmirror.com'
+          use-cache: false
 
       - name: Build (debug)
         if: github.ref_type != 'tag'
