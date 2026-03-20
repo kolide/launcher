@@ -142,6 +142,8 @@ jobs:
 
       - name: Set up zig
         uses: mlugg/setup-zig@v2
+        with:
+          cache-size-limit: 4096
 
       - name: Build (debug)
         if: github.ref_type != 'tag'
