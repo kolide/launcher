@@ -79,9 +79,11 @@ type rowTransformStep struct {
 const (
 	snappyDecodeTransformStep       = "snappy"
 	hexDecodeTransformStep          = "hex"
+	zstdDecodeTransformStep         = "zstd"
 	deserializeFirefoxTransformStep = "deserialize_firefox"
 	deserializeChromeTransformStep  = "deserialize_chrome"
 	camelToSnakeTransformStep       = "camel_to_snake"
+	utf16DecodeTransformStep        = "utf16_decode"
 )
 
 func (r *rowTransformStep) UnmarshalJSON(data []byte) error {
@@ -99,6 +101,14 @@ func (r *rowTransformStep) UnmarshalJSON(data []byte) error {
 	case hexDecodeTransformStep:
 		r.name = hexDecodeTransformStep
 		r.transformFunc = hexDecode
+		return nil
+	case utf16DecodeTransformStep:
+		r.name = utf16DecodeTransformStep
+		r.transformFunc = utf16Decode
+		return nil
+	case zstdDecodeTransformStep:
+		r.name = zstdDecodeTransformStep
+		r.transformFunc = zstdDecode
 		return nil
 	case deserializeFirefoxTransformStep:
 		r.name = deserializeFirefoxTransformStep
