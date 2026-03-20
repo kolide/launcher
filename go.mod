@@ -48,6 +48,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/golang-migrate/migrate/v4 v4.16.2
 	github.com/golang/snappy v0.0.4
+	github.com/klauspost/compress v1.18.5
 	github.com/kolide/go-winlsa v0.0.0-20251002154611-3c83cd484052
 	github.com/kolide/goleveldb v0.0.0-20250731160947-c6b056c282de
 	github.com/kolide/systray v1.10.5-0.20241021175748-13aef6380bdb
@@ -96,7 +97,6 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/huandu/xstrings v1.5.0 // indirect
-	github.com/klauspost/compress v1.18.5 // indirect
 	github.com/klauspost/pgzip v1.2.6 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/magiconair/properties v1.8.9 // indirect
