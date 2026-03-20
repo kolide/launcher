@@ -22,6 +22,9 @@ func zstdDecode(ctx context.Context, _ *slog.Logger, row map[string][]byte) (map
 
 	decodedRow := make(map[string][]byte)
 	for k, v := range row {
+		// To support data sources that have both compressed and uncompressed values,
+		// we check to see if this value is zstd-compressed. If it's not, we pass it through
+		// untransformed.
 		if !detectZstdCompressed(v) {
 			decodedRow[k] = v
 			continue
