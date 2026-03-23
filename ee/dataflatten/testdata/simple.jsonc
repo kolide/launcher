@@ -27,6 +27,7 @@
             * you get the point
     */
     "test6": "this value has a /* in it, but we're ignoring that",
+    /**/
     "test7": 7, // this comment starts at the end of a line
     "test8": [
         /*

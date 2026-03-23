@@ -105,6 +105,7 @@ func jsoncToJson(rawData []byte) ([]byte, error) {
 				}
 			case '*':
 				// Opening of multi-line comment -- read and discard until we see `*/`
+				_, _ = rawDataReader.ReadByte() // discard the `*` in the opening /*
 				for {
 					currentByte, err = rawDataReader.ReadByte()
 					if err != nil {
