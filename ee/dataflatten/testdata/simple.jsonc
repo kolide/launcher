@@ -41,7 +41,8 @@
         },
     ],
     "test9": "this looks like a trailing comma,] but it is not ,}",
-    "test10": "escaped quotes are \"totally fine, even when // and /* are inside them\"", // <- trailing comma with comment afterward
+    "literal_backslash": "path\\",
+    "test10": "escaped quotes are \"totally fine, even when // and /* are inside them\\\"", // <- trailing comma with comment afterward
 }
 /*
 multi-line comment at end of file without a LF after

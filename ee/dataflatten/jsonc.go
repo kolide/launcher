@@ -69,12 +69,29 @@ func jsoncToJson(rawData []byte) ([]byte, error) {
 		}
 
 		// First, check if we're in a string -- we want to ignore comment chars when inside strings.
-		// If there was a char prior to this one, we need to make sure it wasn't a backslash escaping the quotation mark.
-		if currentByte == '"' && (currentOutputIndex == 0 || out[currentOutputIndex-1] != '\\') {
-			if insideString {
-				insideString = false
-			} else {
-				insideString = true
+		if currentByte == '"' {
+			switch currentOutputIndex {
+			case 0:
+				// " is the first char, so we know it is a real (unescaped) quotation mark
+				insideString = !insideString
+			default:
+				// If " doesn't have a slash before it, then it's a real (unescaped) quotation mark
+				if out[currentOutputIndex-1] != '\\' {
+					insideString = !insideString
+				} else {
+					// Count the number of consecutive slashes prior to this quotation mark.
+					backslashCount := 0
+					for i := currentOutputIndex - 1; i >= 0; i-- {
+						if out[i] != '\\' {
+							break
+						}
+						backslashCount += 1
+					}
+					// Odd is escaped, even is unescaped -- check for real (unescaped) quotation mark.
+					if backslashCount%2 == 0 {
+						insideString = !insideString
+					}
+				}
 			}
 		}
 
