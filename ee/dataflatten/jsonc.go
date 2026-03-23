@@ -65,6 +65,7 @@ func jsoncToJson(rawData []byte) ([]byte, error) {
 			if errors.Is(err, io.EOF) {
 				return out[:currentOutputIndex], nil
 			}
+			return nil, fmt.Errorf("reading next byte: %w", err)
 		}
 
 		// First, check if we're in a string -- we want to ignore comment chars when inside strings
@@ -80,10 +81,10 @@ func jsoncToJson(rawData []byte) ([]byte, error) {
 		if !insideString && currentByte == '/' {
 			nextByte, err := rawDataReader.Peek(1)
 			if err != nil {
-				return out, fmt.Errorf("peeking ahead after `/`: %w", err)
+				return nil, fmt.Errorf("peeking ahead after `/`: %w", err)
 			}
 			if len(nextByte) != 1 {
-				return out, fmt.Errorf("peeking ahead 1 byte returned unexpected number of bytes %d", len(nextByte))
+				return nil, fmt.Errorf("peeking ahead 1 byte returned unexpected number of bytes %d", len(nextByte))
 			}
 			switch nextByte[0] {
 			case '/':
@@ -91,7 +92,11 @@ func jsoncToJson(rawData []byte) ([]byte, error) {
 				for {
 					currentByte, err = rawDataReader.ReadByte()
 					if err != nil {
-						return out, fmt.Errorf("reading and discarding single-line comment: %w", err)
+						// Handle single-line comment at end of file without LF after
+						if errors.Is(err, io.EOF) {
+							return out[:currentOutputIndex], nil
+						}
+						return nil, fmt.Errorf("reading and discarding single-line comment: %w", err)
 					}
 					if currentByte == '\n' || currentByte == '\r' {
 						break
@@ -102,7 +107,7 @@ func jsoncToJson(rawData []byte) ([]byte, error) {
 				for {
 					currentByte, err = rawDataReader.ReadByte()
 					if err != nil {
-						return out, fmt.Errorf("reading and discarding multi-line comment: %w", err)
+						return nil, fmt.Errorf("reading and discarding multi-line comment: %w", err)
 					}
 					if currentByte != '*' {
 						continue
@@ -111,13 +116,17 @@ func jsoncToJson(rawData []byte) ([]byte, error) {
 					// Check to see if / comes next by reading the next byte
 					currentByte, err = rawDataReader.ReadByte()
 					if err != nil {
-						return out, fmt.Errorf("reading and discarding multi-line comment after *: %w", err)
+						return nil, fmt.Errorf("reading and discarding multi-line comment after *: %w", err)
 					}
 					if currentByte == '/' {
 						// End of comment -- read our next byte
 						currentByte, err = rawDataReader.ReadByte()
 						if err != nil {
-							return out, fmt.Errorf("reading next byte after close of multi-line comment: %w", err)
+							// Handle multi-line comment at end of file without LF after
+							if errors.Is(err, io.EOF) {
+								return out[:currentOutputIndex], nil
+							}
+							return nil, fmt.Errorf("reading next byte after close of multi-line comment: %w", err)
 						}
 						break
 					}
@@ -142,6 +151,7 @@ func jsoncToJson(rawData []byte) ([]byte, error) {
 
 				// Substitute a space for the trailing comma
 				out[i] = ' '
+				break
 			}
 		}
 

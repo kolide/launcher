@@ -41,3 +41,6 @@
     ],
     "test9": "this looks like a trailing comma,] but it is not ,}", // <- this one is, though
 }
+/*
+multi-line comment at end of file without a LF after
+*/
