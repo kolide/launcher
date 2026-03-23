@@ -25,8 +25,8 @@ func JsoncFile(file string, opts ...FlattenOpts) ([]Row, error) {
 	}
 
 	if json.Valid(transformedRawdata) {
-		// We call Json rather than Jsonc because we know it's already valid transformed JSON
-		return Json(transformedRawdata)
+		// We call Jsonl rather than Jsonc because we know it's already valid transformed JSON
+		return Jsonl(transformedRawdata)
 	}
 
 	// We still don't have valid json data -- next try to convert possible utf16 data to utf8.
@@ -35,7 +35,7 @@ func JsoncFile(file string, opts ...FlattenOpts) ([]Row, error) {
 		return nil, fmt.Errorf("attempting to transform invalid json from utf16 to utf8: %w", err)
 	}
 
-	return Json(transformedRawdata, opts...)
+	return Jsonl(transformedRawdata, opts...)
 }
 
 func Jsonc(rawdata []byte, opts ...FlattenOpts) ([]Row, error) {
@@ -44,12 +44,7 @@ func Jsonc(rawdata []byte, opts ...FlattenOpts) ([]Row, error) {
 		return nil, fmt.Errorf("converting jsonc to json: %w", err)
 	}
 
-	var data any
-	if err := json.Unmarshal(rawdata, &data); err != nil {
-		return nil, fmt.Errorf("unmarshalling json: %w", err)
-	}
-
-	return Flatten(data, opts...)
+	return Jsonl(rawdata, opts...)
 }
 
 // jsoncToJson takes the JSONC contained in `rawData` and strips out comments and trailing commas,

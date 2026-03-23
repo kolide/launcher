@@ -21,23 +21,23 @@ func TestJsoncFile(t *testing.T) {
 			fileName:     filepath.Join("testdata", "nested.json"),
 			expectedRows: []Row{
 				{
-					Path:  []string{"addons", "0", "name"},
+					Path:  []string{"0", "addons", "0", "name"},
 					Value: "Nested Strings",
 				},
 				{
-					Path:  []string{"addons", "0", "nest1", "string3"},
+					Path:  []string{"0", "addons", "0", "nest1", "string3"},
 					Value: "string3",
 				},
 				{
-					Path:  []string{"addons", "0", "nest1", "string4"},
+					Path:  []string{"0", "addons", "0", "nest1", "string4"},
 					Value: "string4",
 				},
 				{
-					Path:  []string{"addons", "0", "nest1", "string5"},
+					Path:  []string{"0", "addons", "0", "nest1", "string5"},
 					Value: "string5",
 				},
 				{
-					Path:  []string{"addons", "0", "nest1", "string6"},
+					Path:  []string{"0", "addons", "0", "nest1", "string6"},
 					Value: "string6",
 				},
 			},
@@ -47,35 +47,35 @@ func TestJsoncFile(t *testing.T) {
 			fileName:     filepath.Join("testdata", "simple.jsonc"),
 			expectedRows: []Row{
 				{
-					Path:  []string{"test3"},
+					Path:  []string{"0", "test3"},
 					Value: "true",
 				},
 				{
-					Path:  []string{"test4"},
+					Path:  []string{"0", "test4"},
 					Value: "this value has a / in it, but that's okay!",
 				},
 				{
-					Path:  []string{"test5"},
+					Path:  []string{"0", "test5"},
 					Value: "this value has a // in it, but that is also fine",
 				},
 				{
-					Path:  []string{"test6"},
+					Path:  []string{"0", "test6"},
 					Value: "this value has a /* in it, but we're ignoring that",
 				},
 				{
-					Path:  []string{"test7"},
+					Path:  []string{"0", "test7"},
 					Value: "7",
 				},
 				{
-					Path:  []string{"test8", "0", "id"},
+					Path:  []string{"0", "test8", "0", "id"},
 					Value: "1",
 				},
 				{
-					Path:  []string{"test8", "1", "id"},
+					Path:  []string{"0", "test8", "1", "id"},
 					Value: "2",
 				},
 				{
-					Path:  []string{"test9"},
+					Path:  []string{"0", "test9"},
 					Value: "this looks like a trailing comma,] but it is not ,}",
 				},
 			},
@@ -114,23 +114,23 @@ func TestJsonc(t *testing.T) {
 			fileName:     filepath.Join("testdata", "nested.json"),
 			expectedRows: []Row{
 				{
-					Path:  []string{"addons", "0", "name"},
+					Path:  []string{"0", "addons", "0", "name"},
 					Value: "Nested Strings",
 				},
 				{
-					Path:  []string{"addons", "0", "nest1", "string3"},
+					Path:  []string{"0", "addons", "0", "nest1", "string3"},
 					Value: "string3",
 				},
 				{
-					Path:  []string{"addons", "0", "nest1", "string4"},
+					Path:  []string{"0", "addons", "0", "nest1", "string4"},
 					Value: "string4",
 				},
 				{
-					Path:  []string{"addons", "0", "nest1", "string5"},
+					Path:  []string{"0", "addons", "0", "nest1", "string5"},
 					Value: "string5",
 				},
 				{
-					Path:  []string{"addons", "0", "nest1", "string6"},
+					Path:  []string{"0", "addons", "0", "nest1", "string6"},
 					Value: "string6",
 				},
 			},
@@ -140,35 +140,35 @@ func TestJsonc(t *testing.T) {
 			fileName:     filepath.Join("testdata", "simple.jsonc"),
 			expectedRows: []Row{
 				{
-					Path:  []string{"test3"},
+					Path:  []string{"0", "test3"},
 					Value: "true",
 				},
 				{
-					Path:  []string{"test4"},
+					Path:  []string{"0", "test4"},
 					Value: "this value has a / in it, but that's okay!",
 				},
 				{
-					Path:  []string{"test5"},
+					Path:  []string{"0", "test5"},
 					Value: "this value has a // in it, but that is also fine",
 				},
 				{
-					Path:  []string{"test6"},
+					Path:  []string{"0", "test6"},
 					Value: "this value has a /* in it, but we're ignoring that",
 				},
 				{
-					Path:  []string{"test7"},
+					Path:  []string{"0", "test7"},
 					Value: "7",
 				},
 				{
-					Path:  []string{"test8", "0", "id"},
+					Path:  []string{"0", "test8", "0", "id"},
 					Value: "1",
 				},
 				{
-					Path:  []string{"test8", "1", "id"},
+					Path:  []string{"0", "test8", "1", "id"},
 					Value: "2",
 				},
 				{
-					Path:  []string{"test9"},
+					Path:  []string{"0", "test9"},
 					Value: "this looks like a trailing comma,] but it is not ,}",
 				},
 			},
