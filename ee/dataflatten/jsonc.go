@@ -68,8 +68,9 @@ func jsoncToJson(rawData []byte) ([]byte, error) {
 			return nil, fmt.Errorf("reading next byte: %w", err)
 		}
 
-		// First, check if we're in a string -- we want to ignore comment chars when inside strings
-		if currentByte == '"' {
+		// First, check if we're in a string -- we want to ignore comment chars when inside strings.
+		// If there was a char prior to this one, we need to make sure it wasn't a backslash escaping the quotation mark.
+		if currentByte == '"' && (currentOutputIndex == 0 || out[currentOutputIndex-1] != '\\') {
 			if insideString {
 				insideString = false
 			} else {

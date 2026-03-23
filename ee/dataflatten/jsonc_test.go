@@ -78,6 +78,10 @@ func TestJsoncFile(t *testing.T) {
 					Path:  []string{"0", "test9"},
 					Value: "this looks like a trailing comma,] but it is not ,}",
 				},
+				{
+					Path:  []string{"0", "test10"},
+					Value: "escaped quotes are \"totally fine, even when // and /* are inside them\"",
+				},
 			},
 		},
 	} {
@@ -170,6 +174,10 @@ func TestJsonc(t *testing.T) {
 				{
 					Path:  []string{"0", "test9"},
 					Value: "this looks like a trailing comma,] but it is not ,}",
+				},
+				{
+					Path:  []string{"0", "test10"},
+					Value: "escaped quotes are \"totally fine, even when // and /* are inside them\"",
 				},
 			},
 		},
