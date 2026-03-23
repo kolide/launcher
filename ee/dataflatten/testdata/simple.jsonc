@@ -1,0 +1,43 @@
+// -*- mode: jsonc -*-
+// -*- jsonc -*-
+{
+    // Here's a single-line comment
+    "test": {},
+    // Here's a single-line comment that spans a couple lines anyway
+    // 
+    // Here's a little more of that comment
+    "test2": [],
+    /*
+        Here's a multi-line comment.
+        It has multiple lines.
+        That's the whole point. 
+    */
+    "test3": true,
+    // Here's a single-line comment: "it's got a string in it!"
+    "test4": "this value has a / in it, but that's okay!",
+    /*
+        Here's a multi-line comment.
+        "It's also got a string in it!"
+    */
+    "test5": "this value has a // in it, but that is also fine",
+    /*
+        Here's a multi-line comment that uses asterisks for bullet points.
+            * point one
+            * point two
+            * you get the point
+    */
+    "test6": "this value has a /* in it, but we're ignoring that",
+    "test7": 7, // this comment starts at the end of a line
+    "test8": [
+        /*
+            Here's a nested comment.
+        */
+        {
+            "id": 1,
+        },
+        {
+            "id": 2
+        },
+    ],
+    "test9": "this looks like a trailing comma,] but it is not ,}", // <- this one is, though
+}
