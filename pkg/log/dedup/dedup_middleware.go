@@ -1,52 +1,6 @@
-// Package dedup provides a stateful slog middleware that suppresses bursts of
-// duplicate log records and later emits a summarized record with duplicate
-// counts. It computes a content hash of each record (excluding timestamps and
-// source metadata) to identify duplicates within a configurable time window.
-//
-// High-level flow:
-//   - Incoming slog.Record enters the middleware chain
-//   - If DuplicateLogWindow <= 0, pass-through (dedup disabled)
-//   - Compute a hash of the record's stable content
-//   - Update or create the cache entry:
-//   - First time: store entry and pass the record through unmodified
-//   - Subsequent times within the window: increment count and suppress
-//   - Once the window elapses for that entry: pass the record with
-//     duplicate_count/first_seen/last_seen attributes
-//   - In the background, a periodic cleanup removes expired entries and, for
-//     those that had duplicates, emits a summarized record preserving the
-//     original message, attributes, and call site (PC).
-//
-// Mermaid overview of the runtime behavior:
-// ```mermaid
-// flowchart TD
-//     A["Incoming slog.Record"] --> B{"DuplicateLogWindow ≤ 0?"}
-//     B -- Yes --> N["Pass‑through (dedup disabled)"]
-//     B -- No  --> D["Compute stable content hash"]
-
-//     D --> F{"Entry exists in cache?"}
-
-//     F -- No  --> G["Create new entry<br/> count = 1; firstSeen = lastSeen = now"]
-//     G --> N
-
-//     F -- Yes --> H["entry.count++<br/>entry.lastSeen = now"]
-//     H --> I{"Window elapsed (now - firstSeen ≥ DuplicateLogWindow)?"}
-
-//     I -- No  --> S["Suppress (return nil)"]
-//     I -- Yes --> J["Pass record with duplicate_count/first_seen/last_seen attrs"]
-//     J --> N
-
-//     %% Background maintenance
-//     subgraph "Background cleanup (periodic)"
-//         T["Every CleanupInterval"] --> U["performCleanup()"]
-//         U --> V{"Entry expired (now - lastSeen > CacheExpiry)?"}
-
-//         V -- Yes --> X["If count > 1:<br/> emit summary record<br/>(original msg/attrs/PC + duplicate_count)"]
-//         V -- No  --> W{"Cache size > MaxCacheSize?"}
-
-//	    W -- Yes --> Y["Evict oldest; if count > 1 emit summary"]
-//	end
-//
-// ```
+// Package dedup provides a stateful slog handler middleware that suppresses
+// bursts of duplicate log records and later emits a summarized record with
+// duplicate counts. See dedup_flow.mmd for a visual overview of the runtime behavior.
 package dedup
 
 import (
@@ -64,11 +18,8 @@ import (
 	"go.opentelemetry.io/otel/metric/noop"
 )
 
-// nextFunc represents the downstream slog-multi inline middleware function
-// used to forward a record to the next handler in the chain.
 type nextFunc func(context.Context, slog.Record) error
 
-// Default configuration values.
 const (
 	DefaultCacheExpiry        = 5 * time.Minute
 	DefaultMaxCacheSize       = 2000
@@ -78,9 +29,8 @@ const (
 	meterName = "github.com/kolide/launcher/v2/pkg/log/dedup"
 )
 
-// Package-level metrics for dedup observability. These use the global OTEL
-// meter provider and fall back to noop implementations on error.
-// this is to avoid circular dependencies with the ee/observability package
+// Uses the global OTEL meter provider and falls back to noop on error
+// to avoid circular dependencies with the ee/observability package.
 var (
 	dedupSuppressedCounter    metric.Int64Counter
 	dedupPassedCounter        metric.Int64Counter
@@ -92,10 +42,8 @@ func init() {
 	ReinitializeMetrics()
 }
 
-// ReinitializeMetrics creates or re-creates the dedup metrics from the current
-// global OTEL meter provider. It must be called any time the meter provider is
-// replaced (see ee/observability/exporter) so that the metrics are bound to the
-// active provider instead of a stale, shut-down one.
+// ReinitializeMetrics must be called any time the global OTEL meter provider is
+// replaced (see ee/observability/exporter) so metrics bind to the active provider.
 func ReinitializeMetrics() {
 	m := otel.Meter(meterName)
 
@@ -130,17 +78,17 @@ func ReinitializeMetrics() {
 	}
 }
 
-// excludedHashFields are the attribute keys that should not affect the content hash.
+// excludedHashFields are attribute keys excluded from the content hash because
+// they vary per emission (timestamps, source location) and would defeat dedup.
 var excludedHashFields = map[string]bool{
-	"ts":              true, // go-kit timestamp
-	"time":            true, // slog timestamp
-	"caller":          true, // go-kit caller info
-	"source":          true, // slog source info
-	"original.time":   true, // slog timestamp forwarded from desktop/watchdog process (see ee/log package)
-	"original.source": true, // slog source info forwarded from desktop/watchdog process (see ee/log package)
+	"ts":              true,
+	"time":            true,
+	"caller":          true,
+	"source":          true,
+	"original.time":   true, // forwarded from desktop/watchdog process (see ee/log)
+	"original.source": true, // forwarded from desktop/watchdog process (see ee/log)
 }
 
-// Config controls the behavior of the dedup middleware.
 type Config struct {
 	CacheExpiry        time.Duration
 	MaxCacheSize       int
@@ -148,68 +96,45 @@ type Config struct {
 	DuplicateLogWindow time.Duration
 }
 
-// Option configures the deduper.
 type Option func(*Config)
 
-// WithCacheExpiry overrides the default cache expiry.
-func WithCacheExpiry(d time.Duration) Option { return func(c *Config) { c.CacheExpiry = d } }
-
-// WithMaxCacheSize overrides the default maximum cache size.
-func WithMaxCacheSize(n int) Option { return func(c *Config) { c.MaxCacheSize = n } }
-
-// WithCleanupInterval overrides the cleanup interval.
+func WithCacheExpiry(d time.Duration) Option     { return func(c *Config) { c.CacheExpiry = d } }
+func WithMaxCacheSize(n int) Option              { return func(c *Config) { c.MaxCacheSize = n } }
 func WithCleanupInterval(d time.Duration) Option { return func(c *Config) { c.CleanupInterval = d } }
-
-// WithDuplicateLogWindow overrides the window to re-log duplicates.
 func WithDuplicateLogWindow(d time.Duration) Option {
 	return func(c *Config) { c.DuplicateLogWindow = d }
 }
 
-// logEntry tracks information about seen log messages for deduplication.
 type logEntry struct {
 	firstSeen time.Time
 	lastSeen  time.Time
 	count     int
 
-	// For emission on cleanup
+	// Preserved for summary emission on cleanup
 	level   slog.Level
 	message string
 	attrs   []slog.Attr
 	pc      uintptr
+	next    nextFunc
 }
 
 // Engine is a stateful deduplication engine. It is safe for concurrent use.
 type Engine struct {
-	// configuration
 	cfg Config
 
-	// runtime state
-	cacheLock sync.RWMutex
-	cache     map[string]*logEntry // maps log hash to corresponding tracked entry
-	// ensure only one cleanup runs at a time
+	cacheLock      sync.RWMutex
+	cache          map[string]*logEntry
 	cleanupRunning atomic.Bool
-	// started indicates whether Start(ctx) has been called and the engine is active
-	started atomic.Bool
+	started        atomic.Bool
 
-	// background cleanup machinery
-	lifecycleLock                sync.Mutex // protects cancel field for Start/Stop operations
+	lifecycleLock                sync.Mutex
 	cancel                       context.CancelFunc
 	backGroundCleanUpWorkerGroup sync.WaitGroup
 
-	// lastNext holds the most recently seen downstream middleware function used to
-	// forward records during background cleanup emissions. Stored via atomic.Value
-	// to allow lock-free reads from the cleanup goroutine.
-	lastNext atomic.Value // of type nextFunc
-
-	// duplicateLogWindow holds the current duplicate log window duration for thread-safe access.
-	// When zero or negative, deduplication is disabled.
+	// Zero or negative disables dedup.
 	duplicateLogWindow atomic.Value // of type time.Duration
 }
 
-// New creates a new deduplication engine. The engine keeps a reference to the
-// most recently observed downstream 'next' function (from Middleware) and uses
-// it to emit summary records during background cleanup so they flow through the
-// same handler chain.
 func New(opts ...Option) *Engine {
 	cfg := Config{
 		CacheExpiry:        DefaultCacheExpiry,
@@ -225,31 +150,24 @@ func New(opts ...Option) *Engine {
 		cfg:   cfg,
 		cache: make(map[string]*logEntry),
 	}
-	// Initialize the atomic duplicate log window with the config value
 	d.duplicateLogWindow.Store(cfg.DuplicateLogWindow)
 	return d
 }
 
-// Middleware is an inline slog middleware method bound to this Engine instance.
-// It matches slog-multi's inline middleware signature.
-func (d *Engine) Middleware(ctx context.Context, record slog.Record, next func(context.Context, slog.Record) error) error {
-	// If the engine hasn't been started or duplicate log window is disabled,
-	// act as a no-op middleware.
+// handleRecord is the core dedup logic. handlerAttrs and handlerGroups are
+// accumulated via slog.Logger.With / WithGroup on the handler chain. They are
+// invisible to the slog.Record but must be included in the hash so that logs
+// from different handler chains (e.g. different "component" values) are not
+// incorrectly deduplicated together.
+func (d *Engine) handleRecord(ctx context.Context, record slog.Record, handlerAttrs []slog.Attr, handlerGroups []string, next func(context.Context, slog.Record) error) error {
 	if !d.started.Load() || d.getDuplicateLogWindow() <= 0 {
 		return next(ctx, record)
 	}
 
-	// Remember the latest downstream 'next' so background cleanup can emit
-	// summary records through the same pipeline.
-	d.lastNext.Store(nextFunc(next))
+	hash := hashRecordWithHandlerAttrs(record, handlerAttrs, handlerGroups)
 
-	// Create a content hash for this record
-	hash := hashRecord(record)
-
-	// Update dedup state and decide whether to log
 	now := time.Now()
 
-	// Compute action under lock, then release before calling next
 	shouldPass := false
 	addDuplicateMeta := false
 	var duplicateCount int
@@ -262,38 +180,35 @@ func (d *Engine) Middleware(ctx context.Context, record slog.Record, next func(c
 
 		entry, exists := d.cache[hash]
 		if !exists {
-			attrs := collectAttrs(record)
 			d.cache[hash] = &logEntry{
 				firstSeen: now,
 				lastSeen:  now,
 				count:     1,
 				level:     record.Level,
 				message:   record.Message,
-				attrs:     attrs,
+				attrs:     collectAttrs(record),
 				pc:        record.PC,
+				next:      nextFunc(next),
 			}
-			// First occurrence passes through unchanged
 			shouldPass = true
 			return
 		}
 
 		entry.lastSeen = now
 		entry.count++
-		// Window for tracking this particular log has elapsed -- relog with duplicate metadata
+		entry.next = nextFunc(next)
 		if now.Sub(entry.firstSeen) >= d.getDuplicateLogWindow() {
 			duplicateCount = entry.count
 			firstSeen = entry.firstSeen
 			lastSeen = entry.lastSeen
 			addDuplicateMeta = true
 			shouldPass = true
-			// Reset the entry to start a new deduplication window
 			entry.firstSeen = now
 			entry.lastSeen = now
 			entry.count = 1
 			return
 		}
 
-		// Otherwise, suppress this duplicate
 		shouldPass = false
 	}()
 
@@ -312,7 +227,6 @@ func (d *Engine) Middleware(ctx context.Context, record slog.Record, next func(c
 	return next(ctx, record)
 }
 
-// Stop stops the background cleanup goroutine.
 func (d *Engine) Stop() {
 	if d == nil {
 		return
@@ -328,7 +242,6 @@ func (d *Engine) Stop() {
 	d.started.Store(false)
 }
 
-// getDuplicateLogWindow returns the current duplicate log window duration atomically.
 func (d *Engine) getDuplicateLogWindow() time.Duration {
 	if d == nil {
 		return 0
@@ -339,8 +252,7 @@ func (d *Engine) getDuplicateLogWindow() time.Duration {
 	return 0
 }
 
-// SetDuplicateLogWindow updates the duplicate log window duration atomically.
-// When set to zero or negative, deduplication is effectively disabled.
+// SetDuplicateLogWindow updates the window atomically. Zero or negative disables dedup.
 func (d *Engine) SetDuplicateLogWindow(window time.Duration) {
 	if d == nil {
 		return
@@ -349,7 +261,6 @@ func (d *Engine) SetDuplicateLogWindow(window time.Duration) {
 	d.recordEnabledGauge()
 }
 
-// recordEnabledGauge records whether deduplication is currently active.
 func (d *Engine) recordEnabledGauge() {
 	var enabled int64
 	if d.started.Load() && d.getDuplicateLogWindow() > 0 {
@@ -358,14 +269,11 @@ func (d *Engine) recordEnabledGauge() {
 	dedupEnabledGauge.Record(context.Background(), enabled)
 }
 
-// startBackgroundCleanup launches the periodic cleanup worker.
-// Start launches the periodic cleanup worker bound to the provided context.
-// Subsequent calls are no-ops until Stop is called.
+// Start launches the periodic cleanup worker. Subsequent calls are no-ops until Stop.
 func (d *Engine) Start(ctx context.Context) {
 	if d == nil {
 		return
 	}
-	// If already started, do nothing.
 	if d.started.Load() {
 		return
 	}
@@ -381,7 +289,6 @@ func (d *Engine) Start(ctx context.Context) {
 	go d.periodicCleanupLoop(runCtx)
 }
 
-// periodicCleanupLoop runs the cleanup ticker until the context is canceled.
 func (d *Engine) periodicCleanupLoop(ctx context.Context) {
 	defer d.backGroundCleanUpWorkerGroup.Done()
 	ticker := time.NewTicker(d.cfg.CleanupInterval)
@@ -396,16 +303,16 @@ func (d *Engine) periodicCleanupLoop(ctx context.Context) {
 	}
 }
 
-// performCleanup removes expired entries and emits a summary record for each.
+// performCleanup expires old entries and emits summary records for those with
+// duplicate counts. It also evicts the oldest entries when the cache exceeds
+// MaxCacheSize. Emission happens outside the lock to avoid re-entrancy deadlocks.
 func (d *Engine) performCleanup() {
 	now := time.Now()
-	// Ensure only one cleanup runs at a time
 	if !d.cleanupRunning.CompareAndSwap(false, true) {
 		return
 	}
-
-	// Build a list to avoid holding the lock while emitting
 	defer d.cleanupRunning.Store(false)
+
 	d.cacheLock.Lock()
 
 	type expired struct {
@@ -416,6 +323,7 @@ func (d *Engine) performCleanup() {
 		pc        uintptr
 		firstSeen time.Time
 		lastSeen  time.Time
+		next      nextFunc
 	}
 	var toEmit []expired
 
@@ -423,7 +331,6 @@ func (d *Engine) performCleanup() {
 		if now.Sub(entry.lastSeen) <= d.cfg.CacheExpiry {
 			continue
 		}
-		// Only emit a summary when there were actual duplicates
 		if entry.count > 1 {
 			toEmit = append(toEmit, expired{
 				level:     entry.level,
@@ -433,14 +340,13 @@ func (d *Engine) performCleanup() {
 				pc:        entry.pc,
 				firstSeen: entry.firstSeen,
 				lastSeen:  entry.lastSeen,
+				next:      entry.next,
 			})
 		}
 		delete(d.cache, hash)
 	}
 
-	// Enforce max cache size by removing oldest; emit summaries for duplicates being evicted
 	if len(d.cache) > d.cfg.MaxCacheSize {
-		// Collect entries with lastSeen
 		type hashTime struct {
 			hash     string
 			lastSeen time.Time
@@ -462,6 +368,7 @@ func (d *Engine) performCleanup() {
 						pc:        entry.pc,
 						firstSeen: entry.firstSeen,
 						lastSeen:  entry.lastSeen,
+						next:      entry.next,
 					})
 				}
 				delete(d.cache, items[i].hash)
@@ -474,9 +381,8 @@ func (d *Engine) performCleanup() {
 
 	dedupCacheEntryCountGauge.Record(context.Background(), cacheSize)
 
-	// Emit outside the lock to avoid re-entrancy deadlocks
 	for _, e := range toEmit {
-		// Build a record that preserves the original call site via PC and uses the original message
+		// PC preserves the original call site in the summary record
 		rec := slog.NewRecord(time.Now(), e.level, e.message, 0)
 		rec.PC = e.pc
 		for _, a := range e.attrs {
@@ -488,30 +394,35 @@ func (d *Engine) performCleanup() {
 			slog.Time("first_seen", e.firstSeen),
 			slog.Time("last_seen", e.lastSeen),
 		)
-		// Emit using the most recently observed downstream 'next' so it
-		// traverses the same pipeline. Best-effort if available.
-		if v := d.lastNext.Load(); v != nil {
-			if n, ok := v.(nextFunc); ok && n != nil {
-				_ = n(context.Background(), rec)
-			}
+		if e.next != nil {
+			_ = e.next(context.Background(), rec)
 		}
 	}
 }
 
-// hashRecord creates a hash of the log record content, excluding time and source information.
-func hashRecord(record slog.Record) string {
-	// Convert record to key-value pairs for hashing
+// hashRecordWithHandlerAttrs builds a stable content hash from the record and
+// any handler-chain attrs/groups. Handler-chain attrs (e.g. "component") are
+// added via slog.Logger.With() and invisible to slog.Record; including them
+// prevents hash collisions between different handler chains.
+func hashRecordWithHandlerAttrs(record slog.Record, handlerAttrs []slog.Attr, handlerGroups []string) string {
 	var keyvals []any
 
-	// Add level and message
 	keyvals = append(keyvals, "level", record.Level.String())
 	keyvals = append(keyvals, "msg", record.Message)
 
-	// Add all attributes except excluded ones
+	for _, group := range handlerGroups {
+		keyvals = append(keyvals, "_handler_group", group)
+	}
+
+	for _, attr := range handlerAttrs {
+		if !excludedHashFields[attr.Key] {
+			keyvals = append(keyvals, attr.Key, attr.Value)
+		}
+	}
+
 	record.Attrs(func(attr slog.Attr) bool {
-		key := attr.Key
-		if !excludedHashFields[key] {
-			keyvals = append(keyvals, key, attr.Value)
+		if !excludedHashFields[attr.Key] {
+			keyvals = append(keyvals, attr.Key, attr.Value)
 		}
 		return true
 	})
@@ -519,7 +430,6 @@ func hashRecord(record slog.Record) string {
 	return hashKeyValuePairs(keyvals...)
 }
 
-// collectAttrs copies the attributes from a record into a slice, preserving order.
 func collectAttrs(record slog.Record) []slog.Attr {
 	attrs := make([]slog.Attr, 0, record.NumAttrs())
 	record.Attrs(func(a slog.Attr) bool {
@@ -529,9 +439,9 @@ func collectAttrs(record slog.Record) []slog.Attr {
 	return attrs
 }
 
-// hashKeyValuePairs creates a hash of key-value pairs for deduplication.
+// hashKeyValuePairs produces a deterministic SHA-256 hex digest of sorted
+// key-value pairs, filtering out excluded fields defensively.
 func hashKeyValuePairs(keyvals ...any) string {
-	// Filter out excluded fields (defensive; hashRecord already filters)
 	var filtered []any
 	for i := 0; i < len(keyvals); i += 2 {
 		if i+1 < len(keyvals) {
@@ -550,7 +460,6 @@ func hashKeyValuePairs(keyvals ...any) string {
 		return i < j
 	})
 
-	// Create hash
 	h := sha256.Sum256(fmt.Appendf(nil, "%v", filtered))
 	return fmt.Sprintf("%x", h)
 }

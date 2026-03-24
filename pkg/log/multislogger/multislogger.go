@@ -90,7 +90,7 @@ func (m *MultiSlogger) AddHandler(handler ...slog.Handler) {
 		slogmulti.
 			Pipe(slogmulti.NewHandleInlineMiddleware(utcTimeMiddleware)).
 			Pipe(slogmulti.NewHandleInlineMiddleware(ctxValuesMiddleWare)).
-			Pipe(slogmulti.NewHandleInlineMiddleware(m.dedupEngine.Middleware)).
+			Pipe(m.dedupEngine.NewMiddleware()).
 			Pipe(slogmulti.NewHandleInlineMiddleware(reportedErrorMiddleware)).
 			Handler(slogmulti.Fanout(m.handlers...)),
 	)
