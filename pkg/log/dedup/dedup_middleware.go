@@ -123,11 +123,11 @@ type Engine struct {
 	cfg Config
 
 	cacheLock      sync.RWMutex
-	cache          map[string]*logEntry
+	cache          map[string]*logEntry // maps log hash to corresponding tracked entry
 	cleanupRunning atomic.Bool
 	started        atomic.Bool
 
-	lifecycleLock                sync.Mutex
+	lifecycleLock                sync.Mutex // protects cancel field for Start/Stop operations
 	cancel                       context.CancelFunc
 	backGroundCleanUpWorkerGroup sync.WaitGroup
 
@@ -154,17 +154,16 @@ func New(opts ...Option) *Engine {
 	return d
 }
 
-// handleRecord is the core dedup logic. handlerAttrs and handlerGroups are
-// accumulated via slog.Logger.With / WithGroup on the handler chain. They are
-// invisible to the slog.Record but must be included in the hash so that logs
-// from different handler chains (e.g. different "component" values) are not
-// incorrectly deduplicated together.
-func (d *Engine) handleRecord(ctx context.Context, record slog.Record, handlerAttrs []slog.Attr, handlerGroups []string, next func(context.Context, slog.Record) error) error {
+// handleRecord is the core dedup logic. handlerAttrs are accumulated via
+// slog.Logger.With() on the handler chain. They are invisible to slog.Record
+// but must be included in the hash so that logs from different handler chains
+// (e.g. different "component" values) are not incorrectly deduplicated together.
+func (d *Engine) handleRecord(ctx context.Context, record slog.Record, handlerAttrs []slog.Attr, next func(context.Context, slog.Record) error) error {
 	if !d.started.Load() || d.getDuplicateLogWindow() <= 0 {
 		return next(ctx, record)
 	}
 
-	hash := hashRecordWithHandlerAttrs(record, handlerAttrs, handlerGroups)
+	hash := hashRecordWithHandlerAttrs(record, handlerAttrs)
 
 	now := time.Now()
 
@@ -404,15 +403,11 @@ func (d *Engine) performCleanup() {
 // any handler-chain attrs/groups. Handler-chain attrs (e.g. "component") are
 // added via slog.Logger.With() and invisible to slog.Record; including them
 // prevents hash collisions between different handler chains.
-func hashRecordWithHandlerAttrs(record slog.Record, handlerAttrs []slog.Attr, handlerGroups []string) string {
+func hashRecordWithHandlerAttrs(record slog.Record, handlerAttrs []slog.Attr) string {
 	var keyvals []any
 
 	keyvals = append(keyvals, "level", record.Level.String())
 	keyvals = append(keyvals, "msg", record.Message)
-
-	for _, group := range handlerGroups {
-		keyvals = append(keyvals, "_handler_group", group)
-	}
 
 	for _, attr := range handlerAttrs {
 		if !excludedHashFields[attr.Key] {

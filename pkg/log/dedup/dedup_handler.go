@@ -38,7 +38,7 @@ func (h *dedupHandler) Enabled(ctx context.Context, level slog.Level) bool {
 }
 
 func (h *dedupHandler) Handle(ctx context.Context, record slog.Record) error {
-	return h.engine.handleRecord(ctx, record, h.attrs, h.groups, h.next.Handle)
+	return h.engine.handleRecord(ctx, record, h.attrs, h.next.Handle)
 }
 
 func (h *dedupHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
