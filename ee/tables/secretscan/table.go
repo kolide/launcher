@@ -56,6 +56,7 @@ type Table struct {
 
 func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
+		table.TextColumn("name"),
 		table.TextColumn("path"),
 		table.TextColumn("raw_data"),
 		table.TextColumn("rule_id"),
@@ -253,9 +254,49 @@ func (t *Table) findingsToRows(ctx context.Context, argon2idSalts []string, find
 			"entropy":            fmt.Sprintf("%.2f", f.Entropy),
 			"hash_argon2id":      argon2idHash,
 			"hash_argon2id_salt": argon2idSalt,
+			"name":               findingToKeyName(f),
 		}
 		results = append(results, row)
 	}
 
 	return results
+}
+
+// findingToKeyName attempts to extract the key name (eg: in an .env file) to help understand the context
+// of the discovered secret. Because of the myriad of possible ways people can stash secrets, this is somewhat
+// simplistic, and tries to fall back to returning blank over something that might return a secret.
+func findingToKeyName(f report.Finding) string {
+	// We can't use f.StartColumn, because in the case of CONFIG_KEY=abc123, it returns the start of CONFIG_KEY, not abc
+	// So instead we remove the secret, from the match block, and then strip out any characters we don't want.
+
+	// First, we take the matched string, and strip out the secret. This should leave us with a key name
+	potential_key_name := strings.ReplaceAll(f.Match, f.Secret, "")
+
+	// if the string isn't short, something is weird. Maybe it's a giant blob of json, and let's just not.
+	if len(potential_key_name) > 64 {
+		return ""
+	}
+
+	// Next, we should reduce this to something that is the likely characters. this filteres out any stray " or , or similar
+	cleaned := strings.Map(allowedRunsInKeyNames, potential_key_name)
+
+	return cleaned
+}
+
+func allowedRunsInKeyNames(r rune) rune {
+	switch {
+	case r >= 43 && r <= 47: // + , = . /
+		return r
+	case r >= 48 && r <= 57: // 0 - 9
+		return r
+	case r >= 65 && r <= 90: // A - Z
+		return r
+	case r >= 97 && r <= 122: // a - z
+		return r
+	case r >= 94 && r <= 95: // ^ _
+		return r
+	}
+
+	// -1 is the sentinel value to indicate that the rune should be removed
+	return -1
 }
