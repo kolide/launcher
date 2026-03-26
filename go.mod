@@ -29,11 +29,11 @@ require (
 	go.etcd.io/bbolt v1.3.6
 	golang.org/x/crypto v0.46.0
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0
-	golang.org/x/image v0.18.0
+	golang.org/x/image v0.38.0
 	golang.org/x/net v0.48.0 // indirect
-	golang.org/x/sync v0.19.0
+	golang.org/x/sync v0.20.0
 	golang.org/x/sys v0.41.0
-	golang.org/x/text v0.32.0
+	golang.org/x/text v0.35.0
 	golang.org/x/time v0.8.0
 	google.golang.org/grpc v1.79.3
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
