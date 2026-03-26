@@ -100,9 +100,10 @@ func Test_utf16Decode(t *testing.T) {
 			t.Parallel()
 			results, err := utf16Decode(t.Context(), multislogger.NewNopLogger(), tt.input)
 			require.NoError(t, err)
+			require.Len(t, results, 1)
 			for k, want := range tt.expected {
-				require.Contains(t, results, k)
-				require.Equal(t, want, results[k])
+				require.Contains(t, results[0], k)
+				require.Equal(t, want, results[0][k])
 			}
 		})
 	}

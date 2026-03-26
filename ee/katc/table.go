@@ -137,33 +137,45 @@ func (k *katcTable) generate(ctx context.Context, queryContext table.QueryContex
 	transformedResults := make([]map[string]string, 0)
 	for _, s := range dataRaw {
 		for _, dataRawRow := range s.rows {
-			// Make sure source's path is included in row data
-			rowData := map[string]string{
-				pathColumnName: s.path,
-			}
+			rowBatch := []map[string][]byte{dataRawRow}
 
 			// Run any needed transformations on the row data
 			for _, step := range k.rowTransformSteps {
-				dataRawRow, err = step.transformFunc(ctx, k.slogger, dataRawRow)
-				if err != nil {
-					k.slogger.Log(ctx, slog.LevelWarn,
-						"running transform func",
-						"transform_step", step.name,
-						"path", s.path,
-						"err", err,
-					)
-					// if a single row fails the transformFunc, just log, omit, and continue.
-					// we've seen cases where rows may not have valid object data in them and fail header parsing
+				var nextBatch []map[string][]byte
+				stepFailed := false
+				for _, r := range rowBatch {
+					outs, err := step.transformFunc(ctx, k.slogger, r)
+					if err != nil {
+						k.slogger.Log(ctx, slog.LevelWarn,
+							"running transform func",
+							"transform_step", step.name,
+							"path", s.path,
+							"err", err,
+						)
+						// if a single row fails the transformFunc, just log, omit, and continue.
+						// we've seen cases where rows may not have valid object data in them and fail header parsing
+						stepFailed = true
+						break
+					}
+					nextBatch = append(nextBatch, outs...)
+				}
+				if stepFailed {
 					continue
 				}
+				rowBatch = nextBatch
 			}
 
 			// After transformations have been applied, we can cast the data from []byte
 			// to string to return to osquery.
-			for key, val := range dataRawRow {
-				rowData[key] = string(val)
+			for _, dataRawRow := range rowBatch {
+				rowData := map[string]string{
+					pathColumnName: s.path,
+				}
+				for key, val := range dataRawRow {
+					rowData[key] = string(val)
+				}
+				transformedResults = append(transformedResults, rowData)
 			}
-			transformedResults = append(transformedResults, rowData)
 		}
 	}
 

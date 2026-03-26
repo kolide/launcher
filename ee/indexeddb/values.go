@@ -78,7 +78,7 @@ const (
 
 // DeserializeChrome deserializes a JS object that has been stored by Chrome
 // in IndexedDB LevelDB-backed databases.
-func DeserializeChrome(ctx context.Context, slogger *slog.Logger, row map[string][]byte) (map[string][]byte, error) {
+func DeserializeChrome(ctx context.Context, slogger *slog.Logger, row map[string][]byte) ([]map[string][]byte, error) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -120,7 +120,7 @@ func DeserializeChrome(ctx context.Context, slogger *slog.Logger, row map[string
 		return nil, fmt.Errorf("decoding obj for indexeddb version %d and serializer version %d: %w", indexeddbVersion, serializerVersion, err)
 	}
 
-	return objData, nil
+	return []map[string][]byte{objData}, nil
 }
 
 // snappyDecompressedIfNeeded decompresses the payload if it is compressed with Snappy.
@@ -183,14 +183,13 @@ func readHeader(srcReader *bytes.Reader) (uint64, byte, error) {
 	}
 }
 
-// chromeRootValueToFlatMap coerces root JS Array values into the flat map this transformFunc has historically returned.
-// follow-up work will be done in a subsequent PR to support returning all array entries, but we'll need to change the transformFunc
-// signature to support this, so for now just unmarshal and return the first element of any array
+// chromeRootValueToFlatMap coerces root JS Array values into a flat map. DeserializeChrome returns
+// that map as a single-element slice for now; follow-on work can return one map per array element.
 func chromeRootValueToFlatMap(ctx context.Context, slogger *slog.Logger, rootTag byte, srcReader *bytes.Reader) (map[string][]byte, error) {
 	switch rootTag {
 	case tokenObjectBegin:
 		return deserializeObject(ctx, slogger, srcReader)
-	case tokenBeginDenseArray, tokenBeginSparseArray:
+	case tokenBeginDenseArray, tokenBeginSparseArray, tokenArrayBuffer:
 		arrBytes, err := deserializeNext(ctx, slogger, rootTag, srcReader)
 		if err != nil {
 			return nil, err

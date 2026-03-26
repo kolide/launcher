@@ -13,7 +13,7 @@ import (
 const zstdMagicNumber uint32 = 0xFD2FB528
 
 // zstdDecode is a dataProcessingStep that decodes data compressed with zstd.
-func zstdDecode(ctx context.Context, _ *slog.Logger, row map[string][]byte) (map[string][]byte, error) {
+func zstdDecode(ctx context.Context, _ *slog.Logger, row map[string][]byte) ([]map[string][]byte, error) {
 	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -37,7 +37,7 @@ func zstdDecode(ctx context.Context, _ *slog.Logger, row map[string][]byte) (map
 		decodedRow[k] = decodedResultBytes
 	}
 
-	return decodedRow, nil
+	return []map[string][]byte{decodedRow}, nil
 }
 
 // zstd-compressed data is made up of one or more frames. The standard frame
