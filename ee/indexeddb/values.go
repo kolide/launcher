@@ -176,15 +176,14 @@ func readHeader(srcReader *bytes.Reader) (uint64, byte, error) {
 			}
 		case tokenObjectBegin, tokenBeginDenseArray, tokenBeginSparseArray:
 			// Done reading header
-			rootTag = nextByte
-			return serializerVersion, rootTag, nil
+			return serializerVersion, nextByte, nil
 		default:
 			// Padding -- ignore
 		}
 	}
 }
 
-// chromeRootValueToFlatMap turns the root structured-clone value into the flat map this package has historically returned.
+// chromeRootValueToFlatMap coerces root JS Array values into the flat map this transformFunc has historically returned.
 // follow-up work will be done in a subsequent PR to support returning all array entries, but we'll need to change the transformFunc
 // signature to support this, so for now just unmarshal and return the first element of any array
 func chromeRootValueToFlatMap(ctx context.Context, slogger *slog.Logger, rootTag byte, srcReader *bytes.Reader) (map[string][]byte, error) {
