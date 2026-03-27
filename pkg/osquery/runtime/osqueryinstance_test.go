@@ -297,7 +297,7 @@ func TestHealthy(t *testing.T) {
 	k.On("NodeKey", types.DefaultEnrollmentID).Return(ulid.New(), nil).Maybe()
 	k.On("EnsureEnrollmentStored", types.DefaultEnrollmentID).Return(nil).Maybe()
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
-	k.On("OsqueryHealthcheckStartupDelay").Return(10 * time.Second)
+	k.On("OsqueryHealthcheckStartupDelay").Return(10 * time.Second).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
@@ -332,7 +332,7 @@ func TestHealthy(t *testing.T) {
 
 	// Add a new extension manager server that we can shut down without killing the errgroup
 	testAdditionalServerName := "kolide_test_ext"
-	require.NoError(t, i.StartOsqueryExtensionManagerServer(testAdditionalServerName, i.extensionManagerClient, nil, true), "adding test server")
+	require.NoError(t, i.StartOsqueryExtensionManagerServer(t.Context(), testAdditionalServerName, i.extensionManagerClient, nil, true), "adding test server")
 
 	// Confirm we're still in a healthy state
 	require.NoError(t, backoff.WaitFor(func() error {
