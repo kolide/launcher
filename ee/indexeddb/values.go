@@ -78,7 +78,7 @@ const (
 
 // DeserializeChrome deserializes a JS object that has been stored by Chrome
 // in IndexedDB LevelDB-backed databases.
-func DeserializeChrome(ctx context.Context, slogger *slog.Logger, row map[string][]byte) (map[string][]byte, error) {
+func DeserializeChrome(ctx context.Context, slogger *slog.Logger, row map[string][]byte) ([]map[string][]byte, error) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -115,12 +115,12 @@ func DeserializeChrome(ctx context.Context, slogger *slog.Logger, row map[string
 	}
 
 	// Now, parse the actual data in this row
-	objData, err := chromeRootValueToFlatMap(ctx, slogger, rootTag, srcReader)
+	dataRows, err := deserializeChromeRootValue(ctx, slogger, rootTag, srcReader)
 	if err != nil {
 		return nil, fmt.Errorf("decoding obj for indexeddb version %d and serializer version %d: %w", indexeddbVersion, serializerVersion, err)
 	}
 
-	return objData, nil
+	return dataRows, nil
 }
 
 // snappyDecompressedIfNeeded decompresses the payload if it is compressed with Snappy.
@@ -174,7 +174,9 @@ func readHeader(srcReader *bytes.Reader) (uint64, byte, error) {
 			if err != nil {
 				return serializerVersion, rootTag, fmt.Errorf("decoding uint32 for version in header: %w", err)
 			}
-		case tokenObjectBegin, tokenBeginDenseArray, tokenBeginSparseArray:
+			// the following case should match any tokens that we support deserializing as the root value
+			// (see deserializeChromeRootValue)
+		case tokenObjectBegin, tokenBeginDenseArray, tokenBeginSparseArray, tokenArrayBuffer:
 			// Done reading header
 			return serializerVersion, nextByte, nil
 		default:
@@ -183,14 +185,19 @@ func readHeader(srcReader *bytes.Reader) (uint64, byte, error) {
 	}
 }
 
-// chromeRootValueToFlatMap coerces root JS Array values into the flat map this transformFunc has historically returned.
-// follow-up work will be done in a subsequent PR to support returning all array entries, but we'll need to change the transformFunc
-// signature to support this, so for now just unmarshal and return the first element of any array
-func chromeRootValueToFlatMap(ctx context.Context, slogger *slog.Logger, rootTag byte, srcReader *bytes.Reader) (map[string][]byte, error) {
+// deserializeChromeRootValue deserializes the root value of a Chrome IndexedDB row.
+// It returns a slice of maps, one for each element in the root value. The root value can be an object, or an array.
+// If the root value is an object, it returns a slice with a single map with the object's properties.
+// If the root value is an array, it returns a slice with a map for each element in the array.
+func deserializeChromeRootValue(ctx context.Context, slogger *slog.Logger, rootTag byte, srcReader *bytes.Reader) ([]map[string][]byte, error) {
 	switch rootTag {
 	case tokenObjectBegin:
-		return deserializeObject(ctx, slogger, srcReader)
-	case tokenBeginDenseArray, tokenBeginSparseArray:
+		row, err := deserializeObject(ctx, slogger, srcReader)
+		if err != nil {
+			return []map[string][]byte{}, err
+		}
+		return []map[string][]byte{row}, nil
+	case tokenBeginDenseArray, tokenBeginSparseArray, tokenArrayBuffer:
 		arrBytes, err := deserializeNext(ctx, slogger, rootTag, srcReader)
 		if err != nil {
 			return nil, err
@@ -200,21 +207,22 @@ func chromeRootValueToFlatMap(ctx context.Context, slogger *slog.Logger, rootTag
 			return nil, fmt.Errorf("unmarshaling root JS array wrapper: %w", err)
 		}
 		if len(elems) == 0 {
-			return map[string][]byte{}, nil
+			return []map[string][]byte{}, nil
 		}
-		var firstArrItem map[string]string
-		// only grab the first one for now (temporary).
-		// this would technically fail if the root array did not contain valid json objects,
-		// but since we're going to be filtering on columns anyway we would not use that data, let it fail
-		// and we'll log and continue parsing other rows.
-		if err := json.Unmarshal([]byte(elems[0]), &firstArrItem); err != nil {
-			return nil, fmt.Errorf("unmarshaling first array element as object: %w", err)
+
+		dataRows := make([]map[string][]byte, len(elems))
+		for i, elem := range elems {
+			var arrItem map[string]string
+			if err := json.Unmarshal([]byte(elem), &arrItem); err != nil {
+				return nil, fmt.Errorf("unmarshaling array element as object: %w", err)
+			}
+			dataRows[i] = make(map[string][]byte, len(arrItem))
+			for k, v := range arrItem {
+				dataRows[i][k] = []byte(v)
+			}
 		}
-		out := make(map[string][]byte, len(firstArrItem))
-		for k, v := range firstArrItem {
-			out[k] = []byte(v)
-		}
-		return out, nil
+
+		return dataRows, nil
 	default:
 		return nil, fmt.Errorf("unsupported root serialized value tag 0x%02x / `%s` (expected object or array)", rootTag, string(rootTag))
 	}

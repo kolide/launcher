@@ -15,7 +15,7 @@ import (
 // In practice we're not seeing all key/values being consistently UTF-16 encoded
 // (e.g. some values are, but keys and some other values are not)
 // so utf16DecodeValue uses some heuristics to determine whether to apply the transformation.
-func utf16Decode(_ context.Context, _ *slog.Logger, row map[string][]byte) (map[string][]byte, error) {
+func utf16Decode(_ context.Context, _ *slog.Logger, row map[string][]byte) ([]map[string][]byte, error) {
 	decodedRow := make(map[string][]byte)
 	for k, v := range row {
 		decoded, err := utf16DecodeValue(v)
@@ -24,7 +24,7 @@ func utf16Decode(_ context.Context, _ *slog.Logger, row map[string][]byte) (map[
 		}
 		decodedRow[k] = decoded
 	}
-	return decodedRow, nil
+	return []map[string][]byte{decodedRow}, nil
 }
 
 // utf16DecodeValue selects the decoding based on byte order marks and early byte sequences:

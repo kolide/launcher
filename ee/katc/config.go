@@ -73,7 +73,7 @@ func (kst *katcSourceType) String() string {
 // JSON KATC config.
 type rowTransformStep struct {
 	name          string
-	transformFunc func(ctx context.Context, slogger *slog.Logger, row map[string][]byte) (map[string][]byte, error)
+	transformFunc func(ctx context.Context, slogger *slog.Logger, row map[string][]byte) ([]map[string][]byte, error)
 }
 
 const (

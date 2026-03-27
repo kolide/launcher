@@ -33,11 +33,12 @@ func Test_deserializeIndexeddbValue(t *testing.T) {
 		0x01, // properties_written
 	}
 
-	obj, err := DeserializeChrome(t.Context(), multislogger.NewNopLogger(), map[string][]byte{"data": testBytes})
+	objs, err := DeserializeChrome(t.Context(), multislogger.NewNopLogger(), map[string][]byte{"data": testBytes})
 	require.NoError(t, err, "deserializing object")
+	require.Len(t, objs, 1)
 
 	// Confirm we got an id property for the object
-	require.Contains(t, obj, "id", "expected id property")
+	require.Contains(t, objs[0], "id", "expected id property")
 }
 
 func Test_deserializeIndexeddbValue_InvalidType(t *testing.T) {

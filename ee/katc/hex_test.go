@@ -20,6 +20,7 @@ func Test_hexDecode(t *testing.T) {
 		"data": []byte(encodedStrQuoted),
 	})
 	require.NoError(t, err)
-	require.Contains(t, results, "data")
-	require.Equal(t, originalValue, results["data"])
+	require.Len(t, results, 1)
+	require.Contains(t, results[0], "data")
+	require.Equal(t, originalValue, results[0]["data"])
 }
