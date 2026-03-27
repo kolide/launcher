@@ -137,14 +137,17 @@ func (k *katcTable) generate(ctx context.Context, queryContext table.QueryContex
 	transformedResults := make([]map[string]string, 0)
 	for _, s := range dataRaw {
 		for _, dataRawRow := range s.rows {
+			// for our first pass of the transforms, set the rowBatch to the single original
+			// row we'll be processing. A transform step can turn this into multiple rows,
+			// (e.g. DeserializeChrome can convert a root array value into multiple rows)
+			// so we'll need to reset this rowBatch after each pass to ensure all rows are processed
+			// by any later transormation steps.
 			rowBatch := []map[string][]byte{dataRawRow}
-
 			// Run any needed transformations on the row data
 			for _, step := range k.rowTransformSteps {
-				var nextBatch []map[string][]byte
-				stepFailed := false
-				for _, r := range rowBatch {
-					outs, err := step.transformFunc(ctx, k.slogger, r)
+				nextBatch := make([]map[string][]byte, 0)
+				for _, r := range rowBatch { // first pass rowBatch will be the single original row
+					transformedRows, err := step.transformFunc(ctx, k.slogger, r)
 					if err != nil {
 						k.slogger.Log(ctx, slog.LevelWarn,
 							"running transform func",
@@ -154,14 +157,14 @@ func (k *katcTable) generate(ctx context.Context, queryContext table.QueryContex
 						)
 						// if a single row fails the transformFunc, just log, omit, and continue.
 						// we've seen cases where rows may not have valid object data in them and fail header parsing
-						stepFailed = true
-						break
+						continue
 					}
-					nextBatch = append(nextBatch, outs...)
+					// add all transformed rows to the nextBatch for the next transform step
+					nextBatch = append(nextBatch, transformedRows...)
 				}
-				if stepFailed {
-					continue
-				}
+				// now before proceeding to the next transform step, reset the rowBatch to
+				// the nextBatch we've accumulated. on the final pass this will contain all of the
+				// successfully transformed rows.
 				rowBatch = nextBatch
 			}
 
