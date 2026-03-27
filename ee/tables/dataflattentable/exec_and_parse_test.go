@@ -7,7 +7,12 @@ import (
 
 	"github.com/kolide/launcher/v2/ee/allowedcmd"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 type mockCommand struct {
 	name string

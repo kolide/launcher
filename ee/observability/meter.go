@@ -8,9 +8,10 @@ import (
 
 const (
 	// Units as defined by https://ucum.org
-	unitByte    = "B"
-	unitPercent = "%"
-	unitByteGCP = "By" // Unfortunately, "B" isn't recognized by our metrics ingest -- we have to use "By" instead
+	unitByte          = "B"
+	unitPercent       = "%"
+	unitByteGCP       = "By" // Unfortunately, "B" isn't recognized by our metrics ingest -- we have to use "By" instead
+	unitDimensionless = "1"  // Useful for "count"
 
 	// Custom units
 	unitRestart = "{restart}"
@@ -27,6 +28,8 @@ const (
 	cpuPercentGaugeDescription                   = "Process CPU percent"
 	checkupScoreGaugeName                        = "launcher.checkup.score"
 	checkupScoreGaugeDescription                 = "Computed checkup score"
+	goroutineCountGaugeName                      = "launcher.goroutine.count"
+	goroutineCountGaugeDescription               = "Number of goroutines"
 	rssHistogramName                             = "launcher.memory.rss"
 	rssHistogramDescription                      = "launcher process RSS bytes"
 	osqueryCpuHistogramName                      = "launcher.osquery.cpu.percent"
@@ -58,6 +61,7 @@ var (
 	MemoryPercentGauge    metric.Int64Gauge
 	CpuPercentGauge       metric.Int64Gauge
 	CheckupScoreGauge     metric.Float64Gauge
+	GoroutineCountGauge   metric.Int64Gauge
 
 	// Histograms
 	RSSHistogram               metric.Int64Histogram
@@ -101,6 +105,9 @@ func ReinitializeMetrics() {
 	CheckupScoreGauge = float64GaugeOrNoop(checkupScoreGaugeName,
 		metric.WithDescription(checkupScoreGaugeDescription),
 		metric.WithUnit(unitPercent))
+	GoroutineCountGauge = int64GaugeOrNoop(goroutineCountGaugeName,
+		metric.WithDescription(goroutineCountGaugeDescription),
+		metric.WithUnit(unitDimensionless))
 
 	// Histograms
 	RSSHistogram = int64HistogramOrNoop(rssHistogramName,

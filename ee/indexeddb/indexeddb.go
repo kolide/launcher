@@ -33,7 +33,7 @@ const maxNumberOfObjectStoresToCheck = 100
 
 // QueryIndexeddbObjectStore queries the indexeddb at the given location `dbLocation`,
 // returning all objects in the given database that live in the given object store.
-func QueryIndexeddbObjectStore(ctx context.Context, slogger *slog.Logger, dbLocation string, dbName string, objectStoreName string) ([]map[string][]byte, error) {
+func QueryIndexeddbObjectStore(ctx context.Context, slogger *slog.Logger, dbLocation string, dbName string, objectStoreName string, comparer string) ([]map[string][]byte, error) {
 	ctx, span := observability.StartSpan(ctx, "db_name", dbName, "object_store_name", objectStoreName)
 	defer span.End()
 
@@ -50,7 +50,7 @@ func QueryIndexeddbObjectStore(ctx context.Context, slogger *slog.Logger, dbLoca
 
 	objs := make([]map[string][]byte, 0)
 
-	db, err := OpenLeveldb(ctx, slogger, tempDbCopyLocation)
+	db, err := OpenLeveldb(ctx, slogger, tempDbCopyLocation, comparer)
 	if err != nil {
 		return nil, fmt.Errorf("opening leveldb: %w", err)
 	}
@@ -183,16 +183,23 @@ func copyFile(ctx context.Context, src string, dest string) error {
 	return nil
 }
 
-func OpenLeveldb(ctx context.Context, slogger *slog.Logger, dbLocation string) (*leveldb.DB, error) {
+func OpenLeveldb(ctx context.Context, slogger *slog.Logger, dbLocation string, comparer string) (*leveldb.DB, error) {
 	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
-	comparer := indexeddbcomparator.NewIdbCmp1Comparer(slogger)
 	opts := &opt.Options{
-		Comparer:               comparer,
+		Comparer:               comparerFromType(comparer, slogger),
 		DisableSeeksCompaction: true,               // no need to perform compaction
 		Strict:                 opt.StrictRecovery, // we prefer to drop corrupted data rather than fail to open the db altogether
 	}
+
+	// we've seen a failure when querying some leveldbs with the historical bytewise comparer like:
+	// opening leveldb: opening db: `leveldb/table: Writer: keys are not in increasing order
+	// this is expected and not an issue for historical bytewise, so we force the db into read-only mode to avoid this
+	if comparer == "historical_bytewise" {
+		opts.ReadOnly = true
+	}
+
 	db, dbOpenErr := leveldb.OpenFile(dbLocation, opts)
 	if dbOpenErr != nil {
 		// TODO we should update goleveldb to return a specific, checkable error type for this case so we don't have to do this gross string check
@@ -225,4 +232,19 @@ func OpenLeveldb(ctx context.Context, slogger *slog.Logger, dbLocation string) (
 	}
 
 	return db, nil
+}
+
+// comparerFromType returns the appropriate comparer for the given comparer type.
+// if unset or invalid, it returns our default comparer, idb_cmp1.
+func comparerFromType(comparerType string, slogger *slog.Logger) leveldbcomparer.Comparer {
+	switch comparerType {
+	case "historical_bytewise":
+		return HistoricalBytewiseComparer()
+	case "default_bytewise":
+		return leveldbcomparer.DefaultComparer
+	case "", "idb_cmp1":
+		return indexeddbcomparator.NewIdbCmp1Comparer(slogger)
+	default:
+		return indexeddbcomparator.NewIdbCmp1Comparer(slogger)
+	}
 }

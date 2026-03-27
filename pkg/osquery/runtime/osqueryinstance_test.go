@@ -25,7 +25,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	// ioCompletionProcessor will continue to run forever until the process (go test in this case) exits,
+	// so we need goleak to ignore that one.
+	goleak.VerifyTestMain(m, goleak.IgnoreAnyFunction("github.com/Microsoft/go-winio.ioCompletionProcessor"))
+}
 
 func TestCalculateOsqueryPaths(t *testing.T) {
 	t.Parallel()

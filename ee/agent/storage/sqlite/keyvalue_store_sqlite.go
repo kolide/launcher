@@ -130,6 +130,9 @@ func validatedDbConn(ctx context.Context, rootDirectory string) (*sql.DB, error)
 		return nil, fmt.Errorf("opening startup db in %s: %w", rootDirectory, err)
 	}
 	if err := conn.PingContext(ctx); err != nil {
+		if connCloseErr := conn.Close(); connCloseErr != nil {
+			return nil, fmt.Errorf("closing conn after failing to establish valid connection to startup db: close err: %v; ping error: %w", connCloseErr, err)
+		}
 		return nil, fmt.Errorf("establishing valid connection to startup db: ping error: %w", err)
 	}
 

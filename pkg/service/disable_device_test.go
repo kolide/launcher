@@ -80,6 +80,10 @@ func TestDeviceDisabled(t *testing.T) {
 				w.Write(respJson)
 			}))
 
+			t.Cleanup(func() {
+				testServer.Close()
+			})
+
 			u, err := url.Parse(testServer.URL)
 			require.NoError(t, err,
 				"should be able to parse test server URL",

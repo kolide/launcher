@@ -456,7 +456,7 @@ func TestQueryLevelDB(t *testing.T) {
 
 	// Create a level db to query
 	tempDir := t.TempDir()
-	db, err := indexeddb.OpenLeveldb(t.Context(), multislogger.NewNopLogger(), tempDir)
+	db, err := indexeddb.OpenLeveldb(t.Context(), multislogger.NewNopLogger(), tempDir, "idb_cmp1")
 	require.NoError(t, err)
 
 	// Add some data
@@ -591,6 +591,85 @@ func TestQueryBytewiseLevelDB(t *testing.T) {
 		keysSeen[row["key"]] = row["value"]
 		require.Equal(t, leveldbDir, row["path"])
 	}
+
+	// all entries are coerced to basic string values
+	require.Equal(t, "test-stringvalue1", keysSeen["test-stringvalue-key1"])
+	require.Equal(t, "2", keysSeen["test-intvalue-key2"])
+	require.Equal(t, "3.3", keysSeen["test-floatvalue-key3"])
+	require.Equal(t, "true", keysSeen["test-booleanvalue-key4"])
+}
+
+func TestQueryBytewiseLevelDBWithHistoricalComparer(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	zipFile := filepath.Join(tempDir, "bytewise.leveldb.zip")
+	require.NoError(t, os.WriteFile(zipFile, bytewiseLeveldb, 0755), "writing zip to temp dir")
+
+	zipReader, err := zip.OpenReader(zipFile)
+	require.NoError(t, err, "opening zip")
+	defer zipReader.Close()
+	for _, fileInZip := range zipReader.File {
+		unzipFile(t, fileInZip, tempDir)
+	}
+
+	// zip was created with path test_data/bytewise_leveldb/... so unzip yields tempDir/test_data/bytewise_leveldb
+	leveldbDir := filepath.Join(tempDir, "test_data", "bytewise_leveldb")
+	sourceQuery := "" // empty: return all keys
+	comparer := comparerHistoricalBytewise
+	cfg := katcTableConfig{
+		Columns: []string{"key", "value"},
+		katcTableDefinition: katcTableDefinition{
+			SourceType: &katcSourceType{
+				name:     leveldbSourceType,
+				dataFunc: leveldbData,
+			},
+			SourcePaths:       &[]string{filepath.Join("some", "incorrect", "path")},
+			SourceQuery:       &sourceQuery,
+			RowTransformSteps: &[]rowTransformStep{},
+			Comparer:          &comparer,
+		},
+		Overlays: []katcTableConfigOverlay{
+			{
+				Filters: map[string]string{
+					"goos": runtime.GOOS,
+				},
+				katcTableDefinition: katcTableDefinition{
+					SourcePaths: &[]string{leveldbDir},
+				},
+			},
+		},
+	}
+	testTable, _ := newKatcTable("test_katc_table", cfg, multislogger.NewNopLogger())
+
+	queryContext := table.QueryContext{
+		Constraints: map[string]table.ConstraintList{
+			pathColumnName: {
+				Constraints: []table.Constraint{
+					{Operator: table.OperatorEquals, Expression: leveldbDir},
+				},
+			},
+		},
+	}
+
+	results, err := testTable.generate(t.Context(), queryContext)
+	require.NoError(t, err)
+
+	// fixture from create_bytewise_leveldb.js has 4 unique entries,
+	// each of which is written twice. with the historical comparer, we should see 8 rows.
+	require.Len(t, results, 8)
+
+	keysSeen := make(map[string]string)
+	for _, row := range results {
+		require.Contains(t, row, "key")
+		require.Contains(t, row, "value")
+		require.Contains(t, row, "path")
+		keysSeen[row["key"]] = row["value"]
+		require.Equal(t, leveldbDir, row["path"])
+	}
+
+	// these rows should only contain 4 unique entries, each written twice
+	require.Len(t, keysSeen, 4)
 
 	// all entries are coerced to basic string values
 	require.Equal(t, "test-stringvalue1", keysSeen["test-stringvalue-key1"])

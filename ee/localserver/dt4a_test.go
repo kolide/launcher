@@ -2,6 +2,7 @@ package localserver
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,7 +14,6 @@ import (
 	storageci "github.com/kolide/launcher/v2/ee/agent/storage/ci"
 	"github.com/kolide/launcher/v2/ee/agent/types"
 	typesmocks "github.com/kolide/launcher/v2/ee/agent/types/mocks"
-	"github.com/kolide/launcher/v2/ee/osquerypublisher"
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -47,18 +47,17 @@ func Test_requestDt4aInfoHandler(t *testing.T) {
 	testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 	require.NoError(t, err, "could not create test config store")
 	k.On("ConfigStore").Return(testConfigStore).Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore)
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
-	k.On("OsqueryPublisher").Return(osqPublisher)
+	k.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		ls.Interrupt(errors.New("test"))
+	})
 
 	// Make a request to our handler
-	request := httptest.NewRequest(http.MethodGet, "/dt4a", nil)
+	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/dt4a", nil)
 	request.Header.Set("origin", acceptableOrigin(t))
 	responseRecorder := httptest.NewRecorder()
 	ls.requestDt4aInfoHandler().ServeHTTP(responseRecorder, request)
@@ -109,18 +108,17 @@ func Test_requestDt4aInfoHandlerWithDt4aIds(t *testing.T) {
 	testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 	require.NoError(t, err, "could not create test config store")
 	k.On("ConfigStore").Return(testConfigStore).Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore)
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
-	k.On("OsqueryPublisher").Return(osqPublisher)
+	k.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		ls.Interrupt(errors.New("test"))
+	})
 
 	// Make a request to our handler
-	request := httptest.NewRequest(http.MethodGet, "/dt4a", nil)
+	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/dt4a", nil)
 	request.Header.Set("origin", acceptableOrigin(t))
 	request.Header.Set(dt4aAccountUuidHeaderKey, dt4aAccountId)
 	request.Header.Set(dt4aUserUuidHeaderKey, dt4aUserId)
@@ -161,18 +159,17 @@ func Test_requestDt4aInfoHandlerWithDt4aIdsNoData(t *testing.T) {
 	testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 	require.NoError(t, err, "could not create test config store")
 	k.On("ConfigStore").Return(testConfigStore).Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore)
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
-	k.On("OsqueryPublisher").Return(osqPublisher)
+	k.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		ls.Interrupt(errors.New("test"))
+	})
 
 	// Make a request to our handler
-	request := httptest.NewRequest(http.MethodGet, "/dt4a", nil)
+	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/dt4a", nil)
 	request.Header.Set("origin", acceptableOrigin(t))
 	request.Header.Set(dt4aAccountUuidHeaderKey, dt4aAccountId)
 	request.Header.Set(dt4aUserUuidHeaderKey, dt4aUserId)
@@ -229,18 +226,17 @@ func Test_requestDt4aInfoHandler_allowsAllSafariWebExtensionOrigins(t *testing.T
 	testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 	require.NoError(t, err, "could not create test config store")
 	k.On("ConfigStore").Return(testConfigStore).Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore)
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
-	k.On("OsqueryPublisher").Return(osqPublisher)
+	k.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		ls.Interrupt(errors.New("test"))
+	})
 
 	// Make a request to our handler
-	request := httptest.NewRequest(http.MethodGet, "/dt4a", nil)
+	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/dt4a", nil)
 	request.Header.Set("origin", fmt.Sprintf("%sexample.com", safariWebExtensionScheme))
 	responseRecorder := httptest.NewRecorder()
 	ls.requestDt4aInfoHandler().ServeHTTP(responseRecorder, request)
@@ -281,18 +277,17 @@ func Test_requestDt4aInfoHandler_allowsMissingOrigin(t *testing.T) {
 	testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 	require.NoError(t, err, "could not create test config store")
 	k.On("ConfigStore").Return(testConfigStore).Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore)
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
-	k.On("OsqueryPublisher").Return(osqPublisher)
+	k.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		ls.Interrupt(errors.New("test"))
+	})
 
 	// Make a request to our handler
-	request := httptest.NewRequest(http.MethodGet, "/dt4a", nil)
+	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/dt4a", nil)
 	responseRecorder := httptest.NewRecorder()
 	ls.requestDt4aInfoHandler().ServeHTTP(responseRecorder, request)
 
@@ -332,17 +327,16 @@ func Test_requestDt4aInfoHandler_allowsEmptyOrigin(t *testing.T) {
 	testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 	require.NoError(t, err, "could not create test config store")
 	k.On("ConfigStore").Return(testConfigStore).Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore)
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
-	k.On("OsqueryPublisher").Return(osqPublisher)
+	k.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		ls.Interrupt(errors.New("test"))
+	})
 
 	// Make a request to our handler
-	request := httptest.NewRequest(http.MethodGet, "/dt4a", nil)
+	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/dt4a", nil)
 	request.Header.Set("origin", "")
 	responseRecorder := httptest.NewRecorder()
 	ls.requestDt4aInfoHandler().ServeHTTP(responseRecorder, request)
@@ -391,18 +385,17 @@ func Test_requestDt4aInfoHandler_badRequest(t *testing.T) {
 			testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 			require.NoError(t, err, "could not create test config store")
 			k.On("ConfigStore").Return(testConfigStore).Maybe()
-			tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-			require.NoError(t, err)
-			k.On("TokenStore").Return(tokenStore)
-			osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
-			k.On("OsqueryPublisher").Return(osqPublisher)
+			k.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 			// Set up localserver
 			ls, err := New(t.Context(), k, nil)
 			require.NoError(t, err)
+			t.Cleanup(func() {
+				ls.Interrupt(errors.New("test"))
+			})
 
 			// Make a request to our handler
-			request := httptest.NewRequest(tt.httpMethod, "/dt4a", tt.requestBody)
+			request := httptest.NewRequestWithContext(t.Context(), tt.httpMethod, "/dt4a", tt.requestBody)
 			request.Header.Set("origin", tt.requestOrigin)
 			responseRecorder := httptest.NewRecorder()
 			ls.requestDt4aInfoHandler().ServeHTTP(responseRecorder, request)
@@ -438,18 +431,17 @@ func Test_requestDt4aInfoHandler_noDataAvailable(t *testing.T) {
 	testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 	require.NoError(t, err, "could not create test config store")
 	k.On("ConfigStore").Return(testConfigStore).Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore)
-	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
-	k.On("OsqueryPublisher").Return(osqPublisher)
+	k.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		ls.Interrupt(errors.New("test"))
+	})
 
 	// Make a request to our handler
-	request := httptest.NewRequest(http.MethodGet, "/dt4a", nil)
+	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/dt4a", nil)
 	request.Header.Set("origin", acceptableOrigin(t))
 	responseRecorder := httptest.NewRecorder()
 	ls.requestDt4aInfoHandler().ServeHTTP(responseRecorder, request)
@@ -480,18 +472,17 @@ func Test_requestDt4aAccelerationHandler(t *testing.T) {
 	testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 	require.NoError(t, err, "could not create test config store")
 	k.On("ConfigStore").Return(testConfigStore).Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore)
-	osqPublisher := osquerypublisher.NewLogPublisherClient(multislogger.NewNopLogger(), k, http.DefaultClient)
-	k.On("OsqueryPublisher").Return(osqPublisher)
+	k.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		ls.Interrupt(errors.New("test"))
+	})
 
 	// Make a request to our handler
-	request := httptest.NewRequest(http.MethodGet, "/", nil)
+	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 	request.Header.Set("origin", acceptableOrigin(t))
 	responseRecorder := httptest.NewRecorder()
 	ls.requestDt4aAccelerationHandler().ServeHTTP(responseRecorder, request)

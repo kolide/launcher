@@ -38,7 +38,7 @@ func validateLeveldbTableColumns(columns []table.ColumnDefinition) error {
 // or nesting. IndexedDB databases leveraging LevelDB should use `indexeddbLeveldbData`
 // instead. If set, the query is a comma-separated allowlist of keys to return; if empty,
 // all keys are returned.
-func leveldbData(ctx context.Context, slogger *slog.Logger, sourcePaths []string, query string, queryContext table.QueryContext) ([]sourceData, error) {
+func leveldbData(ctx context.Context, slogger *slog.Logger, sourcePaths []string, comparer string, query string, queryContext table.QueryContext) ([]sourceData, error) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -67,7 +67,7 @@ func leveldbData(ctx context.Context, slogger *slog.Logger, sourcePaths []string
 				continue
 			}
 
-			rowsFromDb, err := queryLeveldb(ctx, slogger, dbPath, allowedKeyMap)
+			rowsFromDb, err := queryLeveldb(ctx, slogger, dbPath, allowedKeyMap, comparer)
 			if err != nil {
 				return nil, fmt.Errorf("querying leveldb at %s: %w", dbPath, err)
 			}
@@ -81,7 +81,7 @@ func leveldbData(ctx context.Context, slogger *slog.Logger, sourcePaths []string
 	return results, nil
 }
 
-func queryLeveldb(ctx context.Context, slogger *slog.Logger, path string, allowedKeyMap map[string]struct{}) ([]map[string][]byte, error) {
+func queryLeveldb(ctx context.Context, slogger *slog.Logger, path string, allowedKeyMap map[string]struct{}, comparer string) ([]map[string][]byte, error) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -96,7 +96,7 @@ func queryLeveldb(ctx context.Context, slogger *slog.Logger, path string, allowe
 	// The copy was successful -- make sure we clean it up after we're done
 	defer os.RemoveAll(tempDbCopyLocation)
 
-	db, err := indexeddb.OpenLeveldb(ctx, slogger, tempDbCopyLocation)
+	db, err := indexeddb.OpenLeveldb(ctx, slogger, tempDbCopyLocation, comparer)
 	if err != nil {
 		return nil, fmt.Errorf("opening leveldb: %w", err)
 	}

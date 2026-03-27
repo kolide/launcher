@@ -36,4 +36,7 @@ type Knapsack interface {
 	SetEnrollmentDetails(details EnrollmentDetails)
 	// SetLocalizer sets the localizer for the launcher installation
 	SetLocalizer(localizer Localizer)
+	// PersistAgentIngesterKeys persists the agent ingester keys to the token store and
+	// pings the osquery publisher to update its token cache if any updates were made.
+	PersistAgentIngesterKeys(ctx context.Context, authToken, hpkePublicKey, hpkePresharedKey string)
 }

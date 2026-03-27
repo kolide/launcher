@@ -214,14 +214,6 @@ func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUser
 	}
 
 	runner.runnerServer = rs
-	gowrapper.Go(context.TODO(), runner.slogger, func() {
-		if err := runner.runnerServer.Serve(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			runner.slogger.Log(context.TODO(), slog.LevelError,
-				"running monitor server",
-				"err", err,
-			)
-		}
-	})
 
 	if runtime.GOOS == "darwin" {
 		runner.osVersion, err = osversion()
@@ -240,6 +232,15 @@ func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUser
 // Execute immediately checks if the current console user has a desktop process running. If not, it will start a new one.
 // Then repeats based on the executionInterval.
 func (r *DesktopUsersProcessesRunner) Execute() error {
+	gowrapper.Go(context.TODO(), r.slogger, func() {
+		if err := r.runnerServer.Serve(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			r.slogger.Log(context.TODO(), slog.LevelError,
+				"running monitor server",
+				"err", err,
+			)
+		}
+	})
+
 	defer r.updateTicker.Stop()
 	menuRefreshTicker := time.NewTicker(r.menuRefreshInterval)
 	defer menuRefreshTicker.Stop()

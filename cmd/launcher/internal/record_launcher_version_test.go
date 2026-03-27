@@ -8,7 +8,12 @@ import (
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/kit/version"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func TestRecordLauncherVersion(t *testing.T) {
 	t.Parallel()

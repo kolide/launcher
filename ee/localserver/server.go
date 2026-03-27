@@ -380,7 +380,9 @@ func (ls *localServer) Interrupt(_ error) {
 		)
 	}
 
-	ls.cancel()
+	if ls.cancel != nil {
+		ls.cancel()
+	}
 
 	ls.kryptoMiddleware.Close()
 }

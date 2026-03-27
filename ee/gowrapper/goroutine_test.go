@@ -1,6 +1,7 @@
 package gowrapper
 
 import (
+	"context"
 	"log/slog"
 	"testing"
 	"time"
@@ -8,17 +9,19 @@ import (
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/kolide/launcher/v2/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func TestGo_WithPanic(t *testing.T) {
 	t.Parallel()
 
-	funcDelay := 200 * time.Millisecond
-
 	// Capture goroutine results so we know the goroutine executed
 	goroutineResults := make(chan struct{})
 	g := func() {
-		time.Sleep(funcDelay)
 		goroutineResults <- struct{}{}
 		panic("test panic") //nolint:forbidigo // Fine to use panic in tests
 	}
@@ -26,7 +29,6 @@ func TestGo_WithPanic(t *testing.T) {
 	// Capture onPanic results so we know that onPanic executed
 	onPanicResults := make(chan struct{})
 	p := func(_ any) {
-		time.Sleep(funcDelay)
 		onPanicResults <- struct{}{}
 	}
 
@@ -38,7 +40,8 @@ func TestGo_WithPanic(t *testing.T) {
 
 	// Kick off goroutine
 	GoWithRecoveryAction(t.Context(), slogger, g, p)
-	timeoutGracePeriod := 200 * time.Millisecond
+	timeoutCtx, timeoutCancel := context.WithTimeout(t.Context(), 400*time.Millisecond)
+	defer timeoutCancel()
 
 	goroutineExecuted := false
 	onPanicExecuted := false
@@ -49,7 +52,7 @@ func TestGo_WithPanic(t *testing.T) {
 			goroutineExecuted = true
 		case <-onPanicResults:
 			onPanicExecuted = true
-		case <-time.After(funcDelay + funcDelay + timeoutGracePeriod):
+		case <-timeoutCtx.Done():
 			t.Error("goroutine did not exit within timeout: logs: ", logBytes.String())
 			t.FailNow()
 		}
@@ -63,26 +66,23 @@ func TestGo_WithPanic(t *testing.T) {
 func TestGo_WithoutPanic(t *testing.T) {
 	t.Parallel()
 
-	funcDelay := 200 * time.Millisecond
-
 	// Capture goroutine results so we know the goroutine executed
 	goroutineResults := make(chan struct{})
 	g := func() {
-		time.Sleep(funcDelay)
 		goroutineResults <- struct{}{}
 	}
 
 	// Capture onPanic results so we know that onPanic did not execute
 	onPanicResults := make(chan struct{})
 	p := func(_ any) {
-		time.Sleep(funcDelay)
 		onPanicResults <- struct{}{}
 	}
 
 	// Kick off goroutine
 	GoWithRecoveryAction(t.Context(), multislogger.NewNopLogger(), g, p)
-	timeoutGracePeriod := 200 * time.Millisecond
-	goroutineEndTime := time.Now().Add(funcDelay + funcDelay + timeoutGracePeriod)
+	recheckInterval := 100 * time.Millisecond
+	timeoutGracePeriod := 400 * time.Millisecond
+	goroutineEndTime := time.Now().Add(timeoutGracePeriod)
 
 	goroutineExecuted := false
 	onPanicExecuted := false
@@ -93,7 +93,7 @@ func TestGo_WithoutPanic(t *testing.T) {
 			goroutineExecuted = true
 		case <-onPanicResults:
 			onPanicExecuted = true
-		case <-time.After(funcDelay + funcDelay + timeoutGracePeriod):
+		case <-time.After(recheckInterval):
 			continue
 		}
 	}

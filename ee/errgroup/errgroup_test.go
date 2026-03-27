@@ -12,7 +12,12 @@ import (
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/kolide/launcher/v2/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func TestWait(t *testing.T) {
 	t.Parallel()
@@ -117,9 +122,14 @@ func TestShutdown_ReturnsOnTimeout(t *testing.T) {
 	eg := NewLoggedErrgroup(ctx, slogger)
 
 	// Create a goroutine that will not return before the shutdown timeout
+	testCompletedChan := make(chan struct{})
 	eg.StartGoroutine(ctx, "test_goroutine", func() error {
-		time.Sleep(10 * maxErrgroupShutdownDuration)
-		return nil
+		select {
+		case <-time.After(10 * maxErrgroupShutdownDuration):
+			return nil
+		case <-testCompletedChan:
+			return nil
+		}
 	})
 
 	// Shutdown should return by `maxErrgroupShutdownDuration`
@@ -145,6 +155,10 @@ func TestShutdown_ReturnsOnTimeout(t *testing.T) {
 	}
 
 	require.True(t, canceled, "errgroup did not exit")
+
+	// Ensure test cleans up goroutines
+	testCompletedChan <- struct{}{}
+	time.Sleep(2 * time.Second)
 }
 
 func TestStartGoroutine_HandlesPanic(t *testing.T) {

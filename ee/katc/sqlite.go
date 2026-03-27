@@ -16,8 +16,9 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// sqliteData is the dataFunc for sqlite KATC tables
-func sqliteData(ctx context.Context, slogger *slog.Logger, sourcePaths []string, query string, queryContext table.QueryContext) ([]sourceData, error) {
+// sqliteData is the dataFunc for sqlite KATC tables.
+// note that the comparer option is not used for sqlite, it is only included for consistency with the other dataFuncs.
+func sqliteData(ctx context.Context, slogger *slog.Logger, sourcePaths []string, _ string, query string, queryContext table.QueryContext) ([]sourceData, error) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 

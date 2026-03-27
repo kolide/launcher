@@ -39,19 +39,26 @@ import (
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
 
-// makeKnapsack returns a types.Knapsack ready for use in most tests. Use this when your test
-// expects the extension to already be enrolled. If you need an unenrolled extension, use makeKnapsackUnenrolled.
-// If you need to manipulate the enrollment state (e.g. by changing node keys), then set up the mock knapsack
-// manually in your test instead.
-func makeKnapsack(t *testing.T) types.Knapsack {
+func TestMain(m *testing.M) {
+	// ioCompletionProcessor will continue to run forever until the process (go test in this case) exits,
+	// so we need goleak to ignore that one.
+	goleak.VerifyTestMain(m, goleak.IgnoreAnyFunction("github.com/Microsoft/go-winio.ioCompletionProcessor"))
+}
+
+// makeKnapsack returns a *mocks.Knapsack with the most common mocks for our use cases in these tests.
+// It does not have an opinion on enrollment state or enroll secret- ReadEnrollSecret and NodeKey are not mocked here.
+// Add those mocks in the calling tests if needed, or use the makeKnapsackEnrolled/Unenrolled helpers
+func makeKnapsack(t *testing.T) *mocks.Knapsack {
 	m := mocks.NewKnapsack(t)
 	m.On("OsquerydPath").Maybe().Return("")
 	m.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
-	m.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
+	configStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
+	require.NoError(t, err)
+	m.On("ConfigStore").Return(configStore)
 	m.On("Slogger").Return(multislogger.NewNopLogger())
-	m.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
 	m.On("RootDirectory").Maybe().Return("whatever")
 	m.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
 	m.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything, testifymock.Anything).Maybe().Return()
@@ -62,83 +69,47 @@ func makeKnapsack(t *testing.T) types.Knapsack {
 	m.On("OsqueryHistory").Return(osqHistory).Maybe()
 	m.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
 	m.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
-	m.On("NodeKey", testifymock.Anything).Return(ulid.New(), nil).Maybe()
+	m.On("KolideServerURL").Return("").Maybe()
+	m.On("InsecureTransportTLS").Return(true).Maybe()
 	// for now, don't enable dual log publication (cutover to new agent-ingester service) for these
 	// tests. that logic is tested separately and we can add more logic to test here if needed once
 	// we've settled on a cutover plan and desired behaviors
 	m.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 	m.On("OsqueryPublisherURL").Return("").Maybe()
-	m.On("KolideServerURL").Return("").Maybe()
-	m.On("InsecureTransportTLS").Return(true).Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	m.On("TokenStore").Return(tokenStore).Maybe()
+	m.On("PersistAgentIngesterKeys", testifymock.Anything, testifymock.Anything, testifymock.Anything, testifymock.Anything).Return().Maybe()
+
 	return m
 }
 
-func makeTestOsqLogPublisher(k types.Knapsack) types.OsqueryPublisher {
-	slogger := multislogger.NewNopLogger()
-	return osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+// makeKnapsackEnrolled returns a *mocks.Knapsack and the expectedNodeKey in case your tests use it for assertions.
+// Use this when your test expects the extension to already be enrolled. If you need an unenrolled extension,
+// use makeKnapsackUnenrolled. If you need to manipulate the enrollment state (e.g. by changing node keys),
+// then use makeKnapsack and add whatever NodeKey mocks you need.
+func makeKnapsackEnrolled(t *testing.T) (*mocks.Knapsack, string) {
+	m := makeKnapsack(t)
+	expectedNodeKey := ulid.New()
+	m.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
+	m.On("NodeKey", testifymock.Anything).Return(expectedNodeKey, nil).Maybe()
+
+	return m, expectedNodeKey
 }
 
-// makeKnapsackUnenrolled returns a types.Knapsack ready for use in any test that requires
+// makeKnapsackUnenrolled returns a *mocks.Knapsack ready for use in any test that requires
 // an unenrolled extension. If you need to manipulate the enrollment state (e.g. by changing
-// node keys), then set up the mock knapsack manually in your test instead.
-func makeKnapsackUnenrolled(t *testing.T) types.Knapsack {
-	m := mocks.NewKnapsack(t)
-	m.On("OsquerydPath").Maybe().Return("")
-	m.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
-	m.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
-	m.On("Slogger").Return(multislogger.NewNopLogger())
+// node keys), then set use makeKnapsack and add whatever NodeKey mocks you need.
+func makeKnapsackUnenrolled(t *testing.T) *mocks.Knapsack {
+	m := makeKnapsack(t)
 	m.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
-	m.On("RootDirectory").Maybe().Return("whatever")
-	m.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
-	m.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything, testifymock.Anything).Maybe().Return()
-	m.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
-	m.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
-	store := inmemory.NewStore()
-	osqHistory, err := history.InitHistory(store)
-	require.NoError(t, err)
-	m.On("OsqueryHistory").Return(osqHistory).Maybe()
-	m.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
-	m.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	m.On("NodeKey", testifymock.Anything).Return("", nil).Maybe()
-	// for now, don't enable dual log publication (cutover to new agent-ingester service) for these
-	// tests. that logic is tested separately and we can add more logic to test here if needed once
-	// we've settled on a cutover plan and desired behaviors
-	m.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
-	m.On("OsqueryPublisherURL").Return("").Maybe()
-	m.On("KolideServerURL").Return("").Maybe()
-	m.On("InsecureTransportTLS").Return(true).Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	m.On("TokenStore").Return(tokenStore).Maybe()
+
 	return m
 }
 
-// makeKnapsackWithInvalidEnrollment returns aa types.Knapsack ready for use in any test that requires
+// makeKnapsackWithInvalidEnrollment returns a *mocks.Knapsack ready for use in any test that requires
 // an extension with an invalid node key, to test reenrollment.
-func makeKnapsackWithInvalidEnrollment(t *testing.T, expectedNodeKey string) types.Knapsack {
-	// Set up our knapsack
-	k := mocks.NewKnapsack(t)
-	k.On("OsquerydPath").Maybe().Return("")
-	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
-	k.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
-	k.On("Slogger").Return(multislogger.NewNopLogger())
+func makeKnapsackWithInvalidEnrollment(t *testing.T, expectedNodeKey string) *mocks.Knapsack {
+	k := makeKnapsack(t)
 	k.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
-	k.On("RootDirectory").Maybe().Return("whatever")
-	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
-	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything, testifymock.Anything).Maybe().Return()
-	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
-	store := inmemory.NewStore()
-	osqHistory, err := history.InitHistory(store)
-	require.NoError(t, err)
-	k.On("OsqueryHistory").Return(osqHistory).Maybe()
-	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
-	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
-	k.On("KolideServerURL").Return("").Maybe()
-	k.On("InsecureTransportTLS").Return(true).Maybe()
-
 	// At first, return a bad node key -- this will be called once by whatever function we're calling.
 	k.On("NodeKey", testifymock.Anything).Return("bad_node_key", nil).Once()
 	// We expect that we'll attempt to delete any existing enrollment before attempting reenroll.
@@ -150,20 +121,34 @@ func makeKnapsackWithInvalidEnrollment(t *testing.T, expectedNodeKey string) typ
 	k.On("SaveEnrollment", testifymock.Anything, "", expectedNodeKey, testifymock.Anything).Return(nil).Once()
 	// Next, post-enrollment, we'll want to start returning the correct node key.
 	k.On("NodeKey", testifymock.Anything).Return(expectedNodeKey, nil)
-	// for now, don't enable dual log publication (cutover to new agent-ingester service) for these
-	// tests. that logic is tested separately and we can add more logic to test here if needed once
-	// we've settled on a cutover plan and desired behaviors
-	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
-	k.On("OsqueryPublisherURL").Return("").Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore).Maybe()
+
 	return k
+}
+
+// makeKnapsackForEnrollWithJWT returns a *mocks.Knapsack ready for use in any test that requires
+// an enrollment with a JWT. It will return the expected enroll secret for the given munemo. It does
+// not define NodeKey mocking behavior.
+func makeKnapsackForEnrollWithJWT(t *testing.T, expectedMunemo string) (*mocks.Knapsack, string) {
+	mk := makeKnapsack(t)
+	expectedEnrollSecret := createTestEnrollSecret(t, expectedMunemo)
+	mk.On("ReadEnrollSecret").Maybe().Return(expectedEnrollSecret, nil)
+
+	return mk, expectedEnrollSecret
+}
+
+func makeTestOsqLogPublisher(t *testing.T, k types.Knapsack) types.OsqueryPublisher {
+	slogger := multislogger.NewNopLogger()
+	client := &http.Client{}
+	t.Cleanup(func() {
+		client.CloseIdleConnections()
+	})
+	return osquerypublisher.NewLogPublisherClient(slogger, k, client)
 }
 
 func TestNewExtensionEmptyEnrollSecret(t *testing.T) {
 	m := makeKnapsack(t)
-	lpc := makeTestOsqLogPublisher(m)
+	m.On("ReadEnrollSecret").Maybe().Return("", nil)
+	lpc := makeTestOsqLogPublisher(t, m)
 
 	// We should be able to make an extension despite an empty enroll secret
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), m, ulid.New(), ExtensionOpts{})
@@ -172,8 +157,8 @@ func TestNewExtensionEmptyEnrollSecret(t *testing.T) {
 }
 
 func TestGetHostIdentifier(t *testing.T) {
-	k := makeKnapsack(t)
-	lpc := makeTestOsqLogPublisher(k)
+	k, _ := makeKnapsackEnrolled(t)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 
@@ -186,7 +171,7 @@ func TestGetHostIdentifier(t *testing.T) {
 	require.Nil(t, err)
 	assert.Equal(t, oldIdent, ident)
 
-	k = makeKnapsack(t)
+	k, _ = makeKnapsackEnrolled(t)
 	e, err = NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 
 	require.Nil(t, err)
@@ -199,8 +184,8 @@ func TestGetHostIdentifier(t *testing.T) {
 
 func TestGetHostIdentifierCorruptedData(t *testing.T) {
 	// Put bad data in the DB and ensure we can still generate a fresh UUID
-	k := makeKnapsack(t)
-	lpc := makeTestOsqLogPublisher(k)
+	k, _ := makeKnapsackEnrolled(t)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 
@@ -226,7 +211,7 @@ func TestExtensionEnrollTransportError(t *testing.T) {
 	}
 
 	k := makeKnapsackUnenrolled(t)
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, types.DefaultEnrollmentID, ExtensionOpts{})
 	require.Nil(t, err)
 	e.serviceClient = m
@@ -247,7 +232,7 @@ func TestExtensionEnrollSecretInvalid(t *testing.T) {
 		},
 	}
 	k := makeKnapsackUnenrolled(t)
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
@@ -298,7 +283,7 @@ func TestExtensionEnrollValidNodeEmptyResponse(t *testing.T) {
 		},
 	}
 	k := makeKnapsackUnenrolled(t)
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
@@ -330,25 +315,8 @@ func TestExtensionEnrollInvalidRegion(t *testing.T) {
 	}
 
 	expectedMunemo := "test_fake_munemo_2"
-	expectedEnrollSecret := createTestEnrollSecret(t, expectedMunemo)
-	k := mocks.NewKnapsack(t)
-	k.On("OsquerydPath").Maybe().Return("")
-	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
-	configStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
-	require.NoError(t, err)
-	k.On("ConfigStore").Return(configStore)
-	k.On("Slogger").Return(multislogger.NewNopLogger())
-	k.On("ReadEnrollSecret").Maybe().Return(expectedEnrollSecret, nil)
-	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
-	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
-	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything, testifymock.Anything).Maybe().Return()
-	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
-	k.On("KolideServerURL").Return("").Maybe()
-	k.On("InsecureTransportTLS").Return(true).Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore).Maybe()
-	lpc := makeTestOsqLogPublisher(k)
+	k, _ := makeKnapsackForEnrollWithJWT(t, expectedMunemo)
+	lpc := makeTestOsqLogPublisher(t, k)
 
 	// We should attempt to fetch the node key once during enrollment, and we shouldn't have a node key yet
 	k.On("NodeKey", types.DefaultEnrollmentID).Return("", nil).Once()
@@ -389,25 +357,8 @@ func TestExtensionEnrollInvalidRegion_DoesNotSetMissingUrls(t *testing.T) {
 	}
 
 	expectedMunemo := "test_fake_munemo_2"
-	expectedEnrollSecret := createTestEnrollSecret(t, expectedMunemo)
-	k := mocks.NewKnapsack(t)
-	k.On("OsquerydPath").Maybe().Return("")
-	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
-	configStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
-	require.NoError(t, err)
-	k.On("ConfigStore").Return(configStore)
-	k.On("Slogger").Return(multislogger.NewNopLogger())
-	k.On("ReadEnrollSecret").Maybe().Return(expectedEnrollSecret, nil)
-	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
-	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
-	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything, testifymock.Anything).Maybe().Return()
-	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
-	k.On("KolideServerURL").Return("").Maybe()
-	k.On("InsecureTransportTLS").Return(true).Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore).Maybe()
-	lpc := makeTestOsqLogPublisher(k)
+	k, _ := makeKnapsackForEnrollWithJWT(t, expectedMunemo)
+	lpc := makeTestOsqLogPublisher(t, k)
 
 	// We should attempt to fetch the node key once during enrollment, and we shouldn't have a node key yet
 	k.On("NodeKey", types.DefaultEnrollmentID).Return("", nil).Once()
@@ -427,7 +378,6 @@ func TestExtensionEnrollInvalidRegion_DoesNotSetMissingUrls(t *testing.T) {
 
 func TestExtensionEnroll(t *testing.T) {
 	expectedMunemo := "test_fake_munemo"
-	expectedEnrollSecret := createTestEnrollSecret(t, expectedMunemo)
 
 	var gotEnrollSecret string
 	expectedNodeKey := "node_key"
@@ -443,24 +393,8 @@ func TestExtensionEnroll(t *testing.T) {
 	}
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 
-	k := mocks.NewKnapsack(t)
-	k.On("OsquerydPath").Maybe().Return("")
-	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
-	configStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
-	require.NoError(t, err)
-	k.On("ConfigStore").Return(configStore)
-	k.On("Slogger").Return(multislogger.NewNopLogger())
-	k.On("ReadEnrollSecret").Maybe().Return(expectedEnrollSecret, nil)
-	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
-	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
-	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything, testifymock.Anything).Maybe().Return()
-	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
-	k.On("KolideServerURL").Return("").Maybe()
-	k.On("InsecureTransportTLS").Return(true).Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore).Maybe()
-	lpc := makeTestOsqLogPublisher(k)
+	k, expectedEnrollSecret := makeKnapsackForEnrollWithJWT(t, expectedMunemo)
+	lpc := makeTestOsqLogPublisher(t, k)
 
 	e, err := NewExtension(t.Context(), lpc, s, k, types.DefaultEnrollmentID, ExtensionOpts{})
 	require.Nil(t, err)
@@ -548,36 +482,10 @@ func TestFlagsChanged(t *testing.T) {
 		updatedTestServer.Close()
 	})
 
-	m := mocks.NewKnapsack(t)
-	m.On("OsquerydPath").Maybe().Return("")
-	m.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
-	m.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
-	m.On("Slogger").Return(multislogger.NewNopLogger())
-	m.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
-	m.On("RootDirectory").Maybe().Return("whatever")
-	m.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
-	m.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything, testifymock.Anything).Maybe().Return()
-	m.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
-	m.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
-	store := inmemory.NewStore()
-	osqHistory, err := history.InitHistory(store)
-	require.NoError(t, err)
-	m.On("OsqueryHistory").Return(osqHistory).Maybe()
-	m.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
-	m.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
-	m.On("NodeKey", testifymock.Anything).Return("", nil).Maybe()
-	// for now, don't enable dual log publication (cutover to new agent-ingester service) for these
-	// tests. that logic is tested separately and we can add more logic to test here if needed once
-	// we've settled on a cutover plan and desired behaviors
-	m.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
-	m.On("OsqueryPublisherURL").Return("").Maybe()
+	m, _ := makeKnapsackEnrolled(t)
+	m.On("KolideServerURL").Unset()                                                              // unset the default mock for KolideServerURL
 	m.On("KolideServerURL").Return(strings.TrimPrefix(startingTestServer.URL, "http://")).Once() // our first test server
-	m.On("InsecureTransportTLS").Return(true).Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	m.On("TokenStore").Return(tokenStore).Maybe()
-
-	lpc := makeTestOsqLogPublisher(m)
+	lpc := makeTestOsqLogPublisher(t, m)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), m, types.DefaultEnrollmentID, ExtensionOpts{})
 	require.NoError(t, err)
 
@@ -604,8 +512,8 @@ func TestExtensionGenerateConfigsTransportError(t *testing.T) {
 			return "", false, errors.New("transport")
 		},
 	}
-	k := makeKnapsack(t)
-	lpc := makeTestOsqLogPublisher(k)
+	k, _ := makeKnapsackEnrolled(t)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, types.DefaultEnrollmentID, ExtensionOpts{})
 	require.Nil(t, err)
 	e.serviceClient = m
@@ -624,8 +532,8 @@ func TestExtensionGenerateConfigsCaching(t *testing.T) {
 			return configVal, false, nil
 		},
 	}
-	k := makeKnapsack(t)
-	lpc := makeTestOsqLogPublisher(k)
+	k, _ := makeKnapsackEnrolled(t)
+	lpc := makeTestOsqLogPublisher(t, k)
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
 	e, err := NewExtension(t.Context(), lpc, s, k, ulid.New(), ExtensionOpts{})
@@ -668,7 +576,7 @@ func TestExtensionGenerateConfigsEnrollmentInvalid(t *testing.T) {
 	}
 	// Set up our knapsack
 	k := makeKnapsackWithInvalidEnrollment(t, expectedNodeKey)
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.serviceClient = m
@@ -701,23 +609,11 @@ func TestGenerateConfigs_CannotEnrollYet(t *testing.T) {
 		},
 	}
 
-	k := mocks.NewKnapsack(t)
-	k.On("OsquerydPath").Maybe().Return("")
-	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
-	k.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
-	k.On("Slogger").Return(multislogger.NewNopLogger())
+	k := makeKnapsack(t)
 	k.On("ReadEnrollSecret").Return("", errors.New("test")).Once() // checked once in Enroll
-	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
-	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything, testifymock.Anything).Maybe().Return()
-	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
-	k.On("KolideServerURL").Return("").Maybe()
-	k.On("InsecureTransportTLS").Return(true).Maybe()
 	settingsStore := settingsstoremock.NewSettingsStoreWriter(t)
 	settingsStore.On("WriteSettings").Return(nil)
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore).Maybe()
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsStore, k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.serviceClient = s
@@ -779,31 +675,11 @@ func TestGenerateConfigs_WorksAfterSecretlessEnrollment(t *testing.T) {
 		},
 	}
 
-	k := mocks.NewKnapsack(t)
-	k.On("OsquerydPath").Maybe().Return("")
-	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
-	configStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
-	require.NoError(t, err, configStore)
-	k.On("ConfigStore").Return(configStore, nil)
-	k.On("Slogger").Return(multislogger.NewNopLogger())
+	k := makeKnapsack(t)
 	k.On("ReadEnrollSecret").Maybe().Return("", errors.New("test"))
-	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
-	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything, testifymock.Anything).Maybe().Return()
-	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
-	store := inmemory.NewStore()
-	osqHistory, err := history.InitHistory(store)
-	require.NoError(t, err)
-	k.On("OsqueryHistory").Return(osqHistory).Maybe()
-	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
-	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
-	k.On("KolideServerURL").Return("").Maybe()
-	k.On("InsecureTransportTLS").Return(true).Maybe()
 	settingsStore := settingsstoremock.NewSettingsStoreWriter(t)
 	settingsStore.On("WriteSettings").Return(nil)
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore).Maybe()
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
 	e, err := NewExtension(t.Context(), lpc, settingsStore, k, types.DefaultEnrollmentID, ExtensionOpts{})
 	require.Nil(t, err)
@@ -845,10 +721,10 @@ func TestExtensionGenerateConfigs(t *testing.T) {
 			return configVal, false, nil
 		},
 	}
-	k := makeKnapsack(t)
+	k, _ := makeKnapsackEnrolled(t)
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, s, k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.serviceClient = m
@@ -865,8 +741,8 @@ func TestExtensionWriteLogsTransportError(t *testing.T) {
 			return "", "", false, errors.New("transport")
 		},
 	}
-	k := makeKnapsack(t)
-	lpc := makeTestOsqLogPublisher(k)
+	k, _ := makeKnapsackEnrolled(t)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.serviceClient = m
@@ -894,7 +770,7 @@ func TestExtensionWriteLogsEnrollmentInvalid(t *testing.T) {
 	}
 	// Set up our knapsack
 	k := makeKnapsackWithInvalidEnrollment(t, expectedNodeKey)
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.serviceClient = m
@@ -920,32 +796,12 @@ func TestExtensionWriteLogs(t *testing.T) {
 	}
 
 	// Set up our knapsack
-	k := mocks.NewKnapsack(t)
-	k.On("OsquerydPath").Maybe().Return("")
-	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
-	k.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
-	k.On("Slogger").Return(multislogger.NewNopLogger())
+	k := makeKnapsack(t)
 	k.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
-	k.On("RootDirectory").Maybe().Return("whatever")
-	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
-	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything, testifymock.Anything).Maybe().Return()
-	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
-	k.On("KolideServerURL").Return("").Maybe()
-	k.On("InsecureTransportTLS").Return(true).Maybe()
-	store := inmemory.NewStore()
-	osqHistory, err := history.InitHistory(store)
-	require.NoError(t, err)
-	k.On("OsqueryHistory").Return(osqHistory).Maybe()
-	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
-	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
-
 	// Set our node key
 	expectedNodeKey := "node_key"
 	k.On("NodeKey", testifymock.Anything).Return(expectedNodeKey, nil)
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore).Maybe()
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.serviceClient = m
@@ -1015,21 +871,10 @@ func TestExtensionWriteBufferedLogsEmpty(t *testing.T) {
 	statusLogsStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.StatusLogsStore.String())
 	require.NoError(t, err)
 
-	k := mocks.NewKnapsack(t)
-	k.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
-	k.On("Slogger").Return(multislogger.NewNopLogger()).Maybe()
+	k := makeKnapsack(t)
 	k.On("StatusLogsStore").Return(statusLogsStore)
 	k.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
-	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
-	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything, testifymock.Anything).Maybe().Return()
-	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
-	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
-	k.On("KolideServerURL").Return("").Maybe()
-	k.On("InsecureTransportTLS").Return(true).Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore).Maybe()
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
@@ -1066,31 +911,10 @@ func TestExtensionWriteBufferedLogs(t *testing.T) {
 		},
 	}
 
-	k := mocks.NewKnapsack(t)
-	k.On("OsquerydPath").Maybe().Return("")
-	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
-	k.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
-	k.On("Slogger").Return(multislogger.NewNopLogger())
+	k := makeKnapsack(t)
 	k.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
-	k.On("RootDirectory").Maybe().Return("whatever")
-	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
-	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything, testifymock.Anything).Maybe().Return()
-	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
-	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
-	k.On("OsqueryPublisherURL").Return("").Maybe()
-	k.On("KolideServerURL").Return("").Maybe()
-	k.On("InsecureTransportTLS").Return(true).Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore).Maybe()
-	lpc := makeTestOsqLogPublisher(k)
-	store := inmemory.NewStore()
-	osqHistory, err := history.InitHistory(store)
-	require.NoError(t, err)
-	k.On("OsqueryHistory").Return(osqHistory).Maybe()
-	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
-	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	k.On("NodeKey", testifymock.Anything).Return(expectedNodeKey, nil)
+	lpc := makeTestOsqLogPublisher(t, k)
 
 	// Create these buckets ahead of time
 	statusLogsStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.StatusLogsStore.String())
@@ -1163,50 +987,15 @@ func TestExtensionWriteBufferedLogsEnrollmentInvalid(t *testing.T) {
 	}
 
 	// Set up our knapsack
-	k := mocks.NewKnapsack(t)
-	k.On("OsquerydPath").Maybe().Return("")
-	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
-	k.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
-	k.On("Slogger").Return(multislogger.NewNopLogger())
-	k.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
-	k.On("RootDirectory").Maybe().Return("whatever")
-	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
-	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything, testifymock.Anything).Maybe().Return()
-	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
-	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
-	k.On("OsqueryPublisherURL").Return("").Maybe()
-	k.On("KolideServerURL").Return("").Maybe()
-	k.On("InsecureTransportTLS").Return(true).Maybe()
-	store := inmemory.NewStore()
-	osqHistory, err := history.InitHistory(store)
-	require.NoError(t, err)
-	k.On("OsqueryHistory").Return(osqHistory).Maybe()
-	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
-	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
-
+	k := makeKnapsackWithInvalidEnrollment(t, expectedNodeKey)
 	// Create the status logs bucket ahead of time
 	statusLogsStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.StatusLogsStore.String())
 	require.NoError(t, err)
 	k.On("StatusLogsStore").Return(statusLogsStore)
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore).Maybe()
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.serviceClient = m
-
-	// At first, return a bad node key -- this will be called once by GenerateConfigs.
-	k.On("NodeKey", testifymock.Anything).Return("bad_node_key", nil).Once()
-	// We expect that we'll attempt to delete any existing enrollment before attempting reenroll.
-	k.On("DeleteEnrollment", testifymock.Anything).Return(nil)
-	// On re-enroll, we'll check to confirm that we don't have a node key (perhaps from a different enroll thread).
-	// Return no node key, to confirm we proceed with reenrollment.
-	k.On("NodeKey", testifymock.Anything).Return("", nil).Once()
-	// Post-enrollment, we'll save the enrollment.
-	k.On("SaveEnrollment", testifymock.Anything, "", expectedNodeKey, testifymock.Anything).Return(nil).Once()
-	// Next, post-enrollment, we'll want to start returning the correct node key.
-	k.On("NodeKey", testifymock.Anything).Return(expectedNodeKey, nil)
 
 	e.LogString(t.Context(), logger.LogTypeStatus, "status foo")
 	e.LogString(t.Context(), logger.LogTypeStatus, "status bar")
@@ -1222,7 +1011,7 @@ func TestExtensionWriteBufferedLogsEnrollmentInvalid(t *testing.T) {
 }
 
 func TestExtensionWriteBufferedLogsLimit(t *testing.T) {
-	expectedNodeKey := ulid.New()
+	k, expectedNodeKey := makeKnapsackEnrolled(t)
 
 	var gotStatusLogs, gotResultLogs []string
 	m := &mock.KolideService{
@@ -1245,32 +1034,7 @@ func TestExtensionWriteBufferedLogsLimit(t *testing.T) {
 		},
 	}
 
-	k := mocks.NewKnapsack(t)
-	k.On("OsquerydPath").Maybe().Return("")
-	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
-	k.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
-	k.On("Slogger").Return(multislogger.NewNopLogger())
-	k.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
-	k.On("RootDirectory").Maybe().Return("whatever")
-	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
-	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything, testifymock.Anything).Maybe().Return()
-	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
-	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
-	k.On("OsqueryPublisherURL").Return("").Maybe()
-	k.On("KolideServerURL").Return("").Maybe()
-	k.On("InsecureTransportTLS").Return(true).Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore).Maybe()
-	lpc := makeTestOsqLogPublisher(k)
-	store := inmemory.NewStore()
-	osqHistory, err := history.InitHistory(store)
-	require.NoError(t, err)
-	k.On("OsqueryHistory").Return(osqHistory).Maybe()
-	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
-	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
-	k.On("NodeKey", testifymock.Anything).Return(expectedNodeKey, nil)
-
+	lpc := makeTestOsqLogPublisher(t, k)
 	// Create these buckets ahead of time
 	statusLogsStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.StatusLogsStore.String())
 	require.NoError(t, err)
@@ -1326,7 +1090,7 @@ func TestExtensionWriteBufferedLogsLimit(t *testing.T) {
 }
 
 func TestExtensionWriteBufferedLogsDropsBigLog(t *testing.T) {
-	expectedNodeKey := ulid.New()
+	k, expectedNodeKey := makeKnapsackEnrolled(t)
 
 	var gotStatusLogs, gotResultLogs []string
 	m := &mock.KolideService{
@@ -1349,32 +1113,7 @@ func TestExtensionWriteBufferedLogsDropsBigLog(t *testing.T) {
 		},
 	}
 
-	k := mocks.NewKnapsack(t)
-	k.On("OsquerydPath").Maybe().Return("")
-	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
-	k.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
-	k.On("Slogger").Return(multislogger.NewNopLogger())
-	k.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
-	k.On("RootDirectory").Maybe().Return("whatever")
-	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
-	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything, testifymock.Anything).Maybe().Return()
-	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
-	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
-	k.On("OsqueryPublisherURL").Return("").Maybe()
-	k.On("KolideServerURL").Return("").Maybe()
-	k.On("InsecureTransportTLS").Return(true).Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore).Maybe()
-	lpc := makeTestOsqLogPublisher(k)
-	store := inmemory.NewStore()
-	osqHistory, err := history.InitHistory(store)
-	require.NoError(t, err)
-	k.On("OsqueryHistory").Return(osqHistory).Maybe()
-	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
-	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
-	k.On("NodeKey", testifymock.Anything).Return(expectedNodeKey, nil)
-
+	lpc := makeTestOsqLogPublisher(t, k)
 	// Create these buckets ahead of time
 	resultLogsStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ResultLogsStore.String())
 	require.NoError(t, err)
@@ -1431,7 +1170,7 @@ func TestExtensionWriteBufferedLogsDropsBigLog(t *testing.T) {
 }
 
 func TestExtensionWriteLogsLoop(t *testing.T) {
-	expectedNodeKey := ulid.New()
+	k, expectedNodeKey := makeKnapsackEnrolled(t)
 	var gotStatusLogs, gotResultLogs []string
 	var logLock sync.Mutex
 	var done = make(chan struct{})
@@ -1460,33 +1199,8 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 		},
 	}
 
-	k := mocks.NewKnapsack(t)
-	k.On("OsquerydPath").Maybe().Return("")
-	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
-	k.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
-	k.On("Slogger").Return(multislogger.NewNopLogger())
-	k.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
-	k.On("RootDirectory").Maybe().Return("whatever")
-	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
-	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything, testifymock.Anything).Maybe().Return()
-	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
-	k.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
-	k.On("OsqueryPublisherURL").Return("").Maybe()
-	k.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
-	k.On("KolideServerURL").Return("").Maybe()
-	k.On("InsecureTransportTLS").Return(true).Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore).Maybe()
-	lpc := makeTestOsqLogPublisher(k)
-	store := inmemory.NewStore()
-	osqHistory, err := history.InitHistory(store)
-	require.NoError(t, err)
-	k.On("OsqueryHistory").Return(osqHistory).Maybe()
-	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
-	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
-	k.On("NodeKey", testifymock.Anything).Return(expectedNodeKey, nil)
 	k.On("EnsureEnrollmentStored", testifymock.Anything).Return(nil)
+	lpc := makeTestOsqLogPublisher(t, k)
 
 	// Create these buckets ahead of time
 	statusLogsStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.StatusLogsStore.String())
@@ -1587,8 +1301,7 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 }
 
 func TestExtensionPurgeBufferedLogs(t *testing.T) {
-	expectedNodeKey := ulid.New()
-
+	k, expectedNodeKey := makeKnapsackEnrolled(t)
 	var gotStatusLogs, gotResultLogs []string
 	m := &mock.KolideService{
 		PublishLogsFunc: func(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error) {
@@ -1611,29 +1324,7 @@ func TestExtensionPurgeBufferedLogs(t *testing.T) {
 		},
 	}
 
-	k := mocks.NewKnapsack(t)
-	k.On("OsquerydPath").Maybe().Return("")
-	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
-	k.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
-	k.On("Slogger").Return(multislogger.NewNopLogger())
-	k.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
-	k.On("RootDirectory").Maybe().Return("whatever")
-	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
-	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything, testifymock.Anything).Maybe().Return()
-	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
-	k.On("KolideServerURL").Return("").Maybe()
-	k.On("InsecureTransportTLS").Return(true).Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore).Maybe()
-	lpc := makeTestOsqLogPublisher(k)
-	store := inmemory.NewStore()
-	osqHistory, err := history.InitHistory(store)
-	require.NoError(t, err)
-	k.On("OsqueryHistory").Return(osqHistory).Maybe()
-	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
-	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
-	k.On("NodeKey", testifymock.Anything).Return(expectedNodeKey, nil)
+	lpc := makeTestOsqLogPublisher(t, k)
 
 	// Create these buckets ahead of time
 	statusLogsStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.StatusLogsStore.String())
@@ -1680,8 +1371,8 @@ func TestExtensionGetQueriesTransportError(t *testing.T) {
 			return nil, false, errors.New("transport")
 		},
 	}
-	k := makeKnapsack(t)
-	lpc := makeTestOsqLogPublisher(k)
+	k, _ := makeKnapsackEnrolled(t)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.serviceClient = m
@@ -1693,7 +1384,6 @@ func TestExtensionGetQueriesTransportError(t *testing.T) {
 }
 
 func TestExtensionGetQueriesEnrollmentInvalid(t *testing.T) {
-
 	expectedNodeKey := "good_node_key"
 	var gotNodeKey string
 	m := &mock.KolideService{
@@ -1712,7 +1402,7 @@ func TestExtensionGetQueriesEnrollmentInvalid(t *testing.T) {
 
 	// Set up our knapsack
 	k := makeKnapsackWithInvalidEnrollment(t, expectedNodeKey)
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
@@ -1738,8 +1428,8 @@ func TestExtensionGetQueries(t *testing.T) {
 			}, false, nil
 		},
 	}
-	k := makeKnapsack(t)
-	lpc := makeTestOsqLogPublisher(k)
+	k, _ := makeKnapsackEnrolled(t)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.serviceClient = m
@@ -1762,8 +1452,8 @@ func TestGetQueries_Forwarding(t *testing.T) {
 			}, false, nil
 		},
 	}
-	k := makeKnapsack(t)
-	lpc := makeTestOsqLogPublisher(k)
+	k, _ := makeKnapsackEnrolled(t)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.serviceClient = m
@@ -1812,8 +1502,8 @@ func TestGetQueries_Forwarding_RespondsToAccelerationRequest(t *testing.T) {
 			}, false, nil
 		},
 	}
-	k := makeKnapsack(t)
-	lpc := makeTestOsqLogPublisher(k)
+	k, _ := makeKnapsackEnrolled(t)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.serviceClient = m
@@ -1861,30 +1551,10 @@ func TestGetQueries_WorksWithSecretlessEnrollment(t *testing.T) {
 		},
 	}
 
-	k := mocks.NewKnapsack(t)
-	k.On("OsquerydPath").Maybe().Return("")
-	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
-	configStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
-	require.NoError(t, err, configStore)
-	k.On("ConfigStore").Return(configStore, nil)
-	k.On("Slogger").Return(multislogger.NewNopLogger())
+	k := makeKnapsack(t)
 	k.On("ReadEnrollSecret").Maybe().Return("", errors.New("test"))
-	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
-	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything, testifymock.Anything).Maybe().Return()
-	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
-	store := inmemory.NewStore()
-	osqHistory, err := history.InitHistory(store)
-	require.NoError(t, err)
-	k.On("OsqueryHistory").Return(osqHistory).Maybe()
-	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
-	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
-	k.On("KolideServerURL").Return("").Maybe()
-	k.On("InsecureTransportTLS").Return(true).Maybe()
 	settingsStore := settingsstoremock.NewSettingsStoreWriter(t)
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore).Maybe()
-	lpc := makeTestOsqLogPublisher(k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
 	e, err := NewExtension(t.Context(), lpc, settingsStore, k, types.DefaultEnrollmentID, ExtensionOpts{})
 	require.Nil(t, err)
@@ -1943,8 +1613,8 @@ func TestExtensionWriteResultsTransportError(t *testing.T) {
 			return "", "", false, errors.New("transport")
 		},
 	}
-	k := makeKnapsack(t)
-	lpc := makeTestOsqLogPublisher(k)
+	k, _ := makeKnapsackEnrolled(t)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.serviceClient = m
@@ -1972,44 +1642,12 @@ func TestExtensionWriteResultsEnrollmentInvalid(t *testing.T) {
 	}
 
 	// Set up our knapsack
-	k := mocks.NewKnapsack(t)
-	k.On("OsquerydPath").Maybe().Return("")
-	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
-	k.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
-	k.On("Slogger").Return(multislogger.NewNopLogger())
-	k.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
-	k.On("RootDirectory").Maybe().Return("whatever")
-	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
-	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything, testifymock.Anything).Maybe().Return()
-	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
-	store := inmemory.NewStore()
-	osqHistory, err := history.InitHistory(store)
-	require.NoError(t, err)
-	k.On("OsqueryHistory").Return(osqHistory).Maybe()
-	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
-	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
-	k.On("KolideServerURL").Return("").Maybe()
-	k.On("InsecureTransportTLS").Return(true).Maybe()
-	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
-	require.NoError(t, err)
-	k.On("TokenStore").Return(tokenStore).Maybe()
-	lpc := makeTestOsqLogPublisher(k)
+	k := makeKnapsackWithInvalidEnrollment(t, expectedNodeKey)
+	lpc := makeTestOsqLogPublisher(t, k)
 
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.serviceClient = m
-
-	// At first, return a bad node key -- this will be called once by WriteResults.
-	k.On("NodeKey", testifymock.Anything).Return("bad_node_key", nil).Once()
-	// We expect that we'll attempt to delete any existing enrollment before attempting reenroll.
-	k.On("DeleteEnrollment", testifymock.Anything).Return(nil)
-	// On re-enroll, we'll check to confirm that we don't have a node key (perhaps from a different enroll thread).
-	// Return no node key, to confirm we proceed with reenrollment.
-	k.On("NodeKey", testifymock.Anything).Return("", nil).Once()
-	// Post-enrollment, we'll save the enrollment.
-	k.On("SaveEnrollment", testifymock.Anything, "", expectedNodeKey, testifymock.Anything).Return(nil).Once()
-	// Next, post-enrollment, we'll want to start returning the correct node key.
-	k.On("NodeKey", testifymock.Anything).Return(expectedNodeKey, nil)
 
 	err = e.WriteResults(t.Context(), []distributed.Result{})
 	assert.True(t, m.PublishResultsFuncInvoked)
@@ -2026,8 +1664,8 @@ func TestExtensionWriteResults(t *testing.T) {
 			return "", "", false, nil
 		},
 	}
-	k := makeKnapsack(t)
-	lpc := makeTestOsqLogPublisher(k)
+	k, _ := makeKnapsackEnrolled(t)
+	lpc := makeTestOsqLogPublisher(t, k)
 	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.serviceClient = m

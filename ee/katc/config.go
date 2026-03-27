@@ -19,7 +19,7 @@ import (
 type katcSourceType struct {
 	name string
 	// queryContext contains the constraints from the WHERE clause of the query against the KATC table.
-	dataFunc func(ctx context.Context, slogger *slog.Logger, sourcePaths []string, query string, queryContext table.QueryContext) ([]sourceData, error)
+	dataFunc func(ctx context.Context, slogger *slog.Logger, sourcePaths []string, comparer string, query string, queryContext table.QueryContext) ([]sourceData, error)
 }
 
 // sourceData holds the result of calling `katcSourceType.dataFunc`. It maps the
@@ -79,9 +79,11 @@ type rowTransformStep struct {
 const (
 	snappyDecodeTransformStep       = "snappy"
 	hexDecodeTransformStep          = "hex"
+	zstdDecodeTransformStep         = "zstd"
 	deserializeFirefoxTransformStep = "deserialize_firefox"
 	deserializeChromeTransformStep  = "deserialize_chrome"
 	camelToSnakeTransformStep       = "camel_to_snake"
+	utf16DecodeTransformStep        = "utf16_decode"
 )
 
 func (r *rowTransformStep) UnmarshalJSON(data []byte) error {
@@ -100,6 +102,14 @@ func (r *rowTransformStep) UnmarshalJSON(data []byte) error {
 		r.name = hexDecodeTransformStep
 		r.transformFunc = hexDecode
 		return nil
+	case utf16DecodeTransformStep:
+		r.name = utf16DecodeTransformStep
+		r.transformFunc = utf16Decode
+		return nil
+	case zstdDecodeTransformStep:
+		r.name = zstdDecodeTransformStep
+		r.transformFunc = zstdDecode
+		return nil
 	case deserializeFirefoxTransformStep:
 		r.name = deserializeFirefoxTransformStep
 		r.transformFunc = deserializeFirefox
@@ -114,6 +124,38 @@ func (r *rowTransformStep) UnmarshalJSON(data []byte) error {
 		return nil
 	default:
 		return fmt.Errorf("unknown data processing step %s", s)
+	}
+}
+
+// comparerOption is the LevelDB comparer name from config. Only valid values are accepted.
+type comparerOption string
+
+const (
+	comparerHistoricalBytewise comparerOption = "historical_bytewise"
+	comparerDefaultBytewise    comparerOption = "default_bytewise"
+	comparerIdbCmp1            comparerOption = "idb_cmp1"
+)
+
+func (c *comparerOption) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	switch s {
+	case "", "null":
+		*c = comparerIdbCmp1
+		return nil
+	case "historical_bytewise":
+		*c = comparerHistoricalBytewise
+		return nil
+	case "default_bytewise":
+		*c = comparerDefaultBytewise
+		return nil
+	case "idb_cmp1":
+		*c = comparerIdbCmp1
+		return nil
+	default:
+		return fmt.Errorf("unknown comparer %q", s)
 	}
 }
 
@@ -136,6 +178,7 @@ type (
 		SourcePaths       *[]string           `json:"source_paths,omitempty"` // Describes how to connect to source (e.g. path to db) -- % and _ wildcards supported
 		SourceQuery       *string             `json:"source_query,omitempty"` // Query to run against each source path
 		RowTransformSteps *[]rowTransformStep `json:"row_transform_steps,omitempty"`
+		Comparer          *comparerOption     `json:"comparer,omitempty"` // LevelDB/indexeddb comparer: "historical_bytewise", "default_bytewise", or "idb_cmp1" (default)
 	}
 )
 

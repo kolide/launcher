@@ -31,7 +31,7 @@ func TestWaitFor(t *testing.T) {
 	}{
 		{
 			name:               "never returns",
-			innerFn:            innerFuncGenerator(30*time.Millisecond, nil),
+			innerFn:            innerFuncGenerator(500*time.Millisecond, nil),
 			errorAssertion:     require.NoError,
 			testifyExpectation: require.Never,
 			interval:           2 * time.Millisecond,
@@ -89,7 +89,7 @@ func TestWaitFor(t *testing.T) {
 				return true
 			}
 
-			tt.testifyExpectation(t, fn, 30*time.Millisecond, 2*time.Millisecond)
+			tt.testifyExpectation(t, fn, 100*time.Millisecond, 5*time.Millisecond)
 		})
 	}
 }

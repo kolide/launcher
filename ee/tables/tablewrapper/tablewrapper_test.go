@@ -12,7 +12,12 @@ import (
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func TestCall(t *testing.T) {
 	t.Parallel()
@@ -208,6 +213,9 @@ func TestCall_limitsExcessiveConcurrentRequests(t *testing.T) {
 	resp := w.Call(t.Context(), map[string]string{"action": "generate", "context": "{}"})
 	require.Equal(t, int32(1), resp.Status.Code)                // failure
 	require.Contains(t, resp.Status.Message, "timed out after") // matches `querying %s timed out after %s (queried columns: %v)`
+
+	// Ensure that our last call has terminated
+	time.Sleep(overrideTimeout)
 
 	mockFlags.AssertExpectations(t)
 }

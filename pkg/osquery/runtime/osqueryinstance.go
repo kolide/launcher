@@ -51,10 +51,11 @@ const (
 
 	// How long to wait before erroring because the osquery process has not started up successfully.
 	// This is a generous timeout -- the average osquery startup takes just over a second, and the
-	// 95th percentile startup takes just over two seconds. We rounded up to 20 seconds to give
-	// extra time for our outliers.
+	// 95th percentile startup takes just over two seconds. We rounded up to 10 seconds to give
+	// extra time for our outliers. 10 seconds also matches rungroup.InterruptTimeout, ensuring
+	// we don't leave behind osquery processes still trying to start up after exiting launcher.
 	// See writeup in https://github.com/kolide/launcher/pull/2041 for data and details.
-	osqueryStartupTimeout = 20 * time.Second
+	osqueryStartupTimeout = 10 * time.Second
 
 	// How often to check whether the osquery process has started up successfully
 	osqueryStartupRecheckInterval = 1 * time.Second

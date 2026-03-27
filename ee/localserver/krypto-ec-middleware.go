@@ -21,7 +21,6 @@ import (
 	"github.com/kolide/krypto"
 	"github.com/kolide/krypto/pkg/challenge"
 	"github.com/kolide/launcher/v2/ee/agent"
-	"github.com/kolide/launcher/v2/ee/agent/storage"
 	"github.com/kolide/launcher/v2/ee/agent/types"
 	"github.com/kolide/launcher/v2/ee/gowrapper"
 	"github.com/kolide/launcher/v2/ee/observability"
@@ -87,8 +86,7 @@ type kryptoEcMiddleware struct {
 	tenantMunemo          *atomic.String
 	callbackQueue         chan *http.Request
 	enrollmentTracker     types.EnrollmentTracker
-	tokenStore            types.KVStore
-	osqueryPublisher      types.OsqueryPublisher
+	knapsack              types.Knapsack
 	flags                 types.Flags
 
 	// presenceDetectionStatusUpdateInterval is the interval at which the presence detection
@@ -115,8 +113,7 @@ func newKryptoEcMiddleware(slogger *slog.Logger, knapsack types.Knapsack,
 		tenantMunemo:                          atomicMunemo,
 		callbackQueue:                         callbackQueue,
 		enrollmentTracker:                     knapsack,
-		tokenStore:                            knapsack.TokenStore(),
-		osqueryPublisher:                      knapsack.OsqueryPublisher(),
+		knapsack:                              knapsack,
 		flags:                                 knapsack,
 	}
 
@@ -146,10 +143,12 @@ type (
 	}
 
 	callbackResponse struct {
-		NodeKey            string            `json:"node_key"`
-		Munemo             string            `json:"munemo"`
-		AgentIngesterToken string            `json:"agent_ingester_auth_token"`
-		DeploymentURLs     *types.KolideURLs `json:"deployment_urls,omitempty"`
+		NodeKey                       string            `json:"node_key"`
+		Munemo                        string            `json:"munemo"`
+		AgentIngesterToken            string            `json:"agent_ingester_auth_token"`
+		AgentIngesterHPKEPublicKey    string            `json:"agent_ingester_hpke_public_key"`
+		AgentIngesterHPKEPresharedKey string            `json:"agent_ingester_hpke_psk"`
+		DeploymentURLs                *types.KolideURLs `json:"deployment_urls,omitempty"`
 	}
 )
 
@@ -265,18 +264,7 @@ func (e *kryptoEcMiddleware) callbackWorker() {
 				return fmt.Errorf("saving enrollment: %w", err)
 			}
 
-			// if we receive an agent ingester token, save it to the token store and ping the osquery publisher to update its token cache.
-			// osqueryPublisher and tokenStore are always expected to be set at this point, but sanity check in case
-			if r.AgentIngesterToken != "" && e.osqueryPublisher != nil && e.tokenStore != nil {
-				if err := e.tokenStore.Set(storage.AgentIngesterAuthTokenKey, []byte(r.AgentIngesterToken)); err != nil {
-					return fmt.Errorf("saving agent ingester token: %w", err)
-				} else {
-					e.osqueryPublisher.Ping()
-					e.slogger.Log(req.Context(), slog.LevelInfo,
-						"agent ingester token set from secretless enrollment flow",
-					)
-				}
-			}
+			e.knapsack.PersistAgentIngesterKeys(req.Context(), r.AgentIngesterToken, r.AgentIngesterHPKEPublicKey, r.AgentIngesterHPKEPresharedKey)
 
 			e.slogger.Log(req.Context(), slog.LevelInfo,
 				"launcher performed secretless enrollment",

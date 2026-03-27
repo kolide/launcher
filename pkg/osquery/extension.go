@@ -501,16 +501,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		)
 	}
 
-	// save the new agent ingester auth token and ping the log publish client to update its token
-	if err := e.knapsack.TokenStore().Set(storage.AgentIngesterAuthTokenKey, []byte(resp.AgentIngesterToken)); err != nil {
-		e.slogger.Log(ctx, slog.LevelError,
-			"could not save agent ingester auth token",
-			"err", err,
-		)
-	} else {
-		e.logPublishClient.Ping()
-		e.slogger.Log(ctx, slog.LevelInfo, "stored new agent ingester auth token")
-	}
+	e.knapsack.PersistAgentIngesterKeys(ctx, resp.AgentIngesterToken, resp.AgentIngesterHPKEPublicKey, resp.AgentIngesterHPKEPresharedKey)
 
 	e.slogger.Log(ctx, slog.LevelInfo,
 		"completed enrollment",

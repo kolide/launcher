@@ -73,7 +73,8 @@ func FetchBinary(ctx context.Context, localCacheDir, name, binaryName, channelOr
 	}
 	downloadReq = downloadReq.WithContext(ctx)
 
-	httpClient := http.DefaultClient
+	httpClient := &http.Client{}
+	defer httpClient.CloseIdleConnections()
 	response, err := httpClient.Do(downloadReq)
 	if err != nil {
 		return "", fmt.Errorf("couldn't download binary archive: %w", err)

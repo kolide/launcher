@@ -14,10 +14,15 @@ import (
 	tufci "github.com/kolide/launcher/v2/ee/tuf/ci"
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/osquery/osquery-go/gen/osquery"
+	"go.uber.org/goleak"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func TestTufReleaseVersionTable(t *testing.T) {
 	t.Parallel()

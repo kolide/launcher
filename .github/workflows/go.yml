@@ -20,7 +20,7 @@ jobs:
       fail-fast: false # Consider changing this sometime
       matrix:
         os:
-          - macos-14
+          - macos-15
           - windows-latest
     steps:
       - name: Check out code
@@ -200,7 +200,7 @@ jobs:
       matrix:
         os:
           - ubuntu-22.04
-          - macos-14
+          - macos-15
           - windows-latest
     steps:
       - name: Check out code
@@ -264,7 +264,7 @@ jobs:
       matrix:
         os:
           - ubuntu-22.04
-          - macos-14
+          - macos-15
           - windows-latest
     steps:
       - name: Check out code
@@ -367,8 +367,7 @@ jobs:
         run: |
           echo "::notice::Skipping benchmark comparison - no baseline found on main branch. This is expected for new benchmarks."
 
-      - name: Save benchmark results for main
-        if: github.ref == 'refs/heads/main'
+      - name: Save benchmark results
         uses: actions/upload-artifact@v4
         with:
           name: ${{ runner.os }}-benchmark.txt
@@ -387,6 +386,7 @@ jobs:
           - ubuntu-24.04
           - macos-14
           - macos-15
+          - macos-26
           - windows-2022
           - windows-2025
     needs:
@@ -556,7 +556,7 @@ jobs:
       matrix:
         os:
           - ubuntu-22.04
-          - macos-14
+          - macos-15
           - windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -615,6 +615,8 @@ jobs:
   # the merge dependency from being on all the jobs to this single
   # one.
   ci_mergeable:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - run: true
