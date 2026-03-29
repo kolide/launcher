@@ -322,8 +322,6 @@ func findingsToKeyNames(findings []report.Finding) []string {
 			// Handle the case where there are no spaces (single word or empty string)
 			keyNames[idx] = cleanedStr
 		}
-
-		//fmt.Printf("got >%s< from line %s\n", keyNames[idx], finding.Line)
 	}
 
 	return keyNames
