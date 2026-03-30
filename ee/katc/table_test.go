@@ -386,6 +386,7 @@ func TestQueryChromeIndexedDBMixedKeyIteration(t *testing.T) {
 	cfg := katcTableConfig{
 		Columns: []string{
 			"test",
+			"data",
 		},
 		katcTableDefinition: katcTableDefinition{
 			SourceType: &katcSourceType{
@@ -430,11 +431,15 @@ func TestQueryChromeIndexedDBMixedKeyIteration(t *testing.T) {
 
 	results, err := testTable.generate(t.Context(), queryContext)
 	require.NoError(t, err)
-	// we expect exactly 9 rows added to the mixed keys object store. see test_data/main.js for details
-	// on how this is created with various key types
-	require.Equal(t, 9, len(results))
+	// we expect exactly 11 entries added to the mixed keys object store, resulting in 12 rows yielded here:
+	// - 9 entries for the individual key/value pairs
+	// - 1 entry for the root level array containing 2 objects (which should yield 2 rows here)
+	// - 1 entry for the object with compressed data field
+	// see test_data/main.js for details on how this is created with various key types
+	require.Equal(t, 12, len(results))
 
 	resultsSeen := make([]bool, len(results))
+	snappyFound := false
 	// all rows are a simple json object in the format {"test": "<insertionNumber>"}
 	// we do not expect these to come out in the order they were inserted (it is done with mixed key types),
 	// but we do expect to see a row with each individual number 1-9, ensuring no corruption during iteration
@@ -444,11 +449,22 @@ func TestQueryChromeIndexedDBMixedKeyIteration(t *testing.T) {
 		require.NoError(t, err)
 		require.Less(t, insertionNumber-1, len(resultsSeen)) // sanity check
 		resultsSeen[insertionNumber-1] = true
+		if result["test"] == "12" {
+			// note that nothing about this test explicitly ensures that the data field is compressed,
+			// but the test data is large enough to trigger automatic compression, and I've walked through this with the debugger
+			// to ensure that's what's happening here. it seemed like overkill to add and check logging just for this, but the data
+			// in our test db does have the required SSV prefix and snappy decode directive as expected.
+			require.Contains(t, result, "data")
+			// ensure decoding worked as expected
+			require.True(t, strings.HasPrefix(string(result["data"]), "SNAPPY"), "compressed data field should start with SNAPPY")
+			snappyFound = true
+		}
 	}
 	// verify that all 9 have been seen
 	for i, seen := range resultsSeen {
 		require.True(t, seen, "test number %d was not seen during iteration", i)
 	}
+	require.True(t, snappyFound, "compressed snappy data entry was not seen")
 }
 
 func TestQueryLevelDB(t *testing.T) {
