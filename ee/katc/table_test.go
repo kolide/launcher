@@ -456,7 +456,7 @@ func TestQueryChromeIndexedDBMixedKeyIteration(t *testing.T) {
 			// in our test db does have the required SSV prefix and snappy decode directive as expected.
 			require.Contains(t, result, "data")
 			// ensure decoding worked as expected
-			require.True(t, strings.HasPrefix(string(result["data"]), "SNAPPY"), "compressed data field should start with SNAPPY")
+			require.True(t, strings.HasPrefix(result["data"], "SNAPPY"), "compressed data field should start with SNAPPY")
 			snappyFound = true
 		}
 	}
