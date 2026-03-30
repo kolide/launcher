@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -56,6 +57,7 @@ type Table struct {
 
 func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
+		table.TextColumn("name"),
 		table.TextColumn("path"),
 		table.TextColumn("raw_data"),
 		table.TextColumn("rule_id"),
@@ -225,7 +227,9 @@ func (t *Table) findingsToRows(ctx context.Context, argon2idSalts []string, find
 		keepHashing = false
 	}
 
-	for _, f := range findings {
+	keyNamesInFindings := findingsToKeyNames(findings)
+
+	for idx, f := range findings {
 		// Get the hash of this secret. If there's an error, log it, and allow the rest of the data to be returned.
 		// But note that there's an error, since it's probably a salting issue, and we don't need to log a billion times.
 		var argon2idHash string
@@ -253,9 +257,74 @@ func (t *Table) findingsToRows(ctx context.Context, argon2idSalts []string, find
 			"entropy":            fmt.Sprintf("%.2f", f.Entropy),
 			"hash_argon2id":      argon2idHash,
 			"hash_argon2id_salt": argon2idSalt,
+			"name":               keyNamesInFindings[idx],
 		}
 		results = append(results, row)
 	}
 
 	return results
 }
+
+// findingsToKeyNames attempts to extract the key names (eg: in an .env file) to help understand the context
+// of the discovered secret. Because of the multitude of possible ways people can stash secrets, and the myriad of
+// secret types, this is very hard to get right. So instead, we aim to solve the simple case, and ignore the rest.
+func findingsToKeyNames(findings []report.Finding) []string {
+	// Perticular problems...
+	//
+	// We can't use f.StartColumn, because in the case of CONFIG_KEY=abc123, it returns the start of CONFIG_KEY, not abc
+	// So instead we remove the secret, from the match block, and then strip out any characters we don't want.
+	//
+	// f.Line seems appealing, but a line contains more than one secret, we cannot cleanly get the prior one.
+	//
+	// The behavior of f.Match is inconsistent across rules -- for the `generic-api-key` rule, it includes the KEY=
+	// portion, but for an explicit rule (ie: `npm-access-token`) it does not.
+	//
+	// These combine to make it hard to write a generic routine
+
+	keyNames := make([]string, len(findings))
+
+	if len(findings) == 0 {
+		return keyNames
+	}
+
+	// Because we're trying to guess the key name by looking at prior token on the line, we only want to skip lines where
+	// multiple secrets are detected. (eg: `KEY1=foo KEY2=bar` or a dense json block). There are probably ways to work on
+	// a multiple secret line, but let's do the "easy" thing
+	secretsPerLine := make(map[int]int)
+	for _, finding := range findings {
+		secretsPerLine[finding.StartLine] += 1
+	}
+
+	// Now, we can finally examine the findings and try to get the key name
+	for idx, finding := range findings {
+		// check that we only have 1 secret on this line
+		if secretsPerLine[finding.StartLine] != 1 {
+			continue
+		}
+
+		// To find the token _prior_ to the secret, we split on the secret, and then take the first word
+		beforeSecret, _, found := strings.Cut(finding.Line, finding.Secret)
+		if !found || beforeSecret == "" {
+			// this is a weird case, probably an error, but we may as well try to detect it
+			continue
+		}
+
+		// Next up, replace everything we don't want with spaces
+		cleanedStr := strings.Trim(nonAllowedInKeyNames.ReplaceAllString(beforeSecret, " "), " ")
+
+		// And finally, let's find the _last_ word
+		lastSpaceIndex := strings.LastIndex(cleanedStr, " ")
+
+		if lastSpaceIndex != -1 {
+			lastWord := cleanedStr[lastSpaceIndex+1:]
+			keyNames[idx] = lastWord
+		} else {
+			// Handle the case where there are no spaces (single word or empty string)
+			keyNames[idx] = cleanedStr
+		}
+	}
+
+	return keyNames
+}
+
+var nonAllowedInKeyNames = regexp.MustCompile(`[^a-zA-Z0-9+./_^ -]+`)
