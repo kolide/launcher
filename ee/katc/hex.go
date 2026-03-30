@@ -12,7 +12,7 @@ import (
 )
 
 // hexDecode is a dataProcessingStep that decodes data that is hex-encoded.
-func hexDecode(ctx context.Context, _ *slog.Logger, row map[string][]byte) (map[string][]byte, error) {
+func hexDecode(ctx context.Context, _ *slog.Logger, row map[string][]byte) ([]map[string][]byte, error) {
 	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -30,5 +30,5 @@ func hexDecode(ctx context.Context, _ *slog.Logger, row map[string][]byte) (map[
 		decodedRow[k] = bytes.ReplaceAll(decodedBytes, []byte("\u0000"), []byte(""))
 	}
 
-	return decodedRow, nil
+	return []map[string][]byte{decodedRow}, nil
 }

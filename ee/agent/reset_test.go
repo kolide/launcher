@@ -323,10 +323,8 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 		},
 	}
 
-	for _, tt := range testCases {
+	for _, tt := range testCases { //nolint:paralleltest
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			slogger := multislogger.NewNopLogger()
 
 			// Set up dependencies: data store for hardware-identifying data

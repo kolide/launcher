@@ -5,7 +5,7 @@
 # Note that multistage builds can leverage the tag applied (at build
 # time) to this container
 
-FROM --platform=linux/amd64 golang:1.21 AS golauncherbuild
+FROM --platform=linux/amd64 golang:1.25 AS golauncherbuild
 LABEL maintainer="engineering@kolide.co"
 
 # fake data or not?
@@ -36,7 +36,7 @@ RUN cd launcher && GO111MODULE=on go run cmd/make/make.go -targets=launcher -lin
 # Install
 RUN mkdir -p /usr/local/kolide/bin/
 RUN cp launcher/build/linux.*/* /usr/local/kolide/bin/
-RUN cd launcher && GO111MODULE=on go run ./tools/download-osquery.go  --platform linux --output /usr/local/kolide/bin/osqueryd
+RUN cd launcher && GO111MODULE=on go run ./tools/download-osquery.go  --platform linux --arch amd64 --output /usr/local/kolide/bin/osqueryd
 
 # Set entrypoint
 ENTRYPOINT ["/usr/local/kolide/bin/launcher"]

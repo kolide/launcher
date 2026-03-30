@@ -1,0 +1,27 @@
+flowchart TD
+    A["Incoming slog.Record via dedupHandler.Handle"] --> B{"DuplicateLogWindow ≤ 0?"}
+    B -- Yes --> N["Pass‑through to downstream handler"]
+    B -- No  --> D["Compute content hash<br/>(record attrs + handler-chain attrs from WithAttrs)"]
+
+    D --> F{"Entry exists in cache?"}
+
+    F -- No  --> G["Create new entry<br/>count = 1, store downstream handler ref"]
+    G --> N
+
+    F -- Yes --> H["entry.count++<br/>entry.lastSeen = now"]
+    H --> I{"Window elapsed?<br/>(now - firstSeen ≥ DuplicateLogWindow)"}
+
+    I -- No  --> S["Suppress (return nil)"]
+    I -- Yes --> J["Pass record with<br/>duplicate_count / first_seen / last_seen attrs"]
+    J --> K["Reset entry: count = 1,<br/>firstSeen = now (new window)"]
+    K --> N
+
+    subgraph "Background cleanup (periodic)"
+        T["Every CleanupInterval"] --> U["performCleanup()"]
+        U --> V{"Entry expired?<br/>(now - lastSeen > CacheExpiry)"}
+
+        V -- Yes --> X["If count > 1: emit summary<br/>via entry's own downstream handler"]
+        V -- No  --> W{"Cache size > MaxCacheSize?"}
+
+        W -- Yes --> Y["Evict oldest; if count > 1<br/>emit summary via entry's handler"]
+    end

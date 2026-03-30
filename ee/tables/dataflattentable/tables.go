@@ -44,6 +44,12 @@ var allTypes = []DataSourceType{
 		flattenFileFunc:  func(_ table.QueryContext) dataflatten.DataFileFunc { return dataflatten.JsonFile },
 	},
 	{
+		tableName:        "kolide_jsonc",
+		description:      "Parses JSONC files or raw JSONC data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading any JSONC configuration or data file.",
+		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Jsonc },
+		flattenFileFunc:  func(_ table.QueryContext) dataflatten.DataFileFunc { return dataflatten.JsoncFile },
+	},
+	{
 		tableName:        "kolide_xml",
 		description:      "Parses XML files or raw XML data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading XML configuration or data files.",
 		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Xml },
@@ -75,6 +81,12 @@ var allTypes = []DataSourceType{
 		flattenFileFunc:  func(_ table.QueryContext) dataflatten.DataFileFunc { return dataflatten.TomlFile },
 		tableName:        "kolide_toml",
 		description:      "Parses TOML files or raw TOML data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading TOML configuration files (e.g. Cargo.toml, pyproject.toml).",
+	},
+	{
+		tableName:        "kolide_yaml",
+		description:      "Parses YAML files or raw YAML data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading any YAML configuration or data file.",
+		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Yaml },
+		flattenFileFunc:  func(_ table.QueryContext) dataflatten.DataFileFunc { return dataflatten.YamlFile },
 	},
 }
 

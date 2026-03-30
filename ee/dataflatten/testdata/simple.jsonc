@@ -1,0 +1,13 @@
+// -*- mode: jsonc -*-
+// -*- jsonc -*-
+{
+    /*
+        Here's a multi-line comment.
+        It has multiple lines.
+    */
+    "test3": true,
+    // Here's a single-line comment: "it's got a string in it!"
+}
+/*
+multi-line comment at end of file without a LF after
+*/

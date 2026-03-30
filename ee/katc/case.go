@@ -8,7 +8,7 @@ import (
 	"github.com/serenize/snaker"
 )
 
-func camelToSnake(ctx context.Context, _ *slog.Logger, row map[string][]byte) (map[string][]byte, error) {
+func camelToSnake(ctx context.Context, _ *slog.Logger, row map[string][]byte) ([]map[string][]byte, error) {
 	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -18,5 +18,5 @@ func camelToSnake(ctx context.Context, _ *slog.Logger, row map[string][]byte) (m
 		snakeCaseRow[snakeCaseKey] = v
 	}
 
-	return snakeCaseRow, nil
+	return []map[string][]byte{snakeCaseRow}, nil
 }

@@ -247,7 +247,7 @@ lint:
 ## Docker Tooling
 ##
 
-CONTAINER_OSES = ubuntu16 ubuntu18 ubuntu20 centos6 centos7 distroless
+CONTAINER_OSES = ubuntu22 ubuntu24 debian12 distroless
 
 .PHONY: containers
 containers: $(foreach c,$(CONTAINER_OSES),docker-$(c) dockerfake-$(c))
@@ -263,16 +263,16 @@ build-dockerfake:
 
 dockerfake-%:  build-dockerfake
 	@echo '#### Starting to build target: $@'
-	docker build -t gcr.io/kolide-public-containers/launcher-fakedata-$* --build-arg FAKE=-fakedata docker/$*
+	docker build -t us-east1-docker.pkg.dev/kolide-public-containers/kolide-public-containers/launcher-fakedata-$* --build-arg FAKE=-fakedata docker/$*
 
 docker-%: build-docker
 	@echo '#### Starting to build target: $@'
-	docker build -t gcr.io/kolide-public-containers/launcher-$*  docker/$*
+	docker build -t us-east1-docker.pkg.dev/kolide-public-containers/kolide-public-containers/launcher-$*  docker/$*
 
 dockerpush-%: docker-%
 	@echo '#### Starting to push target: $@'
-	docker push gcr.io/kolide-public-containers/launcher-$*
+	docker push us-east1-docker.pkg.dev/kolide-public-containers/kolide-public-containers/launcher-$*
 
 dockerfakepush-%: dockerfake-%
 	@echo '#### Starting to push target: $@'
-	docker push gcr.io/kolide-public-containers/launcher-fakedata-$*
+	docker push us-east1-docker.pkg.dev/kolide-public-containers/kolide-public-containers/launcher-fakedata-$*

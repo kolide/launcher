@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/snappy"
 	"github.com/kolide/launcher/v2/ee/observability"
 	"golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/transform"
@@ -68,11 +69,16 @@ const (
 	// They may signal something besides array termination.
 	tokenPossiblyArrayTermination0x03 byte = 0x03
 	tokenPossiblyArrayTermination0x01 byte = 0x01
+
+	// some headers may indicate that the payload is compressed with Snappy. look for kCompressedWithSnappy explanation here:
+	// https://chromium.googlesource.com/chromium/src/+/main/third_party/blink/renderer/modules/indexeddb/idb_value_wrapping.cc
+	tokenRequiresProcessingSSVPseudoVersion byte = 0x11
+	tokenCompressedWithSnappy               byte = 0x02
 )
 
 // DeserializeChrome deserializes a JS object that has been stored by Chrome
 // in IndexedDB LevelDB-backed databases.
-func DeserializeChrome(ctx context.Context, slogger *slog.Logger, row map[string][]byte) (map[string][]byte, error) {
+func DeserializeChrome(ctx context.Context, slogger *slog.Logger, row map[string][]byte) ([]map[string][]byte, error) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -89,35 +95,75 @@ func DeserializeChrome(ctx context.Context, slogger *slog.Logger, row map[string
 		return nil, fmt.Errorf("reading uvarint as indexeddb version: %w", err)
 	}
 
+	// Grab a reference to the remaining bytes from the data as the payload,
+	// we'll need to read a few bytes from the header and snappy decompress if needed
+	payload := data[len(data)-srcReader.Len():]
+	// If the header does not indicate that the payload is compressed with Snappy,
+	// this will return unchanged
+	payload, err = snappyDecompressedIfNeeded(payload)
+	if err != nil {
+		return nil, fmt.Errorf("indexeddb version %d: %w", indexeddbVersion, err)
+	}
+
+	// Reset the source reader, this will have no effect if the payload is was not compressed with Snappy
+	srcReader = bytes.NewReader(payload)
+
 	// Next, read through the header to extract top-level data
-	serializerVersion, err := readHeader(srcReader)
+	serializerVersion, rootTag, err := readHeader(srcReader)
 	if err != nil {
 		return nil, fmt.Errorf("reading header with indexeddb version %d and serializer version %d: %w", indexeddbVersion, serializerVersion, err)
 	}
 
 	// Now, parse the actual data in this row
-	objData, err := deserializeObject(ctx, slogger, srcReader)
+	dataRows, err := deserializeChromeRootValue(ctx, slogger, rootTag, srcReader)
 	if err != nil {
 		return nil, fmt.Errorf("decoding obj for indexeddb version %d and serializer version %d: %w", indexeddbVersion, serializerVersion, err)
 	}
 
-	return objData, nil
+	return dataRows, nil
+}
+
+// snappyDecompressedIfNeeded decompresses the payload if it is compressed with Snappy.
+// this is determined by the presence of the following sequence in the header payload:
+// 1) 0xFF - kVersionTag
+// 2) 0x11 - kRequiresProcessingSSVPseudoVersion
+// 3) 0x02 - kCompressedWithSnappy
+// 4) the compressed data
+func snappyDecompressedIfNeeded(payload []byte) ([]byte, error) {
+	if len(payload) >= 4 &&
+		payload[0] == tokenVersion &&
+		payload[1] == tokenRequiresProcessingSSVPseudoVersion &&
+		payload[2] == tokenCompressedWithSnappy {
+		decompressed, err := snappy.Decode(nil, payload[3:])
+		if err != nil {
+			return nil, fmt.Errorf("snappy decompress after Chrome FF/11/02 wrapper: %w", err)
+		}
+
+		if len(decompressed) == 0 {
+			return nil, errors.New("snappy decompression yielded empty data set")
+		}
+
+		return decompressed, nil
+	}
+
+	return payload, nil
 }
 
 // readHeader reads through the header bytes at the start of `srcReader`,
 // after reading the indexeddb version. The header usually contains
 // 0xff (tokenVersion), followed by the serializer version (a varint).
-// The end of the header is signaled by 0x6f (tokenObjectBegin) -- we stop
-// reading the header at this point.
-func readHeader(srcReader *bytes.Reader) (uint64, error) {
+// The end of the header is signaled by 0x6f (tokenObjectBegin), 0x41 (tokenBeginDenseArray), or 0x61 (tokenBeginSparseArray).
+// we stop reading the header at this point and return the serializer version and the root tag (next token for further consumption)
+func readHeader(srcReader *bytes.Reader) (uint64, byte, error) {
 	var serializerVersion uint64
+	var rootTag byte
 	for {
 		nextByte, err := srcReader.ReadByte()
 		if err != nil {
 			if err == io.EOF {
-				return serializerVersion, errors.New("unexpected EOF reading header")
+				return serializerVersion, rootTag, errors.New("unexpected EOF reading header")
 			}
-			return serializerVersion, fmt.Errorf("reading next byte in header: %w", err)
+			return serializerVersion, rootTag, fmt.Errorf("reading next byte in header: %w", err)
 		}
 
 		switch nextByte {
@@ -126,14 +172,59 @@ func readHeader(srcReader *bytes.Reader) (uint64, error) {
 			// before -- the last instance of the version token is the correct one.
 			serializerVersion, err = binary.ReadUvarint(srcReader)
 			if err != nil {
-				return serializerVersion, fmt.Errorf("decoding uint32 for version in header: %w", err)
+				return serializerVersion, rootTag, fmt.Errorf("decoding uint32 for version in header: %w", err)
 			}
-		case tokenObjectBegin:
+			// the following case should match any tokens that we support deserializing as the root value
+			// (see deserializeChromeRootValue)
+		case tokenObjectBegin, tokenBeginDenseArray, tokenBeginSparseArray, tokenArrayBuffer:
 			// Done reading header
-			return serializerVersion, nil
+			return serializerVersion, nextByte, nil
 		default:
 			// Padding -- ignore
 		}
+	}
+}
+
+// deserializeChromeRootValue deserializes the root value of a Chrome IndexedDB row.
+// It returns a slice of maps, one for each element in the root value. The root value can be an object, or an array.
+// If the root value is an object, it returns a slice with a single map with the object's properties.
+// If the root value is an array, it returns a slice with a map for each element in the array.
+func deserializeChromeRootValue(ctx context.Context, slogger *slog.Logger, rootTag byte, srcReader *bytes.Reader) ([]map[string][]byte, error) {
+	switch rootTag {
+	case tokenObjectBegin:
+		row, err := deserializeObject(ctx, slogger, srcReader)
+		if err != nil {
+			return []map[string][]byte{}, err
+		}
+		return []map[string][]byte{row}, nil
+	case tokenBeginDenseArray, tokenBeginSparseArray, tokenArrayBuffer:
+		arrBytes, err := deserializeNext(ctx, slogger, rootTag, srcReader)
+		if err != nil {
+			return nil, err
+		}
+		var elems []string
+		if err := json.Unmarshal(arrBytes, &elems); err != nil {
+			return nil, fmt.Errorf("unmarshaling root JS array wrapper: %w", err)
+		}
+		if len(elems) == 0 {
+			return []map[string][]byte{}, nil
+		}
+
+		dataRows := make([]map[string][]byte, len(elems))
+		for i, elem := range elems {
+			var arrItem map[string]string
+			if err := json.Unmarshal([]byte(elem), &arrItem); err != nil {
+				return nil, fmt.Errorf("unmarshaling array element as object: %w", err)
+			}
+			dataRows[i] = make(map[string][]byte, len(arrItem))
+			for k, v := range arrItem {
+				dataRows[i][k] = []byte(v)
+			}
+		}
+
+		return dataRows, nil
+	default:
+		return nil, fmt.Errorf("unsupported root serialized value tag 0x%02x / `%s` (expected object or array)", rootTag, string(rootTag))
 	}
 }
 

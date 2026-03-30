@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/observability"
 )
 
 type runtimeCheckup struct {
@@ -25,14 +26,23 @@ func (c *runtimeCheckup) Name() string {
 }
 
 func (c *runtimeCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
-	extraZip := zip.NewWriter(extraWriter)
-	defer extraZip.Close()
+	// Gather the data that we care about for all types of checkup runs
+	numGoroutine := runtime.NumGoroutine()
+	observability.GoroutineCountGauge.Record(ctx, int64(numGoroutine))
 
 	c.data = map[string]any{
-		"num_goroutine": runtime.NumGoroutine(),
+		"num_goroutine": numGoroutine,
 		"num_cgocall":   runtime.NumCgoCall(),
 		"gomaxprocs":    runtime.GOMAXPROCS(0),
 	}
+
+	// If we're running in the log checkpoint, don't generate extra files
+	if extraWriter == io.Discard {
+		return nil
+	}
+
+	extraZip := zip.NewWriter(extraWriter)
+	defer extraZip.Close()
 
 	if err := gatherMemStats(extraZip); err != nil {
 		return fmt.Errorf("gathering mem stats: %w", err)

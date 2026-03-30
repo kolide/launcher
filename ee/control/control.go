@@ -81,6 +81,8 @@ func New(k types.Knapsack, fetcher dataProvider, opts ...Option) *ControlService
 
 	// Observe ControlRequestInterval changes to know when to accelerate/decelerate fetching frequency
 	cs.knapsack.RegisterChangeObserver(cs, keys.ControlRequestInterval)
+	// Observe InModernStandby changes so that we can kick off a fresh Fetch request on modern standby exit
+	cs.knapsack.RegisterChangeObserver(cs, keys.InModernStandby)
 
 	return cs
 }
@@ -210,6 +212,16 @@ func (cs *ControlService) FlagsChanged(ctx context.Context, flagKeys ...keys.Fla
 	if slices.Contains(flagKeys, keys.ControlRequestInterval) {
 		cs.requestIntervalChanged(ctx, cs.knapsack.ControlRequestInterval())
 	}
+
+	// On modern standby exit, call Fetch in case we missed any data changes while in modern standby
+	if slices.Contains(flagKeys, keys.InModernStandby) && !cs.knapsack.InModernStandby() {
+		if err := cs.Fetch(ctx); err != nil {
+			cs.slogger.Log(ctx, slog.LevelWarn,
+				"failed to fetch data from control server after modern standby exit",
+				"err", err,
+			)
+		}
+	}
 }
 
 func (cs *ControlService) requestIntervalChanged(ctx context.Context, newInterval time.Duration) {
@@ -255,6 +267,12 @@ func (cs *ControlService) requestIntervalChanged(ctx context.Context, newInterva
 func (cs *ControlService) Fetch(ctx context.Context) error {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
+
+	// Skip control server requests while in modern standby -- we don't want to cause unnecessary work
+	// in the consumers during modern standby. We will queue up a new `Fetch` once we exit InModernStandby.
+	if cs.knapsack.InModernStandby() {
+		return nil
+	}
 
 	// Do not block in the case where:
 	// 1. `Start` called `Fetch` on an interval
