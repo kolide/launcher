@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -196,6 +197,67 @@ func TestSecretScan(t *testing.T) {
 				assert.False(t, foundFileNames[forbiddenFile],
 					"file %q should not have any findings", forbiddenFile)
 			}
+		})
+	}
+}
+
+func Test_FindingsToNames(t *testing.T) {
+	t.Parallel()
+
+	// Extract test data
+	projectDir := extractTestData(t)
+
+	mockQC := tablehelpers.MockQueryContext(map[string][]string{
+		"path": {filepath.Join(projectDir, "misc.env")},
+	})
+
+	tbl := &Table{
+		slogger: multislogger.NewNopLogger(),
+	}
+
+	results, err := tbl.generate(t.Context(), mockQC)
+	require.NoError(t, err)
+
+	// Filter down the results to only the columns we're testing against
+	desiredKeys := []string{"name", "rule_id", "line_number", "column_start"}
+	resultsFiltered := make([]map[string]string, len(results))
+
+	for i, row := range results {
+		resultsFiltered[i] = make(map[string]string, len(desiredKeys))
+		for k, v := range row {
+			if !slices.Contains(desiredKeys, k) {
+				continue
+			}
+			resultsFiltered[i][k] = v
+		}
+	}
+
+	// The goal here is to try to ensure that we get the right names back. Notably, that we get two blank
+	// names for the row that has two secrets. I've opted to do this by checking each line and column. Future
+	// libraries might change that, and require a different testing strategy.
+	tests := []map[string]string{
+		{"name": "CONFIG_KEY", "rule_id": "generic-api-key", "line_number": "2", "column_start": "2"},
+		{"name": "CONFIG_KEY2", "rule_id": "generic-api-key", "line_number": "3", "column_start": "2"},
+		{"name": "SPACE_KEY", "rule_id": "generic-api-key", "line_number": "6", "column_start": "2"},
+		{"name": "COLON_KEY", "rule_id": "generic-api-key", "line_number": "7", "column_start": "2"},
+		{"name": "figma_key", "rule_id": "generic-api-key", "line_number": "17", "column_start": "18"},
+		{"name": "BUNDLE_GEMS__CONTRIBSYS__COM", "rule_id": "sidekiq-secret", "line_number": "19", "column_start": "2"},
+		{"name": "NPM_TOKEN", "rule_id": "npm-access-token", "line_number": "18", "column_start": "13"},
+
+		// There are two secrets on line 14, but we expect name to be blank
+		{"name": "", "rule_id": "generic-api-key", "line_number": "14", "column_start": "2"},
+		{"name": "", "rule_id": "generic-api-key", "line_number": "14", "column_start": "152"},
+	}
+
+	// Make sure we covered all the test cases
+	require.Equal(t, len(tests), len(resultsFiltered))
+
+	for _, tt := range tests {
+		t.Run("", func(t *testing.T) {
+			t.Parallel()
+
+			require.Contains(t, resultsFiltered, tt)
+
 		})
 	}
 }
