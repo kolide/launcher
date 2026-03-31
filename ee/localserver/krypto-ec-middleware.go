@@ -117,7 +117,7 @@ func newKryptoEcMiddleware(slogger *slog.Logger, knapsack types.Knapsack,
 		flags:                                 knapsack,
 	}
 
-	gowrapper.Go(context.TODO(), slogger.With("subcomponent", "middleware_callback_worker"), func() {
+	gowrapper.Go(context.TODO(), k.slogger.With("subcomponent", "middleware_callback_worker"), func() {
 		k.callbackWorker()
 	})
 
