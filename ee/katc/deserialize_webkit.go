@@ -301,7 +301,7 @@ func (w *webkitDeserializer) readPoolIndex() (int, error) {
 func (w *webkitDeserializer) deserializeUint32() (uint32, error) {
 	var d uint32
 	if err := binary.Read(w.reader, binary.LittleEndian, &d); err != nil {
-		return 0, fmt.Errorf("decoding double: %w", err)
+		return 0, fmt.Errorf("decoding uint32: %w", err)
 	}
 	return d, nil
 }
