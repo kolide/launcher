@@ -53,28 +53,36 @@ func deserializeWebkit(ctx context.Context, slogger *slog.Logger, row map[string
 }
 
 const (
-	webkitArrayTag        = 1
-	webkitObjectTag       = 2
-	webkitUndefinedTag    = 3
-	webkitNullTag         = 4
-	webkitIntTag          = 5
-	webkitZeroTag         = 6
-	webkitOneTag          = 7
-	webkitFalseTag        = 8
-	webkitTrueTag         = 9
-	webkitDoubleTag       = 10
-	webkitDateTag         = 11
-	webkitFileTag         = 12
-	webkitFileListTag     = 13
-	webkitImageDataTag    = 14
-	webkitBlobTag         = 15
-	webkitStringTag       = 16
-	webkitNumberObjectTag = 28
-	webkitSetObjectTag    = 29
-	webkitMapObjectTag    = 30
+	webkitArrayTag             = 1
+	webkitObjectTag            = 2
+	webkitUndefinedTag         = 3
+	webkitNullTag              = 4
+	webkitIntTag               = 5
+	webkitZeroTag              = 6
+	webkitOneTag               = 7
+	webkitFalseTag             = 8
+	webkitTrueTag              = 9
+	webkitDoubleTag            = 10
+	webkitDateTag              = 11
+	webkitFileTag              = 12
+	webkitFileListTag          = 13
+	webkitImageDataTag         = 14
+	webkitBlobTag              = 15
+	webkitStringTag            = 16
+	webkitRegExpTag            = 18
+	webkitTrueObjectTag        = 24
+	webkitFalseObjectTag       = 25
+	webkitStringObjectTag      = 26
+	webkitEmptyStringObjectTag = 27
+	webkitNumberObjectTag      = 28
+	webkitSetObjectTag         = 29
+	webkitMapObjectTag         = 30
+	webkitNonMapPropertiesTag  = 31
+	webkitNonSetPropertiesTag  = 32
 
-	terminatorTag = 0xFFFFFFFF
-	stringPoolTag = 0xFFFFFFFE
+	terminatorTag         = 0xFFFFFFFF
+	stringPoolTag         = 0xFFFFFFFE
+	nonIndexPropertiesTag = 0xFFFFFFFD
 
 	stringDataIs8BitFlag = 0x80000000
 )
@@ -109,7 +117,7 @@ func (w *webkitDeserializer) Deserialize() ([]map[string][]byte, error) {
 		return nil, fmt.Errorf("expected top-level object, got %d tag", tag)
 	}
 
-	result, err := w.deserializeWebkitObject()
+	result, err := w.deserializeObject()
 	if err != nil {
 		return nil, fmt.Errorf("deserializing webkit object for version %d: %w", version, err)
 	}
@@ -118,7 +126,7 @@ func (w *webkitDeserializer) Deserialize() ([]map[string][]byte, error) {
 
 // deserializeObject deserializes the upcoming object, which takes the following format:
 // ObjectTag (<name:StringData><value:Value>)* TerminatorTag
-func (w *webkitDeserializer) deserializeWebkitObject() (map[string][]byte, error) {
+func (w *webkitDeserializer) deserializeObject() (map[string][]byte, error) {
 	obj := make(map[string][]byte)
 	// Read until we get the terminator tag
 	for {
@@ -152,13 +160,13 @@ func (w *webkitDeserializer) deserializeValue() ([]byte, error) {
 
 	switch tag {
 	case webkitArrayTag:
-		return nil, fmt.Errorf("deserializing arrays (tag %d) not yet supported", tag)
+		return w.deserializeArray()
 	case webkitObjectTag:
-		return w.deserializeNestedWebkitObject()
+		return w.deserializeNestedObject()
 	case webkitMapObjectTag:
-		return nil, fmt.Errorf("deserializing maps (tag %d) not yet supported", tag)
+		return w.deserializeMapData()
 	case webkitSetObjectTag:
-		return nil, fmt.Errorf("deserializing sets (tag %d) not yet supported", tag)
+		return w.deserializeSetData()
 	// Begin Terminal
 	case webkitUndefinedTag:
 		return []byte("undefined"), nil
@@ -174,9 +182,9 @@ func (w *webkitDeserializer) deserializeValue() ([]byte, error) {
 		return []byte("0"), nil
 	case webkitOneTag:
 		return []byte("1"), nil
-	case webkitFalseTag:
+	case webkitFalseTag, webkitFalseObjectTag:
 		return []byte("false"), nil
-	case webkitTrueTag:
+	case webkitTrueTag, webkitTrueObjectTag:
 		return []byte("true"), nil
 	case webkitDateTag, webkitNumberObjectTag, webkitDoubleTag:
 		return w.deserializeDouble()
@@ -186,12 +194,16 @@ func (w *webkitDeserializer) deserializeValue() ([]byte, error) {
 		return nil, fmt.Errorf("deserializing images (tag %d) not yet supported", tag)
 	case webkitBlobTag:
 		return nil, fmt.Errorf("deserializing blobs (tag %d) not yet supported", tag)
-	case webkitStringTag:
+	case webkitStringTag, webkitStringObjectTag:
 		str, _, err := w.deserializeStringData()
 		if err != nil {
-			return nil, fmt.Errorf("deserializing StringData following StringTag: %w", err)
+			return nil, fmt.Errorf("deserializing StringData following tag %d: %w", tag, err)
 		}
 		return str, nil
+	case webkitRegExpTag:
+		return w.deserializeRegexp()
+	case webkitEmptyStringObjectTag:
+		return []byte(""), nil
 	default:
 		return nil, fmt.Errorf("value tag %d not yet supported", tag)
 	}
@@ -199,17 +211,187 @@ func (w *webkitDeserializer) deserializeValue() ([]byte, error) {
 
 // deserializeObject deserializes the upcoming object, which takes the following format:
 // ObjectTag (<name:StringData><value:Value>)* TerminatorTag
-func (w *webkitDeserializer) deserializeNestedWebkitObject() ([]byte, error) {
-	obj, err := w.deserializeWebkitObject()
+func (w *webkitDeserializer) deserializeNestedObject() ([]byte, error) {
+	nestedObj, err := w.deserializeObject()
 	if err != nil {
 		return nil, fmt.Errorf("deserializing nested object: %w", err)
 	}
 
-	rawObj, err := json.Marshal(obj)
+	// Make nested object values readable -- cast []byte to string
+	readableNestedObj := make(map[string]string)
+	for k, v := range nestedObj {
+		readableNestedObj[k] = string(v)
+	}
+
+	rawObj, err := json.Marshal(readableNestedObj)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling object after deserializing: %w", err)
 	}
 	return rawObj, nil
+}
+
+// deserializeArray handles the upcoming array, which takes the following format:
+// <length:uint32_t>(<index:uint32_t><value:Value>)* TerminatorTag (NonIndexPropertiesTag (<name:StringData><value:Value>)*) TerminatorTag
+func (w *webkitDeserializer) deserializeArray() ([]byte, error) {
+	arrayLength, err := w.deserializeUint32()
+	if err != nil {
+		return nil, fmt.Errorf("reading array length: %w", err)
+	}
+
+	resultArr := make([]string, arrayLength)
+	for {
+		currentIdx, err := w.deserializeUint32()
+		if err != nil {
+			return nil, fmt.Errorf("deserializing next index in array: %w", err)
+		}
+		if currentIdx == terminatorTag {
+			break
+		}
+
+		if currentIdx >= arrayLength {
+			return nil, fmt.Errorf("got unexpected index %d for array with length %d", int(currentIdx), arrayLength)
+		}
+
+		currentValue, err := w.deserializeValue()
+		if err != nil {
+			return nil, fmt.Errorf("deserializing next Value in array at index %d: %w", int(currentIdx), err)
+		}
+		// We want to use currentIdx, rather than i, to handle sparse arrays where not every index
+		// necessarily has a value.
+		resultArr[currentIdx] = string(currentValue) // cast to string so it's readable when marshalled again below
+	}
+
+	// After the array may be array properties. We don't care about these, but will want to read them
+	// to advance to the next value we DO care about.
+	propertiesStartTag, err := w.deserializeUint32()
+	if err != nil {
+		return nil, fmt.Errorf("reading properties tag after array: %w", err)
+	}
+	if propertiesStartTag == nonIndexPropertiesTag {
+		if err := w.readAndDiscardProperties(); err != nil {
+			return nil, fmt.Errorf("reading array properties after array: %w", err)
+		}
+	} else if propertiesStartTag != terminatorTag {
+		return nil, fmt.Errorf("expected tag after array terminator to be properties start tag or another terminator tag, but got %d", propertiesStartTag)
+	}
+
+	arrBytes, err := json.Marshal(resultArr)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling array: %w", err)
+	}
+
+	return arrBytes, nil
+}
+
+func (w *webkitDeserializer) readAndDiscardProperties() error {
+	// Read until we get the terminator tag
+	for {
+		// First is the property name, which is a StringData.
+		propName, receivedTerminator, err := w.deserializeStringData()
+		if err != nil {
+			return fmt.Errorf("deserializing property name: %w", err)
+		}
+		if receivedTerminator {
+			break
+		}
+
+		if _, err := w.deserializeValue(); err != nil {
+			return fmt.Errorf("deserializing value for property name %s: %w", string(propName), err)
+		}
+	}
+	return nil
+}
+
+// deserializeMapData deserializes the upcoming MapData.
+// MapData takes the following format:
+// (<key:Value><value:Value>)* NonMapPropertiesTag (<name:StringData><value:Value>)* TerminatorTag
+func (w *webkitDeserializer) deserializeMapData() ([]byte, error) {
+	mapObject := make(map[string]string)
+
+	// Read until we hit webkitNonMapPropertiesTag
+	for {
+		// First, peek ahead
+		nextTag, err := w.reader.ReadByte()
+		if err != nil {
+			return nil, fmt.Errorf("reading next tag in map: %w", err)
+		}
+		if nextTag == webkitNonMapPropertiesTag {
+			break
+		}
+
+		// Not done reading map yet -- unread the byte
+		if err := w.reader.UnreadByte(); err != nil {
+			return nil, fmt.Errorf("unreading byte after peeking ahead in map: %w", err)
+		}
+
+		// Read the key
+		keyRaw, err := w.deserializeValue()
+		if err != nil {
+			return nil, fmt.Errorf("reading next key in map: %w", err)
+		}
+		key := string(keyRaw)
+
+		// Read the value
+		valueRaw, err := w.deserializeValue()
+		if err != nil {
+			return nil, fmt.Errorf("reading next value in map for key %s: %w", key, err)
+		}
+		mapObject[key] = string(valueRaw)
+	}
+
+	if err := w.readAndDiscardProperties(); err != nil {
+		return nil, fmt.Errorf("reading map properties after map: %w", err)
+	}
+
+	resultObj, err := json.Marshal(mapObject)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling map: %w", err)
+	}
+
+	return resultObj, nil
+}
+
+// deserializeSetData deserializes the upcoming SetData.
+// SetData takes the following format:
+// (<key:Value>)* NonSetPropertiesTag (<name:StringData><value:Value>)* TerminatorTag
+func (w *webkitDeserializer) deserializeSetData() ([]byte, error) {
+	setObject := make(map[string]struct{})
+
+	// Read until we hit webkitNonSetPropertiesTag
+	for {
+		// First, peek ahead
+		nextTag, err := w.reader.ReadByte()
+		if err != nil {
+			return nil, fmt.Errorf("reading next tag in set: %w", err)
+		}
+		if nextTag == webkitNonSetPropertiesTag {
+			break
+		}
+
+		// Not done reading set yet -- unread the byte
+		if err := w.reader.UnreadByte(); err != nil {
+			return nil, fmt.Errorf("unreading byte after peeking ahead in set: %w", err)
+		}
+
+		// Read the key
+		keyRaw, err := w.deserializeValue()
+		if err != nil {
+			return nil, fmt.Errorf("reading next key in set: %w", err)
+		}
+
+		setObject[string(keyRaw)] = struct{}{}
+	}
+
+	if err := w.readAndDiscardProperties(); err != nil {
+		return nil, fmt.Errorf("reading set properties after set: %w", err)
+	}
+
+	resultObj, err := json.Marshal(setObject)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling set: %w", err)
+	}
+
+	return resultObj, nil
 }
 
 // deserializeStringData handles the upcoming StringData.
@@ -332,4 +514,23 @@ func (w *webkitDeserializer) deserializeDouble() ([]byte, error) {
 		return nil, fmt.Errorf("decoding double: %w", err)
 	}
 	return []byte(strconv.FormatFloat(d, 'f', -1, 64)), nil
+}
+
+// deserializeRegexp deserializes the upcoming regexp, which takes the following format:
+// <pattern:StringData><flags:StringData>
+func (w *webkitDeserializer) deserializeRegexp() ([]byte, error) {
+	pattern, _, err := w.deserializeStringData()
+	if err != nil {
+		return nil, fmt.Errorf("deserializing pattern in regexp: %w", err)
+	}
+	flags, _, err := w.deserializeStringData()
+	if err != nil {
+		return nil, fmt.Errorf("deserializing flags in regexp: %w", err)
+	}
+
+	regexFull := append([]byte("/"), pattern...)
+	regexFull = append(regexFull, []byte("/")...)
+	regexFull = append(regexFull, flags...)
+
+	return regexFull, nil
 }

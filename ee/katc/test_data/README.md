@@ -19,7 +19,7 @@ cd .. && zip -r test_data/indexeddbs/bytewise.leveldb.zip test_data/bytewise_lev
 
 ## Instructions for generating new test IndexedDBs
 
-Edit [main.js](./main.js) as desired. Open [index.html](./index.html) using Chrome or Firefox,
+Edit [main.js](./main.js) as desired. Open [index.html](./index.html) using Chrome, Firefox, or Safari,
 depending on the desired outcome.
 
 Loading the page will populate IndexedDB with the desired data. You should also see a
@@ -31,8 +31,12 @@ can be found at `/Users/<my-username>/Library/Application Support/Google/Chrome/
 matches in Dev Tools in your browser by going to Application => IndexedDB => launchertestdb.)
 On macOS, Firefox sqlite files can be found at a path similar to this one:
 `/Users/<your-username>/Library/Application Support/Firefox/Profiles/*.default*/storage/default/file++++*+launcher+ee+katc+test_data+index.html/idb/*.sqlite`.
+On macOS, Safari sqlite files can be found at a path similar to this one: `/Users/<my-username>/Library/Containers/com.apple.Safari/Data/Library/WebKit/WebsiteData/Default/*/*/IndexedDB/*/IndexedDB.sqlite3`.
+The path is random, so check the mod time for the file to determine which one you just modified.
+Unless your Terminal has FDA, you will need to find this file via Finder.
 
-Zip the .indexeddb.leveldb directory (for Chrome) or the .sqlite file (for Firefox),
+Zip the .indexeddb.leveldb directory (for Chrome) or the .sqlite file (for Firefox)
+or the .sqlite3 file (for Safari), using `zip` on the command-line, and
 then move the zipped file to [indexeddbs](./indexeddbs). You can then reference this file
 in the indexeddb tests.
 
@@ -60,6 +64,7 @@ The exact deserialization process differs a bit between the two browsers, but in
 
 For Chrome, review the code [here](https://github.com/v8/v8/blob/master/src/objects/value-serializer.cc).
 For Firefox, review the code [here](https://searchfox.org/mozilla-central/source/js/src/vm/StructuredClone.cpp).
+For Safari, review the code [here](https://github.com/WebKit/WebKit/blob/main/Source/WebCore/bindings/js/SerializedScriptValue.cpp).
 
 ### Most likely parsing issues
 
@@ -92,3 +97,4 @@ databases in order to test your fixes.
 * [Helpful tutorial for working with the IndexedDB API](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API/Using_IndexedDB)
 * [Chrome serialization code](https://github.com/v8/v8/blob/master/src/objects/value-serializer.cc)
 * [Firefox serialization code](https://searchfox.org/mozilla-central/source/js/src/vm/StructuredClone.cpp)
+* [Safari serialization code](https://github.com/WebKit/WebKit/blob/main/Source/WebCore/bindings/js/SerializedScriptValue.cpp)
