@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -15,11 +16,15 @@ import (
 	"github.com/kolide/goleveldb/leveldb/opt"
 	"github.com/kolide/launcher/v2/ee/indexeddb"
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/pkg/threadsafebuffer"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/stretchr/testify/require"
 
 	_ "modernc.org/sqlite"
 )
+
+//go:embed test_data/indexeddbs/IndexedDB.sqlite3.zip
+var basicWebkitIndexeddb []byte
 
 //go:embed test_data/indexeddbs/1985929987lbadutnscehter.sqlite.zip
 var basicFirefoxIndexeddb []byte
@@ -29,6 +34,154 @@ var basicChromeIndexeddb []byte
 
 //go:embed test_data/indexeddbs/bytewise.leveldb.zip
 var bytewiseLeveldb []byte
+
+func TestQuerySafariIndexedDB(t *testing.T) {
+	t.Parallel()
+
+	// This test validates generation of table results. It uses a sqlite-backed
+	// WebKit IndexedDB as a source, which means it also exercises functionality from
+	// sqlite.go and deserialize_webkit.go.
+
+	for _, tt := range []struct {
+		fileName     string
+		objStoreName string
+		expectedRows int
+		zipBytes     []byte
+	}{
+		{
+			fileName:     "IndexedDB.sqlite3.zip",
+			objStoreName: "launchertestobjstore",
+			expectedRows: 2,
+			zipBytes:     basicWebkitIndexeddb,
+		},
+	} {
+		t.Run(tt.fileName, func(t *testing.T) {
+			t.Parallel()
+
+			// Write zip bytes to file
+			tempDir := t.TempDir()
+			zipFile := filepath.Join(tempDir, tt.fileName)
+			require.NoError(t, os.WriteFile(zipFile, tt.zipBytes, 0755), "writing zip to temp dir")
+
+			// Unzip to file in temp dir
+			indexeddbDest := strings.TrimSuffix(zipFile, ".zip")
+			zipReader, err := zip.OpenReader(zipFile)
+			require.NoError(t, err, "opening reader to zip file")
+			defer zipReader.Close()
+			for _, fileInZip := range zipReader.File {
+				unzipFile(t, fileInZip, tempDir)
+			}
+
+			// Construct table
+			sourceQuery := fmt.Sprintf(`
+SELECT QUOTE(Records.value) AS data FROM Records
+JOIN ObjectStoreInfo ON (Records.objectStoreID = ObjectStoreInfo.id)
+WHERE ObjectStoreInfo.name = '%s';
+`, tt.objStoreName)
+			cfg := katcTableConfig{
+				Columns: []string{
+					"uuid", "name", "version", "preferences", "flags", "aliases",
+					"linkedIds", "anotherSparseArray", "someDetails", "noDetails",
+					"numArray", "email", "someTimestamp", "someDate", "someMap",
+					"someComplexMap", "someSet", "someRegex", "someStringObject",
+					"someNumberObject", "someDouble", "someBoolean", "someTypedArray",
+					"someArrayBuffer", "anotherTypedArray", "yetAnotherTypedArray",
+					"basicError", "evalError", "rangeError", "referenceError",
+					"syntaxError", "typeError", "uriError", "errorWithCause",
+				},
+				katcTableDefinition: katcTableDefinition{
+					SourceType: &katcSourceType{
+						name:     sqliteSourceType,
+						dataFunc: sqliteData,
+					},
+					SourcePaths: &[]string{filepath.Join("some", "incorrect", "path")},
+					SourceQuery: &sourceQuery,
+					RowTransformSteps: &[]rowTransformStep{
+						{
+							name:          deserializeWebkitTransformStep,
+							transformFunc: deserializeWebkit,
+						},
+					},
+				},
+				Overlays: []katcTableConfigOverlay{
+					{
+						Filters: map[string]string{
+							"goos": runtime.GOOS,
+						},
+						katcTableDefinition: katcTableDefinition{
+							SourcePaths: &[]string{indexeddbDest}, // All sqlite files in the test directory
+						},
+					},
+				},
+			}
+			var logBytes threadsafebuffer.ThreadSafeBuffer
+			slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+				Level: slog.LevelDebug,
+			}))
+			testTable, _ := newKatcTable("test_katc_table", cfg, slogger)
+
+			// Make a query context restricting the source to our exact source sqlite database
+			queryContext := table.QueryContext{
+				Constraints: map[string]table.ConstraintList{
+					pathColumnName: {
+						Constraints: []table.Constraint{
+							{
+								Operator:   table.OperatorEquals,
+								Expression: indexeddbDest,
+							},
+						},
+					},
+				},
+			}
+
+			// At long last: run a query
+			results, err := testTable.generate(t.Context(), queryContext)
+			require.NoError(t, err, "expected no error on generate: logs:", logBytes.String())
+
+			// We should have the expected number of results in the row
+			require.Equal(t, tt.expectedRows, len(results), "unexpected number of rows returned: logs:", logBytes.String())
+
+			// In the TestQueryFirefoxIndexedDB function, add these require statements inside the for loop that checks columns
+			for i := 0; i < tt.expectedRows; i += 1 {
+				require.Contains(t, results[i], pathColumnName, "missing source column")
+				require.Equal(t, indexeddbDest, results[i][pathColumnName])
+				require.Contains(t, results[i], "uuid", "expected uuid column missing")
+				require.Contains(t, results[i], "name", "expected name column missing")
+				require.Contains(t, results[i], "version", "expected version column missing")
+				require.Contains(t, results[i], "preferences", "expected preferences column missing")
+				require.Contains(t, results[i], "flags", "expected flags column missing")
+				require.Contains(t, results[i], "aliases", "expected aliases column missing")
+				require.Contains(t, results[i], "linkedIds", "expected linkedIds column missing")
+				require.Contains(t, results[i], "anotherSparseArray", "expected anotherSparseArray column missing")
+				require.Contains(t, results[i], "someDetails", "expected someDetails column missing")
+				require.Contains(t, results[i], "noDetails", "expected noDetails column missing")
+				require.Contains(t, results[i], "numArray", "expected numArray column missing")
+				require.Contains(t, results[i], "email", "expected email column missing")
+				require.Contains(t, results[i], "someTimestamp", "expected someTimestamp column missing")
+				require.Contains(t, results[i], "someDate", "expected someDate column missing")
+				require.Contains(t, results[i], "someMap", "expected someMap column missing")
+				require.Contains(t, results[i], "someComplexMap", "expected someComplexMap column missing")
+				require.Contains(t, results[i], "someRegex", "expected someRegex column missing")
+				require.Contains(t, results[i], "someStringObject", "expected someStringObject column missing")
+				require.Contains(t, results[i], "someNumberObject", "expected someNumberObject column missing")
+				require.Contains(t, results[i], "someDouble", "expected someDouble column missing")
+				require.Contains(t, results[i], "someBoolean", "expected someBoolean column missing")
+				require.Contains(t, results[i], "someTypedArray", "expected someTypedArray column missing")
+				require.Contains(t, results[i], "someArrayBuffer", "expected someArrayBuffer column missing")
+				require.Contains(t, results[i], "anotherTypedArray", "expected anotherTypedArray column missing")
+				require.Contains(t, results[i], "yetAnotherTypedArray", "expected yetAnotherTypedArray column missing")
+				require.Contains(t, results[i], "basicError", "expected basicError column missing")
+				require.Contains(t, results[i], "evalError", "expected evalError column missing")
+				require.Contains(t, results[i], "rangeError", "expected rangeError column missing")
+				require.Contains(t, results[i], "referenceError", "expected referenceError column missing")
+				require.Contains(t, results[i], "syntaxError", "expected syntaxError column missing")
+				require.Contains(t, results[i], "typeError", "expected typeError column missing")
+				require.Contains(t, results[i], "uriError", "expected uriError column missing")
+				require.Contains(t, results[i], "errorWithCause", "expected errorWithCause column missing")
+			}
+		})
+	}
+}
 
 func TestQueryFirefoxIndexedDB(t *testing.T) {
 	t.Parallel()
