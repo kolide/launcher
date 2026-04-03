@@ -82,6 +82,7 @@ const (
 	zstdDecodeTransformStep         = "zstd"
 	deserializeFirefoxTransformStep = "deserialize_firefox"
 	deserializeChromeTransformStep  = "deserialize_chrome"
+	deserializeWebkitTransformStep  = "deserialize_webkit"
 	camelToSnakeTransformStep       = "camel_to_snake"
 	utf16DecodeTransformStep        = "utf16_decode"
 )
@@ -117,6 +118,10 @@ func (r *rowTransformStep) UnmarshalJSON(data []byte) error {
 	case deserializeChromeTransformStep:
 		r.name = deserializeChromeTransformStep
 		r.transformFunc = indexeddb.DeserializeChrome
+		return nil
+	case deserializeWebkitTransformStep:
+		r.name = deserializeWebkitTransformStep
+		r.transformFunc = deserializeWebkit
 		return nil
 	case camelToSnakeTransformStep:
 		r.name = camelToSnakeTransformStep
