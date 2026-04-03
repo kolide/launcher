@@ -73,8 +73,9 @@ const (
 	webkitSetObjectTag    = 29
 	webkitMapObjectTag    = 30
 
-	terminatorTag = 0xFFFFFFFF
-	stringPoolTag = 0xFFFFFFFE
+	terminatorTag         = 0xFFFFFFFF
+	stringPoolTag         = 0xFFFFFFFE
+	nonIndexPropertiesTag = 0xFFFFFFFD
 
 	stringDataIs8BitFlag = 0x80000000
 )
@@ -152,7 +153,7 @@ func (w *webkitDeserializer) deserializeValue() ([]byte, error) {
 
 	switch tag {
 	case webkitArrayTag:
-		return nil, fmt.Errorf("deserializing arrays (tag %d) not yet supported", tag)
+		return w.deserializeArray()
 	case webkitObjectTag:
 		return w.deserializeNestedWebkitObject()
 	case webkitMapObjectTag:
@@ -210,6 +211,78 @@ func (w *webkitDeserializer) deserializeNestedWebkitObject() ([]byte, error) {
 		return nil, fmt.Errorf("marshalling object after deserializing: %w", err)
 	}
 	return rawObj, nil
+}
+
+// deserializeArray handles the upcoming array, which takes the following format:
+// <length:uint32_t>(<index:uint32_t><value:Value>)* TerminatorTag (NonIndexPropertiesTag (<name:StringData><value:Value>)*) TerminatorTag
+func (w *webkitDeserializer) deserializeArray() ([]byte, error) {
+	arrayLength, err := w.deserializeUint32()
+	if err != nil {
+		return nil, fmt.Errorf("reading array length: %w", err)
+	}
+
+	resultArr := make([]any, arrayLength)
+	for {
+		currentIdx, err := w.deserializeUint32()
+		if err != nil {
+			return nil, fmt.Errorf("deserializing next index in array: %w", err)
+		}
+		if currentIdx == terminatorTag {
+			break
+		}
+
+		if currentIdx >= arrayLength {
+			return nil, fmt.Errorf("got unexpected index %d for array with length %d", int(currentIdx), arrayLength)
+		}
+
+		currentValue, err := w.deserializeValue()
+		if err != nil {
+			return nil, fmt.Errorf("deserializing next Value in array at index %d: %w", int(currentIdx), err)
+		}
+		// We want to use currentIdx, rather than i, to handle sparse arrays where not every index
+		// necessarily has a value.
+		resultArr[currentIdx] = string(currentValue) // cast to string so it's readable when marshalled again below
+	}
+
+	// After the array may be array properties. We don't care about these, but will want to read them
+	// to advance to the next value we DO care about.
+	propertiesStartTag, err := w.deserializeUint32()
+	if err != nil {
+		return nil, fmt.Errorf("reading properties tag after array: %w", err)
+	}
+	if propertiesStartTag == nonIndexPropertiesTag {
+		if err := w.readAndDiscardArrayProperties(); err != nil {
+			return nil, fmt.Errorf("reading array properties after array: %w", err)
+		}
+	} else if propertiesStartTag != terminatorTag {
+		return nil, fmt.Errorf("expected tag after array terminator to be properties start tag or another terminator tag, but got %d", propertiesStartTag)
+	}
+
+	arrBytes, err := json.Marshal(resultArr)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling array: %w", err)
+	}
+
+	return arrBytes, nil
+}
+
+func (w *webkitDeserializer) readAndDiscardArrayProperties() error {
+	// Read until we get the terminator tag
+	for {
+		// First is the property name, which is a StringData.
+		propName, receivedTerminator, err := w.deserializeStringData()
+		if err != nil {
+			return fmt.Errorf("deserializing property name: %w", err)
+		}
+		if receivedTerminator {
+			break
+		}
+
+		if _, err := w.deserializeValue(); err != nil {
+			return fmt.Errorf("deserializing value for property name %s: %w", string(propName), err)
+		}
+	}
+	return nil
 }
 
 // deserializeStringData handles the upcoming StringData.
