@@ -69,6 +69,7 @@ const (
 	webkitImageDataTag        = 14
 	webkitBlobTag             = 15
 	webkitStringTag           = 16
+	webkitRegExpTag           = 18
 	webkitNumberObjectTag     = 28
 	webkitSetObjectTag        = 29
 	webkitMapObjectTag        = 30
@@ -195,6 +196,8 @@ func (w *webkitDeserializer) deserializeValue() ([]byte, error) {
 			return nil, fmt.Errorf("deserializing StringData following StringTag: %w", err)
 		}
 		return str, nil
+	case webkitRegExpTag:
+		return w.deserializeRegexp()
 	default:
 		return nil, fmt.Errorf("value tag %d not yet supported", tag)
 	}
@@ -505,4 +508,23 @@ func (w *webkitDeserializer) deserializeDouble() ([]byte, error) {
 		return nil, fmt.Errorf("decoding double: %w", err)
 	}
 	return []byte(strconv.FormatFloat(d, 'f', -1, 64)), nil
+}
+
+// deserializeRegexp deserializes the upcoming regexp, which takes the following format:
+// <pattern:StringData><flags:StringData>
+func (w *webkitDeserializer) deserializeRegexp() ([]byte, error) {
+	pattern, _, err := w.deserializeStringData()
+	if err != nil {
+		return nil, fmt.Errorf("deserializing pattern in regexp: %w", err)
+	}
+	flags, _, err := w.deserializeStringData()
+	if err != nil {
+		return nil, fmt.Errorf("deserializing flags in regexp: %w", err)
+	}
+
+	regexFull := append([]byte("/"), pattern...)
+	regexFull = append(regexFull, []byte("/")...)
+	regexFull = append(regexFull, flags...)
+
+	return regexFull, nil
 }
