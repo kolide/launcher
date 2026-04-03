@@ -238,7 +238,7 @@ func (w *webkitDeserializer) deserializeArray() ([]byte, error) {
 		return nil, fmt.Errorf("reading array length: %w", err)
 	}
 
-	resultArr := make([]any, arrayLength)
+	resultArr := make([]string, arrayLength)
 	for {
 		currentIdx, err := w.deserializeUint32()
 		if err != nil {
