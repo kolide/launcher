@@ -81,13 +81,13 @@ const (
 
 type webkitDeserializer struct {
 	reader     *bytes.Reader
-	stringPool []string // maintain reference to seen/deserialized strings
+	stringPool [][]byte // maintain reference to seen and deserialized strings
 }
 
 func newWebkitDeserializer(src []byte) *webkitDeserializer {
 	return &webkitDeserializer{
 		reader:     bytes.NewReader(src),
-		stringPool: make([]string, 0),
+		stringPool: make([][]byte, 0),
 	}
 }
 
@@ -236,7 +236,7 @@ func (w *webkitDeserializer) deserializeStringData() ([]byte, bool, error) {
 		if idx >= len(w.stringPool) {
 			return nil, false, fmt.Errorf("requested string at index %d but only %d items in string pool", idx, len(w.stringPool))
 		}
-		return []byte(w.stringPool[idx]), false, nil
+		return w.stringPool[idx], false, nil
 	}
 
 	// This uint32 instead indicates string metadata -- extract it.
@@ -269,7 +269,7 @@ func (w *webkitDeserializer) deserializeStringData() ([]byte, bool, error) {
 		return nil, false, fmt.Errorf("decoding: %w", err)
 	}
 
-	w.stringPool = append(w.stringPool, string(decoded))
+	w.stringPool = append(w.stringPool, decoded)
 
 	return decoded, false, nil
 }
