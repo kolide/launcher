@@ -53,28 +53,30 @@ func deserializeWebkit(ctx context.Context, slogger *slog.Logger, row map[string
 }
 
 const (
-	webkitArrayTag            = 1
-	webkitObjectTag           = 2
-	webkitUndefinedTag        = 3
-	webkitNullTag             = 4
-	webkitIntTag              = 5
-	webkitZeroTag             = 6
-	webkitOneTag              = 7
-	webkitFalseTag            = 8
-	webkitTrueTag             = 9
-	webkitDoubleTag           = 10
-	webkitDateTag             = 11
-	webkitFileTag             = 12
-	webkitFileListTag         = 13
-	webkitImageDataTag        = 14
-	webkitBlobTag             = 15
-	webkitStringTag           = 16
-	webkitRegExpTag           = 18
-	webkitNumberObjectTag     = 28
-	webkitSetObjectTag        = 29
-	webkitMapObjectTag        = 30
-	webkitNonMapPropertiesTag = 31
-	webkitNonSetPropertiesTag = 32
+	webkitArrayTag             = 1
+	webkitObjectTag            = 2
+	webkitUndefinedTag         = 3
+	webkitNullTag              = 4
+	webkitIntTag               = 5
+	webkitZeroTag              = 6
+	webkitOneTag               = 7
+	webkitFalseTag             = 8
+	webkitTrueTag              = 9
+	webkitDoubleTag            = 10
+	webkitDateTag              = 11
+	webkitFileTag              = 12
+	webkitFileListTag          = 13
+	webkitImageDataTag         = 14
+	webkitBlobTag              = 15
+	webkitStringTag            = 16
+	webkitRegExpTag            = 18
+	webkitStringObjectTag      = 26
+	webkitEmptyStringObjectTag = 27
+	webkitNumberObjectTag      = 28
+	webkitSetObjectTag         = 29
+	webkitMapObjectTag         = 30
+	webkitNonMapPropertiesTag  = 31
+	webkitNonSetPropertiesTag  = 32
 
 	terminatorTag         = 0xFFFFFFFF
 	stringPoolTag         = 0xFFFFFFFE
@@ -190,14 +192,16 @@ func (w *webkitDeserializer) deserializeValue() ([]byte, error) {
 		return nil, fmt.Errorf("deserializing images (tag %d) not yet supported", tag)
 	case webkitBlobTag:
 		return nil, fmt.Errorf("deserializing blobs (tag %d) not yet supported", tag)
-	case webkitStringTag:
+	case webkitStringTag, webkitStringObjectTag:
 		str, _, err := w.deserializeStringData()
 		if err != nil {
-			return nil, fmt.Errorf("deserializing StringData following StringTag: %w", err)
+			return nil, fmt.Errorf("deserializing StringData following tag %d: %w", tag, err)
 		}
 		return str, nil
 	case webkitRegExpTag:
 		return w.deserializeRegexp()
+	case webkitEmptyStringObjectTag:
+		return []byte(""), nil
 	default:
 		return nil, fmt.Errorf("value tag %d not yet supported", tag)
 	}
