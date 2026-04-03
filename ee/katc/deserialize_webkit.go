@@ -229,14 +229,11 @@ func (w *webkitDeserializer) deserializeStringData() ([]byte, bool, error) {
 
 	// Retrieve the string from our string pool -- we've seen it and stored it already.
 	if nextTag == stringPoolTag {
-		idx, err := w.readPoolIndex()
+		str, err := w.stringFromStringPool()
 		if err != nil {
-			return nil, false, fmt.Errorf("reading string pool index: %w", err)
+			return nil, false, fmt.Errorf("reading from string pool after string pool tag: %w", err)
 		}
-		if idx >= len(w.stringPool) {
-			return nil, false, fmt.Errorf("requested string at index %d but only %d items in string pool", idx, len(w.stringPool))
-		}
-		return w.stringPool[idx], false, nil
+		return str, false, nil
 	}
 
 	// This uint32 instead indicates string metadata -- extract it.
@@ -269,33 +266,56 @@ func (w *webkitDeserializer) deserializeStringData() ([]byte, bool, error) {
 		return nil, false, fmt.Errorf("decoding: %w", err)
 	}
 
+	// Now that we've seen this string for the first time, add it to our string pool
 	w.stringPool = append(w.stringPool, decoded)
 
 	return decoded, false, nil
 }
 
-// readPoolIndex reads the pool index, which is stored in 1, 2, or 4 bytes,
-// depending on the current size of the string pool.
-func (w *webkitDeserializer) readPoolIndex() (int, error) {
+// stringFromStringPool retrieves a string from the string pool, given the upcoming
+// string pool index. When serializing, the serializer maintains an indexed pool
+// of strings that it has seen. If it encounters a string to serialize that it has seen before,
+// instead of re-serializing that value, it will write stringPoolTag and then the pool index.
+// For example:
+//
+//	{
+//	   "id": "abc",
+//	   "uuid": "abc"
+//	}
+//
+// The serializer will serialize "id" and store it in the pool at index 0, then "abc" and store it
+// in the pool at index 1, then "uuid" and store it in the pool at index 2. When it reaches the second
+// "abc", since it's been seen before, it will instead write out stringPoolTag and then 1.
+func (w *webkitDeserializer) stringFromStringPool() ([]byte, error) {
+	// First, read in the index. The pool index is stored in 1, 2, or 4 bytes,
+	// depending on the current size of the string pool.
+	var idx int
 	if len(w.stringPool) <= 255 {
 		var i uint8
 		if err := binary.Read(w.reader, binary.LittleEndian, &i); err != nil {
-			return 0, fmt.Errorf("reading uint8 index tag: %w", err)
+			return nil, fmt.Errorf("reading uint8 index tag: %w", err)
 		}
-		return int(i), nil
+		idx = int(i)
 	} else if len(w.stringPool) <= 65535 {
 		var i uint16
 		if err := binary.Read(w.reader, binary.LittleEndian, &i); err != nil {
-			return 0, fmt.Errorf("reading uint16 index tag: %w", err)
+			return nil, fmt.Errorf("reading uint16 index tag: %w", err)
 		}
-		return int(i), nil
+		idx = int(i)
 	} else {
 		var i uint32
 		if err := binary.Read(w.reader, binary.LittleEndian, &i); err != nil {
-			return 0, fmt.Errorf("reading uint32 index tag: %w", err)
+			return nil, fmt.Errorf("reading uint32 index tag: %w", err)
 		}
-		return int(i), nil
+		idx = int(i)
 	}
+
+	if idx >= len(w.stringPool) {
+		return nil, fmt.Errorf("requested string at index %d but only %d items in string pool", idx, len(w.stringPool))
+	}
+
+	// Retrieve the string from the pool
+	return w.stringPool[idx], nil
 }
 
 func (w *webkitDeserializer) deserializeUint32() (uint32, error) {
