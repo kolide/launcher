@@ -110,7 +110,7 @@ func (w *webkitDeserializer) Deserialize() ([]map[string][]byte, error) {
 		return nil, fmt.Errorf("expected top-level object, got %d tag", tag)
 	}
 
-	result, err := w.deserializeWebkitObject()
+	result, err := w.deserializeObject()
 	if err != nil {
 		return nil, fmt.Errorf("deserializing webkit object for version %d: %w", version, err)
 	}
@@ -119,7 +119,7 @@ func (w *webkitDeserializer) Deserialize() ([]map[string][]byte, error) {
 
 // deserializeObject deserializes the upcoming object, which takes the following format:
 // ObjectTag (<name:StringData><value:Value>)* TerminatorTag
-func (w *webkitDeserializer) deserializeWebkitObject() (map[string][]byte, error) {
+func (w *webkitDeserializer) deserializeObject() (map[string][]byte, error) {
 	obj := make(map[string][]byte)
 	// Read until we get the terminator tag
 	for {
@@ -155,7 +155,7 @@ func (w *webkitDeserializer) deserializeValue() ([]byte, error) {
 	case webkitArrayTag:
 		return w.deserializeArray()
 	case webkitObjectTag:
-		return w.deserializeNestedWebkitObject()
+		return w.deserializeNestedObject()
 	case webkitMapObjectTag:
 		return nil, fmt.Errorf("deserializing maps (tag %d) not yet supported", tag)
 	case webkitSetObjectTag:
@@ -200,13 +200,19 @@ func (w *webkitDeserializer) deserializeValue() ([]byte, error) {
 
 // deserializeObject deserializes the upcoming object, which takes the following format:
 // ObjectTag (<name:StringData><value:Value>)* TerminatorTag
-func (w *webkitDeserializer) deserializeNestedWebkitObject() ([]byte, error) {
-	obj, err := w.deserializeWebkitObject()
+func (w *webkitDeserializer) deserializeNestedObject() ([]byte, error) {
+	nestedObj, err := w.deserializeObject()
 	if err != nil {
 		return nil, fmt.Errorf("deserializing nested object: %w", err)
 	}
 
-	rawObj, err := json.Marshal(obj)
+	// Make nested object values readable -- cast []byte to string
+	readableNestedObj := make(map[string]string)
+	for k, v := range nestedObj {
+		readableNestedObj[k] = string(v)
+	}
+
+	rawObj, err := json.Marshal(readableNestedObj)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling object after deserializing: %w", err)
 	}
