@@ -70,6 +70,8 @@ const (
 	webkitBlobTag              = 15
 	webkitStringTag            = 16
 	webkitRegExpTag            = 18
+	webkitTrueObjectTag        = 24
+	webkitFalseObjectTag       = 25
 	webkitStringObjectTag      = 26
 	webkitEmptyStringObjectTag = 27
 	webkitNumberObjectTag      = 28
@@ -180,9 +182,9 @@ func (w *webkitDeserializer) deserializeValue() ([]byte, error) {
 		return []byte("0"), nil
 	case webkitOneTag:
 		return []byte("1"), nil
-	case webkitFalseTag:
+	case webkitFalseTag, webkitFalseObjectTag:
 		return []byte("false"), nil
-	case webkitTrueTag:
+	case webkitTrueTag, webkitTrueObjectTag:
 		return []byte("true"), nil
 	case webkitDateTag, webkitNumberObjectTag, webkitDoubleTag:
 		return w.deserializeDouble()
