@@ -53,32 +53,68 @@ func deserializeWebkit(ctx context.Context, slogger *slog.Logger, row map[string
 }
 
 const (
-	webkitArrayTag             = 1
-	webkitObjectTag            = 2
-	webkitUndefinedTag         = 3
-	webkitNullTag              = 4
-	webkitIntTag               = 5
-	webkitZeroTag              = 6
-	webkitOneTag               = 7
-	webkitFalseTag             = 8
-	webkitTrueTag              = 9
-	webkitDoubleTag            = 10
-	webkitDateTag              = 11
-	webkitFileTag              = 12
-	webkitFileListTag          = 13
-	webkitImageDataTag         = 14
-	webkitBlobTag              = 15
-	webkitStringTag            = 16
-	webkitRegExpTag            = 18
-	webkitTrueObjectTag        = 24
-	webkitFalseObjectTag       = 25
-	webkitStringObjectTag      = 26
-	webkitEmptyStringObjectTag = 27
-	webkitNumberObjectTag      = 28
-	webkitSetObjectTag         = 29
-	webkitMapObjectTag         = 30
-	webkitNonMapPropertiesTag  = 31
-	webkitNonSetPropertiesTag  = 32
+	// SerializationTag
+	webkitArrayTag                = 1
+	webkitObjectTag               = 2
+	webkitUndefinedTag            = 3
+	webkitNullTag                 = 4
+	webkitIntTag                  = 5
+	webkitZeroTag                 = 6
+	webkitOneTag                  = 7
+	webkitFalseTag                = 8
+	webkitTrueTag                 = 9
+	webkitDoubleTag               = 10
+	webkitDateTag                 = 11
+	webkitFileTag                 = 12
+	webkitFileListTag             = 13
+	webkitImageDataTag            = 14
+	webkitBlobTag                 = 15
+	webkitStringTag               = 16
+	webkitRegExpTag               = 18
+	webkitObjectReferenceTag      = 19
+	webkitArrayBufferTag          = 21
+	webkitArrayBufferViewTag      = 22
+	webkitArrayBufferTransferTag  = 23
+	webkitTrueObjectTag           = 24
+	webkitFalseObjectTag          = 25
+	webkitStringObjectTag         = 26
+	webkitEmptyStringObjectTag    = 27
+	webkitNumberObjectTag         = 28
+	webkitSetObjectTag            = 29
+	webkitMapObjectTag            = 30
+	webkitNonMapPropertiesTag     = 31
+	webkitNonSetPropertiesTag     = 32
+	webkitSharedArrayBufferTag    = 34
+	webkitResizableArrayBufferTag = 54
+	webkitErrorInstanceTag        = 55
+
+	// ArrayBufferViewSubtag
+	// We don't interpret the data in array buffer views currently, but when we do,
+	// we'll want these.
+	/*
+		arrayBufferDataViewSubtag          = 0
+		arrayBufferInt8ArraySubtag         = 1
+		arrayBufferUint8ArraySubtag        = 2
+		arrayBufferUint8ClampedArraySubtag = 3
+		arrayBufferInt16ArraySubtag        = 4
+		arrayBufferUint16ArraySubtag       = 5
+		arrayBufferInt32ArraySubtag        = 6
+		arrayBufferUint32ArraySubtag       = 7
+		arrayBufferFloat32ArraySubtag      = 8
+		arrayBufferFloat64ArraySubtag      = 9
+		arrayBufferBigInt64ArraySubtag     = 10
+		arrayBufferBigUint64ArraySubtag    = 11
+		arrayBufferFloat16ArraySubtag      = 12
+	*/
+
+	// SerializableErrorType
+	errorTypeError          = 0
+	errorTypeEvalError      = 1
+	errorTypeRangeError     = 2
+	errorTypeReferenceError = 3
+	errorTypeSyntaxError    = 4
+	errorTypeTypeError      = 5
+	errorTypeURIError       = 6
 
 	terminatorTag         = 0xFFFFFFFF
 	stringPoolTag         = 0xFFFFFFFE
@@ -90,6 +126,7 @@ const (
 type webkitDeserializer struct {
 	reader     *bytes.Reader
 	stringPool [][]byte // maintain reference to seen and deserialized strings
+	objectPool [][]byte // maintain reference to seen and deserialized objects -- see webkit's canBeAddedToObjectPool
 }
 
 func newWebkitDeserializer(src []byte) *webkitDeserializer {
@@ -182,11 +219,11 @@ func (w *webkitDeserializer) deserializeValue() ([]byte, error) {
 		return []byte("0"), nil
 	case webkitOneTag:
 		return []byte("1"), nil
-	case webkitFalseTag, webkitFalseObjectTag:
+	case webkitFalseTag:
 		return []byte("false"), nil
-	case webkitTrueTag, webkitTrueObjectTag:
+	case webkitTrueTag:
 		return []byte("true"), nil
-	case webkitDateTag, webkitNumberObjectTag, webkitDoubleTag:
+	case webkitDateTag, webkitDoubleTag:
 		return w.deserializeDouble()
 	case webkitFileTag, webkitFileListTag:
 		return nil, fmt.Errorf("deserializing files (tag %d) not yet supported", tag)
@@ -194,7 +231,7 @@ func (w *webkitDeserializer) deserializeValue() ([]byte, error) {
 		return nil, fmt.Errorf("deserializing images (tag %d) not yet supported", tag)
 	case webkitBlobTag:
 		return nil, fmt.Errorf("deserializing blobs (tag %d) not yet supported", tag)
-	case webkitStringTag, webkitStringObjectTag:
+	case webkitStringTag:
 		str, _, err := w.deserializeStringData()
 		if err != nil {
 			return nil, fmt.Errorf("deserializing StringData following tag %d: %w", tag, err)
@@ -202,8 +239,38 @@ func (w *webkitDeserializer) deserializeValue() ([]byte, error) {
 		return str, nil
 	case webkitRegExpTag:
 		return w.deserializeRegexp()
+	case webkitObjectReferenceTag:
+		return fromPool(w.reader, w.objectPool)
+	case webkitArrayBufferViewTag:
+		return w.deserializeArrayBufferView()
+	case webkitTrueObjectTag:
+		val := []byte("true")
+		w.objectPool = append(w.objectPool, val)
+		return val, nil
+	case webkitFalseObjectTag:
+		val := []byte("false")
+		w.objectPool = append(w.objectPool, val)
+		return val, nil
+	case webkitStringObjectTag:
+		str, _, err := w.deserializeStringData()
+		if err != nil {
+			return nil, fmt.Errorf("deserializing StringData following tag %d: %w", tag, err)
+		}
+		w.objectPool = append(w.objectPool, str)
+		return str, nil
 	case webkitEmptyStringObjectTag:
-		return []byte(""), nil
+		emptyStr := []byte("")
+		w.objectPool = append(w.objectPool, emptyStr)
+		return emptyStr, nil
+	case webkitNumberObjectTag:
+		dbl, err := w.deserializeDouble()
+		if err != nil {
+			return nil, fmt.Errorf("deserializing number object: %w", err)
+		}
+		w.objectPool = append(w.objectPool, dbl)
+		return dbl, nil
+	case webkitErrorInstanceTag:
+		return w.deserializeError()
 	default:
 		return nil, fmt.Errorf("value tag %d not yet supported", tag)
 	}
@@ -227,6 +294,9 @@ func (w *webkitDeserializer) deserializeNestedObject() ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("marshalling object after deserializing: %w", err)
 	}
+
+	w.objectPool = append(w.objectPool, rawObj)
+
 	return rawObj, nil
 }
 
@@ -280,6 +350,8 @@ func (w *webkitDeserializer) deserializeArray() ([]byte, error) {
 		return nil, fmt.Errorf("marshalling array: %w", err)
 	}
 
+	w.objectPool = append(w.objectPool, arrBytes)
+
 	return arrBytes, nil
 }
 
@@ -300,6 +372,105 @@ func (w *webkitDeserializer) readAndDiscardProperties() error {
 		}
 	}
 	return nil
+}
+
+// deserializeArrayBufferView handles the upcoming array buffer view, which has the following format:
+// ArrayBufferViewSubtag <byteOffset:uint64_t> <byteLength:uint64_t> (ArrayBuffer | ObjectReference)
+func (w *webkitDeserializer) deserializeArrayBufferView() ([]byte, error) {
+	subtag, err := w.reader.ReadByte()
+	if err != nil {
+		return nil, fmt.Errorf("reading array buffer view subtag: %w", err)
+	}
+
+	var byteOffset uint64
+	if err := binary.Read(w.reader, binary.LittleEndian, &byteOffset); err != nil {
+		return nil, fmt.Errorf("decoding byte offset: %w", err)
+	}
+
+	var byteLength uint64
+	if err := binary.Read(w.reader, binary.LittleEndian, &byteLength); err != nil {
+		return nil, fmt.Errorf("decoding byte length: %w", err)
+	}
+
+	// Next is either an array buffer or an object reference -- read the tag to find out.
+	nextTag, err := w.reader.ReadByte()
+	if err != nil {
+		return nil, fmt.Errorf("reading next tag inside array buffer view: %w", err)
+	}
+
+	// Get the raw data for the array buffer
+	var rawData []byte
+	switch nextTag {
+	case webkitArrayBufferTag:
+		arrBuf, err := w.deserializeArrayBuffer()
+		if err != nil {
+			return nil, fmt.Errorf("reading array buffer inside array buffer view with subtag %d: %w", subtag, err)
+		}
+		rawData = arrBuf
+	case webkitResizableArrayBufferTag:
+		arrBuf, err := w.deserializeResizableArrayBuffer()
+		if err != nil {
+			return nil, fmt.Errorf("reading resizable array buffer inside array buffer view with subtag %d: %w", subtag, err)
+		}
+		rawData = arrBuf
+	case webkitObjectReferenceTag:
+		obj, err := fromPool(w.reader, w.objectPool)
+		if err != nil {
+			return nil, fmt.Errorf("retrieving object reference from object pool: %w", err)
+		}
+		rawData = obj
+	case webkitArrayBufferTransferTag:
+		// ArrayBufferTransferTag <value:uint32_t>
+		return nil, fmt.Errorf("ArrayBufferTransfer not yet supported in array buffer view with subtag %d", subtag)
+	case webkitSharedArrayBufferTag:
+		// SharedArrayBufferTag <value:uint32_t>
+		return nil, fmt.Errorf("SharedArrayBuffer not yet supported in array buffer view with subtag %d", subtag)
+	default:
+		return nil, fmt.Errorf("unsupported tag %d in array buffer view with subtag %d", nextTag, subtag)
+	}
+
+	// Next, we _would_ interpret the raw data based on the subtag. For now,
+	// though, we're just returning the raw uninterpreted data.
+	w.objectPool = append(w.objectPool, rawData)
+	return rawData, nil
+}
+
+// deserializeArrayBuffer handles the upcoming array buffer, which takes the following format:
+// <byteLength:uint64_t> <contents:byte{length}>
+func (w *webkitDeserializer) deserializeArrayBuffer() ([]byte, error) {
+	var length uint64
+	if err := binary.Read(w.reader, binary.LittleEndian, &length); err != nil {
+		return nil, fmt.Errorf("decoding content length: %w", err)
+	}
+	rawData := make([]byte, length)
+	if _, err := w.reader.Read(rawData); err != nil {
+		return nil, fmt.Errorf("reading %d bytes in array buffer: %w", length, err)
+	}
+	w.objectPool = append(w.objectPool, rawData)
+
+	return rawData, nil
+}
+
+// deserializeResizableArrayBuffer handles the upcoming resizable array buffer, which takes the following format:
+// <byteLength:uint64_t> <maxLength:uint64_t> <contents:byte{length}>
+func (w *webkitDeserializer) deserializeResizableArrayBuffer() ([]byte, error) {
+	var length uint64
+	if err := binary.Read(w.reader, binary.LittleEndian, &length); err != nil {
+		return nil, fmt.Errorf("decoding content length: %w", err)
+	}
+
+	var maxLength uint64
+	if err := binary.Read(w.reader, binary.LittleEndian, &maxLength); err != nil {
+		return nil, fmt.Errorf("decoding max content length: %w", err)
+	}
+
+	rawData := make([]byte, length)
+	if _, err := w.reader.Read(rawData); err != nil {
+		return nil, fmt.Errorf("reading %d bytes in resizable array buffer: %w", length, err)
+	}
+	w.objectPool = append(w.objectPool, rawData)
+
+	return rawData, nil
 }
 
 // deserializeMapData deserializes the upcoming MapData.
@@ -348,6 +519,8 @@ func (w *webkitDeserializer) deserializeMapData() ([]byte, error) {
 		return nil, fmt.Errorf("marshalling map: %w", err)
 	}
 
+	w.objectPool = append(w.objectPool, resultObj)
+
 	return resultObj, nil
 }
 
@@ -391,6 +564,8 @@ func (w *webkitDeserializer) deserializeSetData() ([]byte, error) {
 		return nil, fmt.Errorf("marshalling set: %w", err)
 	}
 
+	w.objectPool = append(w.objectPool, resultObj)
+
 	return resultObj, nil
 }
 
@@ -411,7 +586,7 @@ func (w *webkitDeserializer) deserializeStringData() ([]byte, bool, error) {
 
 	// Retrieve the string from our string pool -- we've seen it and stored it already.
 	if nextTag == stringPoolTag {
-		str, err := w.stringFromStringPool()
+		str, err := fromPool(w.reader, w.stringPool)
 		if err != nil {
 			return nil, false, fmt.Errorf("reading from string pool after string pool tag: %w", err)
 		}
@@ -454,10 +629,10 @@ func (w *webkitDeserializer) deserializeStringData() ([]byte, bool, error) {
 	return decoded, false, nil
 }
 
-// stringFromStringPool retrieves a string from the string pool, given the upcoming
-// string pool index. When serializing, the serializer maintains an indexed pool
-// of strings that it has seen. If it encounters a string to serialize that it has seen before,
-// instead of re-serializing that value, it will write stringPoolTag and then the pool index.
+// fromPool retrieves an item from the corresponding pool, given the upcoming
+// pool index. When serializing, the serializer maintains several indexed pools
+// of items that it has seen. If it encounters an item to serialize that it has seen before,
+// instead of re-serializing that value, it will write the appropriate pool tag and then the pool index.
 // For example:
 //
 //	{
@@ -465,39 +640,39 @@ func (w *webkitDeserializer) deserializeStringData() ([]byte, bool, error) {
 //	   "uuid": "abc"
 //	}
 //
-// The serializer will serialize "id" and store it in the pool at index 0, then "abc" and store it
+// The serializer will serialize "id" and store it in the string pool at index 0, then "abc" and store it
 // in the pool at index 1, then "uuid" and store it in the pool at index 2. When it reaches the second
 // "abc", since it's been seen before, it will instead write out stringPoolTag and then 1.
-func (w *webkitDeserializer) stringFromStringPool() ([]byte, error) {
+func fromPool(reader *bytes.Reader, pool [][]byte) ([]byte, error) {
 	// First, read in the index. The pool index is stored in 1, 2, or 4 bytes,
 	// depending on the current size of the string pool.
 	var idx int
-	if len(w.stringPool) <= 255 {
+	if len(pool) <= 255 {
 		var i uint8
-		if err := binary.Read(w.reader, binary.LittleEndian, &i); err != nil {
+		if err := binary.Read(reader, binary.LittleEndian, &i); err != nil {
 			return nil, fmt.Errorf("reading uint8 index tag: %w", err)
 		}
 		idx = int(i)
-	} else if len(w.stringPool) <= 65535 {
+	} else if len(pool) <= 65535 {
 		var i uint16
-		if err := binary.Read(w.reader, binary.LittleEndian, &i); err != nil {
+		if err := binary.Read(reader, binary.LittleEndian, &i); err != nil {
 			return nil, fmt.Errorf("reading uint16 index tag: %w", err)
 		}
 		idx = int(i)
 	} else {
 		var i uint32
-		if err := binary.Read(w.reader, binary.LittleEndian, &i); err != nil {
+		if err := binary.Read(reader, binary.LittleEndian, &i); err != nil {
 			return nil, fmt.Errorf("reading uint32 index tag: %w", err)
 		}
 		idx = int(i)
 	}
 
-	if idx >= len(w.stringPool) {
-		return nil, fmt.Errorf("requested string at index %d but only %d items in string pool", idx, len(w.stringPool))
+	if idx >= len(pool) {
+		return nil, fmt.Errorf("requested item at index %d but only %d items in pool", idx, len(pool))
 	}
 
-	// Retrieve the string from the pool
-	return w.stringPool[idx], nil
+	// Retrieve the item from the pool
+	return pool[idx], nil
 }
 
 func (w *webkitDeserializer) deserializeUint32() (uint32, error) {
@@ -533,4 +708,109 @@ func (w *webkitDeserializer) deserializeRegexp() ([]byte, error) {
 	regexFull = append(regexFull, flags...)
 
 	return regexFull, nil
+}
+
+var errorEnumToStringMap = map[uint8][]byte{
+	errorTypeError:          []byte("Error"),
+	errorTypeEvalError:      []byte("EvalError"),
+	errorTypeRangeError:     []byte("RangeError"),
+	errorTypeReferenceError: []byte("ReferenceError"),
+	errorTypeSyntaxError:    []byte("SyntaxError"),
+	errorTypeTypeError:      []byte("TypeError"),
+	errorTypeURIError:       []byte("URIError"),
+}
+
+// deserializeError handles the upcoming error object.
+// - uint8: error type
+// - nullable string: error message
+// - Number: line
+// - Number: column
+// - nullable string: source url
+// - nullable string: stack
+// - nullable string: cause
+// See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error
+// for documentation of property names and types.
+func (w *webkitDeserializer) deserializeError() ([]byte, error) {
+	// Create a map to hold the error properties
+	errorObj := map[string]string{
+		"name": "Error",
+	}
+
+	// Read type
+	errorTypeEnum, err := w.reader.ReadByte()
+	if err != nil {
+		return nil, fmt.Errorf("reading error type: %w", err)
+	}
+	errorTypeStr, ok := errorEnumToStringMap[errorTypeEnum]
+	if !ok {
+		return nil, fmt.Errorf("unknown error type %d", errorTypeEnum)
+	}
+	errorObj["type"] = string(errorTypeStr)
+
+	// Read message
+	msg, err := w.deserializeNullableString()
+	if err != nil {
+		return nil, fmt.Errorf("reading error message: %w", err)
+	}
+	errorObj["message"] = string(msg)
+
+	// Read line
+	var line int32
+	if err := binary.Read(w.reader, binary.LittleEndian, &line); err != nil {
+		return nil, fmt.Errorf("reading error line: %w", err)
+	}
+	errorObj["lineNumber"] = strconv.Itoa(int(line))
+
+	// Read column
+	var column int32
+	if err := binary.Read(w.reader, binary.LittleEndian, &column); err != nil {
+		return nil, fmt.Errorf("reading error column: %w", err)
+	}
+	errorObj["column"] = strconv.Itoa(int(column))
+
+	// Read source URL
+	sourceUrl, err := w.deserializeNullableString()
+	if err != nil {
+		return nil, fmt.Errorf("reading error source url: %w", err)
+	}
+	errorObj["fileName"] = string(sourceUrl)
+
+	// Read stack
+	stack, err := w.deserializeNullableString()
+	if err != nil {
+		return nil, fmt.Errorf("reading error stack: %w", err)
+	}
+	errorObj["stack"] = string(stack)
+
+	// Read cause
+	cause, err := w.deserializeNullableString()
+	if err != nil {
+		return nil, fmt.Errorf("reading error cause: %w", err)
+	}
+	errorObj["cause"] = string(cause)
+
+	// Serialize the error object to JSON
+	resultBytes, err := json.Marshal(errorObj)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling error object: %w", err)
+	}
+
+	return resultBytes, nil
+}
+
+// deserializeNullableString handles the upcoming nullable string, which is one byte indicating
+// whether the string is null, and then if it's not null, a StringData.
+func (w *webkitDeserializer) deserializeNullableString() ([]byte, error) {
+	isNull, err := w.reader.ReadByte()
+	if err != nil {
+		return nil, fmt.Errorf("reading isNull: %w", err)
+	}
+	if isNull == 1 {
+		return nil, nil
+	}
+	str, _, err := w.deserializeStringData()
+	if err != nil {
+		return nil, fmt.Errorf("reading string data in non-null nullable string: %w", err)
+	}
+	return str, nil
 }
