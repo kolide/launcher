@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kolide/launcher/v2/ee/agent/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -156,7 +157,7 @@ func Test_Parse(t *testing.T) {
 			td:          &TemplateData{},
 			text:        "Version: {{GARBAGE}}",
 			output:      "",
-			expectedErr: true, // An invalid template format is one of the only times errors are expected
+			expectedErr: true,
 		},
 		{
 			name:   "undefined key",
@@ -181,7 +182,7 @@ func Test_Parse(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			tp := NewTemplateParser(tt.td)
+			tp := NewTemplateParser(tt.td, types.LocalizationData{})
 			o, err := tp.Parse(tt.text)
 			if tt.expectedErr {
 				require.Error(t, err)
@@ -222,7 +223,7 @@ func Test_Parse_Seconds(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			tp := NewTemplateParser(tt.td)
+			tp := NewTemplateParser(tt.td, types.LocalizationData{})
 			o, err := tp.Parse(tt.text)
 			require.NoError(t, err)
 
@@ -236,6 +237,204 @@ func Test_Parse_Seconds(t *testing.T) {
 					o == expectedOutputMinusOneSecond,
 				fmt.Sprintf("expected output %s to be within one second of %d but was not", o, tt.seconds),
 			)
+		})
+	}
+}
+
+func spanishLocData() types.LocalizationData {
+	var dt types.Datetime
+	dt.DistanceInWords.AboutXHours.One = "alrededor de %{count} hora"
+	dt.DistanceInWords.AboutXHours.Other = "alrededor de %{count} horas"
+	dt.DistanceInWords.LessThanXSeconds.One = "menos de %{count} segundo"
+	dt.DistanceInWords.LessThanXSeconds.Other = "menos de %{count} segundos"
+	dt.DistanceInWords.LessThanXMinutes.One = "menos de %{count} minuto"
+	dt.DistanceInWords.LessThanXMinutes.Other = "menos de %{count} minutos"
+	dt.DistanceInWords.XSeconds.One = "%{count} segundo"
+	dt.DistanceInWords.XSeconds.Other = "%{count} segundos"
+	dt.DistanceInWords.XMinutes.One = "%{count} minuto"
+	dt.DistanceInWords.XMinutes.Other = "%{count} minutos"
+	dt.DistanceInWords.XDays.One = "%{count} día"
+	dt.DistanceInWords.XDays.Other = "%{count} días"
+	dt.Relative.Future = "en %{time}"
+	dt.Relative.Past = "hace %{time}"
+
+	return types.LocalizationData{
+		Locale: "es",
+		Translations: map[string]types.Translations{
+			"es": {
+				Datetime: dt,
+			},
+		},
+	}
+}
+
+func Test_Parse_Localized(t *testing.T) {
+	t.Parallel()
+
+	locData := spanishLocData()
+
+	tests := []struct {
+		name   string
+		td     *TemplateData
+		text   string
+		output string
+	}{
+		{
+			name:   "localized 2 hours ago",
+			td:     &TemplateData{LastMenuUpdateTime: time.Now().Add(-2 * time.Hour).Unix()},
+			text:   "{{relativeTime .LastMenuUpdateTime}}",
+			output: "hace alrededor de 2 horas",
+		},
+		{
+			name:   "localized 15 minutes ago",
+			td:     &TemplateData{LastMenuUpdateTime: time.Now().Add(-15*time.Minute - 30*time.Second).Unix()},
+			text:   "{{relativeTime .LastMenuUpdateTime}}",
+			output: "hace 15 minutos",
+		},
+		{
+			name:   "localized one minute ago",
+			td:     &TemplateData{LastMenuUpdateTime: time.Now().Add(-1 * time.Minute).Unix()},
+			text:   "{{relativeTime .LastMenuUpdateTime}}",
+			output: "hace 1 minuto",
+		},
+		{
+			name:   "localized just now",
+			td:     &TemplateData{LastMenuUpdateTime: time.Now().Unix()},
+			text:   "{{relativeTime .LastMenuUpdateTime}}",
+			output: "hace menos de 1 segundo",
+		},
+		{
+			name:   "localized very soon",
+			td:     &TemplateData{},
+			text:   fmt.Sprintf("{{relativeTime %d}}", time.Now().Add(2*time.Minute+30*time.Second).Unix()),
+			output: "en menos de 1 minuto",
+		},
+		{
+			name:   "localized 15 minutes future",
+			td:     &TemplateData{},
+			text:   fmt.Sprintf("{{relativeTime %d}}", time.Now().Add(15*time.Minute+30*time.Second).Unix()),
+			output: "en 15 minutos",
+		},
+		{
+			name:   "localized about one hour",
+			td:     &TemplateData{},
+			text:   fmt.Sprintf("{{relativeTime %d}}", time.Now().Add(1*time.Hour+30*time.Second).Unix()),
+			output: "en alrededor de 1 hora",
+		},
+		{
+			name:   "localized one day",
+			td:     &TemplateData{},
+			text:   fmt.Sprintf("{{relativeTime %d}}", time.Now().Add(24*time.Hour+30*time.Second).Unix()),
+			output: "en 1 día",
+		},
+		{
+			name:   "localized 3 days",
+			td:     &TemplateData{},
+			text:   fmt.Sprintf("{{relativeTime %d}}", time.Now().Add(3*24*time.Hour+30*time.Second).Unix()),
+			output: "en 3 días",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tp := NewTemplateParser(tt.td, locData)
+			o, err := tp.Parse(tt.text)
+			require.NoError(t, err)
+			assert.Equal(t, tt.output, o)
+		})
+	}
+}
+
+func Test_Parse_FallbackOnMissingLocale(t *testing.T) {
+	t.Parallel()
+
+	locData := types.LocalizationData{
+		Locale:       "zz",
+		Translations: map[string]types.Translations{},
+	}
+
+	td := &TemplateData{LastMenuUpdateTime: time.Now().Add(-2 * time.Hour).Unix()}
+	tp := NewTemplateParser(td, locData)
+	o, err := tp.Parse("{{relativeTime .LastMenuUpdateTime}}")
+	require.NoError(t, err)
+	assert.Equal(t, "2 Hours Ago", o)
+}
+
+func Test_Pluralize(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		one    string
+		other  string
+		count  int64
+		expect string
+	}{
+		{
+			name:   "singular",
+			one:    "%{count} minute",
+			other:  "%{count} minutes",
+			count:  1,
+			expect: "%{count} minute",
+		},
+		{
+			name:   "plural",
+			one:    "%{count} minute",
+			other:  "%{count} minutes",
+			count:  5,
+			expect: "%{count} minutes",
+		},
+		{
+			name:   "zero uses other",
+			one:    "%{count} minute",
+			other:  "%{count} minutes",
+			count:  0,
+			expect: "%{count} minutes",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := pluralize(tt.one, tt.other, tt.count)
+			assert.Equal(t, tt.expect, result)
+		})
+	}
+}
+
+func Test_Interpolate(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		tmpl   string
+		count  int64
+		expect string
+	}{
+		{
+			name:   "basic count replacement",
+			tmpl:   "%{count} minutes",
+			count:  15,
+			expect: "15 minutes",
+		},
+		{
+			name:   "no placeholder",
+			tmpl:   "half a minute",
+			count:  1,
+			expect: "half a minute",
+		},
+		{
+			name:   "multiple count placeholders",
+			tmpl:   "%{count} of %{count}",
+			count:  3,
+			expect: "3 of 3",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := interpolate(tt.tmpl, tt.count)
+			assert.Equal(t, tt.expect, result)
 		})
 	}
 }

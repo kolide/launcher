@@ -66,4 +66,8 @@ type Datetime struct {
 			Other string `json:"other"`
 		} `json:"x_years"`
 	} `json:"distance_in_words"`
+	Relative struct {
+		Future string `json:"future"`
+		Past   string `json:"past"`
+	} `json:"relative"`
 }

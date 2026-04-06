@@ -3,9 +3,12 @@ package menu
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"text/template"
 	"time"
+
+	"github.com/kolide/launcher/v2/ee/agent/types"
 )
 
 const (
@@ -30,15 +33,240 @@ const (
 type TemplateData map[string]any
 
 type templateParser struct {
-	td *TemplateData
+	td      *TemplateData
+	locData types.LocalizationData
 }
 
-func NewTemplateParser(td *TemplateData) *templateParser {
-	tp := &templateParser{
-		td: td,
+func NewTemplateParser(td *TemplateData, locData types.LocalizationData) *templateParser {
+	return &templateParser{
+		td:      td,
+		locData: locData,
+	}
+}
+
+// pluralize selects the One or Other form based on count.
+func pluralize(one, other string, count int64) string {
+	if count == 1 {
+		return one
+	}
+	return other
+}
+
+// interpolate replaces %{count} and %{time} placeholders in a translation string.
+func interpolate(tmpl string, count int64) string {
+	result := strings.ReplaceAll(tmpl, "%{count}", strconv.FormatInt(count, 10))
+	return result
+}
+
+// interpolateTime replaces the %{time} placeholder with a time expression.
+func interpolateTime(tmpl string, timeExpr string) string {
+	return strings.ReplaceAll(tmpl, "%{time}", timeExpr)
+}
+
+// localizedDistanceInWords returns a localized distance expression (e.g. "2 horas"),
+// or an empty string if translations are unavailable for the configured locale.
+func (tp *templateParser) localizedDistanceInWords(one, other string, count int64) string {
+	tmpl := pluralize(one, other, count)
+	if tmpl == "" {
+		return ""
+	}
+	return interpolate(tmpl, count)
+}
+
+// wrapRelative wraps a distance expression with the locale's past/future pattern
+// (e.g. "hace %{time}" -> "hace 2 horas"). Returns the expression unchanged
+// if no relative pattern is available.
+func (tp *templateParser) wrapRelative(timeExpr string, isFuture bool) string {
+	t, ok := tp.locData.Translations[tp.locData.Locale]
+	if !ok {
+		return timeExpr
 	}
 
-	return tp
+	pattern := t.Datetime.Relative.Past
+	if isFuture {
+		pattern = t.Datetime.Relative.Future
+	}
+
+	if pattern == "" {
+		return timeExpr
+	}
+
+	return interpolateTime(pattern, timeExpr)
+}
+
+// hasLocalizationData returns true if the parser has a valid locale with translations.
+func (tp *templateParser) hasLocalizationData() bool {
+	if tp.locData.Locale == "" || len(tp.locData.Translations) == 0 {
+		return false
+	}
+	_, ok := tp.locData.Translations[tp.locData.Locale]
+	return ok
+}
+
+// relativeTimeLocalized formats a Unix timestamp as a localized relative time string.
+// Falls back to the English default if translations are unavailable.
+func (tp *templateParser) relativeTimeLocalized(timestamp int64) string {
+	currentTime := time.Now().Unix()
+	diff := timestamp - currentTime
+
+	if !tp.hasLocalizationData() {
+		return relativeTimeDefault(diff)
+	}
+
+	diw := tp.locData.Translations[tp.locData.Locale].Datetime.DistanceInWords
+
+	switch {
+	case diff < -60*60: // more than an hour ago
+		count := -diff / 3600
+		expr := tp.localizedDistanceInWords(diw.AboutXHours.One, diw.AboutXHours.Other, count)
+		if expr == "" {
+			return relativeTimeDefault(diff)
+		}
+		return tp.wrapRelative(expr, false)
+
+	case diff < -60*2: // more than 2 minutes ago
+		count := -diff / 60
+		expr := tp.localizedDistanceInWords(diw.XMinutes.One, diw.XMinutes.Other, count)
+		if expr == "" {
+			return relativeTimeDefault(diff)
+		}
+		return tp.wrapRelative(expr, false)
+
+	case diff < -90: // more than 90 seconds ago
+		count := -diff
+		expr := tp.localizedDistanceInWords(diw.XSeconds.One, diw.XSeconds.Other, count)
+		if expr == "" {
+			return relativeTimeDefault(diff)
+		}
+		return tp.wrapRelative(expr, false)
+
+	case diff < -50: // more than 50 seconds ago
+		expr := tp.localizedDistanceInWords(diw.XMinutes.One, diw.XMinutes.Other, 1)
+		if expr == "" {
+			return relativeTimeDefault(diff)
+		}
+		return tp.wrapRelative(expr, false)
+
+	case diff < -5: // more than 5 seconds ago
+		count := -diff
+		expr := tp.localizedDistanceInWords(diw.XSeconds.One, diw.XSeconds.Other, count)
+		if expr == "" {
+			return relativeTimeDefault(diff)
+		}
+		return tp.wrapRelative(expr, false)
+
+	case diff <= 0: // in the last 5 seconds
+		expr := tp.localizedDistanceInWords(diw.LessThanXSeconds.One, diw.LessThanXSeconds.Other, 1)
+		if expr == "" {
+			return relativeTimeDefault(diff)
+		}
+		return tp.wrapRelative(expr, false)
+
+	case diff < 60*10: // less than 10 minutes
+		expr := tp.localizedDistanceInWords(diw.LessThanXMinutes.One, diw.LessThanXMinutes.Other, 1)
+		if expr == "" {
+			return relativeTimeDefault(diff)
+		}
+		return tp.wrapRelative(expr, true)
+
+	case diff < 60*50: // less than 50 minutes
+		count := diff / 60
+		expr := tp.localizedDistanceInWords(diw.XMinutes.One, diw.XMinutes.Other, count)
+		if expr == "" {
+			return relativeTimeDefault(diff)
+		}
+		return tp.wrapRelative(expr, true)
+
+	case diff < 60*90: // less than 90 minutes
+		expr := tp.localizedDistanceInWords(diw.AboutXHours.One, diw.AboutXHours.Other, 1)
+		if expr == "" {
+			return relativeTimeDefault(diff)
+		}
+		return tp.wrapRelative(expr, true)
+
+	case diff < 60*60*2: // less than 2 hours
+		count := diff / 60
+		expr := tp.localizedDistanceInWords(diw.XMinutes.One, diw.XMinutes.Other, count)
+		if expr == "" {
+			return relativeTimeDefault(diff)
+		}
+		return tp.wrapRelative(expr, true)
+
+	case diff < 60*60*23: // less than 23 hours
+		count := diff / 3600
+		expr := tp.localizedDistanceInWords(diw.AboutXHours.One, diw.AboutXHours.Other, count)
+		if expr == "" {
+			return relativeTimeDefault(diff)
+		}
+		return tp.wrapRelative(expr, true)
+
+	case diff < 60*60*36: // less than 36 hours
+		expr := tp.localizedDistanceInWords(diw.XDays.One, diw.XDays.Other, 1)
+		if expr == "" {
+			return relativeTimeDefault(diff)
+		}
+		return tp.wrapRelative(expr, true)
+
+	case diff < 60*60*48: // less than 48 hours
+		count := diff / 3600
+		expr := tp.localizedDistanceInWords(diw.AboutXHours.One, diw.AboutXHours.Other, count)
+		if expr == "" {
+			return relativeTimeDefault(diff)
+		}
+		return tp.wrapRelative(expr, true)
+
+	case diff < 60*60*24*14: // less than 14 days
+		count := diff / 86400
+		expr := tp.localizedDistanceInWords(diw.XDays.One, diw.XDays.Other, count)
+		if expr == "" {
+			return relativeTimeDefault(diff)
+		}
+		return tp.wrapRelative(expr, true)
+
+	default: // 2 weeks or more -- express as days since no x_weeks translation key exists
+		count := diff / 86400
+		expr := tp.localizedDistanceInWords(diw.XDays.One, diw.XDays.Other, count)
+		if expr == "" {
+			return relativeTimeDefault(diff)
+		}
+		return tp.wrapRelative(expr, true)
+	}
+}
+
+// relativeTimeDefault is the original English-only implementation used as a fallback.
+func relativeTimeDefault(diff int64) string {
+	switch {
+	case diff < -60*60:
+		return fmt.Sprintf("%d Hours Ago", -diff/3600)
+	case diff < -60*2:
+		return fmt.Sprintf("%d Minutes Ago", -diff/60)
+	case diff < -90:
+		return fmt.Sprintf("%d Seconds Ago", -diff)
+	case diff < -50:
+		return "One Minute Ago"
+	case diff < -5:
+		return fmt.Sprintf("%d Seconds Ago", -diff)
+	case diff <= 0:
+		return "Just Now"
+	case diff < 60*10:
+		return "Very Soon"
+	case diff < 60*50:
+		return fmt.Sprintf("In %d Minutes", diff/60)
+	case diff < 60*90:
+		return "In About An Hour"
+	case diff < 60*60*2:
+		return fmt.Sprintf("In %d Minutes", diff/60)
+	case diff < 60*60*23:
+		return fmt.Sprintf("In %d Hours", diff/3600)
+	case diff < 60*60*36:
+		return "In One Day"
+	case diff < 60*60*48:
+		return fmt.Sprintf("In %d Hours", diff/3600)
+	case diff < 60*60*24*14:
+		return fmt.Sprintf("In %d Days", diff/86400)
+	default:
+		return fmt.Sprintf("In %d Weeks", diff/604800)
+	}
 }
 
 // Parse parses text as a template body for the menu template data
@@ -49,7 +277,6 @@ func (tp *templateParser) Parse(text string) (string, error) {
 	}
 
 	t, err := template.New("menu_template").Funcs(template.FuncMap{
-		// hasCapability enables interoperability between different versions of launcher
 		funcHasCapability: func(capability string) bool {
 			switch capability {
 			case funcRelativeTime:
@@ -63,44 +290,7 @@ func (tp *templateParser) Parse(text string) (string, error) {
 			}
 			return false
 		},
-		// relativeTime takes a Unix timestamp and returns a fuzzy timestamp
-		funcRelativeTime: func(timestamp int64) string {
-			currentTime := time.Now().Unix()
-			diff := timestamp - currentTime
-
-			switch {
-			case diff < -60*60: // more than an hour ago
-				return fmt.Sprintf("%d Hours Ago", -diff/3600)
-			case diff < -60*2: // more than 2 minutes ago
-				return fmt.Sprintf("%d Minutes Ago", -diff/60)
-			case diff < -90: // more than 90 seconds ago
-				return fmt.Sprintf("%d Seconds Ago", -diff)
-			case diff < -50: // more than 50 seconds ago
-				return "One Minute Ago"
-			case diff < -5: // more than 5 seconds ago
-				return fmt.Sprintf("%d Seconds Ago", -diff)
-			case diff <= 0: // in the last 5 seconds
-				return "Just Now"
-			case diff < 60*10: // less than 10 minutes
-				return "Very Soon"
-			case diff < 60*50: // less than 50 minutes
-				return fmt.Sprintf("In %d Minutes", diff/60)
-			case diff < 60*90: // less than 90 minutes
-				return "In About An Hour"
-			case diff < 60*60*2: // less than 2 hours
-				return fmt.Sprintf("In %d Minutes", diff/60)
-			case diff < 60*60*23: // less than 23 hours
-				return fmt.Sprintf("In %d Hours", diff/3600)
-			case diff < 60*60*36: // less than 36 hours
-				return "In One Day"
-			case diff < 60*60*48: // less than 48 hours
-				return fmt.Sprintf("In %d Hours", diff/3600)
-			case diff < 60*60*24*14: // less than 14 days
-				return fmt.Sprintf("In %d Days", diff/86400)
-			default: // 2 weeks or more
-				return fmt.Sprintf("In %d Weeks", diff/604800)
-			}
-		},
+		funcRelativeTime: tp.relativeTimeLocalized,
 	}).Parse(text)
 	if err != nil {
 		return "", fmt.Errorf("could not parse template: %w", err)
