@@ -98,6 +98,6 @@ jobs:
           gh pr create \
             --repo kolide/launcher \
             --title "[Automated] $MONTH $YEAR - Update TUF root.json" \
-            --body "Automated update of launcher's root.json to the latest version for $MONTH $YEAR.'" \
+            --body "Automated update of launcher's root.json to the latest version for $MONTH $YEAR." \
             --head "$BRANCH_NAME" \
             --base main
