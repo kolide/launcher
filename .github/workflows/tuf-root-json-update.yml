@@ -83,6 +83,8 @@ jobs:
             /repos/kolide/launcher/git/trees --input -)
           TREE_SHA=$(echo "$CREATE_TREE_RESP" | jq -r '.sha')
 
+          echo $TREE_SHA
+
           # Create commit
           CREATE_COMMIT_RESP=$(jq -n \
             --arg message "$COMMIT_MESSAGE" \
@@ -92,6 +94,8 @@ jobs:
             gh api --method POST -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" \
             /repos/kolide/launcher/git/commits --input -)
           COMMIT_SHA=$(echo "$CREATE_COMMIT_RESP" | jq -r '.sha')
+
+          echo $COMMIT_SHA
 
           # Create reference
           jq -n --arg sha "$COMMIT_SHA" --arg branch "refs/heads/$BRANCH_NAME" '{sha: $sha, ref: $branch}' | \
