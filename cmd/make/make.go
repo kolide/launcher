@@ -33,6 +33,7 @@ func main() {
 		flFakeData       = fs.Bool("fakedata", false, "Compile with build tags to falsify some data, like serial numbers")
 		flGithubOutput   = fs.Bool("github", os.Getenv("GITHUB_ACTIONS") != "", "Include github action output")
 		flIncludeSymbols = fs.Bool("debugsymbols", false, "Compile with or without debug symbols (stripped by default)")
+		flTrimpath       = fs.Bool("trimpath", false, "remove all file system paths from the resulting executable")
 	)
 
 	ffOpts := []ff.Option{
@@ -77,6 +78,10 @@ func main() {
 
 	if *flIncludeSymbols {
 		opts = append(opts, make.WithOutStripped())
+	}
+
+	if *flTrimpath {
+		opts = append(opts, make.WithTrimpath())
 	}
 
 	// We need to avoid cgo on windows. See

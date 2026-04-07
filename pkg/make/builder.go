@@ -37,6 +37,7 @@ type Builder struct {
 	static             bool
 	race               bool
 	stampVersion       bool
+	trimpath           bool
 	fakedata           bool
 	notStripped        bool
 	cgo                bool
@@ -93,6 +94,12 @@ func WithRace() Option {
 func WithStampVersion() Option {
 	return func(b *Builder) {
 		b.stampVersion = true
+	}
+}
+
+func WithTrimpath() Option {
+	return func(b *Builder) {
+		b.trimpath = true
 	}
 }
 
@@ -279,6 +286,10 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 
 		if b.fakedata {
 			baseArgs = append(baseArgs, "-tags", "fakeserial")
+		}
+
+		if b.trimpath {
+			baseArgs = append(baseArgs, "-trimpath")
 		}
 
 		var ldFlags []string
