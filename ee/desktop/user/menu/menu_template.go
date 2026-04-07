@@ -104,122 +104,87 @@ func (tp *templateParser) relativeTimeLocalized(timestamp int64) string {
 
 	diw := tp.locData.Translations[tp.locData.Locale].Datetime.DistanceInWords
 
+	var singular, plural string
+	var count int64
+	var isFuture bool
+
 	switch {
 	case diff < -60*60: // more than an hour ago
-		count := -diff / 3600
-		expr := tp.localizedDistanceInWords(diw.AboutXHours.One, diw.AboutXHours.Other, count)
-		if expr == "" {
-			return relativeTimeDefault(diff)
-		}
-		return tp.wrapRelative(expr, false)
-
+		singular = diw.AboutXHours.One
+		plural = diw.AboutXHours.Other
+		count = -diff / 3600
 	case diff < -60*2: // more than 2 minutes ago
-		count := -diff / 60
-		expr := tp.localizedDistanceInWords(diw.XMinutes.One, diw.XMinutes.Other, count)
-		if expr == "" {
-			return relativeTimeDefault(diff)
-		}
-		return tp.wrapRelative(expr, false)
-
+		singular = diw.XMinutes.One
+		plural = diw.XMinutes.Other
+		count = -diff / 60
 	case diff < -90: // more than 90 seconds ago
-		count := -diff
-		expr := tp.localizedDistanceInWords(diw.XSeconds.One, diw.XSeconds.Other, count)
-		if expr == "" {
-			return relativeTimeDefault(diff)
-		}
-		return tp.wrapRelative(expr, false)
-
+		singular = diw.XSeconds.One
+		plural = diw.XSeconds.Other
+		count = -diff
 	case diff < -50: // more than 50 seconds ago
-		expr := tp.localizedDistanceInWords(diw.XMinutes.One, diw.XMinutes.Other, 1)
-		if expr == "" {
-			return relativeTimeDefault(diff)
-		}
-		return tp.wrapRelative(expr, false)
-
+		singular = diw.XMinutes.One
+		plural = diw.XMinutes.Other
+		count = 1
 	case diff < -5: // more than 5 seconds ago
-		count := -diff
-		expr := tp.localizedDistanceInWords(diw.XSeconds.One, diw.XSeconds.Other, count)
-		if expr == "" {
-			return relativeTimeDefault(diff)
-		}
-		return tp.wrapRelative(expr, false)
-
+		singular = diw.XSeconds.One
+		plural = diw.XSeconds.Other
+		count = -diff
 	case diff <= 0: // in the last 5 seconds
-		expr := tp.localizedDistanceInWords(diw.LessThanXSeconds.One, diw.LessThanXSeconds.Other, 1)
-		if expr == "" {
-			return relativeTimeDefault(diff)
-		}
-		return tp.wrapRelative(expr, false)
-
+		singular = diw.LessThanXSeconds.One
+		plural = diw.LessThanXSeconds.Other
+		count = 1
 	case diff < 60*10: // less than 10 minutes
-		expr := tp.localizedDistanceInWords(diw.LessThanXMinutes.One, diw.LessThanXMinutes.Other, 1)
-		if expr == "" {
-			return relativeTimeDefault(diff)
-		}
-		return tp.wrapRelative(expr, true)
-
+		singular = diw.LessThanXMinutes.One
+		plural = diw.LessThanXMinutes.Other
+		count = 1
+		isFuture = true
 	case diff < 60*50: // less than 50 minutes
-		count := diff / 60
-		expr := tp.localizedDistanceInWords(diw.XMinutes.One, diw.XMinutes.Other, count)
-		if expr == "" {
-			return relativeTimeDefault(diff)
-		}
-		return tp.wrapRelative(expr, true)
-
+		singular = diw.XMinutes.One
+		plural = diw.XMinutes.Other
+		count = diff / 60
+		isFuture = true
 	case diff < 60*90: // less than 90 minutes
-		expr := tp.localizedDistanceInWords(diw.AboutXHours.One, diw.AboutXHours.Other, 1)
-		if expr == "" {
-			return relativeTimeDefault(diff)
-		}
-		return tp.wrapRelative(expr, true)
-
+		singular = diw.AboutXHours.One
+		plural = diw.AboutXHours.Other
+		count = 1
+		isFuture = true
 	case diff < 60*60*2: // less than 2 hours
-		count := diff / 60
-		expr := tp.localizedDistanceInWords(diw.XMinutes.One, diw.XMinutes.Other, count)
-		if expr == "" {
-			return relativeTimeDefault(diff)
-		}
-		return tp.wrapRelative(expr, true)
-
+		singular = diw.XMinutes.One
+		plural = diw.XMinutes.Other
+		count = diff / 60
+		isFuture = true
 	case diff < 60*60*23: // less than 23 hours
-		count := diff / 3600
-		expr := tp.localizedDistanceInWords(diw.AboutXHours.One, diw.AboutXHours.Other, count)
-		if expr == "" {
-			return relativeTimeDefault(diff)
-		}
-		return tp.wrapRelative(expr, true)
-
+		singular = diw.AboutXHours.One
+		plural = diw.AboutXHours.Other
+		count = diff / 3600
+		isFuture = true
 	case diff < 60*60*36: // less than 36 hours
-		expr := tp.localizedDistanceInWords(diw.XDays.One, diw.XDays.Other, 1)
-		if expr == "" {
-			return relativeTimeDefault(diff)
-		}
-		return tp.wrapRelative(expr, true)
-
+		singular = diw.XDays.One
+		plural = diw.XDays.Other
+		count = 1
+		isFuture = true
 	case diff < 60*60*48: // less than 48 hours
-		count := diff / 3600
-		expr := tp.localizedDistanceInWords(diw.AboutXHours.One, diw.AboutXHours.Other, count)
-		if expr == "" {
-			return relativeTimeDefault(diff)
-		}
-		return tp.wrapRelative(expr, true)
-
+		singular = diw.AboutXHours.One
+		plural = diw.AboutXHours.Other
+		count = diff / 3600
+		isFuture = true
 	case diff < 60*60*24*14: // less than 14 days
-		count := diff / 86400
-		expr := tp.localizedDistanceInWords(diw.XDays.One, diw.XDays.Other, count)
-		if expr == "" {
-			return relativeTimeDefault(diff)
-		}
-		return tp.wrapRelative(expr, true)
-
+		singular = diw.XDays.One
+		plural = diw.XDays.Other
+		count = diff / 86400
+		isFuture = true
 	default: // 2 weeks or more -- express as days since no x_weeks translation key exists
-		count := diff / 86400
-		expr := tp.localizedDistanceInWords(diw.XDays.One, diw.XDays.Other, count)
-		if expr == "" {
-			return relativeTimeDefault(diff)
-		}
-		return tp.wrapRelative(expr, true)
+		singular = diw.XDays.One
+		plural = diw.XDays.Other
+		count = diff / 86400
+		isFuture = true
 	}
+
+	expr := tp.localizedDistanceInWords(singular, plural, count)
+	if expr == "" {
+		return relativeTimeDefault(diff)
+	}
+	return tp.wrapRelative(expr, isFuture)
 }
 
 // relativeTimeDefault is the original English-only implementation used as a fallback.
