@@ -44,18 +44,11 @@ func NewTemplateParser(td *TemplateData, locData types.LocalizationData) *templa
 	}
 }
 
-// pluralize selects the singular or plural form based on count.
-func pluralize(singular, plural string, count int64) string {
-	if count == 1 {
-		return singular
-	}
-	return plural
-}
-
 // localizedDistanceInWords returns a localized distance expression (e.g. "2 horas"),
-// or an empty string if translations are unavailable for the configured locale.
-func (tp *templateParser) localizedDistanceInWords(singular, plural string, count int64) string {
-	tmpl := pluralize(singular, plural, count)
+// selecting the correct CLDR plural form for the configured locale.
+// Returns an empty string if translations are unavailable.
+func (tp *templateParser) localizedDistanceInWords(forms types.PluralForms, count int64) string {
+	tmpl := forms.Select(tp.locData.Locale, count)
 	if tmpl == "" {
 		return ""
 	}
@@ -105,83 +98,68 @@ func (tp *templateParser) relativeTimeLocalized(timestamp int64) string {
 
 	diw := tp.locData.Translations[tp.locData.Locale].Datetime.DistanceInWords
 
-	var singular, plural string
+	var forms types.PluralForms
 	var count int64
 	var isFuture bool
 
 	switch {
 	case diff < -60*60: // more than an hour ago
-		singular = diw.AboutXHours.One
-		plural = diw.AboutXHours.Other
+		forms = diw.AboutXHours
 		count = -diff / 3600
 	case diff < -60*2: // more than 2 minutes ago
-		singular = diw.XMinutes.One
-		plural = diw.XMinutes.Other
+		forms = diw.XMinutes
 		count = -diff / 60
 	case diff < -90: // more than 90 seconds ago
-		singular = diw.XSeconds.One
-		plural = diw.XSeconds.Other
+		forms = diw.XSeconds
 		count = -diff
 	case diff < -50: // more than 50 seconds ago
-		singular = diw.XMinutes.One
-		plural = diw.XMinutes.Other
+		forms = diw.XMinutes
 		count = 1
 	case diff < -5: // more than 5 seconds ago
-		singular = diw.XSeconds.One
-		plural = diw.XSeconds.Other
+		forms = diw.XSeconds
 		count = -diff
 	case diff <= 0: // in the last 5 seconds
-		singular = diw.LessThanXSeconds.One
-		plural = diw.LessThanXSeconds.Other
+		forms = diw.LessThanXSeconds
 		count = 1
 	case diff < 60*10: // less than 10 minutes
-		singular = diw.LessThanXMinutes.One
-		plural = diw.LessThanXMinutes.Other
+		forms = diw.LessThanXMinutes
 		count = 1
 		isFuture = true
 	case diff < 60*50: // less than 50 minutes
-		singular = diw.XMinutes.One
-		plural = diw.XMinutes.Other
+		forms = diw.XMinutes
 		count = diff / 60
 		isFuture = true
 	case diff < 60*90: // less than 90 minutes
-		singular = diw.AboutXHours.One
-		plural = diw.AboutXHours.Other
+		forms = diw.AboutXHours
 		count = 1
 		isFuture = true
 	case diff < 60*60*2: // less than 2 hours
-		singular = diw.XMinutes.One
-		plural = diw.XMinutes.Other
+		forms = diw.XMinutes
 		count = diff / 60
 		isFuture = true
 	case diff < 60*60*23: // less than 23 hours
-		singular = diw.AboutXHours.One
-		plural = diw.AboutXHours.Other
+		forms = diw.AboutXHours
 		count = diff / 3600
 		isFuture = true
 	case diff < 60*60*36: // less than 36 hours
-		singular = diw.XDays.One
-		plural = diw.XDays.Other
+		forms = diw.XDays
 		count = 1
 		isFuture = true
 	case diff < 60*60*48: // less than 48 hours
-		singular = diw.AboutXHours.One
-		plural = diw.AboutXHours.Other
+		forms = diw.AboutXHours
 		count = diff / 3600
 		isFuture = true
 	case diff < 60*60*24*14: // less than 14 days
-		singular = diw.XDays.One
-		plural = diw.XDays.Other
+		forms = diw.XDays
 		count = diff / 86400
 		isFuture = true
 	default: // 2 weeks or more -- express as days since no x_weeks translation key exists
-		singular = diw.XDays.One
-		plural = diw.XDays.Other
+		forms = diw.XDays
 		count = diff / 86400
 		isFuture = true
 	}
 
-	expr := tp.localizedDistanceInWords(singular, plural, count)
+	expr := tp.localizedDistanceInWords(forms, count)
 	if expr == "" {
 		return relativeTimeDefault(diff)
 	}
