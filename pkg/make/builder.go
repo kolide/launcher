@@ -14,12 +14,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/user"
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -354,9 +356,22 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.version=%s"`, v))
 			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.branch=%s"`, branch))
 			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.revision=%s"`, revision))
-			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.buildDate=%s"`, time.Now().UTC().Format("2006-01-02")))
 			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.buildUser=%s (%s)"`, usr.Name, usr.Username))
 			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.goVersion=%s"`, runtime.Version()))
+
+			// https://reproducible-builds.org/docs/source-date-epoch/
+			sourceDateEpoch := os.Getenv("SOURCE_DATE_EPOCH")
+			var buildDate string
+			if sourceDateEpoch == "" {
+				buildDate = time.Now().UTC().Format(http.TimeFormat)
+			} else {
+				sde, err := strconv.ParseInt(sourceDateEpoch, 10, 64)
+				if err != nil {
+					return fmt.Errorf("invalid SOURCE_DATE_EPOCH '%s': %w", sourceDateEpoch, err)
+				}
+				buildDate = time.Unix(sde, 0).UTC().Format(http.TimeFormat)
+			}
+			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.buildDate=%s"`, buildDate))
 		}
 
 		if len(ldFlags) != 0 {
