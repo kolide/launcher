@@ -61,6 +61,8 @@ func (pf PluralForms) Select(locale string, count int64) string {
 		if pf.Many != "" {
 			return pf.Many
 		}
+	case plural.Other:
+		// handled by fallback below
 	}
 
 	return pf.Other
