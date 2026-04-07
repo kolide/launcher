@@ -62,9 +62,10 @@ func (tp *templateParser) localizedDistanceInWords(singular, plural string, coun
 	return strings.ReplaceAll(tmpl, "%{count}", strconv.FormatInt(count, 10))
 }
 
-// wrapRelative wraps a distance expression with the locale's past/future pattern
-// (e.g. "hace %{time}" -> "hace 2 horas"). Returns the expression unchanged
-// if no relative pattern is available.
+// wrapRelative wraps a distance expression with the locale's past/future pattern.
+// For example, given timeExpr "2 horas" and isFuture false, it looks up the past
+// pattern "hace %{time}" and returns "hace 2 horas". Returns the expression
+// unchanged if no relative pattern is available.
 func (tp *templateParser) wrapRelative(timeExpr string, isFuture bool) string {
 	t, ok := tp.locData.Translations[tp.locData.Locale]
 	if !ok {
