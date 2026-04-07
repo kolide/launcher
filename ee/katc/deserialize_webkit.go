@@ -755,14 +755,14 @@ func (w *webkitDeserializer) deserializeError() ([]byte, error) {
 	errorObj["message"] = string(msg)
 
 	// Read line
-	var line int32
+	var line uint32
 	if err := binary.Read(w.reader, binary.LittleEndian, &line); err != nil {
 		return nil, fmt.Errorf("reading error line: %w", err)
 	}
 	errorObj["lineNumber"] = strconv.Itoa(int(line))
 
 	// Read column
-	var column int32
+	var column uint32
 	if err := binary.Read(w.reader, binary.LittleEndian, &column); err != nil {
 		return nil, fmt.Errorf("reading error column: %w", err)
 	}
