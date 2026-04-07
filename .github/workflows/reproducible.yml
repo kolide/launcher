@@ -85,7 +85,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ./build1
-          key: ${{ runner.os }}-${{ github.run_id }}-reproducible-1
+          key: ${{ github.run_id }}-reproducible-1
           enableCrossOsArchive: true
 
   second_build:
@@ -96,7 +96,7 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - ubuntu-latest
+          - ubuntu-22.04
     steps:
       - name: Check out code
         id: checkout
@@ -146,7 +146,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ./build2
-          key: ${{ runner.os }}-${{ github.run_id }}-reproducible-2
+          key: ${{ github.run_id }}-reproducible-2
           enableCrossOsArchive: true
 
   verify:
@@ -163,14 +163,14 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: ./build1
-          key: ${{ runner.os }}-${{ github.run_id }}-reproducible-1
+          key: ${{ github.run_id }}-reproducible-1
           fail-on-cache-miss: true
           enableCrossOsArchive: true
       - name: cache restore build 2 output
         uses: actions/cache/restore@v5
         with:
           path: ./build2
-          key: ${{ runner.os }}-${{ github.run_id }}-reproducible-2
+          key: ${{ github.run_id }}-reproducible-2
           fail-on-cache-miss: true
           enableCrossOsArchive: true
       - name: Verify
