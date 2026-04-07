@@ -166,6 +166,7 @@ jobs:
           key: ${{ github.run_id }}-reproducible-1
           fail-on-cache-miss: true
           enableCrossOsArchive: true
+
       - name: cache restore build 2 output
         uses: actions/cache/restore@v5
         with:
@@ -173,6 +174,15 @@ jobs:
           key: ${{ github.run_id }}-reproducible-2
           fail-on-cache-miss: true
           enableCrossOsArchive: true
+
+      - name: Install diffoscope
+        run: |
+          sudo apt-get update
+          sudo apt-get -y install diffoscope
+
+      - name: Run diffoscope
+        run: diffoscope ./build1/linux.amd64/launcher ./build2/linux.amd64/launcher
+
       - name: Verify
         run: |
           VERSIONOUTPUT1=$(./build1/linux.amd64/launcher --version)
