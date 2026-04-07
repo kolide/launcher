@@ -365,75 +365,88 @@ func Test_Pluralize(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name   string
-		one    string
-		other  string
-		count  int64
-		expect string
+		name     string
+		singular string
+		plural   string
+		count    int64
+		expect   string
 	}{
 		{
-			name:   "singular",
-			one:    "%{count} minute",
-			other:  "%{count} minutes",
-			count:  1,
-			expect: "%{count} minute",
+			name:     "singular",
+			singular: "%{count} minute",
+			plural:   "%{count} minutes",
+			count:    1,
+			expect:   "%{count} minute",
 		},
 		{
-			name:   "plural",
-			one:    "%{count} minute",
-			other:  "%{count} minutes",
-			count:  5,
-			expect: "%{count} minutes",
+			name:     "plural",
+			singular: "%{count} minute",
+			plural:   "%{count} minutes",
+			count:    5,
+			expect:   "%{count} minutes",
 		},
 		{
-			name:   "zero uses other",
-			one:    "%{count} minute",
-			other:  "%{count} minutes",
-			count:  0,
-			expect: "%{count} minutes",
+			name:     "zero uses plural",
+			singular: "%{count} minute",
+			plural:   "%{count} minutes",
+			count:    0,
+			expect:   "%{count} minutes",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := pluralize(tt.one, tt.other, tt.count)
+			result := pluralize(tt.singular, tt.plural, tt.count)
 			assert.Equal(t, tt.expect, result)
 		})
 	}
 }
 
-func Test_Interpolate(t *testing.T) {
+func Test_localizedDistanceInWords(t *testing.T) {
 	t.Parallel()
 
+	tp := &templateParser{}
+
 	tests := []struct {
-		name   string
-		tmpl   string
-		count  int64
-		expect string
+		name     string
+		singular string
+		plural   string
+		count    int64
+		expect   string
 	}{
 		{
-			name:   "basic count replacement",
-			tmpl:   "%{count} minutes",
-			count:  15,
-			expect: "15 minutes",
+			name:     "basic count replacement",
+			singular: "%{count} minute",
+			plural:   "%{count} minutes",
+			count:    15,
+			expect:   "15 minutes",
 		},
 		{
-			name:   "no placeholder",
-			tmpl:   "half a minute",
-			count:  1,
-			expect: "half a minute",
+			name:     "no placeholder",
+			singular: "half a minute",
+			plural:   "half a minute",
+			count:    1,
+			expect:   "half a minute",
 		},
 		{
-			name:   "multiple count placeholders",
-			tmpl:   "%{count} of %{count}",
-			count:  3,
-			expect: "3 of 3",
+			name:     "multiple count placeholders",
+			singular: "%{count} of %{count}",
+			plural:   "%{count} of %{count}",
+			count:    3,
+			expect:   "3 of 3",
+		},
+		{
+			name:     "empty translations return empty string",
+			singular: "",
+			plural:   "",
+			count:    5,
+			expect:   "",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := interpolate(tt.tmpl, tt.count)
+			result := tp.localizedDistanceInWords(tt.singular, tt.plural, tt.count)
 			assert.Equal(t, tt.expect, result)
 		})
 	}

@@ -44,33 +44,22 @@ func NewTemplateParser(td *TemplateData, locData types.LocalizationData) *templa
 	}
 }
 
-// pluralize selects the One or Other form based on count.
-func pluralize(one, other string, count int64) string {
+// pluralize selects the singular or plural form based on count.
+func pluralize(singular, plural string, count int64) string {
 	if count == 1 {
-		return one
+		return singular
 	}
-	return other
-}
-
-// interpolate replaces %{count} and %{time} placeholders in a translation string.
-func interpolate(tmpl string, count int64) string {
-	result := strings.ReplaceAll(tmpl, "%{count}", strconv.FormatInt(count, 10))
-	return result
-}
-
-// interpolateTime replaces the %{time} placeholder with a time expression.
-func interpolateTime(tmpl string, timeExpr string) string {
-	return strings.ReplaceAll(tmpl, "%{time}", timeExpr)
+	return plural
 }
 
 // localizedDistanceInWords returns a localized distance expression (e.g. "2 horas"),
 // or an empty string if translations are unavailable for the configured locale.
-func (tp *templateParser) localizedDistanceInWords(one, other string, count int64) string {
-	tmpl := pluralize(one, other, count)
+func (tp *templateParser) localizedDistanceInWords(singular, plural string, count int64) string {
+	tmpl := pluralize(singular, plural, count)
 	if tmpl == "" {
 		return ""
 	}
-	return interpolate(tmpl, count)
+	return strings.ReplaceAll(tmpl, "%{count}", strconv.FormatInt(count, 10))
 }
 
 // wrapRelative wraps a distance expression with the locale's past/future pattern
@@ -91,7 +80,7 @@ func (tp *templateParser) wrapRelative(timeExpr string, isFuture bool) string {
 		return timeExpr
 	}
 
-	return interpolateTime(pattern, timeExpr)
+	return strings.ReplaceAll(pattern, "%{time}", timeExpr)
 }
 
 // hasLocalizationData returns true if the parser has a valid locale with translations.
