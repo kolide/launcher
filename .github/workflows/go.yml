@@ -227,7 +227,7 @@ jobs:
           if [ "$HASH1" = "$HASH2" ]; then
             echo "Builds match"
           else
-            echo "Builds differ"
+            echo "Builds differ: build 1: $HASH1: build 2: $HASH2"
             exit 1
           fi
 
