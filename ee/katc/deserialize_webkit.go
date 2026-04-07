@@ -256,6 +256,8 @@ func (w *webkitDeserializer) deserializeValue() ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("deserializing StringData following tag %d: %w", tag, err)
 		}
+		// The call to deserializeStringData added this string to the string pool --
+		// StringObjects should _also_ live in the object pool, so we add it here.
 		w.objectPool = append(w.objectPool, str)
 		return str, nil
 	case webkitEmptyStringObjectTag:
@@ -431,6 +433,9 @@ func (w *webkitDeserializer) deserializeArrayBufferView() ([]byte, error) {
 
 	// Next, we _would_ interpret the raw data based on the subtag. For now,
 	// though, we're just returning the raw uninterpreted data.
+	// The ArrayBufferView must additionally get added to the object pool, even if
+	// we've already added the enclosed ArrayBuffer, ObjectReference, etc as well --
+	// add it now.
 	w.objectPool = append(w.objectPool, rawData)
 	return rawData, nil
 }
