@@ -162,7 +162,7 @@ jobs:
     name: launcher-reproducible
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false # Consider changing this sometime
+      fail-fast: false
       matrix:
         os:
           - ubuntu-latest
@@ -181,7 +181,6 @@ jobs:
           cache: false
         id: go
 
-      # use bash, because the powershell syntax is different and this is a cross platform workflow
       - id: go-cache-paths
         shell: bash
         run: |
@@ -202,6 +201,9 @@ jobs:
 
       - name: Get dependencies
         run: make deps
+
+      - name: Set up zig
+        uses: mlugg/setup-zig@v2
       
       - name: Set time
         id: time
