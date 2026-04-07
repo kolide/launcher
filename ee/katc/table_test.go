@@ -141,7 +141,6 @@ WHERE ObjectStoreInfo.name = '%s';
 			// We should have the expected number of results in the row
 			require.Equal(t, tt.expectedRows, len(results), "unexpected number of rows returned: logs:", logBytes.String())
 
-			// In the TestQueryFirefoxIndexedDB function, add these require statements inside the for loop that checks columns
 			for i := 0; i < tt.expectedRows; i += 1 {
 				require.Contains(t, results[i], pathColumnName, "missing source column")
 				require.Equal(t, indexeddbDest, results[i][pathColumnName])
