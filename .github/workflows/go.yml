@@ -214,11 +214,13 @@ jobs:
         run: |
           make -j2 github-build SOURCE_DATE_EPOCH=${{ steps.time.outputs.sde }}
           mv build build1
+          ./build1/linux.amd64/launcher --version
       
       - name: Build 2
         run: |
           make -j2 github-build SOURCE_DATE_EPOCH=${{ steps.time.outputs.sde }}
           mv build build2
+          ./build2/linux.amd64/launcher --version
 
       - name: Verify
         run: |
@@ -227,7 +229,7 @@ jobs:
           if [ "$HASH1" = "$HASH2" ]; then
             echo "Builds match"
           else
-            echo "Builds differ: build 1: $HASH1: build 2: $HASH2"
+            echo "Builds differ: build 1: ${HASH1}: build 2: ${HASH2}"
             exit 1
           fi
 
