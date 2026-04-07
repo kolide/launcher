@@ -194,10 +194,9 @@ func zigTarget(goos, goarch string) string {
 
 // PlatformBinaryName is a helper to return the platform specific output path.
 func (b *Builder) PlatformBinaryName(input string) string {
-	// On windows, everything must end in .exe. Strip off the extension
-	// suffix, if present, and add .exe
+	// On windows, everything must end in .exe
 	if b.os == "windows" {
-		input = strings.TrimSuffix(input, ".ext") + ".exe"
+		input = input + ".exe"
 	}
 
 	platformName := fmt.Sprintf("%s.%s", b.os, b.arch)
