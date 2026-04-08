@@ -280,7 +280,7 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 			"arch", b.arch,
 		)
 
-		baseArgs := []string{"build", "-o", output}
+		baseArgs := []string{"build", "-o", output, "-buildvcs=false"}
 		if b.race {
 			baseArgs = append(baseArgs, "-race")
 		}
