@@ -31,6 +31,8 @@ type EncryptedBlob struct {
 	PSKID           string `json:"psk_id"`
 	EncapsulatedKey string `json:"encapsulated_key"` // base64 encoded
 	Ciphertext      string `json:"ciphertext"`       // base64 encoded
+	DeviceID        string `json:"device_id"`
+	OrganizationID  string `json:"organization_id"`
 }
 
 // parseKeyData parses a concatenated string of "keyID:b64(keyMaterial)" into KeyData
@@ -65,7 +67,7 @@ func parseKeyData(concatenated string) (*KeyData, error) {
 
 // encryptWithHPKE encrypts plaintext using HPKE with PSK mode
 // Uses X25519 KEM, HKDF-SHA256 KDF, and AES-256-GCM AEAD
-func encryptWithHPKE(plaintext []byte, hpkeKey *KeyData, psk *KeyData) (*EncryptedBlob, error) {
+func encryptWithHPKE(plaintext []byte, hpkeKey *KeyData, psk *KeyData, deviceID, organizationID string) (*EncryptedBlob, error) {
 	kemID := hpke.KEM_X25519_HKDF_SHA256
 	suite := hpke.NewSuite(kemID, hpke.KDF_HKDF_SHA256, hpke.AEAD_AES256GCM)
 
@@ -89,7 +91,6 @@ func encryptWithHPKE(plaintext []byte, hpkeKey *KeyData, psk *KeyData) (*Encrypt
 
 	// encrypt the plaintext with the associated data (aad). The aad should include any information
 	// that should be cryptographically authenticated but available in plaintext to the receiver.
-	// TODO: (upcoming PR) add metadata here for k2 (probably device id and encryption suite)
 	ciphertext, err := sealer.Seal(plaintext, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encrypt plaintext: %w", err)
@@ -105,5 +106,7 @@ func encryptWithHPKE(plaintext []byte, hpkeKey *KeyData, psk *KeyData) (*Encrypt
 		PSKID:           psk.KeyID,
 		EncapsulatedKey: encapsulatedKeyB64,
 		Ciphertext:      ciphertextB64,
+		DeviceID:        deviceID,
+		OrganizationID:  organizationID,
 	}, nil
 }

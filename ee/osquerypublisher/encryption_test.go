@@ -88,9 +88,10 @@ func TestEncryptWithHPKE(t *testing.T) {
 	}
 
 	plaintext := []byte("test plaintext message")
-
+	expectedDeviceID := "12345"
+	expectedOrganizationID := "54321"
 	// Encrypt
-	encryptedBlob, err := encryptWithHPKE(plaintext, hpkeKey, psk)
+	encryptedBlob, err := encryptWithHPKE(plaintext, hpkeKey, psk, expectedDeviceID, expectedOrganizationID)
 	require.NoError(t, err)
 	require.NotNil(t, encryptedBlob)
 
@@ -100,7 +101,8 @@ func TestEncryptWithHPKE(t *testing.T) {
 	require.Equal(t, psk.KeyID, encryptedBlob.PSKID)
 	require.NotEmpty(t, encryptedBlob.EncapsulatedKey)
 	require.NotEmpty(t, encryptedBlob.Ciphertext)
-
+	require.Equal(t, expectedDeviceID, encryptedBlob.DeviceID)
+	require.Equal(t, expectedOrganizationID, encryptedBlob.OrganizationID)
 	// Decrypt to verify round-trip (using the private key we generated)
 	encapsulatedKeyBytes, err := base64.StdEncoding.DecodeString(encryptedBlob.EncapsulatedKey)
 	require.NoError(t, err, "encapsulated key should be valid base64")

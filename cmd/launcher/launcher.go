@@ -457,7 +457,6 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		controlService.RegisterSubscriber(katcSubsystemName, osqueryRunner)
 		controlService.RegisterSubscriber(katcSubsystemName, startupSettingsWriter)
 		controlService.RegisterConsumer(serverReleaseTrackerDataSubsystemName, keyvalueconsumer.NewConfigConsumer(k.ServerReleaseTrackerDataStore()))
-
 		// Manage filewalkers and handle updates to filewalk configs
 		filewalkManager := filewalker.New(k, slogger)
 		runGroup.Add("filewalkManager", filewalkManager.Execute, filewalkManager.Interrupt)
@@ -545,7 +544,10 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			controlService.RegisterSubscriber(authTokensSubsystemName, telemetryExporter)
 		}
 
+		// logPublishClient handles refreshing it's own auth tokens and encryption keys from the token store
 		controlService.RegisterSubscriber(authTokensSubsystemName, logPublishClient)
+		// logPublishClient handles embedding device metadata into encrypted payloads, subscribe to any changes in e.g. device ID
+		controlService.RegisterSubscriber(serverDataSubsystemName, logPublishClient)
 
 		if metadataWriter := internal.NewMetadataWriter(slogger, k); metadataWriter == nil {
 			slogger.Log(ctx, slog.LevelError,
