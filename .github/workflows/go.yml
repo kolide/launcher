@@ -14,6 +14,8 @@ jobs:
   # Our non-containerized launcher builds -- macOS and Windows. Linux is handled separately
   # below to preserve Ubuntu 20.04 support.
   build:
+    permissions:
+      contents: read
     name: launcher
     runs-on: ${{ matrix.os }}
     strategy:
@@ -92,6 +94,8 @@ jobs:
   # in order to continue to support that platform, but that GH runner has been EOL'ed --
   # so we have a separate build here in an ubuntu:20.04 container instead.
   build_linux:
+    permissions:
+      contents: read
     name: launcher (linux)
     runs-on: ubuntu-22.04
     container: ubuntu:20.04 # Required to support launcher on Ubuntu 20.04
@@ -163,6 +167,8 @@ jobs:
   # that the version of launcher is the same across all runners. We run this job in a container
   # to confirm launcher support on ubuntu 20.04, since runners no longer support ubuntu 20.04.
   version_baseline:
+    permissions:
+      contents: read
     name: Version Baseline
     runs-on: ubuntu-22.04
     container: ubuntu:20.04
@@ -190,6 +196,8 @@ jobs:
         run: ./launcher --version 2>/dev/null | awk '/version /{print "version="$4}' >> "$GITHUB_OUTPUT"
 
   launcher_test:
+    permissions:
+      contents: read
     name: test
     needs:
       - build # a desktop runner test requires a build to exist
@@ -254,6 +262,8 @@ jobs:
           if-no-files-found: error
 
   launcher_table_test:
+    permissions:
+      contents: read
     name: Launcher table performance test
     needs:
       - build
@@ -375,6 +385,8 @@ jobs:
           if-no-files-found: error
 
   exec_testing:
+    permissions:
+      contents: read
     name: Exec Test
     runs-on: ${{ matrix.os }}
     strategy:
@@ -426,6 +438,8 @@ jobs:
         run: ./launcher doctor
 
   container_exec_testing:
+    permissions:
+      contents: read
     name: Exec Test Containers
     runs-on: ubuntu-22.04
     container: ${{ matrix.container }}
@@ -505,6 +519,8 @@ jobs:
   # If the prior exec tests suceeded, this grabs the cached things, and moves them to artifacts. We ought
   # be able to do this entirely on ubuntu, so let's try!
   store_artifacts:
+    permissions:
+      contents: read
     name: Store Artifacts
     runs-on: ubuntu-22.04
     strategy:
@@ -535,6 +551,8 @@ jobs:
           if-no-files-found: error
 
   package_builder_test:
+    permissions:
+      contents: read
     name: package_builder
     runs-on: ${{ matrix.os }}
     strategy:
