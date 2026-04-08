@@ -11,6 +11,8 @@ on:
 
 jobs:
   golangci:
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -39,6 +41,8 @@ jobs:
         if: ${{ always() }}
         run: golangci-lint run
   govulncheck:
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -77,6 +81,8 @@ jobs:
           fi
 
   table_specs:
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -105,6 +111,8 @@ jobs:
   # the merge dependency from being on all the jobs to this single
   # one.
   lint_mergeable:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - run: true
