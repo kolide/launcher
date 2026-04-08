@@ -194,7 +194,7 @@ jobs:
             echo "Builds match"
           else
             echo "Builds differ: build 1: ${HASH1}: build 2: ${HASH2}"
-            diffoscope ./build1/launcher ./build2/launcher
+            diffoscope ./build1/launcher ./build2/launcher --html diffoscope.html
           fi
 
       - name: Verify (Windows)
@@ -206,5 +206,13 @@ jobs:
             echo "Builds match"
           else
             echo "Builds differ: build 1: ${HASH1}: build 2: ${HASH2}"
-            diffoscope ./build1/launcher.exe ./build2/launcher.exe
+            diffoscope ./build1/launcher.exe ./build2/launcher.exe --html diffoscope.html
           fi
+
+      - name: Upload diffoscope output
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.runneros }}-diffoscope
+          path: ./diffoscope.html
+          if-no-files-found: ignore
