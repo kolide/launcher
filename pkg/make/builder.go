@@ -113,7 +113,7 @@ func New(opts ...Option) *Builder {
 		os:     runtime.GOOS,
 		arch:   runtime.GOARCH,
 		goPath: "go",
-		goVer:  strings.TrimPrefix(runtime.Version(), "go"),
+		goVer:  strings.TrimPrefix(strings.Split(runtime.Version(), " ")[0], "go"),
 
 		execCC: exec.CommandContext, //nolint:forbidigo // Fine to use exec.CommandContext outside of launcher proper
 	}
