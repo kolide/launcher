@@ -23,6 +23,11 @@ import (
 	"go.uber.org/goleak"
 )
 
+const (
+	testDeviceID       string = "12345"
+	testOrganizationID string = "54321"
+)
+
 func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m)
 }
@@ -34,6 +39,16 @@ type mockHTTPClient struct {
 func (m *mockHTTPClient) Do(req *http.Request) (*http.Response, error) {
 	args := m.Called(req)
 	return args.Get(0).(*http.Response), args.Error(1)
+}
+
+func testServerProvidedDataStore(t *testing.T) types.KVStore {
+	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ServerProvidedDataStore.String())
+	require.NoError(t, err)
+	err = store.Set([]byte("device_id"), []byte(testDeviceID))
+	require.NoError(t, err)
+	err = store.Set([]byte("organization_id"), []byte(testOrganizationID))
+	require.NoError(t, err)
+	return store
 }
 
 func TestLogPublisherClient_PublishLogs(t *testing.T) {
@@ -87,6 +102,7 @@ func TestLogPublisherClient_PublishLogs(t *testing.T) {
 			err = tokenStore.Set(storage.AgentIngesterHPKEPresharedKey, []byte("test-psk-id:"+base64.StdEncoding.EncodeToString([]byte("test-psk-key-data"))))
 			require.NoError(t, err)
 			mockKnapsack.On("TokenStore").Return(tokenStore).Maybe()
+			mockKnapsack.On("ServerProvidedDataStore").Return(testServerProvidedDataStore(t)).Maybe()
 
 			resp := &http.Response{
 				StatusCode: tt.responseStatus,
@@ -166,6 +182,7 @@ func TestLogPublisherClient_PublishResults(t *testing.T) {
 			err = tokenStore.Set(storage.AgentIngesterHPKEPresharedKey, []byte("test-psk-id:"+base64.StdEncoding.EncodeToString([]byte("test-psk-key-data"))))
 			require.NoError(t, err)
 			mockKnapsack.On("TokenStore").Return(tokenStore).Maybe()
+			mockKnapsack.On("ServerProvidedDataStore").Return(testServerProvidedDataStore(t)).Maybe()
 
 			resp := &http.Response{
 				StatusCode: tt.responseStatus,
@@ -659,6 +676,7 @@ func TestLogPublisherClient_refreshTokenCache_WithHPKEKeys(t *testing.T) {
 
 	mockKnapsack.On("OsqueryPublisherURL").Return("https://example.com").Maybe()
 	mockKnapsack.On("OsqueryPublisherPercentEnabled").Return(100).Maybe()
+	mockKnapsack.On("ServerProvidedDataStore").Return(testServerProvidedDataStore(t)).Maybe()
 
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
