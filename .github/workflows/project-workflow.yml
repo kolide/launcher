@@ -11,6 +11,8 @@ on:
 
 jobs:
   add_to_board:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/add-to-project@v0.3.0
