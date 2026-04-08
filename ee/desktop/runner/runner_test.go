@@ -17,6 +17,7 @@ import (
 
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/v2/ee/agent/flags/keys"
+	"github.com/kolide/launcher/v2/ee/agent/types"
 	"github.com/kolide/launcher/v2/ee/agent/types/mocks"
 	"github.com/kolide/launcher/v2/ee/consoleuser"
 	"github.com/kolide/launcher/v2/ee/desktop/user/notify"
@@ -154,6 +155,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			mockKnapsack.On("Slogger").Return(slogger)
 			mockKnapsack.On("InModernStandby").Return(false)
 			mockKnapsack.On("SystrayRestartEnabled").Return(false).Maybe()
+			mockKnapsack.On("LocalizationData").Return(types.LocalizationData{}).Maybe()
 
 			if os.Getenv("CI") != "true" || runtime.GOOS != "linux" {
 				// Only expect that we call Debug (to set the DEBUG flag on the process) if we actually expect
@@ -391,6 +393,7 @@ func TestUpdate(t *testing.T) {
 			mockKnapsack.On("KolideServerURL").Return("somewhere-over-the-rainbow.example.com")
 			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 			mockKnapsack.On("InModernStandby").Return(false)
+			mockKnapsack.On("LocalizationData").Return(types.LocalizationData{}).Maybe()
 
 			dir := t.TempDir()
 			r, err := New(mockKnapsack, nil, WithUsersFilesRoot(dir))
@@ -430,6 +433,7 @@ func TestSendNotification_NoProcessesYet(t *testing.T) {
 	mockKnapsack.On("DesktopEnabled").Return(true)
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 	mockKnapsack.On("InModernStandby").Return(false)
+	mockKnapsack.On("LocalizationData").Return(types.LocalizationData{}).Maybe()
 
 	dir := t.TempDir()
 	r, err := New(mockKnapsack, nil, WithUsersFilesRoot(dir))
