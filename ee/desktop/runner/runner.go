@@ -749,7 +749,7 @@ func (r *DesktopUsersProcessesRunner) generateMenuFile() error {
 	}
 
 	// Convert the raw JSON to a string and feed it to the parser for template expansion
-	parser := menu.NewTemplateParser(td)
+	parser := menu.NewTemplateParser(td, r.knapsack.LocalizationData())
 	parsedMenuDataStr, err := parser.Parse(string(menuTemplateFileBytes))
 	if err != nil {
 		return fmt.Errorf("failed to parse menu data: %w", err)

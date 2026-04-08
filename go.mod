@@ -144,7 +144,7 @@ require (
 )
 
 require (
-	github.com/BurntSushi/toml v1.1.0 // indirect
+	github.com/BurntSushi/toml v1.1.0
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/fsnotify/fsnotify v1.8.0 // indirect
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
@@ -174,6 +174,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-go 1.25.8
+go 1.25.9
 
 replace github.com/go-ole/go-ole v1.3.0 => github.com/kolide/go-ole v0.0.0-20241008210444-65130153c767
