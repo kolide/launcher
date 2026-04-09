@@ -3,6 +3,7 @@ package osquerypublisher
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -29,10 +30,17 @@ type EncryptedBlob struct {
 	Version         int    `json:"version"`
 	HPKEKeyID       string `json:"hpke_key_id"`
 	PSKID           string `json:"psk_id"`
-	EncapsulatedKey string `json:"encapsulated_key"` // base64 encoded
+	EncapsulatedKey string `json:"encapsulated_key"` // base64 encoded (PSK-mode HPKE for payload)
 	Ciphertext      string `json:"ciphertext"`       // base64 encoded
-	DeviceID        string `json:"device_id"`
-	OrganizationID  string `json:"organization_id"`
+	// Metadata uses HPKE base mode (separate handshake from the PSK payload)
+	MetadataEncapsulatedKey string `json:"metadata_encapsulated_key"` // base64 encoded
+	MetadataCiphertext      string `json:"metadata_ciphertext"`       // base64 encoded
+}
+
+// Metadata represents the metadata required for data routing
+type Metadata struct {
+	DeviceID       string `json:"device_id"`
+	OrganizationID string `json:"organization_id"`
 }
 
 // parseKeyData parses a concatenated string of "keyID:b64(keyMaterial)" into KeyData
@@ -65,8 +73,8 @@ func parseKeyData(concatenated string) (*KeyData, error) {
 	}, nil
 }
 
-// encryptWithHPKE encrypts plaintext using HPKE with PSK mode
-// Uses X25519 KEM, HKDF-SHA256 KDF, and AES-256-GCM AEAD
+// encryptWithHPKE encrypts plaintext in HPKE PSK mode and metadata in a separate HPKE base-mode
+// handshake (same KEM/KDF/AEAD: X25519, HKDF-SHA256, AES-256-GCM).
 func encryptWithHPKE(plaintext []byte, hpkeKey *KeyData, psk *KeyData, deviceID, organizationID string) (*EncryptedBlob, error) {
 	kemID := hpke.KEM_X25519_HKDF_SHA256
 	suite := hpke.NewSuite(kemID, hpke.KDF_HKDF_SHA256, hpke.AEAD_AES256GCM)
@@ -99,14 +107,37 @@ func encryptWithHPKE(plaintext []byte, hpkeKey *KeyData, psk *KeyData, deviceID,
 	// b64 encode the outputs
 	encapsulatedKeyB64 := base64.StdEncoding.EncodeToString(encapsulatedKey)
 	ciphertextB64 := base64.StdEncoding.EncodeToString(ciphertext)
+	metadata := &Metadata{
+		DeviceID:       deviceID,
+		OrganizationID: organizationID,
+	}
+	metadataJSON, err := json.Marshal(metadata)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal metadata: %w", err)
+	}
+
+	metaSender, err := suite.NewSender(pkR, []byte(hpkeDomain))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HPKE sender for metadata: %w", err)
+	}
+	metadataEncapsulatedKey, metadataSealer, err := metaSender.Setup(rand.Reader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to setup HPKE base encryption for metadata: %w", err)
+	}
+	metadataCiphertext, err := metadataSealer.Seal(metadataJSON, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encrypt metadata: %w", err)
+	}
+	metadataEncapsulatedKeyB64 := base64.StdEncoding.EncodeToString(metadataEncapsulatedKey)
+	metadataCiphertextB64 := base64.StdEncoding.EncodeToString(metadataCiphertext)
 
 	return &EncryptedBlob{
-		Version:         currentEncryptedBlobVersion,
-		HPKEKeyID:       hpkeKey.KeyID,
-		PSKID:           psk.KeyID,
-		EncapsulatedKey: encapsulatedKeyB64,
-		Ciphertext:      ciphertextB64,
-		DeviceID:        deviceID,
-		OrganizationID:  organizationID,
+		Version:                 currentEncryptedBlobVersion,
+		HPKEKeyID:               hpkeKey.KeyID,
+		PSKID:                   psk.KeyID,
+		EncapsulatedKey:         encapsulatedKeyB64,
+		Ciphertext:              ciphertextB64,
+		MetadataEncapsulatedKey: metadataEncapsulatedKeyB64,
+		MetadataCiphertext:      metadataCiphertextB64,
 	}, nil
 }

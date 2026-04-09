@@ -2,6 +2,7 @@ package osquerypublisher
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"testing"
 
 	"github.com/cloudflare/circl/hpke"
@@ -101,8 +102,8 @@ func TestEncryptWithHPKE(t *testing.T) {
 	require.Equal(t, psk.KeyID, encryptedBlob.PSKID)
 	require.NotEmpty(t, encryptedBlob.EncapsulatedKey)
 	require.NotEmpty(t, encryptedBlob.Ciphertext)
-	require.Equal(t, expectedDeviceID, encryptedBlob.DeviceID)
-	require.Equal(t, expectedOrganizationID, encryptedBlob.OrganizationID)
+	require.NotEmpty(t, encryptedBlob.MetadataEncapsulatedKey)
+	require.NotEmpty(t, encryptedBlob.MetadataCiphertext)
 	// Decrypt to verify round-trip (using the private key we generated)
 	encapsulatedKeyBytes, err := base64.StdEncoding.DecodeString(encryptedBlob.EncapsulatedKey)
 	require.NoError(t, err, "encapsulated key should be valid base64")
@@ -119,4 +120,20 @@ func TestEncryptWithHPKE(t *testing.T) {
 	decrypted, err := opener.Open(ciphertextBytes, nil)
 	require.NoError(t, err)
 	require.Equal(t, plaintext, decrypted, "decrypted plaintext should match original")
+
+	metaEncBytes, err := base64.StdEncoding.DecodeString(encryptedBlob.MetadataEncapsulatedKey)
+	require.NoError(t, err)
+	metaCipherBytes, err := base64.StdEncoding.DecodeString(encryptedBlob.MetadataCiphertext)
+	require.NoError(t, err)
+
+	metaReceiver, err := suite.NewReceiver(skR, []byte(hpkeDomain))
+	require.NoError(t, err)
+	metaOpener, err := metaReceiver.Setup(metaEncBytes)
+	require.NoError(t, err)
+	metadataPlain, err := metaOpener.Open(metaCipherBytes, nil)
+	require.NoError(t, err)
+	var gotMeta Metadata
+	require.NoError(t, json.Unmarshal(metadataPlain, &gotMeta))
+	require.Equal(t, expectedDeviceID, gotMeta.DeviceID)
+	require.Equal(t, expectedOrganizationID, gotMeta.OrganizationID)
 }
