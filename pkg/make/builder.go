@@ -342,13 +342,13 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.goVersion=%s"`, runtime.Version()))
 
 			// https://reproducible-builds.org/docs/source-date-epoch/
-			sourceDateEpoch := os.Getenv("SOURCE_DATE_EPOCH")
+			sourceDateEpoch := os.Getenv("BUILD_DATE")
 			if sourceDateEpoch == "" {
-				return errors.New("must specify SOURCE_DATE_EPOCH with linkstamp option")
+				return errors.New("must specify BUILD_DATE with linkstamp option")
 			}
 			sde, err := strconv.ParseInt(sourceDateEpoch, 10, 64)
 			if err != nil {
-				return fmt.Errorf("invalid SOURCE_DATE_EPOCH '%s': %w", sourceDateEpoch, err)
+				return fmt.Errorf("invalid BUILD_DATE '%s': %w", sourceDateEpoch, err)
 			}
 			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.buildDate=%s"`, time.Unix(sde, 0).UTC().Format(http.TimeFormat)))
 		}
