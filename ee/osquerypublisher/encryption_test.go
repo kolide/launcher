@@ -91,8 +91,13 @@ func TestEncryptWithHPKE(t *testing.T) {
 	plaintext := []byte("test plaintext message")
 	expectedDeviceID := "12345"
 	expectedOrganizationID := "54321"
-	// Encrypt
-	encryptedBlob, err := encryptWithHPKE(plaintext, hpkeKey, psk, expectedDeviceID, expectedOrganizationID)
+	metadataJSON, err := json.Marshal(&Metadata{
+		DeviceID:       expectedDeviceID,
+		OrganizationID: expectedOrganizationID,
+	})
+	require.NoError(t, err)
+
+	encryptedBlob, err := encryptWithHPKE(plaintext, hpkeKey, psk, metadataJSON)
 	require.NoError(t, err)
 	require.NotNil(t, encryptedBlob)
 

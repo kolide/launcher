@@ -3,7 +3,6 @@ package osquerypublisher
 import (
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -16,6 +15,12 @@ const (
 	keyDelimiter                string = ":"
 	currentEncryptedBlobVersion int    = 1
 	hpkeDomain                  string = "AGENT_INGESTER_UPLOAD_ENC_V1"
+	// the payloadAAD stays unencrypted and is used to authenticate the payload to ensure the message hasn't
+	// been tampered with in transit. The receiver/decrypter must provide the same value in their decryption flow.
+	// Using the encryption suite is common practice for this type of data, but it is only important that whatever the value
+	// is cryptographically authenticated. If we chose to use a new suite and wanted to update this value, we should bump the
+	// EncryptedBlob version so that the receiver knows to utilize a newer AAD value.
+	// payloadAAD                  string = "HPKE-PSK-X25519-HKDF-SHA256-AES-256-GCM"
 )
 
 // KeyData holds a key and it's corresponding identifier.
@@ -73,9 +78,12 @@ func parseKeyData(concatenated string) (*KeyData, error) {
 	}, nil
 }
 
-// encryptWithHPKE encrypts plaintext in HPKE PSK mode and metadata in a separate HPKE base-mode
-// handshake (same KEM/KDF/AEAD: X25519, HKDF-SHA256, AES-256-GCM).
-func encryptWithHPKE(plaintext []byte, hpkeKey *KeyData, psk *KeyData, deviceID, organizationID string) (*EncryptedBlob, error) {
+// encryptWithHPKE encrypts plaintext in HPKE PSK mode and metadataJSON in a separate HPKE base-mode
+// handshake (same KEM/KDF/AEAD: X25519, HKDF-SHA256, AES-256-GCM). metadataJSON must be non-empty.
+func encryptWithHPKE(plaintext []byte, hpkeKey *KeyData, psk *KeyData, metadataJSON []byte) (*EncryptedBlob, error) {
+	if len(metadataJSON) == 0 {
+		return nil, errors.New("metadata JSON is empty")
+	}
 	kemID := hpke.KEM_X25519_HKDF_SHA256
 	suite := hpke.NewSuite(kemID, hpke.KDF_HKDF_SHA256, hpke.AEAD_AES256GCM)
 
@@ -107,14 +115,6 @@ func encryptWithHPKE(plaintext []byte, hpkeKey *KeyData, psk *KeyData, deviceID,
 	// b64 encode the outputs
 	encapsulatedKeyB64 := base64.StdEncoding.EncodeToString(encapsulatedKey)
 	ciphertextB64 := base64.StdEncoding.EncodeToString(ciphertext)
-	metadata := &Metadata{
-		DeviceID:       deviceID,
-		OrganizationID: organizationID,
-	}
-	metadataJSON, err := json.Marshal(metadata)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal metadata: %w", err)
-	}
 
 	metaSender, err := suite.NewSender(pkR, []byte(hpkeDomain))
 	if err != nil {

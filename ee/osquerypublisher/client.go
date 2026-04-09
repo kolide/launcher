@@ -11,6 +11,7 @@ import (
 	"math/rand"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/kolide/kit/contexts/uuid"
@@ -36,29 +37,26 @@ type (
 	// LogPublisherClient adheres to the Publisher interface. It handles log publication
 	// to the agent-ingester microservice
 	LogPublisherClient struct {
-		slogger        *slog.Logger
-		knapsack       types.Knapsack
-		client         PublisherHTTPClient
-		authTokens     map[string]string
-		hpkeKeys       map[string]*KeyData
-		psks           map[string]*KeyData
-		tokensMutex    *sync.RWMutex // used to protect the authTokens, hpkeKeys, and psks maps
-		deviceID       string        // cached device id from server provided data store used for the encrypted blob
-		organizationID string        // cached organization id from server provided data store used for the encrypted blob
-		metadataMutex  *sync.RWMutex // used to protect the encrypted blob metadata fields (device id, org id)
+		slogger      *slog.Logger
+		knapsack     types.Knapsack
+		client       PublisherHTTPClient
+		authTokens   map[string]string
+		hpkeKeys     map[string]*KeyData
+		psks         map[string]*KeyData
+		tokensMutex  *sync.RWMutex          // used to protect the authTokens, hpkeKeys, and psks maps
+		metadataJSON atomic.Pointer[[]byte] // cached JSON for encrypted blob metadata (see refreshServerMetadata)
 	}
 )
 
 func NewLogPublisherClient(logger *slog.Logger, k types.Knapsack, client PublisherHTTPClient) types.OsqueryPublisher {
 	lpc := LogPublisherClient{
-		slogger:       logger.With("component", "osquery_log_publisher"),
-		knapsack:      k,
-		client:        client,
-		authTokens:    make(map[string]string),
-		tokensMutex:   &sync.RWMutex{},
-		hpkeKeys:      make(map[string]*KeyData),
-		psks:          make(map[string]*KeyData),
-		metadataMutex: &sync.RWMutex{},
+		slogger:     logger.With("component", "osquery_log_publisher"),
+		knapsack:    k,
+		client:      client,
+		authTokens:  make(map[string]string),
+		tokensMutex: &sync.RWMutex{},
+		hpkeKeys:    make(map[string]*KeyData),
+		psks:        make(map[string]*KeyData),
 	}
 
 	lpc.refreshTokenCache()
@@ -161,16 +159,11 @@ func (lpc *LogPublisherClient) PublishResults(ctx context.Context, results []dis
 // includes marshalling the payload, fetching the auth token, issuing the request, and handling the response/logging.
 func (lpc *LogPublisherClient) publish(ctx context.Context, slogger *slog.Logger, payload any, publicationPath string) (*types.OsqueryPublicationResponse, error) {
 	var err error
-	// copy over the cached metadata to avoid race conditions
-	lpc.metadataMutex.RLock()
-	deviceID := lpc.deviceID
-	organizationID := lpc.organizationID
-	lpc.metadataMutex.RUnlock()
-	// don't bother publishing the payloadif we don't have the device ID or organization ID,
-	// we wouldn't know how to handle the payload downstream anyway
-	if deviceID == "" || organizationID == "" {
-		return nil, errors.New("no device ID or organization ID found, skipping publication")
+	metaPtr := lpc.metadataJSON.Load()
+	if metaPtr == nil || len(*metaPtr) == 0 {
+		return nil, errors.New("no publication metadata available, skipping publication")
 	}
+	metadataJSON := *metaPtr
 	// in the future we will want to plumb an enrollment ID through here, for now just use the default
 	enrollmentID := types.DefaultEnrollmentID
 	authToken := lpc.getTokenForEnrollment(enrollmentID)
@@ -195,7 +188,7 @@ func (lpc *LogPublisherClient) publish(ctx context.Context, slogger *slog.Logger
 
 	// TODO: (upcoming PR) data should be compressed here prior to encryption
 	// encrypt the payload
-	encryptedBlob, err := encryptWithHPKE(jsonData, hpkeKey, psk, deviceID, organizationID)
+	encryptedBlob, err := encryptWithHPKE(jsonData, hpkeKey, psk, metadataJSON)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encrypt payload with HPKE: %w", err)
 	}
@@ -268,15 +261,16 @@ func (lpc *LogPublisherClient) refreshServerMetadata() {
 
 	if store == nil { // should never happen but sanity check
 		lpc.slogger.Log(context.TODO(), slog.LevelWarn,
-			"ServerProvidedDataStore is not set, skipping AAD metadata refresh",
+			"ServerProvidedDataStore is not set, skipping metadata refresh",
 		)
 		return
 	}
 
+	// any errors encountered here are likely transient, don't clear the metadata cache on failure
 	deviceID, err := store.Get([]byte("device_id"))
 	if err != nil {
 		lpc.slogger.Log(context.TODO(), slog.LevelWarn,
-			"failed to fetch device ID from ServerProvidedDataStore, skipping AAD metadata refresh",
+			"failed to fetch device ID from ServerProvidedDataStore, skipping metadata refresh",
 			"err", err,
 		)
 		return
@@ -285,16 +279,33 @@ func (lpc *LogPublisherClient) refreshServerMetadata() {
 	organizationID, err := store.Get([]byte("organization_id"))
 	if err != nil {
 		lpc.slogger.Log(context.TODO(), slog.LevelWarn,
-			"failed to fetch organization ID from ServerProvidedDataStore, skipping AAD metadata refresh",
+			"failed to fetch organization ID from ServerProvidedDataStore, skipping metadata refresh",
 			"err", err,
 		)
 		return
 	}
 
-	lpc.metadataMutex.Lock()
-	defer lpc.metadataMutex.Unlock()
-	lpc.deviceID = string(deviceID)
-	lpc.organizationID = string(organizationID)
+	// if we legitimately don't have a device or organization ID, clear the metadata cache so we
+	// do not attempt to publish any logs/results. These would not be able to be routed or decrypted correctly
+	if len(deviceID) == 0 || len(organizationID) == 0 {
+		lpc.metadataJSON.Store(nil)
+		return
+	}
+
+	metadata := &Metadata{
+		DeviceID:       string(deviceID),
+		OrganizationID: string(organizationID),
+	}
+	encoded, err := json.Marshal(metadata)
+	if err != nil {
+		lpc.slogger.Log(context.TODO(), slog.LevelWarn,
+			"failed to marshal publication metadata, skipping metadata refresh",
+			"err", err,
+		)
+		return
+	}
+
+	lpc.metadataJSON.Store(&encoded)
 }
 
 // refreshTokenCache loads in the agent ingester auth token, HPKE keys, and PSKs from the TokenStore
