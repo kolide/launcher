@@ -121,11 +121,13 @@ func FetchBinary(ctx context.Context, localCacheDir, name, binaryName, channelOr
 	return localBinaryPath, nil
 }
 
+func isChannel(channelOrVersion string) bool {
+	return channelOrVersion == "stable" || channelOrVersion == "beta" || channelOrVersion == "nightly" || channelOrVersion == "alpha"
+}
+
 func dlTarPath(name, channelOrVersion, platform, arch string) (string, error) {
 	// Figure out if we're downloading a specific version or a channel
-	isChannel := channelOrVersion == "stable" || channelOrVersion == "beta" || channelOrVersion == "nightly" || channelOrVersion == "alpha"
-
-	if !isChannel {
+	if !isChannel(channelOrVersion) {
 		// We're requesting a version, not a channel, so we already know where the download lives.
 		return dlTarPathFromVersion(name, channelOrVersion, platform, arch), nil
 	}
