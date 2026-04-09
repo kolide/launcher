@@ -20,7 +20,8 @@ const (
 	// Using the encryption suite is common practice for this type of data, but it is only important that whatever the value
 	// is cryptographically authenticated. If we chose to use a new suite and wanted to update this value, we should bump the
 	// EncryptedBlob version so that the receiver knows to utilize a newer AAD value.
-	// payloadAAD                  string = "HPKE-PSK-X25519-HKDF-SHA256-AES-256-GCM"
+	payloadAAD  string = "HPKE-PSK-X25519-HKDF-SHA256-AES-256-GCM"
+	metadataAAD string = "HPKE-BASE-X25519-HKDF-SHA256-AES-256-GCM"
 )
 
 // KeyData holds a key and it's corresponding identifier.
@@ -106,8 +107,8 @@ func encryptWithHPKE(plaintext []byte, hpkeKey *KeyData, psk *KeyData, metadataJ
 	}
 
 	// encrypt the plaintext with the associated data (aad). The aad should include any information
-	// that should be cryptographically authenticated but available in plaintext to the receiver.
-	ciphertext, err := sealer.Seal(plaintext, nil)
+	// that should be cryptographically authenticated but can be available in plaintext to the receiver.
+	ciphertext, err := sealer.Seal(plaintext, []byte(payloadAAD))
 	if err != nil {
 		return nil, fmt.Errorf("failed to encrypt plaintext: %w", err)
 	}
@@ -124,7 +125,7 @@ func encryptWithHPKE(plaintext []byte, hpkeKey *KeyData, psk *KeyData, metadataJ
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup HPKE base encryption for metadata: %w", err)
 	}
-	metadataCiphertext, err := metadataSealer.Seal(metadataJSON, nil)
+	metadataCiphertext, err := metadataSealer.Seal(metadataJSON, []byte(metadataAAD))
 	if err != nil {
 		return nil, fmt.Errorf("failed to encrypt metadata: %w", err)
 	}

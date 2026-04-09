@@ -122,7 +122,7 @@ func TestEncryptWithHPKE(t *testing.T) {
 	opener, err := receiver.SetupPSK(encapsulatedKeyBytes, psk.Key, []byte(psk.KeyID))
 	require.NoError(t, err)
 
-	decrypted, err := opener.Open(ciphertextBytes, nil)
+	decrypted, err := opener.Open(ciphertextBytes, []byte(payloadAAD))
 	require.NoError(t, err)
 	require.Equal(t, plaintext, decrypted, "decrypted plaintext should match original")
 
@@ -135,7 +135,7 @@ func TestEncryptWithHPKE(t *testing.T) {
 	require.NoError(t, err)
 	metaOpener, err := metaReceiver.Setup(metaEncBytes)
 	require.NoError(t, err)
-	metadataPlain, err := metaOpener.Open(metaCipherBytes, nil)
+	metadataPlain, err := metaOpener.Open(metaCipherBytes, []byte(metadataAAD))
 	require.NoError(t, err)
 	var gotMeta Metadata
 	require.NoError(t, json.Unmarshal(metadataPlain, &gotMeta))
