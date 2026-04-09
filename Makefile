@@ -44,7 +44,7 @@ build_%: ARCHARG = $(if $(ARCH), --arch $(ARCH))
 build_%: GOARG = $(if $(CROSSGOPATH), --go $(CROSSGOPATH))
 build_%: GOBUILD = $(if $(CROSSGOPATH), $(CROSSGOPATH), go)
 build_%: .pre-build
-	$(GOBUILD) run cmd/make/make.go -targets=$(TARGET) -linkstamp -trimpath $(OSARG) $(ARCHARG) $(GOARG)
+	$(GOBUILD) run cmd/make/make.go -targets=$(TARGET) -linkstamp $(OSARG) $(ARCHARG) $(GOARG)
 
 fake_%: TARGET =  $(word 2, $(subst _, ,$@))
 fake_%: OS = $(word 3, $(subst _, ,$@))
@@ -52,7 +52,7 @@ fake_%: OSARG = $(if $(OS), --os $(OS))
 fake_%: ARCH = $(word 4, $(subst _, ,$@))
 fake_%: ARCHARG = $(if $(ARCH), --arch $(ARCH))
 fake_%: .pre-build
-	go run cmd/make/make.go -targets=$(TARGET) -linkstamp -trimpath -fakedata $(OSARG) $(ARCHARG)
+	go run cmd/make/make.go -targets=$(TARGET) -linkstamp -fakedata $(OSARG) $(ARCHARG)
 
 # The lipo command will combine things into universal
 # binaries. Because of the go path needs, there is little point in
@@ -214,10 +214,10 @@ codesign-windows-%:
 codesign: notarize-darwin codesign-windows
 
 package-builder: .pre-build deps
-	go run cmd/make/make.go -targets=package-builder -linkstamp -trimpath
+	go run cmd/make/make.go -targets=package-builder -linkstamp
 
 package-builder-windows: .pre-build deps
-	go run cmd/make/make.go -targets=package-builder -linkstamp -trimpath --os windows
+	go run cmd/make/make.go -targets=package-builder -linkstamp --os windows
 
 deps-go:
 	go run cmd/make/make.go -targets=deps-go
