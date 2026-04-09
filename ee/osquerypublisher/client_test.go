@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/cloudflare/circl/hpke"
@@ -44,6 +46,180 @@ func makeTestServerProvidedDataStore(t *testing.T) types.KVStore {
 	err = store.Set([]byte("organization_id"), []byte("54321"))
 	require.NoError(t, err)
 	return store
+}
+
+func TestLogPublisherClient_refreshServerMetadata(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		setupKnapsack func(t *testing.T) *mocks.Knapsack
+		seed          func(lpc *LogPublisherClient)
+		assert        func(t *testing.T, lpc *LogPublisherClient)
+	}{
+		{
+			name: "nil ServerProvidedDataStore leaves cache unchanged",
+			setupKnapsack: func(t *testing.T) *mocks.Knapsack {
+				k := mocks.NewKnapsack(t)
+				k.On("ServerProvidedDataStore").Return(nil).Once()
+				return k
+			},
+			seed: func(lpc *LogPublisherClient) {
+				b := []byte(`{"device_id":"12345","organization_id":"54321"}`)
+				lpc.metadataJSON.Store(&b)
+			},
+			assert: func(t *testing.T, lpc *LogPublisherClient) {
+				p := lpc.metadataJSON.Load()
+				require.NotNil(t, p)
+				var got Metadata
+				require.NoError(t, json.Unmarshal(*p, &got))
+				require.Equal(t, "12345", got.DeviceID)
+				require.Equal(t, "54321", got.OrganizationID)
+			},
+		},
+		{
+			name: "device_id Get error leaves cache unchanged",
+			setupKnapsack: func(t *testing.T) *mocks.Knapsack {
+				kv := mocks.NewKVStore(t)
+				kv.On("Get", []byte("device_id")).Return(nil, errors.New("read error")).Once()
+				k := mocks.NewKnapsack(t)
+				k.On("ServerProvidedDataStore").Return(kv).Once()
+				return k
+			},
+			seed: func(lpc *LogPublisherClient) {
+				b := []byte(`{"device_id":"keepmedeviceid","organization_id":"keepmeorganizationid"}`)
+				lpc.metadataJSON.Store(&b)
+			},
+			assert: func(t *testing.T, lpc *LogPublisherClient) {
+				p := lpc.metadataJSON.Load()
+				require.NotNil(t, p)
+				var got Metadata
+				require.NoError(t, json.Unmarshal(*p, &got))
+				require.Equal(t, "keepmedeviceid", got.DeviceID)
+				require.Equal(t, "keepmeorganizationid", got.OrganizationID)
+			},
+		},
+		{
+			name: "organization_id Get error leaves cache unchanged",
+			setupKnapsack: func(t *testing.T) *mocks.Knapsack {
+				kv := mocks.NewKVStore(t)
+				kv.On("Get", []byte("device_id")).Return([]byte("originaldeviceid"), nil).Once()
+				kv.On("Get", []byte("organization_id")).Return(nil, errors.New("read error")).Once()
+				k := mocks.NewKnapsack(t)
+				k.On("ServerProvidedDataStore").Return(kv).Once()
+				return k
+			},
+			seed: func(lpc *LogPublisherClient) {
+				b := []byte(`{"device_id":"originaldeviceid","organization_id":"originalorganizationid"}`)
+				lpc.metadataJSON.Store(&b)
+			},
+			assert: func(t *testing.T, lpc *LogPublisherClient) {
+				p := lpc.metadataJSON.Load()
+				require.NotNil(t, p)
+				var got Metadata
+				require.NoError(t, json.Unmarshal(*p, &got))
+				require.Equal(t, "originaldeviceid", got.DeviceID)
+				require.Equal(t, "originalorganizationid", got.OrganizationID)
+			},
+		},
+		{
+			name: "valid device and organization IDs",
+			setupKnapsack: func(t *testing.T) *mocks.Knapsack {
+				store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ServerProvidedDataStore.String())
+				require.NoError(t, err)
+				require.NoError(t, store.Set([]byte("device_id"), []byte("12345")))
+				require.NoError(t, store.Set([]byte("organization_id"), []byte("54321")))
+				k := mocks.NewKnapsack(t)
+				k.On("ServerProvidedDataStore").Return(store).Once()
+				return k
+			},
+			assert: func(t *testing.T, lpc *LogPublisherClient) {
+				p := lpc.metadataJSON.Load()
+				require.NotNil(t, p)
+				var got Metadata
+				require.NoError(t, json.Unmarshal(*p, &got))
+				require.Equal(t, "12345", got.DeviceID)
+				require.Equal(t, "54321", got.OrganizationID)
+			},
+		},
+		{
+			name: "empty device_id clears cache",
+			setupKnapsack: func(t *testing.T) *mocks.Knapsack {
+				store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ServerProvidedDataStore.String())
+				require.NoError(t, err)
+				require.NoError(t, store.Set([]byte("device_id"), []byte{}))
+				require.NoError(t, store.Set([]byte("organization_id"), []byte("org-only")))
+				k := mocks.NewKnapsack(t)
+				k.On("ServerProvidedDataStore").Return(store).Once()
+				return k
+			},
+			seed: func(lpc *LogPublisherClient) {
+				b := []byte(`{"device_id":"stale","organization_id":"stale"}`)
+				lpc.metadataJSON.Store(&b)
+			},
+			assert: func(t *testing.T, lpc *LogPublisherClient) {
+				require.Nil(t, lpc.metadataJSON.Load())
+			},
+		},
+		{
+			name: "empty organization_id clears cache",
+			setupKnapsack: func(t *testing.T) *mocks.Knapsack {
+				store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ServerProvidedDataStore.String())
+				require.NoError(t, err)
+				require.NoError(t, store.Set([]byte("device_id"), []byte("dev-only")))
+				require.NoError(t, store.Set([]byte("organization_id"), []byte{}))
+				k := mocks.NewKnapsack(t)
+				k.On("ServerProvidedDataStore").Return(store).Once()
+				return k
+			},
+			seed: func(lpc *LogPublisherClient) {
+				b := []byte(`{"device_id":"stale","organization_id":"stale"}`)
+				lpc.metadataJSON.Store(&b)
+			},
+			assert: func(t *testing.T, lpc *LogPublisherClient) {
+				require.Nil(t, lpc.metadataJSON.Load())
+			},
+		},
+		{
+			name: "missing device_id key clears cache",
+			setupKnapsack: func(t *testing.T) *mocks.Knapsack {
+				store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ServerProvidedDataStore.String())
+				require.NoError(t, err)
+				require.NoError(t, store.Set([]byte("organization_id"), []byte("org-1")))
+				k := mocks.NewKnapsack(t)
+				k.On("ServerProvidedDataStore").Return(store).Once()
+				return k
+			},
+			seed: func(lpc *LogPublisherClient) {
+				b := []byte(`{"device_id":"stale","organization_id":"stale"}`)
+				lpc.metadataJSON.Store(&b)
+			},
+			assert: func(t *testing.T, lpc *LogPublisherClient) {
+				require.Nil(t, lpc.metadataJSON.Load())
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			mk := tt.setupKnapsack(t)
+			lpc := &LogPublisherClient{
+				slogger:     multislogger.NewNopLogger().With("component", "osquery_log_publisher"),
+				knapsack:    mk,
+				client:      &mockHTTPClient{},
+				authTokens:  make(map[string]string),
+				tokensMutex: &sync.RWMutex{},
+				hpkeKeys:    make(map[string]*KeyData),
+				psks:        make(map[string]*KeyData),
+			}
+			if tt.seed != nil {
+				tt.seed(lpc)
+			}
+			lpc.refreshServerMetadata()
+			tt.assert(t, lpc)
+		})
+	}
 }
 
 func TestLogPublisherClient_PublishLogs(t *testing.T) {
