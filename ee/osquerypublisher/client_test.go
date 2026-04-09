@@ -71,7 +71,7 @@ func TestLogPublisherClient_refreshServerMetadata(t *testing.T) {
 			assert: func(t *testing.T, lpc *LogPublisherClient) {
 				p := lpc.metadataJSON.Load()
 				require.NotNil(t, p)
-				var got Metadata
+				var got blobMetadata
 				require.NoError(t, json.Unmarshal(*p, &got))
 				require.Equal(t, "12345", got.DeviceID)
 				require.Equal(t, "54321", got.OrganizationID)
@@ -93,7 +93,7 @@ func TestLogPublisherClient_refreshServerMetadata(t *testing.T) {
 			assert: func(t *testing.T, lpc *LogPublisherClient) {
 				p := lpc.metadataJSON.Load()
 				require.NotNil(t, p)
-				var got Metadata
+				var got blobMetadata
 				require.NoError(t, json.Unmarshal(*p, &got))
 				require.Equal(t, "keepmedeviceid", got.DeviceID)
 				require.Equal(t, "keepmeorganizationid", got.OrganizationID)
@@ -116,7 +116,7 @@ func TestLogPublisherClient_refreshServerMetadata(t *testing.T) {
 			assert: func(t *testing.T, lpc *LogPublisherClient) {
 				p := lpc.metadataJSON.Load()
 				require.NotNil(t, p)
-				var got Metadata
+				var got blobMetadata
 				require.NoError(t, json.Unmarshal(*p, &got))
 				require.Equal(t, "originaldeviceid", got.DeviceID)
 				require.Equal(t, "originalorganizationid", got.OrganizationID)
@@ -136,7 +136,7 @@ func TestLogPublisherClient_refreshServerMetadata(t *testing.T) {
 			assert: func(t *testing.T, lpc *LogPublisherClient) {
 				p := lpc.metadataJSON.Load()
 				require.NotNil(t, p)
-				var got Metadata
+				var got blobMetadata
 				require.NoError(t, json.Unmarshal(*p, &got))
 				require.Equal(t, "12345", got.DeviceID)
 				require.Equal(t, "54321", got.OrganizationID)

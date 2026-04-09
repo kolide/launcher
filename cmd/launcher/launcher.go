@@ -457,6 +457,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		controlService.RegisterSubscriber(katcSubsystemName, osqueryRunner)
 		controlService.RegisterSubscriber(katcSubsystemName, startupSettingsWriter)
 		controlService.RegisterConsumer(serverReleaseTrackerDataSubsystemName, keyvalueconsumer.NewConfigConsumer(k.ServerReleaseTrackerDataStore()))
+
 		// Manage filewalkers and handle updates to filewalk configs
 		filewalkManager := filewalker.New(k, slogger)
 		runGroup.Add("filewalkManager", filewalkManager.Execute, filewalkManager.Interrupt)

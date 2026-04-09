@@ -91,7 +91,7 @@ func TestEncryptWithHPKE(t *testing.T) {
 	plaintext := []byte("test plaintext message")
 	expectedDeviceID := "12345"
 	expectedOrganizationID := "54321"
-	metadataJSON, err := json.Marshal(&Metadata{
+	metadataJSON, err := json.Marshal(&blobMetadata{
 		DeviceID:       expectedDeviceID,
 		OrganizationID: expectedOrganizationID,
 	})
@@ -137,7 +137,7 @@ func TestEncryptWithHPKE(t *testing.T) {
 	require.NoError(t, err)
 	metadataPlain, err := metaOpener.Open(metaCipherBytes, []byte(metadataAAD))
 	require.NoError(t, err)
-	var gotMeta Metadata
+	var gotMeta blobMetadata
 	require.NoError(t, json.Unmarshal(metadataPlain, &gotMeta))
 	require.Equal(t, expectedDeviceID, gotMeta.DeviceID)
 	require.Equal(t, expectedOrganizationID, gotMeta.OrganizationID)

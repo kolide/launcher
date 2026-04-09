@@ -43,8 +43,8 @@ type EncryptedBlob struct {
 	MetadataCiphertext      string `json:"metadata_ciphertext"`       // base64 encoded
 }
 
-// Metadata represents the metadata required for data routing
-type Metadata struct {
+// blobMetadata represents the metadata required for data routing and server decryption
+type blobMetadata struct {
 	DeviceID       string `json:"device_id"`
 	OrganizationID string `json:"organization_id"`
 }

@@ -292,7 +292,7 @@ func (lpc *LogPublisherClient) refreshServerMetadata() {
 		return
 	}
 
-	metadata := &Metadata{
+	metadata := &blobMetadata{
 		DeviceID:       string(deviceID),
 		OrganizationID: string(organizationID),
 	}
