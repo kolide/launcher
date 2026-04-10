@@ -44,8 +44,8 @@ func FetchBinary(ctx context.Context, localCacheDir, name, binaryName, channelOr
 		return "", fmt.Errorf("could not create cache directory: %w", err)
 	}
 
-	localBinaryPath := filepath.Join(localCacheDir, fmt.Sprintf("%s-%s-%s", name, target.Platform, channelOrVersion), binaryName)
-	localPackagePath := filepath.Join(localCacheDir, fmt.Sprintf("%s-%s-%s.tar.gz", name, target.Platform, channelOrVersion))
+	localBinaryPath := filepath.Join(localCacheDir, fmt.Sprintf("%s-%s-%s-%s", name, target.Platform, target.Arch, channelOrVersion), binaryName)
+	localPackagePath := filepath.Join(localCacheDir, fmt.Sprintf("%s-%s-%s-%s.tar.gz", name, target.Platform, target.Arch, channelOrVersion))
 
 	// See if a local package exists on disk already. If so, return the cached path
 	if _, err := os.Stat(localBinaryPath); err == nil {
