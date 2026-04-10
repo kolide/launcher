@@ -74,6 +74,13 @@ func makeTestOsqLogPublisher(t *testing.T, mk *typesMocks.Knapsack) types.Osquer
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	mk.On("TokenStore").Return(tokenStore).Maybe()
+	serverProvidedDataStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ServerProvidedDataStore.String())
+	require.NoError(t, err)
+	err = serverProvidedDataStore.Set([]byte("device_id"), []byte("12345"))
+	require.NoError(t, err)
+	err = serverProvidedDataStore.Set([]byte("organization_id"), []byte("54321"))
+	require.NoError(t, err)
+	mk.On("ServerProvidedDataStore").Return(serverProvidedDataStore).Maybe()
 	slogger := multislogger.NewNopLogger()
 	client := &http.Client{}
 	t.Cleanup(func() {

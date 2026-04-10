@@ -77,6 +77,13 @@ func makeKnapsack(t *testing.T) *mocks.Knapsack {
 	m.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
 	m.On("OsqueryPublisherURL").Return("").Maybe()
 	m.On("PersistAgentIngesterKeys", testifymock.Anything, testifymock.Anything, testifymock.Anything, testifymock.Anything).Return().Maybe()
+	serverProvidedDataStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ServerProvidedDataStore.String())
+	require.NoError(t, err)
+	err = serverProvidedDataStore.Set([]byte("device_id"), []byte("12345"))
+	require.NoError(t, err)
+	err = serverProvidedDataStore.Set([]byte("organization_id"), []byte("54321"))
+	require.NoError(t, err)
+	m.On("ServerProvidedDataStore").Return(serverProvidedDataStore).Maybe()
 
 	return m
 }
