@@ -35,6 +35,11 @@ func (p *parser) parseDumpstate(reader io.Reader) (any, error) {
 	for p.scanner.Scan() {
 		p.lastReadLine = p.scanner.Text()
 
+		// Skip empty lines or indented lines (which can appear if a sub-parser consumed a device name)
+		if strings.TrimSpace(p.lastReadLine) == "" || strings.HasPrefix(p.lastReadLine, "\t") {
+			continue
+		}
+
 		// Process each device
 		if p.isDeviceName() {
 			currentDeviceName := p.extractDeviceName()
@@ -126,6 +131,12 @@ func (p *parser) parseDevice() (map[string]any, error) {
 		}
 
 		if p.isDeviceDelimiter() {
+			return deviceResults, nil
+		}
+
+		// If the exit line from a sub-parser is a new device name, return now.
+		// parseDumpstate will advance the scanner on its next iteration.
+		if p.isDeviceName() {
 			return deviceResults, nil
 		}
 

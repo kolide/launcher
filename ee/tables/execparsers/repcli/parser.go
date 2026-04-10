@@ -82,6 +82,9 @@ func updatedKeyPaths(currentPaths []*repcliLine, newSection *repcliLine) []*repc
 
 		// we've gone too far and need to replace the previous key
 		if newSection.indentLevel < sectionLine.indentLevel {
+			if idx == 0 {
+				return []*repcliLine{newSection}
+			}
 			return append(currentPaths[:idx-1], newSection)
 		}
 
@@ -117,11 +120,14 @@ func setNestedValue(results resultMap, lines []*repcliLine) resultMap {
 		return results
 	}
 
-	if _, ok := results[key]; !ok {
-		results[key] = make(resultMap, 0)
+	existing, ok := results[key].(resultMap)
+	if !ok {
+		// Key was previously set to a non-map value (e.g. string or []string).
+		// A section header now claims this path — create a fresh map.
+		existing = make(resultMap)
 	}
 
-	results[key] = setNestedValue(results[key].(resultMap), lines[1:])
+	results[key] = setNestedValue(existing, lines[1:])
 
 	return results
 }

@@ -86,6 +86,19 @@ func TestParse(t *testing.T) {
 			expectedValueCount:  0,
 			expectedErr:         true,
 		},
+		{
+			name: "Identity block followed immediately by next device does not error",
+			input: []byte(`Local device
+	State: connected
+	Identity:
+		Public key SHA256: abc123
+Found ncm-0 (ncm-device)
+	State: disconnected
+`),
+			expectedDeviceCount: 1,
+			expectedValueCount:  2,
+			expectedErr:         false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -120,6 +133,16 @@ func TestParse(t *testing.T) {
 						for propertyKey, propertyValue := range properties {
 							actualValueCount += 1
 							validateKeyValueInCommandOutput(t, propertyKey, propertyValue.(string), tt.input)
+						}
+
+						continue
+					}
+
+					if topLevelKey == "Identity" {
+						identity := topLevelValue.(map[string]any)
+						for identityKey, identityValue := range identity {
+							actualValueCount += 1
+							validateKeyValueInCommandOutput(t, identityKey, identityValue.(string), tt.input)
 						}
 
 						continue
