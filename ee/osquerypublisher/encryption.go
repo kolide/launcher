@@ -15,6 +15,13 @@ const (
 	keyDelimiter                string = ":"
 	currentEncryptedBlobVersion int    = 1
 	hpkeDomain                  string = "AGENT_INGESTER_UPLOAD_ENC_V1"
+	// the payloadAAD stays unencrypted and is used to authenticate the payload to ensure the message hasn't
+	// been tampered with in transit. The receiver/decrypter must provide the same value in their decryption flow.
+	// Using the encryption suite is common practice for this type of data, but it is only important that whatever the value
+	// is cryptographically authenticated. If we chose to use a new suite and wanted to update this value, we should bump the
+	// EncryptedBlob version so that the receiver knows to utilize a newer AAD value.
+	payloadAAD  string = "HPKE-PSK-X25519-HKDF-SHA256-AES-256-GCM"
+	metadataAAD string = "HPKE-BASE-X25519-HKDF-SHA256-AES-256-GCM"
 )
 
 // KeyData holds a key and it's corresponding identifier.
@@ -29,8 +36,17 @@ type EncryptedBlob struct {
 	Version         int    `json:"version"`
 	HPKEKeyID       string `json:"hpke_key_id"`
 	PSKID           string `json:"psk_id"`
-	EncapsulatedKey string `json:"encapsulated_key"` // base64 encoded
+	EncapsulatedKey string `json:"encapsulated_key"` // base64 encoded (PSK-mode HPKE for payload)
 	Ciphertext      string `json:"ciphertext"`       // base64 encoded
+	// Metadata uses HPKE base mode (separate handshake from the PSK payload)
+	MetadataEncapsulatedKey string `json:"metadata_encapsulated_key"` // base64 encoded
+	MetadataCiphertext      string `json:"metadata_ciphertext"`       // base64 encoded
+}
+
+// blobMetadata represents the metadata required for data routing and server decryption
+type blobMetadata struct {
+	DeviceID       string `json:"device_id"`
+	OrganizationID string `json:"organization_id"`
 }
 
 // parseKeyData parses a concatenated string of "keyID:b64(keyMaterial)" into KeyData
@@ -63,9 +79,12 @@ func parseKeyData(concatenated string) (*KeyData, error) {
 	}, nil
 }
 
-// encryptWithHPKE encrypts plaintext using HPKE with PSK mode
-// Uses X25519 KEM, HKDF-SHA256 KDF, and AES-256-GCM AEAD
-func encryptWithHPKE(plaintext []byte, hpkeKey *KeyData, psk *KeyData) (*EncryptedBlob, error) {
+// encryptWithHPKE encrypts plaintext in HPKE PSK mode and metadataJSON in a separate HPKE base-mode
+// handshake (same KEM/KDF/AEAD: X25519, HKDF-SHA256, AES-256-GCM). metadataJSON must be non-empty.
+func encryptWithHPKE(plaintext []byte, hpkeKey *KeyData, psk *KeyData, metadataJSON []byte) (*EncryptedBlob, error) {
+	if len(metadataJSON) == 0 {
+		return nil, errors.New("metadata JSON is empty")
+	}
 	kemID := hpke.KEM_X25519_HKDF_SHA256
 	suite := hpke.NewSuite(kemID, hpke.KDF_HKDF_SHA256, hpke.AEAD_AES256GCM)
 
@@ -88,9 +107,8 @@ func encryptWithHPKE(plaintext []byte, hpkeKey *KeyData, psk *KeyData) (*Encrypt
 	}
 
 	// encrypt the plaintext with the associated data (aad). The aad should include any information
-	// that should be cryptographically authenticated but available in plaintext to the receiver.
-	// TODO: (upcoming PR) add metadata here for k2 (probably device id and encryption suite)
-	ciphertext, err := sealer.Seal(plaintext, nil)
+	// that should be cryptographically authenticated but can be available in plaintext to the receiver.
+	ciphertext, err := sealer.Seal(plaintext, []byte(payloadAAD))
 	if err != nil {
 		return nil, fmt.Errorf("failed to encrypt plaintext: %w", err)
 	}
@@ -99,11 +117,28 @@ func encryptWithHPKE(plaintext []byte, hpkeKey *KeyData, psk *KeyData) (*Encrypt
 	encapsulatedKeyB64 := base64.StdEncoding.EncodeToString(encapsulatedKey)
 	ciphertextB64 := base64.StdEncoding.EncodeToString(ciphertext)
 
+	metaSender, err := suite.NewSender(pkR, []byte(hpkeDomain))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HPKE sender for metadata: %w", err)
+	}
+	metadataEncapsulatedKey, metadataSealer, err := metaSender.Setup(rand.Reader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to setup HPKE base encryption for metadata: %w", err)
+	}
+	metadataCiphertext, err := metadataSealer.Seal(metadataJSON, []byte(metadataAAD))
+	if err != nil {
+		return nil, fmt.Errorf("failed to encrypt metadata: %w", err)
+	}
+	metadataEncapsulatedKeyB64 := base64.StdEncoding.EncodeToString(metadataEncapsulatedKey)
+	metadataCiphertextB64 := base64.StdEncoding.EncodeToString(metadataCiphertext)
+
 	return &EncryptedBlob{
-		Version:         currentEncryptedBlobVersion,
-		HPKEKeyID:       hpkeKey.KeyID,
-		PSKID:           psk.KeyID,
-		EncapsulatedKey: encapsulatedKeyB64,
-		Ciphertext:      ciphertextB64,
+		Version:                 currentEncryptedBlobVersion,
+		HPKEKeyID:               hpkeKey.KeyID,
+		PSKID:                   psk.KeyID,
+		EncapsulatedKey:         encapsulatedKeyB64,
+		Ciphertext:              ciphertextB64,
+		MetadataEncapsulatedKey: metadataEncapsulatedKeyB64,
+		MetadataCiphertext:      metadataCiphertextB64,
 	}, nil
 }

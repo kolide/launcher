@@ -87,7 +87,7 @@ func runMake(args []string) error {
 		flLauncherPath = flagset.String(
 			"launcher_path",
 			"",
-			"Path of local launcher binary to use in packaging",
+			"Path of local launcher binary to use in packaging (if set, then -package_version is also required)",
 		)
 		flLauncherArmPath = flagset.String(
 			"launcher_arm_path",
@@ -224,6 +224,10 @@ func runMake(args []string) error {
 
 	if *flHostname == "" {
 		return errors.New("hostname undefined")
+	}
+
+	if *flLauncherPath != "" && *flPackageVersion == "" {
+		return errors.New("must specify -package_version when providing -launcher_path")
 	}
 
 	// Validate that pinned certs are valid hex
