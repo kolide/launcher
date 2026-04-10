@@ -29,7 +29,7 @@ func main() {
 		flGoPath         = fs.String("go", "", "Path for go binary. Will attempt auto detection.")
 		flRace           = fs.Bool("race", false, "Build race-detector version of binaries.")
 		flStatic         = fs.Bool("static", false, "Build a static binary.")
-		flStampVersion   = fs.Bool("linkstamp", false, "Add version info with ldflags.")
+		flStampVersion   = fs.Bool("linkstamp", false, "Add version info with ldflags; requires BUILD_DATE env var to be set")
 		flFakeData       = fs.Bool("fakedata", false, "Compile with build tags to falsify some data, like serial numbers")
 		flGithubOutput   = fs.Bool("github", os.Getenv("GITHUB_ACTIONS") != "", "Include github action output")
 		flIncludeSymbols = fs.Bool("debugsymbols", false, "Compile with or without debug symbols (stripped by default)")
@@ -92,8 +92,6 @@ func main() {
 	targetSet := map[string]func(context.Context) error{
 		"deps-go":         make.New(opts...).DepsGo,
 		"launcher":        make.New(optsMaybeCgo...).BuildCmd("./cmd/launcher", fakeName("launcher", *flFakeData)),
-		"tables.ext":      make.New(optsMaybeCgo...).BuildCmd("./cmd/launcher.ext", "tables.ext"),
-		"grpc.ext":        make.New(optsMaybeCgo...).BuildCmd("./cmd/grpc.ext", "grpc.ext"),
 		"package-builder": make.New(opts...).BuildCmd("./cmd/package-builder", "package-builder"),
 		"make":            make.New(opts...).BuildCmd("./cmd/make", "make"),
 	}

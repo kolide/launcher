@@ -14,12 +14,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
-	"os/user"
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -194,10 +195,9 @@ func zigTarget(goos, goarch string) string {
 
 // PlatformBinaryName is a helper to return the platform specific output path.
 func (b *Builder) PlatformBinaryName(input string) string {
-	// On windows, everything must end in .exe. Strip off the extension
-	// suffix, if present, and add .exe
+	// On windows, everything must end in .exe
 	if b.os == "windows" {
-		input = strings.TrimSuffix(input, ".ext") + ".exe"
+		input = input + ".exe"
 	}
 
 	platformName := fmt.Sprintf("%s.%s", b.os, b.arch)
@@ -273,7 +273,7 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 			"arch", b.arch,
 		)
 
-		baseArgs := []string{"build", "-o", output}
+		baseArgs := []string{"build", "-o", output, "-buildvcs=false", "-trimpath"}
 		if b.race {
 			baseArgs = append(baseArgs, "-race")
 		}
@@ -335,18 +335,22 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 				return fmt.Errorf("git for revision: %w", err)
 			}
 
-			usr, err := user.Current()
-			if err != nil {
-				return err
-			}
-
 			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.appName=%s"`, appName))
 			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.version=%s"`, v))
 			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.branch=%s"`, branch))
 			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.revision=%s"`, revision))
-			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.buildDate=%s"`, time.Now().UTC().Format("2006-01-02")))
-			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.buildUser=%s (%s)"`, usr.Name, usr.Username))
 			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.goVersion=%s"`, runtime.Version()))
+
+			// https://reproducible-builds.org/docs/source-date-epoch/
+			sourceDateEpoch := os.Getenv("BUILD_DATE")
+			if sourceDateEpoch == "" {
+				return errors.New("must specify BUILD_DATE with linkstamp option")
+			}
+			sde, err := strconv.ParseInt(sourceDateEpoch, 10, 64)
+			if err != nil {
+				return fmt.Errorf("invalid BUILD_DATE '%s': %w", sourceDateEpoch, err)
+			}
+			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.buildDate=%s"`, time.Unix(sde, 0).UTC().Format(http.TimeFormat)))
 		}
 
 		if len(ldFlags) != 0 {
