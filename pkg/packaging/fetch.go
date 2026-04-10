@@ -55,7 +55,7 @@ func FetchBinary(ctx context.Context, localCacheDir, name, binaryName, channelOr
 	// First, create download URI. The download mirror stores binaries by their name, without a file extension,
 	// so strip that off first.
 	baseName := strings.TrimSuffix(name, filepath.Ext(name))
-	downloadPath, err := dlTarPath(baseName, channelOrVersion, string(target.Platform), string(target.Arch))
+	downloadPath, err := dlTarPath(baseName, channelOrVersion, string(target.Platform), string(target.Arch), localCacheDir)
 	if err != nil {
 		return "", fmt.Errorf("could not get download path: %w", err)
 	}
@@ -125,14 +125,14 @@ func isChannel(channelOrVersion string) bool {
 	return channelOrVersion == "stable" || channelOrVersion == "beta" || channelOrVersion == "nightly" || channelOrVersion == "alpha"
 }
 
-func dlTarPath(name, channelOrVersion, platform, arch string) (string, error) {
+func dlTarPath(name, channelOrVersion, platform, arch, cacheDir string) (string, error) {
 	// Figure out if we're downloading a specific version or a channel
 	if !isChannel(channelOrVersion) {
 		// We're requesting a version, not a channel, so we already know where the download lives.
 		return dlTarPathFromVersion(name, channelOrVersion, platform, arch), nil
 	}
 
-	version, err := getReleaseVersionFromTufRepo(name, channelOrVersion, platform, arch)
+	version, err := getReleaseVersionFromTufRepo(name, channelOrVersion, platform, arch, cacheDir)
 	if err != nil {
 		return "", fmt.Errorf("could not find release version for channel %s: %w", channelOrVersion, err)
 	}
@@ -147,21 +147,17 @@ func dlTarPathFromVersion(name, version, platform, arch string) string {
 //go:embed assets/tuf/root.json
 var rootJson []byte
 
-func getReleaseVersionFromTufRepo(binaryName, channel, platform, arch string) (string, error) {
-	tempDir, err := os.MkdirTemp(os.TempDir(), "tuf")
-	if err != nil {
-		return "", fmt.Errorf("making temp TUF dir: %w", err)
-	}
-	defer os.RemoveAll(tempDir)
-
+func getReleaseVersionFromTufRepo(binaryName, channel, platform, arch, cacheDir string) (string, error) {
+	tufCacheDir := filepath.Join(cacheDir, "tuf")
+	// Make the directory if it doesn't already exist.
 	// Ensure that directory permissions are correct, otherwise TUF will fail to initialize. We cannot
 	// have permissions in excess of -rwxr-x---.
-	if err := os.Chmod(tempDir, 0750); err != nil {
-		return "", fmt.Errorf("chmodding local TUF directory %s: %w", tempDir, err)
+	if err := os.MkdirAll(tufCacheDir, 0750); err != nil {
+		return "", fmt.Errorf("creating TUF directory inside cache dir: %w", err)
 	}
 
 	// Set up our local store i.e. point to the directory in our filesystem
-	localStore, err := filejsonstore.NewFileJSONStore(tempDir)
+	localStore, err := filejsonstore.NewFileJSONStore(tufCacheDir)
 	if err != nil {
 		return "", fmt.Errorf("could not initialize local TUF store: %w", err)
 	}
@@ -179,14 +175,19 @@ func getReleaseVersionFromTufRepo(binaryName, channel, platform, arch string) (s
 		return "", fmt.Errorf("failed to initialize TUF client with root JSON: %w", err)
 	}
 
-	if _, err := metadataClient.Update(); err != nil {
-		return "", fmt.Errorf("failed to update metadata: %w", err)
-	}
-
+	// Try to find our target before fetching from remote TUF, in case we already have TUF metadata
 	targetToFind := path.Join(binaryName, platform, arch, channel, "release.json")
 	foundTarget, err := metadataClient.Target(targetToFind)
 	if err != nil {
-		return "", fmt.Errorf("finding target metadata %s: %w", targetToFind, err)
+		// Fetch TUF data from our remote store
+		if _, err := metadataClient.Update(); err != nil {
+			return "", fmt.Errorf("failed to update metadata: %w", err)
+		}
+		// Try again
+		foundTarget, err = metadataClient.Target(targetToFind)
+		if err != nil {
+			return "", fmt.Errorf("finding target metadata %s after update: %w", targetToFind, err)
+		}
 	}
 
 	var custom struct {

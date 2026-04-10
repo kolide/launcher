@@ -282,13 +282,13 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 	// directly, if p.LauncherVersion is actually a version, or via TUF, if p.LauncherVersion is actually
 	// an update channel.
 	if p.PackageVersion == "" {
-		if err := p.setPackageVersion(launcherVersion); err != nil {
+		if err := p.setPackageVersion(launcherVersion, p.CacheDir); err != nil {
 			return fmt.Errorf("determining package version: %w", err)
 		}
 	}
 
 	// Record the osquery version, now that we've downloaded it
-	p.setOsqueryVersionInCtx(ctx, p.OsqueryVersion)
+	p.setOsqueryVersionInCtx(ctx, p.OsqueryVersion, p.CacheDir)
 
 	p.initOptions = &packagekit.InitOptions{
 		Name:        "launcher",

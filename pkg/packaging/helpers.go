@@ -20,8 +20,8 @@ func sanitizeHostname(hostname string) string {
 
 // setPackageVersion retrieves the launcher version from TUF if it's not already provided,
 // and sets it as the package version.
-func (p *PackageOptions) setPackageVersion(launcherChannelOrVersion string) error {
-	launcherVersion, err := p.getFormattedVersion("launcher", launcherChannelOrVersion)
+func (p *PackageOptions) setPackageVersion(launcherChannelOrVersion string, localCacheDir string) error {
+	launcherVersion, err := p.getFormattedVersion("launcher", launcherChannelOrVersion, localCacheDir)
 	if err != nil {
 		return fmt.Errorf("determining package version: %w", err)
 	}
@@ -31,10 +31,10 @@ func (p *PackageOptions) setPackageVersion(launcherChannelOrVersion string) erro
 
 // setOsqueryVersionInCtx retrieves the osquery version from TUF if it's not already provided,
 // and sets it in the context.
-func (p *PackageOptions) setOsqueryVersionInCtx(ctx context.Context, osquerydChannelOrVersion string) {
+func (p *PackageOptions) setOsqueryVersionInCtx(ctx context.Context, osquerydChannelOrVersion string, localCacheDir string) {
 	logger := log.With(ctxlog.FromContext(ctx), "library", "setOsqueryVersionInCtx")
 
-	osquerydVersion, err := p.getFormattedVersion("osqueryd", osquerydChannelOrVersion)
+	osquerydVersion, err := p.getFormattedVersion("osqueryd", osquerydChannelOrVersion, localCacheDir)
 	if err != nil {
 		level.Warn(logger).Log(
 			"msg", "could not get osqueryd version",
@@ -47,10 +47,10 @@ func (p *PackageOptions) setOsqueryVersionInCtx(ctx context.Context, osquerydCha
 	packagekit.SetInContext(ctx, packagekit.ContextOsqueryVersionKey, osquerydVersion)
 }
 
-func (p *PackageOptions) getFormattedVersion(binary string, channelOrVersion string) (string, error) {
+func (p *PackageOptions) getFormattedVersion(binary string, channelOrVersion string, localCacheDir string) (string, error) {
 	versionRaw := channelOrVersion
 	if isChannel(channelOrVersion) {
-		versionFromTuf, err := getReleaseVersionFromTufRepo(binary, channelOrVersion, string(p.target.Platform), string(p.target.Arch))
+		versionFromTuf, err := getReleaseVersionFromTufRepo(binary, channelOrVersion, string(p.target.Platform), string(p.target.Arch), localCacheDir)
 		if err != nil {
 			return "", fmt.Errorf("getting release version for %s from TUF for channel %s: %w", binary, channelOrVersion, err)
 		}
