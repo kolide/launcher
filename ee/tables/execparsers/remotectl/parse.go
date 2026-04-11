@@ -32,26 +32,46 @@ func (p *parser) parseDumpstate(reader io.Reader) (any, error) {
 	results := make(map[string]map[string]any)
 
 	p.scanner = bufio.NewScanner(reader)
-	for p.scanner.Scan() {
-		p.lastReadLine = p.scanner.Text()
 
-		// Skip empty lines or indented lines (which can appear if a sub-parser consumed a device name)
-		if strings.TrimSpace(p.lastReadLine) == "" || strings.HasPrefix(p.lastReadLine, "\t") {
-			continue
-		}
+	// Seed the first line.
+	if !p.scanner.Scan() {
+		return results, nil
+	}
+	p.lastReadLine = p.scanner.Text()
 
-		// Process each device
-		if p.isDeviceName() {
-			currentDeviceName := p.extractDeviceName()
-			currentDeviceResults, err := p.parseDevice()
-			if err != nil {
-				return nil, err
+	for {
+		// Skip empty lines between devices.
+		if strings.TrimSpace(p.lastReadLine) == "" {
+			if !p.scanner.Scan() {
+				break
 			}
-			results[currentDeviceName] = currentDeviceResults
+			p.lastReadLine = p.scanner.Text()
 			continue
 		}
 
-		return nil, errors.New("no device name(s) given in remotectl dumpstate output")
+		if !p.isDeviceName() {
+			return nil, errors.New("no device name(s) given in remotectl dumpstate output")
+		}
+
+		currentDeviceName := p.extractDeviceName()
+		currentDeviceResults, err := p.parseDevice()
+		if err != nil {
+			return nil, err
+		}
+		results[currentDeviceName] = currentDeviceResults
+
+		// parseDevice returns with p.lastReadLine holding its exit trigger:
+		//   - empty line (device delimiter): advance the scanner for the next iteration.
+		//   - device name (sub-parser consumed it): loop back and reuse directly, no Scan needed.
+		//   - anything else (last tab-indented line before EOF): scanner exhausted, stop.
+		if strings.TrimSpace(p.lastReadLine) == "" {
+			if !p.scanner.Scan() {
+				break
+			}
+			p.lastReadLine = p.scanner.Text()
+		} else if !p.isDeviceName() {
+			break
+		}
 	}
 
 	return results, nil

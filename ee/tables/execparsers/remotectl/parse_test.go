@@ -89,8 +89,19 @@ func TestParse(t *testing.T) {
 		{
 			name: "property before any array item does not panic",
 			input: []byte("Local device\n\tServices:\n\t\t\tVersion: 1\n"),
-			expectedDeviceCount: 0,
+			expectedDeviceCount: 1,
 			expectedValueCount:  0,
+			expectedErr:         false,
+		},
+		{
+			// parseStringArray (used for Heartbeat) exits when it reads a line whose
+			// indentation is <= the starting level, consuming the next device name into
+			// p.lastReadLine. parseDumpstate must reuse that line instead of advancing
+			// the scanner, otherwise the next device's first property is dropped.
+			name:                "device following Heartbeat section captures all properties",
+			input:               []byte("Local device\n\tHeartbeat:\n\t\theartbeat-item\nFound ncm-0 (ncm-device)\n\tState: disconnected\n"),
+			expectedDeviceCount: 2,
+			expectedValueCount:  2,
 			expectedErr:         false,
 		},
 		{
@@ -102,8 +113,8 @@ func TestParse(t *testing.T) {
 Found ncm-0 (ncm-device)
 	State: disconnected
 `),
-			expectedDeviceCount: 1,
-			expectedValueCount:  2,
+			expectedDeviceCount: 2,
+			expectedValueCount:  3,
 			expectedErr:         false,
 		},
 	}
