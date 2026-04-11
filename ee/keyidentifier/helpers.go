@@ -19,7 +19,9 @@ func boolPtr(b bool) *bool {
 // read. It returns as string. (This is used by the ssh.com format.)
 func readSizedString(r *bytes.Reader) (string, error) {
 	strLenBytes := make([]uint8, 4)
-	r.Read(strLenBytes)
+	if _, err := io.ReadFull(r, strLenBytes); err != nil {
+		return "", fmt.Errorf("reading string length: %w", err)
+	}
 
 	strLen := binary.BigEndian.Uint32(strLenBytes)
 
