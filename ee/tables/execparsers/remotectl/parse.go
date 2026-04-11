@@ -32,21 +32,46 @@ func (p *parser) parseDumpstate(reader io.Reader) (any, error) {
 	results := make(map[string]map[string]any)
 
 	p.scanner = bufio.NewScanner(reader)
-	for p.scanner.Scan() {
-		p.lastReadLine = p.scanner.Text()
 
-		// Process each device
-		if p.isDeviceName() {
-			currentDeviceName := p.extractDeviceName()
-			currentDeviceResults, err := p.parseDevice()
-			if err != nil {
-				return nil, err
+	// Seed the first line.
+	if !p.scanner.Scan() {
+		return results, nil
+	}
+	p.lastReadLine = p.scanner.Text()
+
+	for {
+		// Skip empty lines between devices.
+		if strings.TrimSpace(p.lastReadLine) == "" {
+			if !p.scanner.Scan() {
+				break
 			}
-			results[currentDeviceName] = currentDeviceResults
+			p.lastReadLine = p.scanner.Text()
 			continue
 		}
 
-		return nil, errors.New("no device name(s) given in remotectl dumpstate output")
+		if !p.isDeviceName() {
+			return nil, errors.New("no device name(s) given in remotectl dumpstate output")
+		}
+
+		currentDeviceName := p.extractDeviceName()
+		currentDeviceResults, err := p.parseDevice()
+		if err != nil {
+			return nil, err
+		}
+		results[currentDeviceName] = currentDeviceResults
+
+		// parseDevice returns with p.lastReadLine holding its exit trigger:
+		//   - empty line (device delimiter): advance the scanner for the next iteration.
+		//   - device name (sub-parser consumed it): loop back and reuse directly, no Scan needed.
+		//   - anything else (last tab-indented line before EOF): scanner exhausted, stop.
+		if strings.TrimSpace(p.lastReadLine) == "" {
+			if !p.scanner.Scan() {
+				break
+			}
+			p.lastReadLine = p.scanner.Text()
+		} else if !p.isDeviceName() {
+			break
+		}
 	}
 
 	return results, nil
@@ -126,6 +151,12 @@ func (p *parser) parseDevice() (map[string]any, error) {
 		}
 
 		if p.isDeviceDelimiter() {
+			return deviceResults, nil
+		}
+
+		// If the exit line from a sub-parser is a new device name, return now.
+		// parseDumpstate will advance the scanner on its next iteration.
+		if p.isDeviceName() {
 			return deviceResults, nil
 		}
 
@@ -269,6 +300,10 @@ func (p *parser) parseObjectArray() ([]map[string]any, bool, error) {
 
 		// One more level indented -- we have properties attached to the item we processed last. Extract them.
 		if currentIndentationLevel >= arrayItemPropertyIndentationLevel {
+			if len(arrayResults) == 0 {
+				// Property appeared before any item — skip it.
+				continue
+			}
 			lastProcessedItem := arrayResults[len(arrayResults)-1]
 
 			if strings.HasPrefix(strings.TrimSpace(p.lastReadLine), "Properties:") {
@@ -318,7 +353,14 @@ func (p *parser) parseKeyValList() (map[string]any, error) {
 }
 
 func (p *parser) getCurrentIndentationLevel() int {
-	return strings.LastIndex(p.lastReadLine, "\t")
+	count := 0
+	for _, c := range p.lastReadLine {
+		if c != '\t' {
+			break
+		}
+		count++
+	}
+	return count
 }
 
 func extractPropertyKeyValue(line string) (string, string, error) {
@@ -332,7 +374,7 @@ func extractTopLevelKeyValue(line string) (string, string, error) {
 }
 
 func extractKeyValue(line, delimiter string) (string, string, error) {
-	extracted := strings.Split(line, delimiter)
+	extracted := strings.SplitN(line, delimiter, 2)
 	if len(extracted) != 2 {
 		return "", "", fmt.Errorf("top-level key/value pair `%s` in remotectl output is in an unexpected format", line)
 	}
