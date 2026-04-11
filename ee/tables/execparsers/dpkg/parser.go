@@ -50,5 +50,10 @@ func dpkgParse(reader io.Reader) (any, error) {
 		}
 	}
 
+	// Flush the last record if input ended without a trailing blank line.
+	if len(row) > 0 {
+		results = append(results, row)
+	}
+
 	return results, nil
 }
