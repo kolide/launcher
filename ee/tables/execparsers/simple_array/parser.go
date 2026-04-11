@@ -34,6 +34,10 @@ func parse(reader io.Reader) (any, error) {
 			chunk = strings.TrimSpace(chunk)
 			chunk = strings.Trim(chunk, `"`)
 
+			if chunk == "" {
+				continue
+			}
+
 			// If a chunk has a space in the middle, it's malformed and we should error out
 			if strings.Contains(chunk, " ") {
 				return nil, fmt.Errorf("malformed chunk: %s in line %s", chunk, line)
