@@ -280,6 +280,10 @@ func (p *parser) parseObjectArray() ([]map[string]any, bool, error) {
 
 		// One more level indented -- we have properties attached to the item we processed last. Extract them.
 		if currentIndentationLevel >= arrayItemPropertyIndentationLevel {
+			if len(arrayResults) == 0 {
+				// Property appeared before any item — skip it.
+				continue
+			}
 			lastProcessedItem := arrayResults[len(arrayResults)-1]
 
 			if strings.HasPrefix(strings.TrimSpace(p.lastReadLine), "Properties:") {
@@ -329,7 +333,14 @@ func (p *parser) parseKeyValList() (map[string]any, error) {
 }
 
 func (p *parser) getCurrentIndentationLevel() int {
-	return strings.LastIndex(p.lastReadLine, "\t")
+	count := 0
+	for _, c := range p.lastReadLine {
+		if c != '\t' {
+			break
+		}
+		count++
+	}
+	return count
 }
 
 func extractPropertyKeyValue(line string) (string, string, error) {
@@ -343,7 +354,7 @@ func extractTopLevelKeyValue(line string) (string, string, error) {
 }
 
 func extractKeyValue(line, delimiter string) (string, string, error) {
-	extracted := strings.Split(line, delimiter)
+	extracted := strings.SplitN(line, delimiter, 2)
 	if len(extracted) != 2 {
 		return "", "", fmt.Errorf("top-level key/value pair `%s` in remotectl output is in an unexpected format", line)
 	}
