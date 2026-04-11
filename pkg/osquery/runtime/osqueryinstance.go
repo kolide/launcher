@@ -544,11 +544,13 @@ func (i *OsqueryInstance) Launch() error {
 
 	// All done with osquery setup! Mark instance as connected, then proceed
 	// with setting up remaining errgroups.
-	if err := i.history.SetConnected(i.runId, i); err != nil {
-		i.slogger.Log(ctx, slog.LevelWarn,
-			"could not set connection time for osquery instance history",
-			"err", err,
-		)
+	if i.history != nil {
+		if err := i.history.SetConnected(i.runId, i); err != nil {
+			i.slogger.Log(ctx, slog.LevelWarn,
+				"could not set connection time for osquery instance history",
+				"err", err,
+			)
+		}
 	}
 
 	// Health check on interval
