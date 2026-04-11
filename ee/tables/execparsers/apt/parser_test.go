@@ -41,6 +41,18 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
+			name:  "windows line endings",
+			input: []byte("base-files/jammy-updates 12ubuntu4.3 amd64 [upgradable from: 12ubuntu4.2]\r\n"),
+			expected: []map[string]string{
+				{
+					"package":         "base-files",
+					"sources":         "jammy-updates",
+					"update_version":  "12ubuntu4.3",
+					"current_version": "12ubuntu4.2",
+				},
+			},
+		},
+		{
 			name:  "apt_upgradeable",
 			input: apt_upgradeable,
 			expected: []map[string]string{

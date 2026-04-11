@@ -124,6 +124,14 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:  "whitespace-only lines produce no rows",
+			input: []byte("base-devel autoconf\n   \n\t  \nbase-devel automake\n"),
+			expected: []map[string]string{
+				{"group": "base-devel", "package": "autoconf"},
+				{"group": "base-devel", "package": "automake"},
+			},
+		},
 	}
 
 	for _, tt := range tests {
