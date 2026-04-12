@@ -175,7 +175,9 @@ func (aq *ActionQueue) runCleanup() {
 }
 
 func (aq *ActionQueue) StopCleanup(err error) {
-	aq.cancel()
+	if aq.cancel != nil {
+		aq.cancel()
+	}
 }
 
 func (aq *ActionQueue) storeActionRecord(actionToStore action) {
