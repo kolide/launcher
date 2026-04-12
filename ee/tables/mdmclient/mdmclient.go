@@ -202,7 +202,9 @@ func transformLengthByteEntriesInOutput(out []byte) []byte {
 
 		// Replace comma with semicolon for first capture group (e.g. transforming `length = 32,` to `length = 32;`)
 		lengthEndIndex := match[3]
-		out[lengthEndIndex-1] = ';'
+		if lengthEndIndex > 0 && lengthEndIndex <= len(out) {
+			out[lengthEndIndex-1] = ';'
+		}
 
 		// Quote second capture group and append a semicolon (e.g., transforming
 		// `bytes = 0x068b4535 172f7bd3 851facee c98e0d88 ... 38625271 61731ac3 ` to
@@ -224,6 +226,9 @@ func transformLengthByteEntriesInOutput(out []byte) []byte {
 }
 
 func insertAt(original []byte, insertIndex int, value byte) []byte {
+	if insertIndex < 0 || insertIndex > len(original) {
+		return original
+	}
 	original = append(original[:insertIndex+1], original[insertIndex:]...)
 	original[insertIndex] = value
 
