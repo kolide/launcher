@@ -58,7 +58,11 @@ func encodeJSONRPCPublishResultsResponse(_ context.Context, obj any) (json.RawMe
 	}
 
 	b, err := json.Marshal(res)
-	return encodeJSONResponse(b, fmt.Errorf("marshal json response: %w", err))
+	if err != nil {
+		return encodeJSONResponse(b, fmt.Errorf("marshal json response: %w", err))
+	}
+
+	return encodeJSONResponse(b, nil)
 }
 
 // PublishResults implements KolideService.PublishResults

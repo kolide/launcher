@@ -50,7 +50,11 @@ func encodeJSONRPCPublishLogsResponse(_ context.Context, obj any) (json.RawMessa
 	}
 
 	b, err := json.Marshal(res)
-	return encodeJSONResponse(b, fmt.Errorf("marshal json response: %w", err))
+	if err != nil {
+		return encodeJSONResponse(b, fmt.Errorf("marshal json response: %w", err))
+	}
+
+	return encodeJSONResponse(b, nil)
 }
 
 func decodeJSONRPCPublishLogsResponse(_ context.Context, res jsonrpc.Response) (any, error) {
