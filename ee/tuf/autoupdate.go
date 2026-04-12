@@ -767,6 +767,9 @@ func findRelease(ctx context.Context, binary autoupdatableBinary, targets data.T
 
 		// We found the release file that matches our OS and binary. Evaluate it
 		// to see if we're on this latest version.
+		if target.Custom == nil {
+			return "", data.TargetFileMeta{}, fmt.Errorf("release file for %s missing custom metadata", binary)
+		}
 		var custom ReleaseFileCustomMetadata
 		if err := json.Unmarshal(*target.Custom, &custom); err != nil {
 			return "", data.TargetFileMeta{}, fmt.Errorf("could not unmarshal release file custom metadata: %w", err)
@@ -807,6 +810,9 @@ func findReleasePromoteTime(ctx context.Context, binary autoupdatableBinary, tar
 			continue
 		}
 
+		if target.Custom == nil {
+			return 0
+		}
 		var custom ReleaseFileCustomMetadata
 		if err := json.Unmarshal(*target.Custom, &custom); err != nil {
 			return 0
