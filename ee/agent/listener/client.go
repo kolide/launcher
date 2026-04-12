@@ -66,6 +66,10 @@ func NewLauncherClientConnection(ctx context.Context, rootDirectory string, sock
 		}
 	}
 
+	if socketPath == "" {
+		return nil, fmt.Errorf("no launcher socket found at %s", socketPattern)
+	}
+
 	d := net.Dialer{
 		Timeout: dialTimeout,
 	}
