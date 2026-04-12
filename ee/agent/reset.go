@@ -354,17 +354,21 @@ func currentMunemo(k types.Knapsack) (string, error) {
 // to previous records if they exist, and returns the collection ready for storage.
 func prepareDatabaseResetRecords(ctx context.Context, k types.Knapsack, slogger *slog.Logger, resetReason string) ([]byte, error) { // nolint:unused
 	nodeKeys := make([]string, 0)
-	for _, enrollmentId := range k.EnrollmentIDs() {
-		nodeKey, err := k.ConfigStore().Get(storage.KeyByIdentifier([]byte("nodeKey"), storage.IdentifierTypeEnrollment, []byte(enrollmentId)))
-		if err != nil {
-			slogger.Log(ctx, slog.LevelWarn,
-				"could not get node key from store",
-				"enrollment_id", enrollmentId,
-				"err", err,
-			)
-			continue
+	if k.ConfigStore() == nil {
+		slogger.Log(ctx, slog.LevelWarn, "config store is nil, skipping node key retrieval")
+	} else {
+		for _, enrollmentId := range k.EnrollmentIDs() {
+			nodeKey, err := k.ConfigStore().Get(storage.KeyByIdentifier([]byte("nodeKey"), storage.IdentifierTypeEnrollment, []byte(enrollmentId)))
+			if err != nil {
+				slogger.Log(ctx, slog.LevelWarn,
+					"could not get node key from store",
+					"enrollment_id", enrollmentId,
+					"err", err,
+				)
+				continue
+			}
+			nodeKeys = append(nodeKeys, string(nodeKey))
 		}
-		nodeKeys = append(nodeKeys, string(nodeKey))
 	}
 	nodeKey := strings.Join(nodeKeys, ",")
 
@@ -373,34 +377,46 @@ func prepareDatabaseResetRecords(ctx context.Context, k types.Knapsack, slogger 
 		slogger.Log(ctx, slog.LevelWarn, "could not get local pubkey from store", "err", err)
 	}
 
-	serial, err := k.PersistentHostDataStore().Get(hostDataKeySerial)
-	if err != nil {
-		slogger.Log(ctx, slog.LevelWarn, "could not get serial from store", "err", err)
+	var serial, hardwareUuid, munemo []byte
+	if k.PersistentHostDataStore() == nil {
+		slogger.Log(ctx, slog.LevelWarn, "persistent host data store is nil, skipping serial/hardware uuid/munemo retrieval")
+	} else {
+		var err error
+		serial, err = k.PersistentHostDataStore().Get(hostDataKeySerial)
+		if err != nil {
+			slogger.Log(ctx, slog.LevelWarn, "could not get serial from store", "err", err)
+		}
+
+		hardwareUuid, err = k.PersistentHostDataStore().Get(hostDataKeyHardwareUuid)
+		if err != nil {
+			slogger.Log(ctx, slog.LevelWarn, "could not get hardware uuid from store", "err", err)
+		}
+
+		munemo, err = k.PersistentHostDataStore().Get(hostDataKeyMunemo)
+		if err != nil {
+			slogger.Log(ctx, slog.LevelWarn, "could not get munemo from store", "err", err)
+		}
 	}
 
-	hardwareUuid, err := k.PersistentHostDataStore().Get(hostDataKeyHardwareUuid)
-	if err != nil {
-		slogger.Log(ctx, slog.LevelWarn, "could not get hardware uuid from store", "err", err)
-	}
+	var deviceId, remoteIp, tombstoneId []byte
+	if k.ServerProvidedDataStore() == nil {
+		slogger.Log(ctx, slog.LevelWarn, "server provided data store is nil, skipping device id/remote ip/tombstone id retrieval")
+	} else {
+		var err error
+		deviceId, err = k.ServerProvidedDataStore().Get([]byte("device_id"))
+		if err != nil {
+			slogger.Log(ctx, slog.LevelWarn, "could not get device id from store", "err", err)
+		}
 
-	munemo, err := k.PersistentHostDataStore().Get(hostDataKeyMunemo)
-	if err != nil {
-		slogger.Log(ctx, slog.LevelWarn, "could not get munemo from store", "err", err)
-	}
+		remoteIp, err = k.ServerProvidedDataStore().Get([]byte("remote_ip"))
+		if err != nil {
+			slogger.Log(ctx, slog.LevelWarn, "could not get remote ip from store", "err", err)
+		}
 
-	deviceId, err := k.ServerProvidedDataStore().Get([]byte("device_id"))
-	if err != nil {
-		slogger.Log(ctx, slog.LevelWarn, "could not get device id from store", "err", err)
-	}
-
-	remoteIp, err := k.ServerProvidedDataStore().Get([]byte("remote_ip"))
-	if err != nil {
-		slogger.Log(ctx, slog.LevelWarn, "could not get remote ip from store", "err", err)
-	}
-
-	tombstoneId, err := k.ServerProvidedDataStore().Get([]byte("tombstone_id"))
-	if err != nil {
-		slogger.Log(ctx, slog.LevelWarn, "could not get tombstone id from store", "err", err)
+		tombstoneId, err = k.ServerProvidedDataStore().Get([]byte("tombstone_id"))
+		if err != nil {
+			slogger.Log(ctx, slog.LevelWarn, "could not get tombstone id from store", "err", err)
+		}
 	}
 
 	dataToStore := dbResetRecord{
@@ -433,6 +449,10 @@ func prepareDatabaseResetRecords(ctx context.Context, k types.Knapsack, slogger 
 // getLocalPubKey retrieves the local database key, parses it, and returns
 // the pubkey.
 func getLocalPubKey(k types.Knapsack) ([]byte, error) { // nolint:unused
+	if k.ConfigStore() == nil {
+		return nil, errors.New("config store is nil")
+	}
+
 	localEccKeyRaw, err := k.ConfigStore().Get([]byte("localEccKey"))
 	if err != nil {
 		return nil, fmt.Errorf("getting raw key from config store: %w", err)
