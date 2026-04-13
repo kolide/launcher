@@ -203,6 +203,9 @@ func unmarshallScanOuput(reader io.Reader) []map[string]any {
 		rowData := make(map[string]any, len(headers))
 
 		for i, value := range splitAtIndexes(line, headerSeparatorIndexes) {
+			if i >= len(headers) {
+				break
+			}
 			rowData[headers[i]] = value
 		}
 
