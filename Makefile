@@ -121,6 +121,9 @@ rel-launcherapp: $(foreach arch, $(DARWIN_ARCHES), build/darwin.$(arch)/Kolide.a
 RELEASE_VERSION = $(shell git describe --tags --always --dirty)
 # RELEASE_VERSION_SHORT contains only <major>.<minor>.<patch>
 RELEASE_VERSION_SHORT = $(shell git describe --tags --always --dirty | sed -En 's/v([[:digit:]]+)\.([[:digit:]]+)\.([[:digit:]]+).*/\1.\2.\3/p')
+# We use BUILD_DATE to create reproducible builds with consistent embedded timestamps --
+# we default to using the commit timestamp.
+# See https://reproducible-builds.org/docs/source-date-epoch/ for SOURCE_DATE_EPOCH documentation
 DATE_FMT = +%Y-%m-%d
 ifdef SOURCE_DATE_EPOCH
     BUILD_DATE ?= $(shell date -u -d "@$(SOURCE_DATE_EPOCH)" "$(DATE_FMT)" 2>/dev/null || date -u -r "$(SOURCE_DATE_EPOCH)" "$(DATE_FMT)" 2>/dev/null || date -u "$(DATE_FMT)")
