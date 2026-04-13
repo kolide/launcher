@@ -38,6 +38,8 @@ func (m *mockHTTPClient) Do(req *http.Request) (*http.Response, error) {
 	return args.Get(0).(*http.Response), args.Error(1)
 }
 
+func (m *mockHTTPClient) CloseIdleConnections() {} // no-op for testing
+
 func makeTestServerProvidedDataStore(t *testing.T) types.KVStore {
 	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ServerProvidedDataStore.String())
 	require.NoError(t, err)
