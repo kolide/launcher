@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/klauspost/compress/zstd"
 	"github.com/kolide/kit/contexts/uuid"
 	"github.com/kolide/launcher/v2/ee/agent/storage"
 	"github.com/kolide/launcher/v2/ee/agent/types"
@@ -45,6 +46,11 @@ type (
 		psks         map[string]*KeyData
 		tokensMutex  *sync.RWMutex          // used to protect the authTokens, hpkeKeys, and psks maps
 		metadataJSON atomic.Pointer[[]byte] // cached JSON for encrypted blob metadata (see refreshServerMetadata)
+		zstdEncoder  *zstd.Encoder          // zstdEncoder compresses marshaled JSON before HPKE;
+		// zstdEncoderMutex protects the zstdEncoder for initialization retries and Close behavior.
+		// The EncodeAll behavior is safe for concurrent use, but we want to ensure access to the field itself is
+		// guarded if we're recreating the encoder or calling Close during an encoding operation.
+		zstdEncoderMutex sync.Mutex
 	}
 )
 
@@ -59,10 +65,64 @@ func NewLogPublisherClient(logger *slog.Logger, k types.Knapsack, client Publish
 		psks:        make(map[string]*KeyData),
 	}
 
+	// attempt to initialize our zstd encoder for re-use across multiple publications.
+	// if for whatever reason this fails we will retry per-publication later
+	if encoder, err := newZstdEncoder(); err != nil {
+		lpc.slogger.Log(context.TODO(), slog.LevelError,
+			"failed to initialize log publisher client zstd encoder",
+			"err", err,
+		)
+	} else {
+		lpc.zstdEncoder = encoder
+	}
+
 	lpc.refreshTokenCache()
 	lpc.refreshServerMetadata()
 
 	return &lpc
+}
+
+// newZstdEncoder is a small helper to attempt creation of our zstd encoder. we'll try to set this
+// up once for re-use during LogPublisherClient initialization, but if there is a failure we will
+// retry per-publication until successful later
+func newZstdEncoder() (*zstd.Encoder, error) {
+	return zstd.NewWriter(nil, zstd.WithEncoderConcurrency(0))
+}
+
+// Close closes any client idle connections and releases the zstd encoder
+func (lpc *LogPublisherClient) Close() error {
+	if lpc.client != nil { // safe to call more than once
+		lpc.client.CloseIdleConnections()
+	}
+
+	// if our zstdEncoder is already nil there's nothing else to do
+	if lpc.zstdEncoder == nil {
+		return nil
+	}
+
+	lpc.zstdEncoderMutex.Lock()
+	defer lpc.zstdEncoderMutex.Unlock()
+	err := lpc.zstdEncoder.Close()
+	lpc.zstdEncoder = nil
+
+	return err
+}
+
+// compressPayload returns a zstd-compressed copy of the marshaled JSON request body.
+func (lpc *LogPublisherClient) compressPayload(src []byte) ([]byte, error) {
+	lpc.zstdEncoderMutex.Lock()
+	defer lpc.zstdEncoderMutex.Unlock()
+
+	// if for whatever reason we failed to initialize the encoder during NewLogPublisherClient, try again
+	if lpc.zstdEncoder == nil {
+		enc, err := newZstdEncoder()
+		if err != nil {
+			return nil, fmt.Errorf("creating zstd encoder: %w", err)
+		}
+		lpc.zstdEncoder = enc
+	}
+
+	return lpc.zstdEncoder.EncodeAll(src, make([]byte, 0, len(src))), nil
 }
 
 // NewPublisherHTTPClient is a helper method to allow us to make any http client tweaks as we learn realistic
@@ -186,7 +246,27 @@ func (lpc *LogPublisherClient) publish(ctx context.Context, slogger *slog.Logger
 		return nil, fmt.Errorf("marshaling unencrypted request payload: %w", err)
 	}
 
-	// TODO: (upcoming PR) data should be compressed here prior to encryption
+	uncompressedPayloadLen := len(jsonData)
+	jsonData, err = lpc.compressPayload(jsonData)
+	if err != nil {
+		return nil, fmt.Errorf("zstd compressing publication payload: %w", err)
+	}
+	compressedPayloadLen := len(jsonData)
+	// the following log is temporary and will be used to evaluate how we should change the batching logic
+	// to account for compression. this can be removed once we've made that determination. for now we'll maintain
+	// the pre-compression max batch size values, but can likely increase that value depending on the compression ratio
+	// we see for this data.
+	if uncompressedPayloadLen > 0 {
+		slogger.Log(ctx, slog.LevelInfo,
+			"osquery publication zstd compression stats",
+			"publication_type", publicationPath,
+			"raw_payload_length", uncompressedPayloadLen,
+			"compressed_payload_length", compressedPayloadLen,
+			"compression_ratio", float64(uncompressedPayloadLen)/float64(compressedPayloadLen),
+			"bytes_saved", uncompressedPayloadLen-compressedPayloadLen,
+		)
+	}
+
 	// encrypt the payload
 	encryptedBlob, err := encryptWithHPKE(jsonData, hpkeKey, psk, metadataJSON)
 	if err != nil {

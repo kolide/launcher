@@ -8,6 +8,7 @@ import (
 type (
 	PublisherHTTPClient interface {
 		Do(req *http.Request) (*http.Response, error)
+		CloseIdleConnections()
 	}
 )
 
