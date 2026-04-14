@@ -2,6 +2,7 @@ package osquerypublisher
 
 import (
 	"bytes"
+	"compress/zlib"
 	"context"
 	"encoding/json"
 	"errors"
@@ -14,7 +15,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/klauspost/compress/zstd"
 	"github.com/kolide/kit/contexts/uuid"
 	"github.com/kolide/launcher/v2/ee/agent/storage"
 	"github.com/kolide/launcher/v2/ee/agent/types"
@@ -46,34 +46,27 @@ type (
 		psks         map[string]*KeyData
 		tokensMutex  *sync.RWMutex          // used to protect the authTokens, hpkeKeys, and psks maps
 		metadataJSON atomic.Pointer[[]byte] // cached JSON for encrypted blob metadata (see refreshServerMetadata)
-		zstdEncoder  *zstd.Encoder          // zstdEncoder compresses marshaled JSON before HPKE;
-		// zstdEncoderMutex protects the zstdEncoder for initialization retries and Close behavior.
-		// The EncodeAll behavior is safe for concurrent use, but we want to ensure access to the field itself is
-		// guarded if we're recreating the encoder or calling Close during an encoding operation.
-		zstdEncoderMutex sync.Mutex
+		// zlibWriter compresses marshaled JSON prior to HPKE.
+		zlibWriter      *zlib.Writer
+		zlibCompressBuf bytes.Buffer
+		// zlibWriterMutex protects against concurrent Write/Close/Reset operations on our zlibWriter and zlibCompressBuf
+		zlibWriterMutex *sync.Mutex
 	}
 )
 
 func NewLogPublisherClient(logger *slog.Logger, k types.Knapsack, client PublisherHTTPClient) types.OsqueryPublisher {
+	compressionBuffer := bytes.Buffer{}
 	lpc := LogPublisherClient{
-		slogger:     logger.With("component", "osquery_log_publisher"),
-		knapsack:    k,
-		client:      client,
-		authTokens:  make(map[string]string),
-		tokensMutex: &sync.RWMutex{},
-		hpkeKeys:    make(map[string]*KeyData),
-		psks:        make(map[string]*KeyData),
-	}
-
-	// attempt to initialize our zstd encoder for re-use across multiple publications.
-	// if for whatever reason this fails we will retry per-publication later
-	if encoder, err := newZstdEncoder(); err != nil {
-		lpc.slogger.Log(context.TODO(), slog.LevelError,
-			"failed to initialize log publisher client zstd encoder",
-			"err", err,
-		)
-	} else {
-		lpc.zstdEncoder = encoder
+		slogger:         logger.With("component", "osquery_log_publisher"),
+		knapsack:        k,
+		client:          client,
+		authTokens:      make(map[string]string),
+		tokensMutex:     &sync.RWMutex{},
+		hpkeKeys:        make(map[string]*KeyData),
+		psks:            make(map[string]*KeyData),
+		zlibWriter:      zlib.NewWriter(&compressionBuffer),
+		zlibCompressBuf: compressionBuffer,
+		zlibWriterMutex: &sync.Mutex{},
 	}
 
 	lpc.refreshTokenCache()
@@ -82,47 +75,40 @@ func NewLogPublisherClient(logger *slog.Logger, k types.Knapsack, client Publish
 	return &lpc
 }
 
-// newZstdEncoder is a small helper to attempt creation of our zstd encoder. we'll try to set this
-// up once for re-use during LogPublisherClient initialization, but if there is a failure we will
-// retry per-publication until successful later
-func newZstdEncoder() (*zstd.Encoder, error) {
-	return zstd.NewWriter(nil, zstd.WithEncoderConcurrency(0))
-}
-
-// Close closes any client idle connections and releases the zstd encoder
+// Close closes any client idle connections and releases the zlib writer.
 func (lpc *LogPublisherClient) Close() error {
 	if lpc.client != nil { // safe to call more than once
 		lpc.client.CloseIdleConnections()
 	}
 
-	// if our zstdEncoder is already nil there's nothing else to do
-	if lpc.zstdEncoder == nil {
-		return nil
-	}
-
-	lpc.zstdEncoderMutex.Lock()
-	defer lpc.zstdEncoderMutex.Unlock()
-	err := lpc.zstdEncoder.Close()
-	lpc.zstdEncoder = nil
-
-	return err
+	lpc.zlibWriterMutex.Lock()
+	defer lpc.zlibWriterMutex.Unlock()
+	// compressPayload already Closes the zlib writer after each encode, just nil out the field and
+	// reset the buffer to clear any residual state
+	lpc.zlibWriter = nil
+	lpc.zlibCompressBuf.Reset()
+	return nil
 }
 
-// compressPayload returns a zstd-compressed copy of the marshaled JSON request body.
+// compressPayload returns a zlib-compressed copy of the marshaled JSON request body.
 func (lpc *LogPublisherClient) compressPayload(src []byte) ([]byte, error) {
-	lpc.zstdEncoderMutex.Lock()
-	defer lpc.zstdEncoderMutex.Unlock()
+	lpc.zlibWriterMutex.Lock()
+	defer lpc.zlibWriterMutex.Unlock()
 
-	// if for whatever reason we failed to initialize the encoder during NewLogPublisherClient, try again
-	if lpc.zstdEncoder == nil {
-		enc, err := newZstdEncoder()
-		if err != nil {
-			return nil, fmt.Errorf("creating zstd encoder: %w", err)
-		}
-		lpc.zstdEncoder = enc
+	// to prevent excessive allocations across many small writes, we reset the buffer and writer
+	// before each compress operation instead of initializing a new writer and buffer each time
+	lpc.zlibCompressBuf.Reset()
+	lpc.zlibWriter.Reset(&lpc.zlibCompressBuf)
+
+	if _, err := lpc.zlibWriter.Write(src); err != nil {
+		return nil, fmt.Errorf("zlib write: %w", err)
 	}
 
-	return lpc.zstdEncoder.EncodeAll(src, make([]byte, 0, len(src))), nil
+	if err := lpc.zlibWriter.Close(); err != nil {
+		return nil, fmt.Errorf("zlib close: %w", err)
+	}
+
+	return bytes.Clone(lpc.zlibCompressBuf.Bytes()), nil
 }
 
 // NewPublisherHTTPClient is a helper method to allow us to make any http client tweaks as we learn realistic
@@ -249,7 +235,7 @@ func (lpc *LogPublisherClient) publish(ctx context.Context, slogger *slog.Logger
 	uncompressedPayloadLen := len(jsonData)
 	jsonData, err = lpc.compressPayload(jsonData)
 	if err != nil {
-		return nil, fmt.Errorf("zstd compressing publication payload: %w", err)
+		return nil, fmt.Errorf("zlib compressing publication payload: %w", err)
 	}
 	compressedPayloadLen := len(jsonData)
 	// the following log is temporary and will be used to evaluate how we should change the batching logic
@@ -258,7 +244,7 @@ func (lpc *LogPublisherClient) publish(ctx context.Context, slogger *slog.Logger
 	// we see for this data.
 	if uncompressedPayloadLen > 0 {
 		slogger.Log(ctx, slog.LevelInfo,
-			"osquery publication zstd compression stats",
+			"osquery publication zlib compression stats",
 			"publication_type", publicationPath,
 			"raw_payload_length", uncompressedPayloadLen,
 			"compressed_payload_length", compressedPayloadLen,
