@@ -31,6 +31,10 @@ const (
 	directoryScanConcurrency = 4
 )
 
+// FIXME: Depending on what we want to do, it might make more sense
+// to generate the config.toml the same way gitleaks does. Or generate
+// a smaller one and iterate. https://github.com/gitleaks/gitleaks/tree/master/cmd/generate/config
+//
 //go:embed config.toml
 var embeddedConfigTOML []byte
 
