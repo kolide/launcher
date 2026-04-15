@@ -2,6 +2,8 @@ package secretscan
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -229,7 +231,14 @@ func (t *Table) findingsToRows(ctx context.Context, argon2idSalts []string, find
 
 	keyNamesInFindings := findingsToKeyNames(findings)
 
+	// Just for logging purposes -- we're curious how frequently we detect these
+	encryptedJwtCount := 0
 	for idx, f := range findings {
+		// Encrypted data is a false positive -- we should not count these as secrets.
+		if isEncryptedJWTFamilyValue(f) {
+			encryptedJwtCount += 1
+			continue
+		}
 		// Get the hash of this secret. If there's an error, log it, and allow the rest of the data to be returned.
 		// But note that there's an error, since it's probably a salting issue, and we don't need to log a billion times.
 		var argon2idHash string
@@ -262,7 +271,56 @@ func (t *Table) findingsToRows(ctx context.Context, argon2idSalts []string, find
 		results = append(results, row)
 	}
 
+	if encryptedJwtCount > 0 {
+		t.slogger.Log(ctx, slog.LevelInfo,
+			"detected and skipped encrypted JWT family values",
+			"jwt_family_count", encryptedJwtCount,
+		)
+	}
+
 	return results
+}
+
+type jwtFamilyHeader struct {
+	Alg string `json:"alg,omitempty"`
+	Enc string `json:"enc,omitempty"`
+	Cty string `json:"cty,omitempty"`
+}
+
+// isEncryptedJWTFamilyValue inspects the given finding to determine if it is encrypted content
+// somewhere in the JWT family (JWE or encrypted JWK). For JWEs, we only support the compact
+// serialization format currently.
+func isEncryptedJWTFamilyValue(finding report.Finding) bool {
+	// Grab just the header to examine.
+	header, _, _ := strings.Cut(finding.Secret, ".")
+
+	// We expect these values to be b64-encoded.
+	decoded, err := base64.RawURLEncoding.DecodeString(header)
+	if err != nil {
+		// Not base64 -- not a JWE/JWK
+		return false
+	}
+
+	var h jwtFamilyHeader
+	if err := json.Unmarshal(decoded, &h); err != nil {
+		// Not a valid header -- not a JWE/JWK
+		return false
+	}
+
+	// Check for JWEs. The presence of the Algorithm and Encryption Algorithm
+	// header params suggest that this is a JWE.
+	// https://datatracker.ietf.org/doc/html/rfc7516#section-4.1.1
+	// https://datatracker.ietf.org/doc/html/rfc7516#section-4.1.2
+	if len(h.Alg) > 0 && len(h.Enc) > 0 {
+		return true
+	}
+	// Check for encrypted JWKs.
+	// https://datatracker.ietf.org/doc/html/rfc7517#section-7
+	if strings.Contains(h.Cty, "jwk+json") {
+		return true
+	}
+
+	return false
 }
 
 // findingsToKeyNames attempts to extract the key names (eg: in an .env file) to help understand the context
