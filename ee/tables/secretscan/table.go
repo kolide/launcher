@@ -1,7 +1,9 @@
 package secretscan
 
 import (
+	"bytes"
 	"context"
+	_ "embed"
 	"fmt"
 	"log/slog"
 	"os"
@@ -29,10 +31,17 @@ const (
 	directoryScanConcurrency = 4
 )
 
+// FIXME: Depending on what we want to do, it might make more sense
+// to generate the config.toml the same way gitleaks does. Or generate
+// a smaller one and iterate. https://github.com/gitleaks/gitleaks/tree/master/cmd/generate/config
+//
+//go:embed config.toml
+var embeddedConfigTOML []byte
+
 func newDefaultConfig() (config.Config, error) {
 	v := viper.New() // init viper here so we don't update a global var
 	v.SetConfigType("toml")
-	err := v.ReadConfig(strings.NewReader(config.DefaultConfig))
+	err := v.ReadConfig(bytes.NewReader(embeddedConfigTOML))
 	if err != nil {
 		return config.Config{}, err
 	}
@@ -229,7 +238,15 @@ func (t *Table) findingsToRows(ctx context.Context, argon2idSalts []string, find
 
 	keyNamesInFindings := findingsToKeyNames(findings)
 
+	var countOfSkippedFalsePositives int
 	for idx, f := range findings {
+		// We've found there are some patterns that reliable look like a secret, but we know are not. It's not entirely
+		// clear what the most appropriate way to handle these are, so for now, we hardcode the exclusion
+		if notASecret := knownFalsePositive(f); notASecret {
+			countOfSkippedFalsePositives = +1
+			continue
+		}
+
 		// Get the hash of this secret. If there's an error, log it, and allow the rest of the data to be returned.
 		// But note that there's an error, since it's probably a salting issue, and we don't need to log a billion times.
 		var argon2idHash string
@@ -260,6 +277,13 @@ func (t *Table) findingsToRows(ctx context.Context, argon2idSalts []string, find
 			"name":               keyNamesInFindings[idx],
 		}
 		results = append(results, row)
+	}
+
+	if countOfSkippedFalsePositives > 0 {
+		t.slogger.Log(ctx, slog.LevelDebug,
+			"Skipped some false positives",
+			"count", countOfSkippedFalsePositives,
+		)
 	}
 
 	return results
