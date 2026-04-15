@@ -13,7 +13,7 @@ import (
 // to be re-written as we learn more.
 func knownFalsePositive(finding report.Finding) bool {
 	// currently all the known false positives are on the generic rule. Check that first
-	if finding.RuleID == "generic-api-key" {
+	if finding.RuleID != "generic-api-key" {
 		return false
 	}
 
@@ -32,7 +32,7 @@ func knownFalsePositive(finding report.Finding) bool {
 
 func isB5Encrypted(finding report.Finding) bool {
 	// we're looking for base64 encoded json, we has a common prefix
-	if strings.HasPrefix(finding.Secret, "eyJ") {
+	if !strings.HasPrefix(finding.Secret, "eyJ") {
 		return false
 	}
 
@@ -45,7 +45,7 @@ func isB5Encrypted(finding report.Finding) bool {
 	}
 
 	var decoded map[string]string
-	if err := json.Unmarshal([]byte(fromBase64), &decoded); err != nil {
+	if err := json.Unmarshal(fromBase64, &decoded); err != nil {
 		return false
 	}
 
