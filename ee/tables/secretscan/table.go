@@ -229,7 +229,15 @@ func (t *Table) findingsToRows(ctx context.Context, argon2idSalts []string, find
 
 	keyNamesInFindings := findingsToKeyNames(findings)
 
+	var countOfSkippedFalsePositives int
 	for idx, f := range findings {
+		// We've found there are some patterns that reliable look like a secret, but we know are not. It's not entirely
+		// clear what the most appropriate way to handle these are, so for now, we hardcode the exclusion
+		if notASecret := knownFalsePositive(f); notASecret {
+			countOfSkippedFalsePositives = +1
+			continue
+		}
+
 		// Get the hash of this secret. If there's an error, log it, and allow the rest of the data to be returned.
 		// But note that there's an error, since it's probably a salting issue, and we don't need to log a billion times.
 		var argon2idHash string
@@ -260,6 +268,13 @@ func (t *Table) findingsToRows(ctx context.Context, argon2idSalts []string, find
 			"name":               keyNamesInFindings[idx],
 		}
 		results = append(results, row)
+	}
+
+	if countOfSkippedFalsePositives > 0 {
+		t.slogger.Log(ctx, slog.LevelDebug,
+			"Skipped some false positives",
+			"count", countOfSkippedFalsePositives,
+		)
 	}
 
 	return results
