@@ -1,7 +1,9 @@
 package secretscan
 
 import (
+	"bytes"
 	"context"
+	_ "embed"
 	"fmt"
 	"log/slog"
 	"os"
@@ -29,10 +31,13 @@ const (
 	directoryScanConcurrency = 4
 )
 
+//go:embed config.toml
+var embeddedConfigTOML []byte
+
 func newDefaultConfig() (config.Config, error) {
 	v := viper.New() // init viper here so we don't update a global var
 	v.SetConfigType("toml")
-	err := v.ReadConfig(strings.NewReader(config.DefaultConfig))
+	err := v.ReadConfig(bytes.NewReader(embeddedConfigTOML))
 	if err != nil {
 		return config.Config{}, err
 	}
