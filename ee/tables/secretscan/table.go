@@ -370,11 +370,7 @@ func isEmptyVariable(finding report.Finding) bool {
 	}
 	before, _, _ := strings.Cut(lineWithSecret, finding.Secret)
 	beforeTrimmed := strings.TrimSpace(before)
-	if beforeTrimmed != "" {
-		return false
-	}
-
-	return true
+	return beforeTrimmed == ""
 }
 
 // findingsToKeyNames attempts to extract the key names (eg: in an .env file) to help understand the context
