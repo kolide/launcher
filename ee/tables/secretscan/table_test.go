@@ -17,7 +17,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/zricethezav/gitleaks/v8/detect"
 	"github.com/zricethezav/gitleaks/v8/report"
+	"github.com/zricethezav/gitleaks/v8/sources"
 )
 
 func TestSecretScan(t *testing.T) {
@@ -408,6 +410,94 @@ func Test_isEncryptedJWTFamilyValue(t *testing.T) {
 			t.Parallel()
 
 			require.Equal(t, tt.expectedIsEncryptedJWT, isEncryptedJWTFamilyValue(report.Finding{Secret: tt.encryptedJWT}))
+		})
+	}
+}
+
+func Test_isEmptyVariable(t *testing.T) {
+	t.Parallel()
+
+	// Set up one table for use for all test cases
+	tbl := &Table{
+		slogger: multislogger.NewNopLogger(),
+	}
+	cfg, err := newDefaultConfig()
+	require.NoError(t, err)
+	tbl.defaultConfig = &cfg
+
+	for _, tt := range []struct {
+		testCaseName   string
+		rawData        string
+		expectedReturn bool
+	}{
+		{
+			testCaseName: "underscore",
+			rawData: `
+123_S3_CREDS=
+123_S3_IP_REGION=
+`,
+			expectedReturn: true,
+		},
+		{
+			testCaseName: "hyphen",
+			rawData: `
+123-S3-CREDS=
+123-S3-IP-REGION=
+`,
+			expectedReturn: true,
+		},
+		{
+			testCaseName: "alphanumeric",
+			rawData: `
+123S3CREDS=
+123S3IPREGION=
+`,
+			expectedReturn: true,
+		},
+		{
+			testCaseName: "tab before empty variable",
+			rawData: `
+	123_S3_CREDS=
+	123_S3_IP_REGION=
+`,
+			expectedReturn: true,
+		},
+		{
+			testCaseName: "non-empty",
+			rawData: `
+123_S3_CREDS=9b065cc5-cf2e-4b3f-9a20-3422e060807a
+123_S3_IP_REGION=52b22b1e-2178-4a1e-bbba-50d0160ffab3
+`,
+			expectedReturn: false,
+		},
+		{
+			testCaseName: "high entropy", // 4.19 entropy
+			rawData: `
+375E6860-39D4-11F1-B4AC-0800200C9A66-375E6861-39D4-11F1-B4AC-0800200C9A66_123_S3_CREDS=
+4DE613D1-39D4-11F1-B4AC-0800200C9A66_123_S3_IP_REGION_4DE613D0-39D4-11F1-B4AC-0800200C9A66=
+`,
+			expectedReturn: false,
+		},
+	} {
+		t.Run(tt.testCaseName, func(t *testing.T) {
+			t.Parallel()
+
+			detector := detect.NewDetector(*tbl.defaultConfig)
+			fileSource := &sources.File{
+				Content: strings.NewReader(tt.rawData),
+				Config:  &detector.Config,
+			}
+
+			findings, err := detector.DetectSource(t.Context(), fileSource)
+			require.NoError(t, err)
+			require.Greater(t, len(findings), 0)
+
+			for _, finding := range findings {
+				// Make sure the test finding we generated is the type we expected
+				require.Equal(t, "generic-api-key", finding.RuleID)
+				// Confirm that isEmptyVariable classifies the finding appropriately
+				require.Equal(t, tt.expectedReturn, isEmptyVariable(finding))
+			}
 		})
 	}
 }
