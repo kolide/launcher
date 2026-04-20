@@ -20,14 +20,13 @@ func TestScanPathFIFO(t *testing.T) {
 	}
 
 	// Initialize config for direct scanPath calls
-	cfg, err := newDefaultConfig()
-	require.NoError(t, err)
-	tbl.defaultConfig = &cfg
+	newConfigOnce()
+	require.NoError(t, configErr)
 
 	tempDir := t.TempDir()
 	fifoPath := filepath.Join(tempDir, "test_fifo")
 
-	err = unix.Mkfifo(fifoPath, 0644)
+	err := unix.Mkfifo(fifoPath, 0644)
 	require.NoError(t, err, "creating FIFO")
 
 	// Scanning a FIFO should return an error

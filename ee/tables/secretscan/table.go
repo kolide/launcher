@@ -2,6 +2,7 @@ package secretscan
 
 import (
 	"context"
+	_ "embed"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -31,30 +32,43 @@ const (
 	directoryScanConcurrency = 4
 )
 
-func newDefaultConfig() (config.Config, error) {
+var (
+	//go:embed config.toml
+	rawKolideConfig string
+	kolideConfig    *config.Config
+	configErr       error
+)
+
+// newConfigOnce sets up our config, which pulls in the default gitleaks config as our base.
+// When gitleaks pulls in the default config, it updates multiple global vars (`viper.SetConfigType("toml")`,
+// and a private variable extendDepth). We use a OnceFunc here to avoid both the data race
+// and undesirable behavior resulting from extendDepth being modified multiple times.
+var newConfigOnce = sync.OnceFunc(func() {
 	v := viper.New() // init viper here so we don't update a global var
 	v.SetConfigType("toml")
-	err := v.ReadConfig(strings.NewReader(config.DefaultConfig))
+	err := v.ReadConfig(strings.NewReader(rawKolideConfig))
 	if err != nil {
-		return config.Config{}, err
+		configErr = fmt.Errorf("reading config: %w", err)
+		return
 	}
 	var vc config.ViperConfig
 	err = v.Unmarshal(&vc)
 	if err != nil {
-		return config.Config{}, err
+		configErr = fmt.Errorf("unmarshalling config: %w", err)
+		return
 	}
+
 	cfg, err := vc.Translate()
 	if err != nil {
-		return config.Config{}, err
+		configErr = fmt.Errorf("translating: %w", err)
+		return
 	}
-	return cfg, nil
-}
+
+	kolideConfig = &cfg
+})
 
 type Table struct {
-	slogger       *slog.Logger
-	defaultConfig *config.Config
-	configOnce    sync.Once
-	configErr     error
+	slogger *slog.Logger
 }
 
 func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
@@ -83,16 +97,9 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	t.configOnce.Do(func() {
-		cfg, err := newDefaultConfig()
-		if err != nil {
-			t.configErr = fmt.Errorf("creating default config: %w", err)
-			return
-		}
-		t.defaultConfig = &cfg
-	})
-	if t.configErr != nil {
-		return nil, t.configErr
+	newConfigOnce()
+	if configErr != nil {
+		return nil, configErr
 	}
 
 	var results []map[string]string
@@ -161,7 +168,7 @@ func (t *Table) scanPath(ctx context.Context, argon2idSalts []string, targetPath
 	}
 
 	// Fresh detector per scan - gitleaks accumulates findings internally
-	detector := detect.NewDetector(*t.defaultConfig)
+	detector := detect.NewDetector(*kolideConfig)
 
 	var source sources.Source
 	var file *os.File
@@ -199,7 +206,7 @@ func (t *Table) scanPath(ctx context.Context, argon2idSalts []string, targetPath
 
 func (t *Table) scanContent(ctx context.Context, argon2idSalts []string, content []byte) ([]map[string]string, error) {
 	// Fresh detector per scan - gitleaks accumulates findings internally
-	detector := detect.NewDetector(*t.defaultConfig)
+	detector := detect.NewDetector(*kolideConfig)
 
 	fileSource := &sources.File{
 		Content: strings.NewReader(string(content)),
@@ -231,14 +238,23 @@ func (t *Table) findingsToRows(ctx context.Context, argon2idSalts []string, find
 
 	keyNamesInFindings := findingsToKeyNames(findings)
 
-	// Just for logging purposes -- we're curious how frequently we detect these
-	encryptedJwtCount := 0
+	// Just for logging purposes -- we're curious how frequently we detect false positives
+	encryptedJwtFalsePositiveCount := 0
+	emptyVariableFalsePositiveCount := 0
 	for idx, f := range findings {
-		// Encrypted data is a false positive -- we should not count these as secrets.
-		if isEncryptedJWTFamilyValue(f) {
-			encryptedJwtCount += 1
-			continue
+		// We sometimes see false positives under the "generic-api-key" rule.
+		// Check for these.
+		if f.RuleID == "generic-api-key" {
+			if isEncryptedJWTFamilyValue(f) {
+				encryptedJwtFalsePositiveCount += 1
+				continue
+			}
+			if isEmptyVariable(f) {
+				emptyVariableFalsePositiveCount += 1
+				continue
+			}
 		}
+
 		// Get the hash of this secret. If there's an error, log it, and allow the rest of the data to be returned.
 		// But note that there's an error, since it's probably a salting issue, and we don't need to log a billion times.
 		var argon2idHash string
@@ -271,10 +287,11 @@ func (t *Table) findingsToRows(ctx context.Context, argon2idSalts []string, find
 		results = append(results, row)
 	}
 
-	if encryptedJwtCount > 0 {
+	if encryptedJwtFalsePositiveCount > 0 || emptyVariableFalsePositiveCount > 0 {
 		t.slogger.Log(ctx, slog.LevelInfo,
-			"detected and skipped encrypted JWT family values",
-			"jwt_family_count", encryptedJwtCount,
+			"detected and skipped false positive generic-api-key findings",
+			"jwt_family_count", encryptedJwtFalsePositiveCount,
+			"empty_variable", emptyVariableFalsePositiveCount,
 		)
 	}
 
@@ -321,6 +338,46 @@ func isEncryptedJWTFamilyValue(finding report.Finding) bool {
 	}
 
 	return false
+}
+
+// emptyVariableRegexp matches strings that start with a word char,
+// contain only word chars and underscores or hyphens, and end with a
+// singular equal sign -- for example, `MY_ENV_VAR=`.
+var emptyVariableRegexp = regexp.MustCompile(`^\w[\w-]*=$`)
+
+// isEmptyVariable inspects the given finding to determine if it is actually
+// an empty variable name instead.
+func isEmptyVariable(finding report.Finding) bool {
+	// This type of false positive typically has an entropy score around 3,
+	// so we exclude higher-entropy values right off the bat.
+	if finding.Entropy >= 4 {
+		return false
+	}
+
+	// Next, check for our regex match.
+	if !emptyVariableRegexp.MatchString(finding.Secret) {
+		return false
+	}
+
+	// We expect that this "secret" would be at the start of a line, with either nothing
+	// or whitespace in front of it. However, sometimes our finding.Line will contain
+	// multiple lines -- in this case, it looks like "\nMY_ENV_VAR1=\nMY_ENV_VAR2=".
+	// So first we isolate the actual line we're looking at, then check to see if there's
+	// anything besides whitespace in front of it.
+	lines := strings.Split(strings.ReplaceAll(finding.Line, "\r\n", "\n"), "\n")
+	var lineWithSecret string
+	for _, line := range lines {
+		if strings.Contains(line, finding.Secret) {
+			lineWithSecret = line
+			break
+		}
+	}
+	if lineWithSecret == "" {
+		return false
+	}
+	before, _, _ := strings.Cut(lineWithSecret, finding.Secret)
+	beforeTrimmed := strings.TrimSpace(before)
+	return beforeTrimmed == ""
 }
 
 // findingsToKeyNames attempts to extract the key names (eg: in an .env file) to help understand the context

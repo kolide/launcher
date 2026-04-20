@@ -17,7 +17,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/zricethezav/gitleaks/v8/detect"
 	"github.com/zricethezav/gitleaks/v8/report"
+	"github.com/zricethezav/gitleaks/v8/sources"
 )
 
 func TestSecretScan(t *testing.T) {
@@ -370,6 +372,184 @@ func extractTestData(tb testing.TB) string {
 	return filepath.Join(tempDir, "test_data")
 }
 
+func Test_isEncryptedJWTFamilyValue(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		testCaseName           string
+		encryptedJWT           string
+		expectedIsEncryptedJWT bool
+	}{
+		{
+			testCaseName:           "encrypted JWK, Appendix C RFC example", // https://datatracker.ietf.org/doc/html/rfc7517#appendix-C
+			encryptedJWT:           "eyJhbGciOiJQQkVTMi1IUzI1NitBMTI4S1ciLCJwMnMiOiIyV0NUY0paMVJ2ZF9DSnVKcmlwUTF3IiwicDJjIjo0MDk2LCJlbmMiOiJBMTI4Q0JDLUhTMjU2IiwiY3R5IjoiandrK2pzb24ifQ.TrqXOwuNUfDV9VPTNbyGvEJ9JMjefAVn-TR1uIxR9p6hsRQh9Tk7BA.Ye9j1qs22DmRSAddIh-VnA.AwhB8lxrlKjFn02LGWEqg27H4Tg9fyZAbFv3p5ZicHpj64QyHC44qqlZ3JEmnZTgQowIqZJ13jbyHB8LgePiqUJ1hf6M2HPLgzw8L-mEeQ0jvDUTrE07NtOerBk8bwBQyZ6g0kQ3DEOIglfYxV8-FJvNBYwbqN1Bck6d_i7OtjSHV-8DIrp-3JcRIe05YKy3Oi34Z_GOiAc1EK21B11c_AE11PII_wvvtRiUiG8YofQXakWd1_O98Kap-UgmyWPfreUJ3lJPnbD4Ve95owEfMGLOPflo2MnjaTDCwQokoJ_xplQ2vNPz8iguLcHBoKllyQFJL2mOWBwqhBo9Oj-O800as5mmLsvQMTflIrIEbbTMzHMBZ8EFW9fWwwFu0DWQJGkMNhmBZQ-3lvqTc-M6-gWA6D8PDhONfP2Oib2HGizwG1iEaX8GRyUpfLuljCLIe1DkGOewhKuKkZh04DKNM5Nbugf2atmU9OP0Ldx5peCUtRG1gMVl7Qup5ZXHTjgPDr5b2N731UooCGAUqHdgGhg0JVJ_ObCTdjsH4CF1SJsdUhrXvYx3HJh2Xd7CwJRzU_3Y1GxYU6-s3GFPbirfqqEipJDBTHpcoCmyrwYjYHFgnlqBZRotRrS95g8F95bRXqsaDY7UgQGwBQBwy665d0zpvTasvfXf_c0MWAl-neFaKOW_Px6g4EUDjG1GWSXV9cLStLw_0ovdApDIFLHYHePyagyHjouQUuGiq7BsYwYrwaF06tgB8hV8omLNfMEmDPJaZUzMuHw6tBDwGkzD-tS_ub9hxrpJ4UsOWnt5rGUyoN2N_c1-TQlXxm5oto14MxnoAyBQBpwIEgSH3Y4ZhwKBhHPjSo0cdwuNdYbGPpb-YUvF-2NZzODiQ1OvWQBRHSbPWYz_xbGkgD504LRtqRwCO7CC_CyyURi1sEssPVsMJRX_U4LFEOc82TiDdqjKOjRUfKK5rqLi8nBE9soQ0DSaOoFQZiGrBrqxDsNYiAYAmxxkos-i3nX4qtByVx85sCE5U_0MqG7COxZWMOPEFrDaepUV-cOyrvoUIng8i8ljKBKxETY2BgPegKBYCxsAUcAkKamSCC9AiBxA0UOHyhTqtlvMksO7AEhNC2-YzPyx1FkhMoS4LLe6E_pFsMlmjA6P1NSge9C5G5tETYXGAn6b1xZbHtmwrPScro9LWhVmAaA7_bxYObnFUxgWtK4vzzQBjZJ36UTk4OTB-JvKWgfVWCFsaw5WCHj6Oo4jpO7d2yN7WMfAj2hTEabz9wumQ0TMhBduZ-QON3pYObSy7TSC1vVme0NJrwF_cJRehKTFmdlXGVldPxZCplr7ZQqRQhF8JP-l4mEQVnCaWGn9ONHlemczGOS-A-wwtnmwjIB1V_vgJRf4FdpV-4hUk4-QLpu3-1lWFxrtZKcggq3tWTduRo5_QebQbUUT_VSCgsFcOmyWKoj56lbxthN19hq1XGWbLGfrrR6MWh23vk01zn8FVwi7uFwEnRYSafsnWLa1Z5TpBj9GvAdl2H9NHwzpB5NqHpZNkQ3NMDj13Fn8fzO0JB83Etbm_tnFQfcb13X3bJ15Cz-Ww1MGhvIpGGnMBT_ADp9xSIyAM9dQ1yeVXk-AIgWBUlN5uyWSGyCxp0cJwx7HxM38z0UIeBu-MytL-eqndM7LxytsVzCbjOTSVRmhYEMIzUAnS1gs7uMQAGRdgRIElTJESGMjb_4bZq9s6Ve1LKkSi0_QDsrABaLe55UY0zF4ZSfOV5PMyPtocwV_dcNPlxLgNAD1BFX_Z9kAdMZQW6fAmsfFle0zAoMe4l9pMESH0JB4sJGdCKtQXj1cXNydDYozF7l8H00BV_Er7zd6VtIw0MxwkFCTatsv_R-GsBCH218RgVPsfYhwVuT8R4HarpzsDBufC4r8_c8fc9Z278sQ081jFjOja6L2x0N_ImzFNXU6xwO-Ska-QeuvYZ3X_L31ZOX4Llp-7QSfgDoHnOxFv1Xws-D5mDHD3zxOup2b2TppdKTZb9eW2vxUVviM8OI9atBfPKMGAOv9omA-6vv5IxUH0-lWMiHLQ_g8vnswp-Jav0c4t6URVUzujNOoNd_CBGGVnHiJTCHl88LQxsqLHHIu4Fz-U2SGnlxGTj0-ihit2ELGRv4vO8E1BosTmf0cx3qgG0Pq0eOLBDIHsrdZ_CCAiTc0HVkMbyq1M6qEhM-q5P6y1QCIrwg.0HFmhOzsQ98nNWJjIHkR7A",
+			expectedIsEncryptedJWT: true,
+		},
+		{
+			testCaseName:           "JWE, Appendix A.1 example", // https://datatracker.ietf.org/doc/html/rfc7516#appendix-A.1
+			encryptedJWT:           "eyJhbGciOiJSU0EtT0FFUCIsImVuYyI6IkEyNTZHQ00ifQ.OKOawDo13gRp2ojaHV7LFpZcgV7T6DVZKTyKOMTYUmKoTCVJRgckCL9kiMT03JGeipsEdY3mx_etLbbWSrFr05kLzcSr4qKAq7YN7e9jwQRb23nfa6c9d-StnImGyFDbSv04uVuxIp5Zms1gNxKKK2Da14B8S4rzVRltdYwam_lDp5XnZAYpQdb76FdIKLaVmqgfwX7XWRxv2322i-vDxRfqNzo_tETKzpVLzfiwQyeyPGLBIO56YJ7eObdv0je81860ppamavo35UgoRdbYaBcoh9QcfylQr66oc6vFWXRcZ_ZT2LawVCWTIy3brGPi6UklfCpIMfIjf7iGdXKHzg.48V1_ALb6US04U3b.5eym8TW_c8SuK0ltJ3rpYIzOeDQz7TALvtu6UG9oMo4vpzs9tX_EFShS8iB7j6jiSdiwkIr3ajwQzaBtQD_A.XFBoMYUZodetZdvTiFvSkQ",
+			expectedIsEncryptedJWT: true,
+		},
+		{
+			testCaseName:           "JWE, Appendix A.2 example", // https://datatracker.ietf.org/doc/html/rfc7516#appendix-A.2
+			encryptedJWT:           "eyJhbGciOiJSU0ExXzUiLCJlbmMiOiJBMTI4Q0JDLUhTMjU2In0.UGhIOguC7IuEvf_NPVaXsGMoLOmwvc1GyqlIKOK1nN94nHPoltGRhWhw7Zx0-kFm1NJn8LE9XShH59_i8J0PH5ZZyNfGy2xGdULU7sHNF6Gp2vPLgNZ__deLKxGHZ7PcHALUzoOegEI-8E66jX2E4zyJKx-YxzZIItRzC5hlRirb6Y5Cl_p-ko3YvkkysZIFNPccxRU7qve1WYPxqbb2Yw8kZqa2rMWI5ng8OtvzlV7elprCbuPhcCdZ6XDP0_F8rkXds2vE4X-ncOIM8hAYHHi29NX0mcKiRaD0-D-ljQTP-cFPgwCp6X-nZZd9OHBv-B3oWh2TbqmScqXMR4gp_A.AxY8DCtDaGlsbGljb3RoZQ.KDlTtXchhZTGufMYmOYGS4HffxPSUrfmqCHXaI9wOGY.9hH0vgRfYgPnAHOd8stkvw",
+			expectedIsEncryptedJWT: true,
+		},
+		{
+			testCaseName:           "JWE, Appendix A.3 example", // https://datatracker.ietf.org/doc/html/rfc7516#appendix-A.3
+			encryptedJWT:           "eyJhbGciOiJBMTI4S1ciLCJlbmMiOiJBMTI4Q0JDLUhTMjU2In0.6KB707dM9YTIgHtLvtgWQ8mKwboJW3of9locizkDTHzBC2IlrT1oOQ.AxY8DCtDaGlsbGljb3RoZQ.KDlTtXchhZTGufMYmOYGS4HffxPSUrfmqCHXaI9wOGY.U0m_YmjN04DJvceFICbCVQ",
+			expectedIsEncryptedJWT: true,
+		},
+		{
+			testCaseName:           "unencrypted JWT",
+			encryptedJWT:           "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiaWF0IjoxNTE2MjM5MDIyfQ.gog41qgIIHkH2h-83gwRq5-NYOciZ4DgN4ulHFSkh6k",
+			expectedIsEncryptedJWT: false,
+		},
+	} {
+		t.Run(tt.testCaseName, func(t *testing.T) {
+			t.Parallel()
+
+			require.Equal(t, tt.expectedIsEncryptedJWT, isEncryptedJWTFamilyValue(report.Finding{Secret: tt.encryptedJWT}))
+		})
+	}
+}
+
+func Test_isEmptyVariable(t *testing.T) {
+	t.Parallel()
+
+	// Make sure config exists
+	newConfigOnce()
+	require.NoError(t, configErr)
+
+	for _, tt := range []struct {
+		testCaseName   string
+		rawData        string
+		expectedReturn bool
+	}{
+		{
+			testCaseName: "underscore",
+			rawData: `
+123_S3_CREDS=
+123_S3_IP_REGION=
+`,
+			expectedReturn: true,
+		},
+		{
+			testCaseName: "hyphen",
+			rawData: `
+123-S3-CREDS=
+123-S3-IP-REGION=
+`,
+			expectedReturn: true,
+		},
+		{
+			testCaseName: "alphanumeric",
+			rawData: `
+123S3CREDS=
+123S3IPREGION=
+`,
+			expectedReturn: true,
+		},
+		{
+			testCaseName: "tab before empty variable",
+			rawData: `
+	123_S3_CREDS=
+	123_S3_IP_REGION=
+`,
+			expectedReturn: true,
+		},
+		{
+			testCaseName: "non-empty",
+			rawData: `
+123_S3_CREDS=9b065cc5-cf2e-4b3f-9a20-3422e060807a
+123_S3_IP_REGION=52b22b1e-2178-4a1e-bbba-50d0160ffab3
+`,
+			expectedReturn: false,
+		},
+		{
+			testCaseName: "high entropy", // 4.19 entropy
+			rawData: `
+375E6860-39D4-11F1-B4AC-0800200C9A66-375E6861-39D4-11F1-B4AC-0800200C9A66_123_S3_CREDS=
+4DE613D1-39D4-11F1-B4AC-0800200C9A66_123_S3_IP_REGION_4DE613D0-39D4-11F1-B4AC-0800200C9A66=
+`,
+			expectedReturn: false,
+		},
+	} {
+		t.Run(tt.testCaseName, func(t *testing.T) {
+			t.Parallel()
+
+			detector := detect.NewDetector(*kolideConfig)
+			fileSource := &sources.File{
+				Content: strings.NewReader(tt.rawData),
+				Config:  &detector.Config,
+			}
+
+			findings, err := detector.DetectSource(t.Context(), fileSource)
+			require.NoError(t, err)
+			require.Greater(t, len(findings), 0)
+
+			for _, finding := range findings {
+				// Make sure the test finding we generated is the type we expected
+				require.Equal(t, "generic-api-key", finding.RuleID)
+				// Confirm that isEmptyVariable classifies the finding appropriately
+				require.Equal(t, tt.expectedReturn, isEmptyVariable(finding))
+			}
+		})
+	}
+}
+
+// Test_kolideConfig confirms that our overrides in config.toml work as expected
+func Test_kolideConfig(t *testing.T) {
+	t.Parallel()
+
+	// Make sure config exists
+	newConfigOnce()
+	require.NoError(t, configErr)
+
+	for _, tt := range []struct {
+		testCaseName string
+		pathName     string
+		rawData      string
+	}{
+		{
+			testCaseName: "K8s sealed secrets",
+			pathName:     "k8s.yaml",
+			rawData: `
+apiVersion: bitnami.com/v1alpha1
+kind: SealedSecret
+metadata:
+  creationTimestamp: null
+  name: basic-auth
+  namespace: default
+spec:
+  encryptedData:
+    password: AgAYsM4W6e5MMp90oqj7sIolG+//xxJTwRh8ke50CUFiZ8M/r5BoV/vHh3zKnlskt/s4jK058M1i4Y3ETgfsrbiYD/3ADLKRHjr2TO5O6xUrWtfFh6aDR8fOSbVpm1qCSmxFGMaHq5QLJ3Ab0FQTKF/eFehogkzXb8opY/PlI9r+9DcUJ1epAjbNjzvHDDSEZxwi/i5kCNfxqnQNZHQ4uIgEysOk/kjBEtfISxyeD2PGYiyMYk9zMtEUk9LoUTR3/EXiFcJc4iw83DUVICbaCdMPh2ZRsv3A1CWx608rtIyF+qqKnmfX5me7njnYi0vGVDY97T4cV5rKrdZTTOZVggur2l+sPG+BJSYmEVqz3cZ81mVOr4znwU6w3f2e5HxD7ivdJJEz70xgPFX8pFruQulAOohd8qXakqdtA+ew+tr0h3M+cWvOu6VNXQlbijRgC4R89CclHW4/GX3j0OulJUotrV29rTpmVZ7MTGrnZkwJbNUYAe1GEFo7LNws+GJTcNM9R6QA/AYvJ2eE3SjE2G7VaIUh2RvSe2O094Ln7yIJctzEK8afiCiIQQnIgy/M+YheoC+TzogvLZGuNsvrt/oiiilUNa6WODTr1DmJGIyM4cg0pZuVKJ8dx+zf4l7+efkBOa/2mzU9DakvoRQK8/ClR6tuOAVXHZksPehcI3eTX/ZI0MtM2CLJouoi86hPbgwEorBt+nLClkw=
+    user: AgAMrlzJFHS+mqUhv2ZpG57VNoTSRrewuu6FZVPZcV35dCmdZwesz3MSrmweNHXAlJbVMSMRlINIEBQZKgjw0szEh2ZKkXjGv1926p34GJJSB5/rqYBIDUFkIRY3aJsijMN6etjLRQi68sbYIQAZQM4pGdN23++CfNmXoQgDm9ItspcSYAcOeKP8tZ799pQTdM1pMMur5EyrYWxckORCz+OT1+buCL9+5DJkjU7JuQCk5QkwXRE1sm76FvmmP+a3FbNCIgqsBpD42AqqD4/ex0PogKr7gDkG27MWZNIvCWDd2iF4x1cwJgOtNZJEzQ7tDr+Mf4438w03sJQPMtCEUuuzX1I7SPuT6D9eRSV00GA/IS0/fmNbPf2pPHFxj8t1RMsGI2ZLdZBOXapn3P0SLYZ2Xh6QIqdxzb3VR37WS/Ir4c8v86ZzDTbnqVdT/rwb7U4Iy2k3nDj+/ghxD+7HQbmBx4zzFVYe70Sb1QIWthzZHtuvoX7+FeSa6iU6ipUj4g0U9r53vD+AYt7ntJtCI3EdX+Fh9yJe4AAL4ToHjnt3s2EG4K5i0/21KwAy9WX2rkwBb8GD3POT3zZq2b4uB5gUYyF467kw0J7MfEsPJjAfhd72+IMM9BZDU4tlrFBJPRubVsmRJKelM/o1YTkbl+eFNyWBE1t5IQ9DFjHpcppgUm1CUiDdI0RbIc2goHfFWNePxZZQBg==
+  template:
+    metadata:
+      creationTimestamp: null
+      name: basic-auth
+      namespace: default
+`,
+		},
+	} {
+		t.Run(tt.testCaseName, func(t *testing.T) {
+			t.Parallel()
+
+			detector := detect.NewDetector(*kolideConfig)
+			fileSource := &sources.File{
+				Content: strings.NewReader(tt.rawData),
+				Path:    tt.pathName,
+				Config:  &detector.Config,
+			}
+
+			findings, err := detector.DetectSource(t.Context(), fileSource)
+			require.NoError(t, err)
+			require.Equal(t, 0, len(findings))
+		})
+	}
+}
+
 // Benchmarks
 
 func BenchmarkSecretScanDirectory(b *testing.B) {
@@ -415,48 +595,6 @@ func BenchmarkSecretScanFile(b *testing.B) {
 	}
 
 	ci.ReportNonGolangMemoryUsage(b, baselineStats)
-}
-
-func Test_isEncryptedJWTFamilyValue(t *testing.T) {
-	t.Parallel()
-
-	for _, tt := range []struct {
-		testCaseName           string
-		encryptedJWT           string
-		expectedIsEncryptedJWT bool
-	}{
-		{
-			testCaseName:           "encrypted JWK, Appendix C RFC example", // https://datatracker.ietf.org/doc/html/rfc7517#appendix-C
-			encryptedJWT:           "eyJhbGciOiJQQkVTMi1IUzI1NitBMTI4S1ciLCJwMnMiOiIyV0NUY0paMVJ2ZF9DSnVKcmlwUTF3IiwicDJjIjo0MDk2LCJlbmMiOiJBMTI4Q0JDLUhTMjU2IiwiY3R5IjoiandrK2pzb24ifQ.TrqXOwuNUfDV9VPTNbyGvEJ9JMjefAVn-TR1uIxR9p6hsRQh9Tk7BA.Ye9j1qs22DmRSAddIh-VnA.AwhB8lxrlKjFn02LGWEqg27H4Tg9fyZAbFv3p5ZicHpj64QyHC44qqlZ3JEmnZTgQowIqZJ13jbyHB8LgePiqUJ1hf6M2HPLgzw8L-mEeQ0jvDUTrE07NtOerBk8bwBQyZ6g0kQ3DEOIglfYxV8-FJvNBYwbqN1Bck6d_i7OtjSHV-8DIrp-3JcRIe05YKy3Oi34Z_GOiAc1EK21B11c_AE11PII_wvvtRiUiG8YofQXakWd1_O98Kap-UgmyWPfreUJ3lJPnbD4Ve95owEfMGLOPflo2MnjaTDCwQokoJ_xplQ2vNPz8iguLcHBoKllyQFJL2mOWBwqhBo9Oj-O800as5mmLsvQMTflIrIEbbTMzHMBZ8EFW9fWwwFu0DWQJGkMNhmBZQ-3lvqTc-M6-gWA6D8PDhONfP2Oib2HGizwG1iEaX8GRyUpfLuljCLIe1DkGOewhKuKkZh04DKNM5Nbugf2atmU9OP0Ldx5peCUtRG1gMVl7Qup5ZXHTjgPDr5b2N731UooCGAUqHdgGhg0JVJ_ObCTdjsH4CF1SJsdUhrXvYx3HJh2Xd7CwJRzU_3Y1GxYU6-s3GFPbirfqqEipJDBTHpcoCmyrwYjYHFgnlqBZRotRrS95g8F95bRXqsaDY7UgQGwBQBwy665d0zpvTasvfXf_c0MWAl-neFaKOW_Px6g4EUDjG1GWSXV9cLStLw_0ovdApDIFLHYHePyagyHjouQUuGiq7BsYwYrwaF06tgB8hV8omLNfMEmDPJaZUzMuHw6tBDwGkzD-tS_ub9hxrpJ4UsOWnt5rGUyoN2N_c1-TQlXxm5oto14MxnoAyBQBpwIEgSH3Y4ZhwKBhHPjSo0cdwuNdYbGPpb-YUvF-2NZzODiQ1OvWQBRHSbPWYz_xbGkgD504LRtqRwCO7CC_CyyURi1sEssPVsMJRX_U4LFEOc82TiDdqjKOjRUfKK5rqLi8nBE9soQ0DSaOoFQZiGrBrqxDsNYiAYAmxxkos-i3nX4qtByVx85sCE5U_0MqG7COxZWMOPEFrDaepUV-cOyrvoUIng8i8ljKBKxETY2BgPegKBYCxsAUcAkKamSCC9AiBxA0UOHyhTqtlvMksO7AEhNC2-YzPyx1FkhMoS4LLe6E_pFsMlmjA6P1NSge9C5G5tETYXGAn6b1xZbHtmwrPScro9LWhVmAaA7_bxYObnFUxgWtK4vzzQBjZJ36UTk4OTB-JvKWgfVWCFsaw5WCHj6Oo4jpO7d2yN7WMfAj2hTEabz9wumQ0TMhBduZ-QON3pYObSy7TSC1vVme0NJrwF_cJRehKTFmdlXGVldPxZCplr7ZQqRQhF8JP-l4mEQVnCaWGn9ONHlemczGOS-A-wwtnmwjIB1V_vgJRf4FdpV-4hUk4-QLpu3-1lWFxrtZKcggq3tWTduRo5_QebQbUUT_VSCgsFcOmyWKoj56lbxthN19hq1XGWbLGfrrR6MWh23vk01zn8FVwi7uFwEnRYSafsnWLa1Z5TpBj9GvAdl2H9NHwzpB5NqHpZNkQ3NMDj13Fn8fzO0JB83Etbm_tnFQfcb13X3bJ15Cz-Ww1MGhvIpGGnMBT_ADp9xSIyAM9dQ1yeVXk-AIgWBUlN5uyWSGyCxp0cJwx7HxM38z0UIeBu-MytL-eqndM7LxytsVzCbjOTSVRmhYEMIzUAnS1gs7uMQAGRdgRIElTJESGMjb_4bZq9s6Ve1LKkSi0_QDsrABaLe55UY0zF4ZSfOV5PMyPtocwV_dcNPlxLgNAD1BFX_Z9kAdMZQW6fAmsfFle0zAoMe4l9pMESH0JB4sJGdCKtQXj1cXNydDYozF7l8H00BV_Er7zd6VtIw0MxwkFCTatsv_R-GsBCH218RgVPsfYhwVuT8R4HarpzsDBufC4r8_c8fc9Z278sQ081jFjOja6L2x0N_ImzFNXU6xwO-Ska-QeuvYZ3X_L31ZOX4Llp-7QSfgDoHnOxFv1Xws-D5mDHD3zxOup2b2TppdKTZb9eW2vxUVviM8OI9atBfPKMGAOv9omA-6vv5IxUH0-lWMiHLQ_g8vnswp-Jav0c4t6URVUzujNOoNd_CBGGVnHiJTCHl88LQxsqLHHIu4Fz-U2SGnlxGTj0-ihit2ELGRv4vO8E1BosTmf0cx3qgG0Pq0eOLBDIHsrdZ_CCAiTc0HVkMbyq1M6qEhM-q5P6y1QCIrwg.0HFmhOzsQ98nNWJjIHkR7A",
-			expectedIsEncryptedJWT: true,
-		},
-		{
-			testCaseName:           "JWE, Appendix A.1 example", // https://datatracker.ietf.org/doc/html/rfc7516#appendix-A.1
-			encryptedJWT:           "eyJhbGciOiJSU0EtT0FFUCIsImVuYyI6IkEyNTZHQ00ifQ.OKOawDo13gRp2ojaHV7LFpZcgV7T6DVZKTyKOMTYUmKoTCVJRgckCL9kiMT03JGeipsEdY3mx_etLbbWSrFr05kLzcSr4qKAq7YN7e9jwQRb23nfa6c9d-StnImGyFDbSv04uVuxIp5Zms1gNxKKK2Da14B8S4rzVRltdYwam_lDp5XnZAYpQdb76FdIKLaVmqgfwX7XWRxv2322i-vDxRfqNzo_tETKzpVLzfiwQyeyPGLBIO56YJ7eObdv0je81860ppamavo35UgoRdbYaBcoh9QcfylQr66oc6vFWXRcZ_ZT2LawVCWTIy3brGPi6UklfCpIMfIjf7iGdXKHzg.48V1_ALb6US04U3b.5eym8TW_c8SuK0ltJ3rpYIzOeDQz7TALvtu6UG9oMo4vpzs9tX_EFShS8iB7j6jiSdiwkIr3ajwQzaBtQD_A.XFBoMYUZodetZdvTiFvSkQ",
-			expectedIsEncryptedJWT: true,
-		},
-		{
-			testCaseName:           "JWE, Appendix A.2 example", // https://datatracker.ietf.org/doc/html/rfc7516#appendix-A.2
-			encryptedJWT:           "eyJhbGciOiJSU0ExXzUiLCJlbmMiOiJBMTI4Q0JDLUhTMjU2In0.UGhIOguC7IuEvf_NPVaXsGMoLOmwvc1GyqlIKOK1nN94nHPoltGRhWhw7Zx0-kFm1NJn8LE9XShH59_i8J0PH5ZZyNfGy2xGdULU7sHNF6Gp2vPLgNZ__deLKxGHZ7PcHALUzoOegEI-8E66jX2E4zyJKx-YxzZIItRzC5hlRirb6Y5Cl_p-ko3YvkkysZIFNPccxRU7qve1WYPxqbb2Yw8kZqa2rMWI5ng8OtvzlV7elprCbuPhcCdZ6XDP0_F8rkXds2vE4X-ncOIM8hAYHHi29NX0mcKiRaD0-D-ljQTP-cFPgwCp6X-nZZd9OHBv-B3oWh2TbqmScqXMR4gp_A.AxY8DCtDaGlsbGljb3RoZQ.KDlTtXchhZTGufMYmOYGS4HffxPSUrfmqCHXaI9wOGY.9hH0vgRfYgPnAHOd8stkvw",
-			expectedIsEncryptedJWT: true,
-		},
-		{
-			testCaseName:           "JWE, Appendix A.3 example", // https://datatracker.ietf.org/doc/html/rfc7516#appendix-A.3
-			encryptedJWT:           "eyJhbGciOiJBMTI4S1ciLCJlbmMiOiJBMTI4Q0JDLUhTMjU2In0.6KB707dM9YTIgHtLvtgWQ8mKwboJW3of9locizkDTHzBC2IlrT1oOQ.AxY8DCtDaGlsbGljb3RoZQ.KDlTtXchhZTGufMYmOYGS4HffxPSUrfmqCHXaI9wOGY.U0m_YmjN04DJvceFICbCVQ",
-			expectedIsEncryptedJWT: true,
-		},
-		{
-			testCaseName:           "unencrypted JWT",
-			encryptedJWT:           "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiaWF0IjoxNTE2MjM5MDIyfQ.gog41qgIIHkH2h-83gwRq5-NYOciZ4DgN4ulHFSkh6k",
-			expectedIsEncryptedJWT: false,
-		},
-	} {
-		t.Run(tt.testCaseName, func(t *testing.T) {
-			t.Parallel()
-
-			require.Equal(t, tt.expectedIsEncryptedJWT, isEncryptedJWTFamilyValue(report.Finding{Secret: tt.encryptedJWT}))
-		})
-	}
 }
 
 func BenchmarkSecretScanRawData(b *testing.B) {

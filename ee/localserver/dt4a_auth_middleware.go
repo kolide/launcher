@@ -293,8 +293,8 @@ func (c *chain) validate(trustedKeys map[string]*ecdsa.PublicKey) error {
 	// make a copy of the root key so that we can reassign it
 	parentEcdsa := &ecdsa.PublicKey{
 		Curve: rootKey.Curve,
-		X:     rootKey.X,
-		Y:     rootKey.Y,
+		X:     rootKey.X, //nolint:staticcheck
+		Y:     rootKey.Y, //nolint:staticcheck
 	}
 
 	var currentPayload payload
