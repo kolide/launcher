@@ -2,6 +2,7 @@ package secretscan
 
 import (
 	"context"
+	_ "embed"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -31,30 +32,43 @@ const (
 	directoryScanConcurrency = 4
 )
 
-func newDefaultConfig() (config.Config, error) {
+var (
+	//go:embed config.toml
+	rawKolideConfig string
+	kolideConfig    *config.Config
+	configErr       error
+)
+
+// newConfigOnce sets up our config, which pulls in the default gitleaks config as our base.
+// When gitleaks pulls in the default config, it updates multiple global vars (`viper.SetConfigType("toml")`,
+// and a private variable extendDepth). We use a OnceFunc here to avoid both the data race
+// and undesirable behavior resulting from extendDepth being modified multiple times.
+var newConfigOnce = sync.OnceFunc(func() {
 	v := viper.New() // init viper here so we don't update a global var
 	v.SetConfigType("toml")
-	err := v.ReadConfig(strings.NewReader(config.DefaultConfig))
+	err := v.ReadConfig(strings.NewReader(rawKolideConfig))
 	if err != nil {
-		return config.Config{}, err
+		configErr = fmt.Errorf("reading config: %w", err)
+		return
 	}
 	var vc config.ViperConfig
 	err = v.Unmarshal(&vc)
 	if err != nil {
-		return config.Config{}, err
+		configErr = fmt.Errorf("unmarshalling config: %w", err)
+		return
 	}
+
 	cfg, err := vc.Translate()
 	if err != nil {
-		return config.Config{}, err
+		configErr = fmt.Errorf("translating: %w", err)
+		return
 	}
-	return cfg, nil
-}
+
+	kolideConfig = &cfg
+})
 
 type Table struct {
-	slogger       *slog.Logger
-	defaultConfig *config.Config
-	configOnce    sync.Once
-	configErr     error
+	slogger *slog.Logger
 }
 
 func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
@@ -83,16 +97,9 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	t.configOnce.Do(func() {
-		cfg, err := newDefaultConfig()
-		if err != nil {
-			t.configErr = fmt.Errorf("creating default config: %w", err)
-			return
-		}
-		t.defaultConfig = &cfg
-	})
-	if t.configErr != nil {
-		return nil, t.configErr
+	newConfigOnce()
+	if configErr != nil {
+		return nil, configErr
 	}
 
 	var results []map[string]string
@@ -161,7 +168,7 @@ func (t *Table) scanPath(ctx context.Context, argon2idSalts []string, targetPath
 	}
 
 	// Fresh detector per scan - gitleaks accumulates findings internally
-	detector := detect.NewDetector(*t.defaultConfig)
+	detector := detect.NewDetector(*kolideConfig)
 
 	var source sources.Source
 	var file *os.File
@@ -199,7 +206,7 @@ func (t *Table) scanPath(ctx context.Context, argon2idSalts []string, targetPath
 
 func (t *Table) scanContent(ctx context.Context, argon2idSalts []string, content []byte) ([]map[string]string, error) {
 	// Fresh detector per scan - gitleaks accumulates findings internally
-	detector := detect.NewDetector(*t.defaultConfig)
+	detector := detect.NewDetector(*kolideConfig)
 
 	fileSource := &sources.File{
 		Content: strings.NewReader(string(content)),

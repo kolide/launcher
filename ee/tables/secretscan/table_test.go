@@ -417,13 +417,9 @@ func Test_isEncryptedJWTFamilyValue(t *testing.T) {
 func Test_isEmptyVariable(t *testing.T) {
 	t.Parallel()
 
-	// Set up one table for use for all test cases
-	tbl := &Table{
-		slogger: multislogger.NewNopLogger(),
-	}
-	cfg, err := newDefaultConfig()
-	require.NoError(t, err)
-	tbl.defaultConfig = &cfg
+	// Make sure config exists
+	newConfigOnce()
+	require.NoError(t, configErr)
 
 	for _, tt := range []struct {
 		testCaseName   string
@@ -482,7 +478,7 @@ func Test_isEmptyVariable(t *testing.T) {
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 
-			detector := detect.NewDetector(*tbl.defaultConfig)
+			detector := detect.NewDetector(*kolideConfig)
 			fileSource := &sources.File{
 				Content: strings.NewReader(tt.rawData),
 				Config:  &detector.Config,
@@ -498,6 +494,58 @@ func Test_isEmptyVariable(t *testing.T) {
 				// Confirm that isEmptyVariable classifies the finding appropriately
 				require.Equal(t, tt.expectedReturn, isEmptyVariable(finding))
 			}
+		})
+	}
+}
+
+// Test_kolideConfig confirms that our overrides in config.toml work as expected
+func Test_kolideConfig(t *testing.T) {
+	t.Parallel()
+
+	// Make sure config exists
+	newConfigOnce()
+	require.NoError(t, configErr)
+
+	for _, tt := range []struct {
+		testCaseName string
+		pathName     string
+		rawData      string
+	}{
+		{
+			testCaseName: "K8s sealed secrets",
+			pathName:     "k8s.yaml",
+			rawData: `
+apiVersion: bitnami.com/v1alpha1
+kind: SealedSecret
+metadata:
+  creationTimestamp: null
+  name: basic-auth
+  namespace: default
+spec:
+  encryptedData:
+    password: AgAYsM4W6e5MMp90oqj7sIolG+//xxJTwRh8ke50CUFiZ8M/r5BoV/vHh3zKnlskt/s4jK058M1i4Y3ETgfsrbiYD/3ADLKRHjr2TO5O6xUrWtfFh6aDR8fOSbVpm1qCSmxFGMaHq5QLJ3Ab0FQTKF/eFehogkzXb8opY/PlI9r+9DcUJ1epAjbNjzvHDDSEZxwi/i5kCNfxqnQNZHQ4uIgEysOk/kjBEtfISxyeD2PGYiyMYk9zMtEUk9LoUTR3/EXiFcJc4iw83DUVICbaCdMPh2ZRsv3A1CWx608rtIyF+qqKnmfX5me7njnYi0vGVDY97T4cV5rKrdZTTOZVggur2l+sPG+BJSYmEVqz3cZ81mVOr4znwU6w3f2e5HxD7ivdJJEz70xgPFX8pFruQulAOohd8qXakqdtA+ew+tr0h3M+cWvOu6VNXQlbijRgC4R89CclHW4/GX3j0OulJUotrV29rTpmVZ7MTGrnZkwJbNUYAe1GEFo7LNws+GJTcNM9R6QA/AYvJ2eE3SjE2G7VaIUh2RvSe2O094Ln7yIJctzEK8afiCiIQQnIgy/M+YheoC+TzogvLZGuNsvrt/oiiilUNa6WODTr1DmJGIyM4cg0pZuVKJ8dx+zf4l7+efkBOa/2mzU9DakvoRQK8/ClR6tuOAVXHZksPehcI3eTX/ZI0MtM2CLJouoi86hPbgwEorBt+nLClkw=
+    user: AgAMrlzJFHS+mqUhv2ZpG57VNoTSRrewuu6FZVPZcV35dCmdZwesz3MSrmweNHXAlJbVMSMRlINIEBQZKgjw0szEh2ZKkXjGv1926p34GJJSB5/rqYBIDUFkIRY3aJsijMN6etjLRQi68sbYIQAZQM4pGdN23++CfNmXoQgDm9ItspcSYAcOeKP8tZ799pQTdM1pMMur5EyrYWxckORCz+OT1+buCL9+5DJkjU7JuQCk5QkwXRE1sm76FvmmP+a3FbNCIgqsBpD42AqqD4/ex0PogKr7gDkG27MWZNIvCWDd2iF4x1cwJgOtNZJEzQ7tDr+Mf4438w03sJQPMtCEUuuzX1I7SPuT6D9eRSV00GA/IS0/fmNbPf2pPHFxj8t1RMsGI2ZLdZBOXapn3P0SLYZ2Xh6QIqdxzb3VR37WS/Ir4c8v86ZzDTbnqVdT/rwb7U4Iy2k3nDj+/ghxD+7HQbmBx4zzFVYe70Sb1QIWthzZHtuvoX7+FeSa6iU6ipUj4g0U9r53vD+AYt7ntJtCI3EdX+Fh9yJe4AAL4ToHjnt3s2EG4K5i0/21KwAy9WX2rkwBb8GD3POT3zZq2b4uB5gUYyF467kw0J7MfEsPJjAfhd72+IMM9BZDU4tlrFBJPRubVsmRJKelM/o1YTkbl+eFNyWBE1t5IQ9DFjHpcppgUm1CUiDdI0RbIc2goHfFWNePxZZQBg==
+  template:
+    metadata:
+      creationTimestamp: null
+      name: basic-auth
+      namespace: default
+`,
+		},
+	} {
+		t.Run(tt.testCaseName, func(t *testing.T) {
+			t.Parallel()
+
+			detector := detect.NewDetector(*kolideConfig)
+			fileSource := &sources.File{
+				Content: strings.NewReader(tt.rawData),
+				Path:    tt.pathName,
+				Config:  &detector.Config,
+			}
+
+			findings, err := detector.DetectSource(t.Context(), fileSource)
+			require.NoError(t, err)
+			require.Equal(t, 0, len(findings))
 		})
 	}
 }
