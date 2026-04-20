@@ -483,10 +483,18 @@ spec:
 			expectedFinding: false,
 		},
 		{
-			testCaseName: "empty variable (true positive)",
+			testCaseName: "empty variable (true positive, variable is not empty)",
 			rawData: `
 123_S3_CREDS=9b065cc5-cf2e-4b3f-9a20-3422e060807a
 123_S3_IP_REGION=52b22b1e-2178-4a1e-bbba-50d0160ffab3
+`,
+			expectedFinding: true,
+		},
+		{
+			testCaseName: "empty variable (true positive, long variable with high entropy)",
+			rawData: `
+375E6860-39D4-11F1-B4AC-0800200C9A66-375E6861-39D4-11F1-B4AC-0800200C9A66_123_S3_CREDS=
+4DE613D1-39D4-11F1-B4AC-0800200C9A66_123_S3_IP_REGION_4DE613D0-39D4-11F1-B4AC-0800200C9A66=
 `,
 			expectedFinding: true,
 		},

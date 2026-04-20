@@ -15,4 +15,6 @@ paths = ['''(?i).*\.ya?ml$''']
 [[rules.allowlists]]
 description = "Ignore variable names with empty values (https://github.com/gitleaks/gitleaks/issues/1828)"
 condition = "AND"
-regexes = ['''^\s*[A-Z\d][A-Z\d_-]*=$''']
+# We limit length to 35 as a proxy for not allowlisting high-entropy values here.
+# Variable names are probably usually under that length.
+regexes = ['''^\s*[A-Z\d][A-Z\d_-]{0,35}=$''']
