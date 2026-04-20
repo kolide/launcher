@@ -15,5 +15,4 @@ paths = ['''(?i).*\.ya?ml$''']
 [[rules.allowlists]]
 description = "Ignore variable names with empty values (https://github.com/gitleaks/gitleaks/issues/1828)"
 condition = "AND"
-regex_target = "match"
 regexes = ['''^\s*[A-Z\d][A-Z\d_-]*=$''']
