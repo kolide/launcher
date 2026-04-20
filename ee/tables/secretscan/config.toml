@@ -18,3 +18,4 @@ condition = "AND"
 # We limit length to 35 as a proxy for not allowlisting high-entropy values here.
 # Variable names are probably usually under that length.
 regexes = ['''^\s*[A-Z\d][A-Z\d_-]{0,35}=$''']
+paths = ['''(?i).*\.env$''']

@@ -452,6 +452,7 @@ spec:
 		},
 		{
 			testCaseName: "empty variable, with underscore",
+			pathName:     ".env",
 			rawData: `
 123_S3_CREDS=
 123_S3_IP_REGION=
@@ -460,6 +461,7 @@ spec:
 		},
 		{
 			testCaseName: "empty variable, with hyphen",
+			pathName:     ".env",
 			rawData: `
 123-S3-CREDS=
 123-S3-IP-REGION=
@@ -468,6 +470,7 @@ spec:
 		},
 		{
 			testCaseName: "empty variable, with alphanumeric",
+			pathName:     ".env",
 			rawData: `
 123S3CREDS=
 123S3IPREGION=
@@ -476,6 +479,7 @@ spec:
 		},
 		{
 			testCaseName: "empty variable, with tab before empty variable",
+			pathName:     ".env",
 			rawData: `
 	123_S3_CREDS=
 	123_S3_IP_REGION=
@@ -484,6 +488,7 @@ spec:
 		},
 		{
 			testCaseName: "empty variable (true positive, variable is not empty)",
+			pathName:     ".env",
 			rawData: `
 123_S3_CREDS=9b065cc5-cf2e-4b3f-9a20-3422e060807a
 123_S3_IP_REGION=52b22b1e-2178-4a1e-bbba-50d0160ffab3
@@ -492,6 +497,7 @@ spec:
 		},
 		{
 			testCaseName: "empty variable (true positive, long variable with high entropy)",
+			pathName:     ".env",
 			rawData: `
 375E6860-39D4-11F1-B4AC-0800200C9A66-375E6861-39D4-11F1-B4AC-0800200C9A66_123_S3_CREDS=
 4DE613D1-39D4-11F1-B4AC-0800200C9A66_123_S3_IP_REGION_4DE613D0-39D4-11F1-B4AC-0800200C9A66=
