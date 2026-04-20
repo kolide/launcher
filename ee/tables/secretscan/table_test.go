@@ -423,9 +423,10 @@ func Test_kolideConfig(t *testing.T) {
 	require.NoError(t, configErr)
 
 	for _, tt := range []struct {
-		testCaseName string
-		pathName     string
-		rawData      string
+		testCaseName    string
+		pathName        string
+		rawData         string
+		expectedFinding bool
 	}{
 		{
 			testCaseName: "K8s sealed secrets",
@@ -447,6 +448,7 @@ spec:
       name: basic-auth
       namespace: default
 `,
+			expectedFinding: false,
 		},
 		{
 			testCaseName: "empty variable, with underscore",
@@ -454,6 +456,7 @@ spec:
 123_S3_CREDS=
 123_S3_IP_REGION=
 `,
+			expectedFinding: false,
 		},
 		{
 			testCaseName: "empty variable, with hyphen",
@@ -461,6 +464,7 @@ spec:
 123-S3-CREDS=
 123-S3-IP-REGION=
 `,
+			expectedFinding: false,
 		},
 		{
 			testCaseName: "empty variable, with alphanumeric",
@@ -468,6 +472,7 @@ spec:
 123S3CREDS=
 123S3IPREGION=
 `,
+			expectedFinding: false,
 		},
 		{
 			testCaseName: "empty variable, with tab before empty variable",
@@ -475,6 +480,15 @@ spec:
 	123_S3_CREDS=
 	123_S3_IP_REGION=
 `,
+			expectedFinding: false,
+		},
+		{
+			testCaseName: "empty variable (true positive)",
+			rawData: `
+123_S3_CREDS=9b065cc5-cf2e-4b3f-9a20-3422e060807a
+123_S3_IP_REGION=52b22b1e-2178-4a1e-bbba-50d0160ffab3
+`,
+			expectedFinding: true,
 		},
 	} {
 		t.Run(tt.testCaseName, func(t *testing.T) {
@@ -489,7 +503,11 @@ spec:
 
 			findings, err := detector.DetectSource(t.Context(), fileSource)
 			require.NoError(t, err)
-			require.Equal(t, 0, len(findings))
+			if tt.expectedFinding {
+				require.Less(t, 0, len(findings))
+			} else {
+				require.Equal(t, 0, len(findings))
+			}
 		})
 	}
 }
