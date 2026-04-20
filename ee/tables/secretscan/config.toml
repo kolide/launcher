@@ -5,11 +5,15 @@ title = "Kolide secretscan config"
 [extend]
 useDefault = true
 
-# Ignore K8s Sealed Secrets
-# https://github.com/gitleaks/gitleaks/issues/1728
 [[rules]]
 id = "generic-api-key"
 [[rules.allowlists]]
+description = "Ignore K8s Sealed Secrets (https://github.com/gitleaks/gitleaks/issues/1728)"
 condition = "AND"
 regexes = ['''Ag[a-zA-Z0-9+/]{500,}={0,2}''']
 paths = ['''(?i).*\.ya?ml$''']
+[[rules.allowlists]]
+description = "Ignore variable names with empty values (https://github.com/gitleaks/gitleaks/issues/1828)"
+condition = "AND"
+regex_target = "match"
+regexes = ['''^\s*\w[\w-]*=$''']
