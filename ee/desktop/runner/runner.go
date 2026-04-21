@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/ecdsa"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -240,6 +241,16 @@ func (r *DesktopUsersProcessesRunner) Execute() error {
 			)
 		}
 	})
+
+	// Write the localization file once at startup so it is available before
+	// any desktop child process is spawned. Failures here are non-fatal --
+	// child processes fall back to English when the file is missing.
+	if err := r.writeLocalizationFile(); err != nil {
+		r.slogger.Log(context.TODO(), slog.LevelWarn,
+			"failed to write initial localization file",
+			"err", err,
+		)
+	}
 
 	defer r.updateTicker.Stop()
 	menuRefreshTicker := time.NewTicker(r.menuRefreshInterval)
@@ -580,6 +591,22 @@ func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
 	return nil
 }
 
+// Ping handles notifications from the control service that a subscribed
+// subsystem (e.g. localizations) has been updated. The runner re-writes the
+// shared localization file so desktop child processes pick up the new
+// translations on their next read, and refreshes the menu so any localized
+// menu strings reflect the new locale as well.
+func (r *DesktopUsersProcessesRunner) Ping() {
+	if err := r.writeLocalizationFile(); err != nil {
+		r.slogger.Log(context.TODO(), slog.LevelWarn,
+			"failed to write localization file after subsystem update",
+			"err", err,
+		)
+	}
+
+	r.refreshMenu()
+}
+
 func (r *DesktopUsersProcessesRunner) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
@@ -698,6 +725,16 @@ func (r *DesktopUsersProcessesRunner) refreshMenu() {
 				"err", err,
 			)
 		}
+	}
+
+	// Defensively re-write the localization file alongside the menu so the
+	// shared file stays in sync with the latest translations even if the
+	// localizations subsystem update was missed.
+	if err := r.writeLocalizationFile(); err != nil {
+		r.slogger.Log(context.TODO(), slog.LevelWarn,
+			"failed to write localization file during menu refresh",
+			"err", err,
+		)
 	}
 
 	if r.knapsack.InModernStandby() {
@@ -1113,6 +1150,25 @@ func (r *DesktopUsersProcessesRunner) menuTemplatePath() string {
 	return filepath.Join(r.usersFilesRoot, "menu_template.json")
 }
 
+// localizationPath returns the path to the localization data file shared
+// with the desktop child processes.
+func (r *DesktopUsersProcessesRunner) localizationPath() string {
+	return filepath.Join(r.usersFilesRoot, "localization.json")
+}
+
+// writeLocalizationFile serializes the current LocalizationData from the
+// knapsack and writes it to the shared file consumed by desktop child processes.
+func (r *DesktopUsersProcessesRunner) writeLocalizationFile() error {
+	data, err := json.Marshal(r.knapsack.LocalizationData())
+	if err != nil {
+		return fmt.Errorf("marshalling localization data: %w", err)
+	}
+	if err := r.writeSharedFile(r.localizationPath(), data); err != nil {
+		return fmt.Errorf("writing localization file: %w", err)
+	}
+	return nil
+}
+
 // desktopCommand invokes the launcher desktop executable with the appropriate env vars
 func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socketPath, menuPath string) (*exec.Cmd, error) {
 	// Whenever we swap to using allowedcmd.Launcher instead, we should account for
@@ -1132,6 +1188,7 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 		fmt.Sprintf("USER_SERVER_SOCKET_PATH=%s", socketPath),
 		fmt.Sprintf("ICON_PATH=%s", r.iconFileLocation()),
 		fmt.Sprintf("MENU_PATH=%s", menuPath),
+		fmt.Sprintf("LOCALIZATION_PATH=%s", r.localizationPath()),
 		fmt.Sprintf("PPID=%d", os.Getpid()),
 		fmt.Sprintf("RUNNER_SERVER_URL=%s", r.runnerServer.Url()),
 		fmt.Sprintf("RUNNER_SERVER_AUTH_TOKEN=%s", r.runnerServer.RegisterClient(uid)),

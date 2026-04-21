@@ -19,7 +19,7 @@ var assets embed.FS
 
 const (
 	localizationsDataKey = "localization"
-	defaultLocale        = "en-US"
+	defaultLocale        = "es-ES"
 )
 
 type LocalizationConsumer struct {

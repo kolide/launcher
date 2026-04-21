@@ -10,7 +10,7 @@ package notify
 #include <stdlib.h>
 
 bool sendNotification(char *cTitle, char *cBody, char *cActionUri);
-void runNotificationListenerApp(void);
+void runNotificationListenerApp(char *cLearnMoreLabel);
 */
 import "C"
 import (
@@ -24,13 +24,15 @@ import (
 )
 
 type macNotifier struct {
-	interrupt   chan struct{}
-	interrupted atomic.Bool
+	localizationPath string
+	interrupt        chan struct{}
+	interrupted      atomic.Bool
 }
 
-func NewDesktopNotifier(_ *slog.Logger, _ string) *macNotifier {
+func NewDesktopNotifier(_ *slog.Logger, _ string, localizationPath string) *macNotifier {
 	return &macNotifier{
-		interrupt: make(chan struct{}),
+		localizationPath: localizationPath,
+		interrupt:        make(chan struct{}),
 	}
 }
 
@@ -48,9 +50,17 @@ func (m *macNotifier) Interrupt(err error) {
 }
 
 func (m *macNotifier) Listen() {
-	if isBundle() {
-		C.runNotificationListenerApp()
+	if !isBundle() {
+		return
 	}
+
+	// Resolve the "Learn More" label once at listener startup. The action title
+	// is baked into the registered notification category, so live locale changes
+	// only take effect after the desktop process restarts.
+	learnMoreCStr := C.CString(learnMoreLabel(m.localizationPath))
+	defer C.free(unsafe.Pointer(learnMoreCStr))
+
+	C.runNotificationListenerApp(learnMoreCStr)
 }
 
 func (m *macNotifier) SendNotification(n Notification) error {
