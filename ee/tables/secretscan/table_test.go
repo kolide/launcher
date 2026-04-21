@@ -414,90 +414,6 @@ func Test_isEncryptedJWTFamilyValue(t *testing.T) {
 	}
 }
 
-func Test_isEmptyVariable(t *testing.T) {
-	t.Parallel()
-
-	// Make sure config exists
-	newConfigOnce()
-	require.NoError(t, configErr)
-
-	for _, tt := range []struct {
-		testCaseName   string
-		rawData        string
-		expectedReturn bool
-	}{
-		{
-			testCaseName: "underscore",
-			rawData: `
-123_S3_CREDS=
-123_S3_IP_REGION=
-`,
-			expectedReturn: true,
-		},
-		{
-			testCaseName: "hyphen",
-			rawData: `
-123-S3-CREDS=
-123-S3-IP-REGION=
-`,
-			expectedReturn: true,
-		},
-		{
-			testCaseName: "alphanumeric",
-			rawData: `
-123S3CREDS=
-123S3IPREGION=
-`,
-			expectedReturn: true,
-		},
-		{
-			testCaseName: "tab before empty variable",
-			rawData: `
-	123_S3_CREDS=
-	123_S3_IP_REGION=
-`,
-			expectedReturn: true,
-		},
-		{
-			testCaseName: "non-empty",
-			rawData: `
-123_S3_CREDS=9b065cc5-cf2e-4b3f-9a20-3422e060807a
-123_S3_IP_REGION=52b22b1e-2178-4a1e-bbba-50d0160ffab3
-`,
-			expectedReturn: false,
-		},
-		{
-			testCaseName: "high entropy", // 4.19 entropy
-			rawData: `
-375E6860-39D4-11F1-B4AC-0800200C9A66-375E6861-39D4-11F1-B4AC-0800200C9A66_123_S3_CREDS=
-4DE613D1-39D4-11F1-B4AC-0800200C9A66_123_S3_IP_REGION_4DE613D0-39D4-11F1-B4AC-0800200C9A66=
-`,
-			expectedReturn: false,
-		},
-	} {
-		t.Run(tt.testCaseName, func(t *testing.T) {
-			t.Parallel()
-
-			detector := detect.NewDetector(*kolideConfig)
-			fileSource := &sources.File{
-				Content: strings.NewReader(tt.rawData),
-				Config:  &detector.Config,
-			}
-
-			findings, err := detector.DetectSource(t.Context(), fileSource)
-			require.NoError(t, err)
-			require.Greater(t, len(findings), 0)
-
-			for _, finding := range findings {
-				// Make sure the test finding we generated is the type we expected
-				require.Equal(t, "generic-api-key", finding.RuleID)
-				// Confirm that isEmptyVariable classifies the finding appropriately
-				require.Equal(t, tt.expectedReturn, isEmptyVariable(finding))
-			}
-		})
-	}
-}
-
 // Test_kolideConfig confirms that our overrides in config.toml work as expected
 func Test_kolideConfig(t *testing.T) {
 	t.Parallel()
@@ -507,9 +423,10 @@ func Test_kolideConfig(t *testing.T) {
 	require.NoError(t, configErr)
 
 	for _, tt := range []struct {
-		testCaseName string
-		pathName     string
-		rawData      string
+		testCaseName    string
+		pathName        string
+		rawData         string
+		expectedFinding bool
 	}{
 		{
 			testCaseName: "K8s sealed secrets",
@@ -531,6 +448,70 @@ spec:
       name: basic-auth
       namespace: default
 `,
+			expectedFinding: false,
+		},
+		{
+			testCaseName: "empty variable, with underscore",
+			pathName:     ".env",
+			rawData: `
+123_S3_CREDS=
+123_S3_IP_REGION=
+`,
+			expectedFinding: false,
+		},
+		{
+			testCaseName: "empty variable, with hyphen",
+			pathName:     ".env",
+			rawData: `
+123-S3-CREDS=
+123-S3-IP-REGION=
+`,
+			expectedFinding: false,
+		},
+		{
+			testCaseName: "empty variable, with alphanumeric",
+			pathName:     ".env.local",
+			rawData: `
+123S3CREDS=
+123S3IPREGION=
+`,
+			expectedFinding: false,
+		},
+		{
+			testCaseName: "empty variable, with tab before empty variable",
+			pathName:     "aws.env",
+			rawData: `
+	123_S3_CREDS=
+	123_S3_IP_REGION=
+`,
+			expectedFinding: false,
+		},
+		{
+			testCaseName: "empty variable, all lowercase",
+			pathName:     ".env",
+			rawData: `
+123_s3_creds=
+123_s3_ip_region=
+`,
+			expectedFinding: false,
+		},
+		{
+			testCaseName: "empty variable (true positive, variable is not empty)",
+			pathName:     ".env",
+			rawData: `
+123_S3_CREDS=9b065cc5-cf2e-4b3f-9a20-3422e060807a
+123_S3_IP_REGION=52b22b1e-2178-4a1e-bbba-50d0160ffab3
+`,
+			expectedFinding: true,
+		},
+		{
+			testCaseName: "empty variable (true positive, long variable with high entropy)",
+			pathName:     ".env",
+			rawData: `
+375E6860-39D4-11F1-B4AC-0800200C9A66-375E6861-39D4-11F1-B4AC-0800200C9A66_123_S3_CREDS=
+4DE613D1-39D4-11F1-B4AC-0800200C9A66_123_S3_IP_REGION_4DE613D0-39D4-11F1-B4AC-0800200C9A66=
+`,
+			expectedFinding: true,
 		},
 	} {
 		t.Run(tt.testCaseName, func(t *testing.T) {
@@ -545,7 +526,11 @@ spec:
 
 			findings, err := detector.DetectSource(t.Context(), fileSource)
 			require.NoError(t, err)
-			require.Equal(t, 0, len(findings))
+			if tt.expectedFinding {
+				require.Less(t, 0, len(findings))
+			} else {
+				require.Equal(t, 0, len(findings))
+			}
 		})
 	}
 }

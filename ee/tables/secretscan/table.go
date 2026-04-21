@@ -240,17 +240,12 @@ func (t *Table) findingsToRows(ctx context.Context, argon2idSalts []string, find
 
 	// Just for logging purposes -- we're curious how frequently we detect false positives
 	encryptedJwtFalsePositiveCount := 0
-	emptyVariableFalsePositiveCount := 0
 	for idx, f := range findings {
 		// We sometimes see false positives under the "generic-api-key" rule.
 		// Check for these.
 		if f.RuleID == "generic-api-key" {
 			if isEncryptedJWTFamilyValue(f) {
 				encryptedJwtFalsePositiveCount += 1
-				continue
-			}
-			if isEmptyVariable(f) {
-				emptyVariableFalsePositiveCount += 1
 				continue
 			}
 		}
@@ -287,11 +282,10 @@ func (t *Table) findingsToRows(ctx context.Context, argon2idSalts []string, find
 		results = append(results, row)
 	}
 
-	if encryptedJwtFalsePositiveCount > 0 || emptyVariableFalsePositiveCount > 0 {
+	if encryptedJwtFalsePositiveCount > 0 {
 		t.slogger.Log(ctx, slog.LevelInfo,
 			"detected and skipped false positive generic-api-key findings",
 			"jwt_family_count", encryptedJwtFalsePositiveCount,
-			"empty_variable", emptyVariableFalsePositiveCount,
 		)
 	}
 
@@ -338,46 +332,6 @@ func isEncryptedJWTFamilyValue(finding report.Finding) bool {
 	}
 
 	return false
-}
-
-// emptyVariableRegexp matches strings that start with a word char,
-// contain only word chars and underscores or hyphens, and end with a
-// singular equal sign -- for example, `MY_ENV_VAR=`.
-var emptyVariableRegexp = regexp.MustCompile(`^\w[\w-]*=$`)
-
-// isEmptyVariable inspects the given finding to determine if it is actually
-// an empty variable name instead.
-func isEmptyVariable(finding report.Finding) bool {
-	// This type of false positive typically has an entropy score around 3,
-	// so we exclude higher-entropy values right off the bat.
-	if finding.Entropy >= 4 {
-		return false
-	}
-
-	// Next, check for our regex match.
-	if !emptyVariableRegexp.MatchString(finding.Secret) {
-		return false
-	}
-
-	// We expect that this "secret" would be at the start of a line, with either nothing
-	// or whitespace in front of it. However, sometimes our finding.Line will contain
-	// multiple lines -- in this case, it looks like "\nMY_ENV_VAR1=\nMY_ENV_VAR2=".
-	// So first we isolate the actual line we're looking at, then check to see if there's
-	// anything besides whitespace in front of it.
-	lines := strings.Split(strings.ReplaceAll(finding.Line, "\r\n", "\n"), "\n")
-	var lineWithSecret string
-	for _, line := range lines {
-		if strings.Contains(line, finding.Secret) {
-			lineWithSecret = line
-			break
-		}
-	}
-	if lineWithSecret == "" {
-		return false
-	}
-	before, _, _ := strings.Cut(lineWithSecret, finding.Secret)
-	beforeTrimmed := strings.TrimSpace(before)
-	return beforeTrimmed == ""
 }
 
 // findingsToKeyNames attempts to extract the key names (eg: in an .env file) to help understand the context
