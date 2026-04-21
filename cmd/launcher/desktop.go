@@ -62,6 +62,11 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 			"",
 			"path to read menu data",
 		)
+		flLocalizationPath = flagset.String(
+			"localization_path",
+			"",
+			"path to read localization data",
+		)
 		fldebug = flagset.Bool(
 			"debug",
 			false,
@@ -148,7 +153,7 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 	}
 
 	// Set up notification sending and listening
-	notifier := notify.NewDesktopNotifier(slogger, *flIconPath)
+	notifier := notify.NewDesktopNotifier(slogger, *flIconPath, *flLocalizationPath)
 	runGroup.Add("desktopNotifier", notifier.Execute, notifier.Interrupt)
 
 	server, err := userserver.New(slogger, *flUserServerAuthToken, *flUserServerSocketPath, shutdownChan, showDesktopChan, notifier)

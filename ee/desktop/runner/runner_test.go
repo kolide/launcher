@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -553,4 +554,81 @@ func TestDesktopUsersProcessesRunner_DetectPresence(t *testing.T) {
 		require.Error(t, err)
 		require.Equal(t, presencedetection.DetectionFailedDurationValue, d)
 	})
+}
+
+func Test_writeLocalizationFile(t *testing.T) {
+	t.Parallel()
+
+	expected := types.LocalizationData{
+		Locale: "es-ES",
+		Translations: map[string]types.Translations{
+			"es-ES": {},
+		},
+	}
+
+	mockKnapsack := mocks.NewKnapsack(t)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopEnabled)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopGoMaxProcs)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopUpdateInterval)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.KolideServerURL)
+	mockKnapsack.On("DesktopUpdateInterval").Return(time.Millisecond * 250)
+	mockKnapsack.On("DesktopMenuRefreshInterval").Return(time.Millisecond * 250)
+	mockKnapsack.On("DesktopGoMaxProcs").Return(2).Maybe()
+	mockKnapsack.On("KolideServerURL").Return("somewhere-over-the-rainbow.example.com")
+	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+	mockKnapsack.On("InModernStandby").Return(false).Maybe()
+	mockKnapsack.On("DebugServerData").Return(false).Maybe()
+	mockKnapsack.On("LocalizationData").Return(expected)
+
+	dir := t.TempDir()
+	r, err := New(mockKnapsack, nil, WithUsersFilesRoot(dir))
+	require.NoError(t, err)
+
+	require.NoError(t, r.writeLocalizationFile())
+
+	contents, err := os.ReadFile(r.localizationPath())
+	require.NoError(t, err)
+
+	var got types.LocalizationData
+	require.NoError(t, json.Unmarshal(contents, &got))
+	require.Equal(t, expected.Locale, got.Locale)
+	require.Contains(t, got.Translations, "es-ES")
+}
+
+func Test_Ping_writesLocalizationFile(t *testing.T) {
+	t.Parallel()
+
+	expected := types.LocalizationData{
+		Locale: "fr-FR",
+		Translations: map[string]types.Translations{
+			"fr-FR": {},
+		},
+	}
+
+	mockKnapsack := mocks.NewKnapsack(t)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopEnabled)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopGoMaxProcs)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopUpdateInterval)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.KolideServerURL)
+	mockKnapsack.On("DesktopUpdateInterval").Return(time.Millisecond * 250)
+	mockKnapsack.On("DesktopMenuRefreshInterval").Return(time.Millisecond * 250)
+	mockKnapsack.On("DesktopGoMaxProcs").Return(2).Maybe()
+	mockKnapsack.On("KolideServerURL").Return("somewhere-over-the-rainbow.example.com")
+	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+	mockKnapsack.On("InModernStandby").Return(false)
+	mockKnapsack.On("DebugServerData").Return(false).Maybe()
+	mockKnapsack.On("LocalizationData").Return(expected)
+
+	dir := t.TempDir()
+	r, err := New(mockKnapsack, nil, WithUsersFilesRoot(dir))
+	require.NoError(t, err)
+
+	r.Ping()
+
+	contents, err := os.ReadFile(r.localizationPath())
+	require.NoError(t, err)
+
+	var got types.LocalizationData
+	require.NoError(t, json.Unmarshal(contents, &got))
+	require.Equal(t, expected.Locale, got.Locale)
 }

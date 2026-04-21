@@ -493,6 +493,11 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 
 		runGroup.Add("desktopRunner", runner.Execute, runner.Interrupt)
 		controlService.RegisterConsumer(desktopMenuSubsystemName, runner)
+		// Subscribe the runner to the localizations subsystem so it can re-write
+		// the shared localization file whenever the control server pushes new
+		// translations. Desktop child processes pick up the new file on their
+		// next read.
+		controlService.RegisterSubscriber(localizationsSubsystemName, runner)
 
 		// create an action queue for all other action style commands
 		actionsQueue = actionqueue.New(
