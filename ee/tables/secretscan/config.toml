@@ -13,9 +13,18 @@ condition = "AND"
 regexes = ['''Ag[a-zA-Z0-9+/]{500,}={0,2}''']
 paths = ['''(?i).*\.ya?ml$''']
 [[rules.allowlists]]
-description = "Ignore variable names with empty values (https://github.com/gitleaks/gitleaks/issues/1828)"
+description = "Ignore all-caps variable names with empty values (https://github.com/gitleaks/gitleaks/issues/1828)"
 condition = "AND"
 # We limit length to 35 as a proxy for not allowlisting high-entropy values here.
-# Variable names are probably usually under that length.
+# Variable names are probably usually under that length. We restrict to all-caps
+# for the same reason.
 regexes = ['''^\s*[A-Z\d][A-Z\d_-]{0,35}=$''']
+paths = ['''(?i).*\.env$''']
+[[rules.allowlists]]
+description = "Ignore all-lowercase variable names with empty values (https://github.com/gitleaks/gitleaks/issues/1828)"
+condition = "AND"
+# We limit length to 35 as a proxy for not allowlisting high-entropy values here.
+# Variable names are probably usually under that length. We restrict to all-lowercase
+# for the same reason.
+regexes = ['''^\s*[a-z\d][a-z\d_-]{0,35}=$''']
 paths = ['''(?i).*\.env$''']

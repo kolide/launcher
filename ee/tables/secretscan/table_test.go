@@ -487,6 +487,15 @@ spec:
 			expectedFinding: false,
 		},
 		{
+			testCaseName: "empty variable, all lowercase",
+			pathName:     ".env",
+			rawData: `
+123_s3_creds=
+123_s3_ip_region=
+`,
+			expectedFinding: false,
+		},
+		{
 			testCaseName: "empty variable (true positive, variable is not empty)",
 			pathName:     ".env",
 			rawData: `
