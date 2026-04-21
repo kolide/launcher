@@ -414,90 +414,6 @@ func Test_isEncryptedJWTFamilyValue(t *testing.T) {
 	}
 }
 
-func Test_isEmptyVariable(t *testing.T) {
-	t.Parallel()
-
-	// Make sure config exists
-	newConfigOnce()
-	require.NoError(t, configErr)
-
-	for _, tt := range []struct {
-		testCaseName   string
-		rawData        string
-		expectedReturn bool
-	}{
-		{
-			testCaseName: "underscore",
-			rawData: `
-123_S3_CREDS=
-123_S3_IP_REGION=
-`,
-			expectedReturn: true,
-		},
-		{
-			testCaseName: "hyphen",
-			rawData: `
-123-S3-CREDS=
-123-S3-IP-REGION=
-`,
-			expectedReturn: true,
-		},
-		{
-			testCaseName: "alphanumeric",
-			rawData: `
-123S3CREDS=
-123S3IPREGION=
-`,
-			expectedReturn: true,
-		},
-		{
-			testCaseName: "tab before empty variable",
-			rawData: `
-	123_S3_CREDS=
-	123_S3_IP_REGION=
-`,
-			expectedReturn: true,
-		},
-		{
-			testCaseName: "non-empty",
-			rawData: `
-123_S3_CREDS=9b065cc5-cf2e-4b3f-9a20-3422e060807a
-123_S3_IP_REGION=52b22b1e-2178-4a1e-bbba-50d0160ffab3
-`,
-			expectedReturn: false,
-		},
-		{
-			testCaseName: "high entropy", // 4.19 entropy
-			rawData: `
-375E6860-39D4-11F1-B4AC-0800200C9A66-375E6861-39D4-11F1-B4AC-0800200C9A66_123_S3_CREDS=
-4DE613D1-39D4-11F1-B4AC-0800200C9A66_123_S3_IP_REGION_4DE613D0-39D4-11F1-B4AC-0800200C9A66=
-`,
-			expectedReturn: false,
-		},
-	} {
-		t.Run(tt.testCaseName, func(t *testing.T) {
-			t.Parallel()
-
-			detector := detect.NewDetector(*kolideConfig)
-			fileSource := &sources.File{
-				Content: strings.NewReader(tt.rawData),
-				Config:  &detector.Config,
-			}
-
-			findings, err := detector.DetectSource(t.Context(), fileSource)
-			require.NoError(t, err)
-			require.Greater(t, len(findings), 0)
-
-			for _, finding := range findings {
-				// Make sure the test finding we generated is the type we expected
-				require.Equal(t, "generic-api-key", finding.RuleID)
-				// Confirm that isEmptyVariable classifies the finding appropriately
-				require.Equal(t, tt.expectedReturn, isEmptyVariable(finding))
-			}
-		})
-	}
-}
-
 // Test_kolideConfig confirms that our overrides in config.toml work as expected
 func Test_kolideConfig(t *testing.T) {
 	t.Parallel()
@@ -507,9 +423,10 @@ func Test_kolideConfig(t *testing.T) {
 	require.NoError(t, configErr)
 
 	for _, tt := range []struct {
-		testCaseName string
-		pathName     string
-		rawData      string
+		testCaseName    string
+		pathName        string
+		rawData         string
+		expectedFinding bool
 	}{
 		{
 			testCaseName: "K8s sealed secrets",
@@ -531,6 +448,132 @@ spec:
       name: basic-auth
       namespace: default
 `,
+			expectedFinding: false,
+		},
+		{
+			testCaseName: "empty variable, with underscore",
+			pathName:     ".env",
+			rawData: `
+123_S3_CREDS=
+123_S3_IP_REGION=
+`,
+			expectedFinding: false,
+		},
+		{
+			testCaseName: "empty variable, with hyphen",
+			pathName:     ".env",
+			rawData: `
+123-S3-CREDS=
+123-S3-IP-REGION=
+`,
+			expectedFinding: false,
+		},
+		{
+			testCaseName: "empty variable, with alphanumeric",
+			pathName:     ".env.local",
+			rawData: `
+123S3CREDS=
+123S3IPREGION=
+`,
+			expectedFinding: false,
+		},
+		{
+			testCaseName: "empty variable, with tab before empty variable",
+			pathName:     "aws.env",
+			rawData: `
+	123_S3_CREDS=
+	123_S3_IP_REGION=
+`,
+			expectedFinding: false,
+		},
+		{
+			testCaseName: "empty variable, all lowercase",
+			pathName:     ".env",
+			rawData: `
+123_s3_creds=
+123_s3_ip_region=
+`,
+			expectedFinding: false,
+		},
+		{
+			testCaseName: "empty variable (true positive, variable is not empty)",
+			pathName:     ".env",
+			rawData: `
+123_S3_CREDS=9b065cc5-cf2e-4b3f-9a20-3422e060807a
+123_S3_IP_REGION=52b22b1e-2178-4a1e-bbba-50d0160ffab3
+`,
+			expectedFinding: true,
+		},
+		{
+			testCaseName: "empty variable (true positive, long variable with high entropy)",
+			pathName:     ".env",
+			rawData: `
+375E6860-39D4-11F1-B4AC-0800200C9A66-375E6861-39D4-11F1-B4AC-0800200C9A66_123_S3_CREDS=
+4DE613D1-39D4-11F1-B4AC-0800200C9A66_123_S3_IP_REGION_4DE613D0-39D4-11F1-B4AC-0800200C9A66=
+`,
+			expectedFinding: true,
+		},
+		{
+			testCaseName:    "key algorithm",
+			rawData:         `key_algorithm = "EC_secp384r1"`,
+			expectedFinding: false,
+		},
+		{
+			testCaseName:    "key algorithm (true positive)",
+			rawData:         `key_algorithm = "52b22b1e-2178-4a1e-bbba-50d0160ffab3"`,
+			expectedFinding: true,
+		},
+		{
+			testCaseName: "encrypted private key (COSIGN labeled RSA key)",
+			rawData: `-----BEGIN ENCRYPTED COSIGN PRIVATE KEY-----
+eyJrZGYiOnsibmFtZSI6InNjcnlwdCIsInBhcmFtcyI6eyJOIjozMjc2OCwiciI6
+OCwicCI6MX0sInNhbHQiOiJ4WWdoc09JTUxUWGNOT0RsclNIOUNKc1FlOVFnZmN1
+cmUrMXlLdHh1TlkwPSJ9LCJjaXBoZXIiOnsibmFtZSI6Im5hY2wvc2VjcmV0Ym94
+Iiwibm9uY2UiOiI0cS9PSlVmaXJkSUkrUjZ0ajZBMmcyQ0JqL25xdFNicCJ9LCJj
+aXBoZXJ0ZXh0IjoiKzB4Q3NzcFN0WStBczdKanJpOWtsbHBWd2JhcUI4ZWJNdWto
+eS9aVE1MSXRsL3B1YS9jWVJvbytLRGxMWWdmOW1kSjk4K1FnQW9oTktoYnJPMTcw
+MHdBY1JTMjFDOE4zQUNJRUVZaWpOMllBNnMraGJSbkhjUnd4eGhDMDFtb2FvL0dO
+Y1pmbEJheXZMV3pXblo4d2NDZ2ZpT1o1VXlRTEFJMHh0dnR6dEh3cTdDV1Vhd3V4
+RlhlNDZzck9TUE9SNHN6bytabWErUGovSFE9PSJ9
+-----END ENCRYPTED COSIGN PRIVATE KEY-----`,
+			expectedFinding: false,
+		},
+		{
+			testCaseName: "encrypted private key (COSIGN labeled EC key)",
+			rawData: `-----BEGIN ENCRYPTED COSIGN PRIVATE KEY-----
+eyJrZGYiOnsibmFtZSI6InNjcnlwdCIsInBhcmFtcyI6eyJOIjo2NTUzNiwiciI6
+OCwicCI6MX0sInNhbHQiOiJHK3F5WTYrNzhNS0JzMXNGTGs1ajYwcS9kS3Z1czBW
+VkhlSHZybC9POTF3PSJ9LCJjaXBoZXIiOnsibmFtZSI6Im5hY2wvc2VjcmV0Ym94
+Iiwibm9uY2UiOiJRc2JGdG13WDRDK2ttV3ZCcVRaMEFGOUFYdk1jRmg1SCJ9LCJj
+aXBoZXJ0ZXh0IjoiREM5T28zeldiYVQzSXYwdFVnWEdycjUxYW1samwwNlQ5MTNP
+VkxPbWpuMWhnK2o2WXRUbWg3SGhZSlY1N2J5eGE0Q281bE9YYmRqbTJ3aklubEd1
+Um5aZCt5OExnekpSNzFSeEhKVzgrWmRlcFJmYWJMTjdHbDgrSFZEcERVQ3NxQnRh
+VngyblpGbFEwWUl1anZwbFphblNGaUVvdERLVGkxZ3VhUXIwUHNzYU01NXZxbTRY
+WS9rPSJ9
+-----END ENCRYPTED COSIGN PRIVATE KEY-----`,
+			expectedFinding: false,
+		},
+		{
+			testCaseName: "encrypted private key (SIGSTORE labeled key)",
+			rawData: `-----BEGIN ENCRYPTED SIGSTORE PRIVATE KEY-----
+eyJrZGYiOnsibmFtZSI6InNjcnlwdCIsInBhcmFtcyI6eyJOIjozMjc2OCwiciI6
+OCwicCI6MX0sInNhbHQiOiI3T3VGd2VsbWZZNXVId2NoaURSc210anNwZ2ZlZjFG
+Mk5lOGFDTjVLYVpZPSJ9LCJjaXBoZXIiOnsibmFtZSI6Im5hY2wvc2VjcmV0Ym94
+Iiwibm9uY2UiOiJQNHk4OGhCb3ZTa09MbXN0bFVBaGJwdDJ0K2xTNUxQSCJ9LCJj
+aXBoZXJ0ZXh0IjoiMnB1QzdyZldJOWh3bnJlQ2s4aUZDRlVwQlRrSzRJNlIvbFBF
+cnBDekpXUGpJWXl4eGVIL1A2VW52cFJHdVhla1NNb3JMdGhLamdoQ1JlNy82NDVH
+QWtoVm1LRC92eEF0S2EvbE1abENSQ3FlekJGUFd1dzNpeFRtZ2xhb2J1ZFVSbUVs
+bmNGOGlZbzBTMVl6Y1ZOMVFwY2J2c0dNcUlYRzVlbmdteGp5dCtBcXlyZTF0Q0Y0
+V01tU1BlaEljNlBqd2h1Q2xHaVpJUWRvTGc9PSJ9
+-----END ENCRYPTED SIGSTORE PRIVATE KEY-----`,
+			expectedFinding: false,
+		},
+		{
+			testCaseName: "encrypted private key (true positive, key is not encrypted)",
+			rawData: `-----BEGIN PRIVATE KEY-----
+MC4CAQAwBQYDK2VwBCIEIALEbo1EFnWFqBK/wC+hhypG/8hXEerwdNetAoFoFVdv
+-----END PRIVATE KEY-----`,
+			expectedFinding: true,
 		},
 	} {
 		t.Run(tt.testCaseName, func(t *testing.T) {
@@ -545,7 +588,11 @@ spec:
 
 			findings, err := detector.DetectSource(t.Context(), fileSource)
 			require.NoError(t, err)
-			require.Equal(t, 0, len(findings))
+			if tt.expectedFinding {
+				require.Less(t, 0, len(findings))
+			} else {
+				require.Equal(t, 0, len(findings))
+			}
 		})
 	}
 }

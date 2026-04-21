@@ -5,11 +5,38 @@ title = "Kolide secretscan config"
 [extend]
 useDefault = true
 
-# Ignore K8s Sealed Secrets
-# https://github.com/gitleaks/gitleaks/issues/1728
 [[rules]]
 id = "generic-api-key"
 [[rules.allowlists]]
+description = "Ignore K8s Sealed Secrets (https://github.com/gitleaks/gitleaks/issues/1728)"
 condition = "AND"
 regexes = ['''Ag[a-zA-Z0-9+/]{500,}={0,2}''']
 paths = ['''(?i).*\.ya?ml$''']
+[[rules.allowlists]]
+description = "Ignore all-caps variable names with empty values (https://github.com/gitleaks/gitleaks/issues/1828)"
+condition = "AND"
+# We limit length to 35 as a proxy for not allowlisting high-entropy values here.
+# Variable names are probably usually under that length. We restrict to all-caps
+# for the same reason.
+regexes = ['''^\s*[A-Z\d][A-Z\d_-]{0,35}=$''']
+paths = ['''.*\.env(\..+)?$''']
+[[rules.allowlists]]
+description = "Ignore all-lowercase variable names with empty values (https://github.com/gitleaks/gitleaks/issues/1828)"
+condition = "AND"
+# We limit length to 35 as a proxy for not allowlisting high-entropy values here.
+# Variable names are probably usually under that length. We restrict to all-lowercase
+# for the same reason.
+regexes = ['''^\s*[a-z\d][a-z\d_-]{0,35}=$''']
+paths = ['''.*\.env(\..+)?$''']
+[[rules.allowlists]]
+description = "Ignore key algorithms supported by AWS Certificate Manager (https://github.com/gitleaks/gitleaks/issues/1053)"
+condition = "AND"
+# Values retrieved from https://docs.aws.amazon.com/acm/latest/APIReference/API_CertificateDetail.html
+stopwords = ["RSA_1024", "RSA_2048", "RSA_3072", "RSA_4096", "EC_prime256v1", "EC_secp384r1", "EC_secp521r1"]
+
+[[rules]]
+id = "private-key"
+[[rules.allowlists]]
+description = "Ignore Cosign encrypted private keys (https://github.com/gitleaks/gitleaks/issues/1034)"
+condition = "AND"
+stopwords = ["BEGIN ENCRYPTED COSIGN PRIVATE KEY", "BEGIN ENCRYPTED SIGSTORE PRIVATE KEY"]
