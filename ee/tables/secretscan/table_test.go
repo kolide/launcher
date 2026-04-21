@@ -523,6 +523,58 @@ spec:
 			rawData:         `key_algorithm = "52b22b1e-2178-4a1e-bbba-50d0160ffab3"`,
 			expectedFinding: true,
 		},
+		{
+			testCaseName: "encrypted private key (COSIGN labeled RSA key)",
+			rawData: `-----BEGIN ENCRYPTED COSIGN PRIVATE KEY-----
+eyJrZGYiOnsibmFtZSI6InNjcnlwdCIsInBhcmFtcyI6eyJOIjozMjc2OCwiciI6
+OCwicCI6MX0sInNhbHQiOiJ4WWdoc09JTUxUWGNOT0RsclNIOUNKc1FlOVFnZmN1
+cmUrMXlLdHh1TlkwPSJ9LCJjaXBoZXIiOnsibmFtZSI6Im5hY2wvc2VjcmV0Ym94
+Iiwibm9uY2UiOiI0cS9PSlVmaXJkSUkrUjZ0ajZBMmcyQ0JqL25xdFNicCJ9LCJj
+aXBoZXJ0ZXh0IjoiKzB4Q3NzcFN0WStBczdKanJpOWtsbHBWd2JhcUI4ZWJNdWto
+eS9aVE1MSXRsL3B1YS9jWVJvbytLRGxMWWdmOW1kSjk4K1FnQW9oTktoYnJPMTcw
+MHdBY1JTMjFDOE4zQUNJRUVZaWpOMllBNnMraGJSbkhjUnd4eGhDMDFtb2FvL0dO
+Y1pmbEJheXZMV3pXblo4d2NDZ2ZpT1o1VXlRTEFJMHh0dnR6dEh3cTdDV1Vhd3V4
+RlhlNDZzck9TUE9SNHN6bytabWErUGovSFE9PSJ9
+-----END ENCRYPTED COSIGN PRIVATE KEY-----`,
+			expectedFinding: false,
+		},
+		{
+			testCaseName: "encrypted private key (COSIGN labeled EC key)",
+			rawData: `-----BEGIN ENCRYPTED COSIGN PRIVATE KEY-----
+eyJrZGYiOnsibmFtZSI6InNjcnlwdCIsInBhcmFtcyI6eyJOIjo2NTUzNiwiciI6
+OCwicCI6MX0sInNhbHQiOiJHK3F5WTYrNzhNS0JzMXNGTGs1ajYwcS9kS3Z1czBW
+VkhlSHZybC9POTF3PSJ9LCJjaXBoZXIiOnsibmFtZSI6Im5hY2wvc2VjcmV0Ym94
+Iiwibm9uY2UiOiJRc2JGdG13WDRDK2ttV3ZCcVRaMEFGOUFYdk1jRmg1SCJ9LCJj
+aXBoZXJ0ZXh0IjoiREM5T28zeldiYVQzSXYwdFVnWEdycjUxYW1samwwNlQ5MTNP
+VkxPbWpuMWhnK2o2WXRUbWg3SGhZSlY1N2J5eGE0Q281bE9YYmRqbTJ3aklubEd1
+Um5aZCt5OExnekpSNzFSeEhKVzgrWmRlcFJmYWJMTjdHbDgrSFZEcERVQ3NxQnRh
+VngyblpGbFEwWUl1anZwbFphblNGaUVvdERLVGkxZ3VhUXIwUHNzYU01NXZxbTRY
+WS9rPSJ9
+-----END ENCRYPTED COSIGN PRIVATE KEY-----`,
+			expectedFinding: false,
+		},
+		{
+			testCaseName: "encrypted private key (SIGSTORE labeled key)",
+			rawData: `-----BEGIN ENCRYPTED SIGSTORE PRIVATE KEY-----
+eyJrZGYiOnsibmFtZSI6InNjcnlwdCIsInBhcmFtcyI6eyJOIjozMjc2OCwiciI6
+OCwicCI6MX0sInNhbHQiOiI3T3VGd2VsbWZZNXVId2NoaURSc210anNwZ2ZlZjFG
+Mk5lOGFDTjVLYVpZPSJ9LCJjaXBoZXIiOnsibmFtZSI6Im5hY2wvc2VjcmV0Ym94
+Iiwibm9uY2UiOiJQNHk4OGhCb3ZTa09MbXN0bFVBaGJwdDJ0K2xTNUxQSCJ9LCJj
+aXBoZXJ0ZXh0IjoiMnB1QzdyZldJOWh3bnJlQ2s4aUZDRlVwQlRrSzRJNlIvbFBF
+cnBDekpXUGpJWXl4eGVIL1A2VW52cFJHdVhla1NNb3JMdGhLamdoQ1JlNy82NDVH
+QWtoVm1LRC92eEF0S2EvbE1abENSQ3FlekJGUFd1dzNpeFRtZ2xhb2J1ZFVSbUVs
+bmNGOGlZbzBTMVl6Y1ZOMVFwY2J2c0dNcUlYRzVlbmdteGp5dCtBcXlyZTF0Q0Y0
+V01tU1BlaEljNlBqd2h1Q2xHaVpJUWRvTGc9PSJ9
+-----END ENCRYPTED SIGSTORE PRIVATE KEY-----`,
+			expectedFinding: false,
+		},
+		{
+			testCaseName: "encrypted private key (true positive, key is not encrypted)",
+			rawData: `-----BEGIN PRIVATE KEY-----
+MC4CAQAwBQYDK2VwBCIEIALEbo1EFnWFqBK/wC+hhypG/8hXEerwdNetAoFoFVdv
+-----END PRIVATE KEY-----`,
+			expectedFinding: true,
+		},
 	} {
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
