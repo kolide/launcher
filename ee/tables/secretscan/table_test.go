@@ -513,6 +513,16 @@ spec:
 `,
 			expectedFinding: true,
 		},
+		{
+			testCaseName:    "key algorithm",
+			rawData:         `key_algorithm = "EC_secp384r1"`,
+			expectedFinding: false,
+		},
+		{
+			testCaseName:    "key algorithm (true positive)",
+			rawData:         `key_algorithm = "52b22b1e-2178-4a1e-bbba-50d0160ffab3"`,
+			expectedFinding: true,
+		},
 	} {
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
