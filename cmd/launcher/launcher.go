@@ -512,6 +512,8 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		actionsQueue.RegisterActor(flareconsumer.FlareSubsystem, flareconsumer.New(k))
 		// register force full control data fetch consumer
 		actionsQueue.RegisterActor(control.ForceFullControlDataFetchAction, controlService)
+		// register "filewalk now" consumer
+		actionsQueue.RegisterActor(filewalker.FilewalkNowAction, filewalkManager)
 
 		// create notification consumer
 		notificationConsumer, err := notificationconsumer.NewNotifyConsumer(

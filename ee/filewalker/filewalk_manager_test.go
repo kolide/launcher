@@ -1,6 +1,7 @@
 package filewalker
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -183,6 +184,137 @@ func TestPing(t *testing.T) {
 
 	// Shut down
 	filewalkManager.Interrupt(nil)
+}
+
+func TestDo(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		testCaseName         string
+		managedFilewalks     []string
+		filewalksRequested   []string
+		filewalksExpected    []string
+		filewalksNotExpected []string
+	}{
+		{
+			testCaseName: "one filewalk specified",
+			managedFilewalks: []string{
+				"TestDo_1a",
+				"TestDo_1b",
+			},
+			filewalksRequested: []string{
+				"TestDo_1a",
+			},
+			filewalksExpected: []string{
+				"TestDo_1a",
+			},
+			filewalksNotExpected: []string{
+				"TestDo_1b",
+			},
+		},
+		{
+			testCaseName: "no filewalks specified",
+			managedFilewalks: []string{
+				"TestDo_2a",
+				"TestDo_2b",
+			},
+			filewalksRequested: []string{},
+			filewalksExpected: []string{
+				"TestDo_2a",
+				"TestDo_2b",
+			},
+			filewalksNotExpected: []string{},
+		},
+		{
+			testCaseName: "includes invalid filewalk",
+			managedFilewalks: []string{
+				"TestDo_3a",
+			},
+			filewalksRequested: []string{
+				"TestDo_invalid",
+				"TestDo_3a",
+			},
+			filewalksExpected: []string{
+				"TestDo_3a",
+			},
+			filewalksNotExpected: []string{},
+		},
+	} {
+		t.Run(tt.testCaseName, func(t *testing.T) {
+			t.Parallel()
+
+			// Set up dependencies
+			var logBytes threadsafebuffer.ThreadSafeBuffer
+			slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+				Level: slog.LevelDebug,
+			}))
+			mockKnapsack := typesmocks.NewKnapsack(t)
+			cfgStore, err := storageci.NewStore(t, slogger, storage.FilewalkConfigStore.String())
+			require.NoError(t, err)
+			mockKnapsack.On("FilewalkConfigStore").Return(cfgStore)
+			resultsStore, err := storageci.NewStore(t, slogger, storage.FilewalkResultsStore.String())
+			require.NoError(t, err)
+			mockKnapsack.On("FilewalkResultsStore").Return(resultsStore)
+
+			// Set up our filewalk config in the store. Set a very long filewalk interval.
+			for _, fwName := range tt.managedFilewalks {
+				cfg := generateCfgWithSeeding(t, 500*time.Minute, 1, nil, 1)
+				cfgRaw, err := json.Marshal(cfg)
+				require.NoError(t, err)
+				cfgStore.Set([]byte(fwName), cfgRaw)
+			}
+
+			// Init filewalk manager
+			filewalkManager := New(mockKnapsack, slogger)
+
+			// Run the manager and let it spin up filewalkers
+			go filewalkManager.Execute()
+
+			// Wait for filewalks to complete
+			time.Sleep(5 * time.Second)
+
+			// Get walk timestamp for each table
+			firstWalkTimestamps := make(map[string]int64)
+			for _, fwName := range tt.managedFilewalks {
+				lastWalkTimeRaw, err := resultsStore.Get(LastWalkTimeKey(fwName))
+				require.NoError(t, err)
+				require.NotNil(t, lastWalkTimeRaw)
+				firstWalkTimestamps[fwName] = int64(binary.NativeEndian.Uint64(lastWalkTimeRaw))
+			}
+
+			// Call Ping
+			req := controlServerFilewalkRequest{
+				FilewalkNames: tt.filewalksRequested,
+			}
+			rawReq, err := json.Marshal(req)
+			require.NoError(t, err)
+			require.NoError(t, filewalkManager.Do(bytes.NewReader(rawReq)))
+
+			// Wait a little bit for the filewalk to go through
+			time.Sleep(5 * time.Second)
+
+			// Get updated timestamp for each table
+			updatedWalkTimestamps := make(map[string]int64)
+			for _, fwName := range tt.managedFilewalks {
+				lastWalkTimeRaw, err := resultsStore.Get(LastWalkTimeKey(fwName))
+				require.NoError(t, err)
+				updatedWalkTimestamps[fwName] = int64(binary.NativeEndian.Uint64(lastWalkTimeRaw))
+			}
+
+			// Check that we did not perform filewalks we did not ask for
+			for _, fwName := range tt.filewalksNotExpected {
+				require.Equal(t, firstWalkTimestamps[fwName], updatedWalkTimestamps[fwName])
+			}
+
+			// Check that we performed the filewalks we expected to
+			for _, fwName := range tt.filewalksExpected {
+				require.Less(t, firstWalkTimestamps[fwName], updatedWalkTimestamps[fwName])
+			}
+
+			// Shut down
+			filewalkManager.Interrupt(nil)
+		})
+	}
 }
 
 func TestInterrupt_Multiple(t *testing.T) {
