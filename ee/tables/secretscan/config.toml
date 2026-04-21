@@ -19,7 +19,7 @@ condition = "AND"
 # Variable names are probably usually under that length. We restrict to all-caps
 # for the same reason.
 regexes = ['''^\s*[A-Z\d][A-Z\d_-]{0,35}=$''']
-paths = ['''(?i).*\.env$''']
+paths = ['''.*\.env(\..+)?$''']
 [[rules.allowlists]]
 description = "Ignore all-lowercase variable names with empty values (https://github.com/gitleaks/gitleaks/issues/1828)"
 condition = "AND"
@@ -27,4 +27,4 @@ condition = "AND"
 # Variable names are probably usually under that length. We restrict to all-lowercase
 # for the same reason.
 regexes = ['''^\s*[a-z\d][a-z\d_-]{0,35}=$''']
-paths = ['''(?i).*\.env$''']
+paths = ['''.*\.env(\..+)?$''']

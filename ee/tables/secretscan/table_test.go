@@ -470,7 +470,7 @@ spec:
 		},
 		{
 			testCaseName: "empty variable, with alphanumeric",
-			pathName:     ".env",
+			pathName:     ".env.local",
 			rawData: `
 123S3CREDS=
 123S3IPREGION=
@@ -479,7 +479,7 @@ spec:
 		},
 		{
 			testCaseName: "empty variable, with tab before empty variable",
-			pathName:     ".env",
+			pathName:     "aws.env",
 			rawData: `
 	123_S3_CREDS=
 	123_S3_IP_REGION=
