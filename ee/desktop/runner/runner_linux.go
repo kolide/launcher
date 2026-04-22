@@ -445,3 +445,6 @@ func osversion() (string, error) {
 func logIndicatesSystrayNeedsRestart(_ string) bool {
 	return false
 }
+
+// waitForReadyToSpawnDesktopState is currently a macOS-only check.
+func (r *DesktopUsersProcessesRunner) waitForReadyToSpawnDesktopState(_ context.Context, _ string) {}
