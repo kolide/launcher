@@ -815,7 +815,10 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 		return fmt.Errorf("determining executable path: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// We use a slightly longer timeout here in case we've just booted up
+	// and are waiting for dependent services to start before we start up
+	// the desktop process.
+	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 	defer cancel()
 
 	consoleUsers, err := consoleuser.CurrentUids(ctx)
@@ -827,6 +830,10 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 		if r.userHasDesktopProcess(uid) {
 			continue
 		}
+
+		// Check to see if necessary dependencies are running on macOS before we spawn the desktop process.
+		// This will block for up to 30 seconds, at which point we proceed with trying to spawn anyway.
+		r.waitForReadyToSpawnDesktopState(ctx, uid)
 
 		// we've decided to spawn a new desktop user process for this user
 		if err := r.spawnForUser(ctx, uid, executablePath); err != nil {
