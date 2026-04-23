@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/kolide/kit/fsutil"
+	"github.com/kolide/launcher/v2/pkg/backoff"
 	"github.com/kolide/launcher/v2/pkg/packaging"
 )
 
@@ -69,10 +70,17 @@ func DownloadOsquery(version string) (binaryPath string, cleanup func() error, e
 			return "", nil, fmt.Errorf("fetching osqueryd binary: %w", err)
 		}
 
-		// Copy to our standardized cache location
-		if err := fsutil.CopyFile(dlPath, binaryPath); err != nil {
-			return "", nil, fmt.Errorf("copying osqueryd binary from %s to %s: %w", dlPath, binaryPath, err)
+		// Copy to our standardized cache location. We do a couple retries because
+		// Windows is slow to release file handles.
+		if err := backoff.WaitFor(func() error {
+			if err := fsutil.CopyFile(dlPath, binaryPath); err != nil {
+				return fmt.Errorf("copying osqueryd binary from %s to %s: %w", dlPath, binaryPath, err)
+			}
+			return nil
+		}, 5*time.Second, 500*time.Millisecond); err != nil {
+			return "", nil, fmt.Errorf("copying osqueryd binary failed after retries: %w", err)
 		}
+
 	}
 
 	// Always ensure the binary is executable and has no quarantine attributes,
