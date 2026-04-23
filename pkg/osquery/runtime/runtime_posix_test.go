@@ -49,7 +49,11 @@ func TestOsquerySlowStart(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("EnrollmentIDs").Return([]string{types.DefaultEnrollmentID})
-	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
+	// OsqueryHealthcheckStartupDelay defaults to ten minutes, which is too long for tests.
+	// We don't want an extremely short interval, though, because we need to give the osquery instance
+	// time to actually start before we begin healthchecking it. So, we wait for at least the
+	// amount of time that we give for the socket to appear.
+	k.On("OsqueryHealthcheckStartupDelay").Return(socketOpenTimeout).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
 	k.On("OsqueryVerbose").Return(true).Maybe()
@@ -124,7 +128,11 @@ func TestExtensionSocketPath(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("EnrollmentIDs").Return([]string{types.DefaultEnrollmentID})
-	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
+	// OsqueryHealthcheckStartupDelay defaults to ten minutes, which is too long for tests.
+	// We don't want an extremely short interval, though, because we need to give the osquery instance
+	// time to actually start before we begin healthchecking it. So, we wait for at least the
+	// amount of time that we give for the socket to appear.
+	k.On("OsqueryHealthcheckStartupDelay").Return(socketOpenTimeout).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
