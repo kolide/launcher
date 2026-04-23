@@ -30,10 +30,9 @@ func TestCreateOsqueryCommandEnvVars(t *testing.T) {
 
 	i := newInstance(types.DefaultEnrollmentID, k, lpc, settingsstoremock.NewSettingsStoreWriter(t))
 	i.paths = &osqueryFilePaths{
-		pidfilePath:           "/foo/bar/osquery-abcd.pid",
-		databasePath:          "/foo/bar/osquery.db",
-		extensionSocketPath:   "/foo/bar/osquery.sock",
-		extensionAutoloadPath: "/foo/bar/osquery.autoload",
+		pidfilePath:         "/foo/bar/osquery-abcd.pid",
+		databasePath:        "/foo/bar/osquery.db",
+		extensionSocketPath: "/foo/bar/osquery.sock",
 	}
 
 	cmd, err := i.createOsquerydCommand("") // we do not actually exec so don't need to download a real osquery for this test

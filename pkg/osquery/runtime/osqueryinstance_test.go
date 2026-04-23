@@ -54,17 +54,14 @@ func TestCalculateOsqueryPaths(t *testing.T) {
 	} else {
 		require.Equal(t, fmt.Sprintf(`\\.\pipe\kolide-osquery-%s`, runId), paths.extensionSocketPath)
 	}
-
-	require.Equal(t, rootDir, filepath.Dir(paths.extensionAutoloadPath))
 }
 
 func TestCreateOsqueryCommand(t *testing.T) {
 	t.Parallel()
 	paths := &osqueryFilePaths{
-		pidfilePath:           "/foo/bar/osquery-abcd.pid",
-		databasePath:          "/foo/bar/osquery.db",
-		extensionSocketPath:   "/foo/bar/osquery.sock",
-		extensionAutoloadPath: "/foo/bar/osquery.autoload",
+		pidfilePath:         "/foo/bar/osquery-abcd.pid",
+		databasePath:        "/foo/bar/osquery.db",
+		extensionSocketPath: "/foo/bar/osquery.sock",
 	}
 
 	rootDir := t.TempDir()
@@ -116,8 +113,9 @@ func TestCreateOsqueryCommandWithFlags(t *testing.T) {
 	cmd, err := i.createOsquerydCommand("") // we do not actually exec so don't need to download a real osquery for this test
 	require.NoError(t, err)
 
-	// count of flags that cannot be overridden with this option
-	const nonOverridableFlagsCount = 8
+	// count of flags that cannot be overridden with this option:
+	// pidfile, database_path, extensions_socket, disable_extensions, extensions_timeout, config_plugin, extensions_require
+	const nonOverridableFlagsCount = 7
 
 	// Ensure that the provided flags were placed last (so that they can override)
 	assert.Equal(
