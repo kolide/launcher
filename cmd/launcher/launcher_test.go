@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"os"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/kolide/launcher/v2/pkg/backoff"
 	"github.com/kolide/launcher/v2/pkg/launcher"
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/kolide/launcher/v2/pkg/osquery/testutil"
@@ -47,6 +49,15 @@ func Test_runLauncher(t *testing.T) {
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			// Set up opts
 			testRootDir := t.TempDir()
+			t.Cleanup(func() {
+				// Do a couple retries in case the directory is still in use --
+				// Windows is a little slow on this sometimes
+				if err := backoff.WaitFor(func() error {
+					return os.RemoveAll(testRootDir)
+				}, 5*time.Second, 500*time.Millisecond); err != nil {
+					t.Logf("testRootDirectory RemoveAll cleanup: %v", err)
+				}
+			})
 			downloadOnceFunc() // get an osquery binary
 			require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 			defaultOpts, err := launcher.ParseOptions("launcher", []string{
