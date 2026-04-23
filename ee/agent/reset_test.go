@@ -31,17 +31,19 @@ func TestMain(m *testing.M) {
 }
 
 var testOsqueryBinary string
+var osqueryBinaryDownloadErr error
 
 // downloadOnceFunc downloads a real osquery binary for use in tests. This function
 // can be called multiple times but will only execute once -- the osquery binary is
 // stored at path `testOsqueryBinary` and can be reused by all subsequent tests.
 var downloadOnceFunc = sync.OnceFunc(func() {
-	testOsqueryBinary, _, _ = testutil.DownloadOsquery("nightly")
+	testOsqueryBinary, _, osqueryBinaryDownloadErr = testutil.DownloadOsquery("nightly")
 })
 
 func TestDetectAndRemediateHardwareChange(t *testing.T) {
 	t.Parallel()
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 
 	// Pre-compute hardware serial and UUID once rather than in each parallel subtest.
 	// All subtests query the same hardware and get the same result, so running 16+
@@ -506,6 +508,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 func TestDetectAndRemediateHardwareChange_SavesDataOverMultipleResets(t *testing.T) {
 	t.Parallel()
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 
 	slogger := multislogger.NewNopLogger()
 
@@ -603,6 +606,7 @@ func TestDetectAndRemediateHardwareChange_SavesDataOverMultipleResets(t *testing
 func TestExecute(t *testing.T) {
 	t.Parallel()
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
@@ -659,6 +663,7 @@ func TestExecute(t *testing.T) {
 func TestInterrupt_Multiple(t *testing.T) {
 	t.Parallel()
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
