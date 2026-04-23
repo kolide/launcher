@@ -93,8 +93,6 @@ func makeTestOsqLogPublisher(t *testing.T, mk *typesMocks.Knapsack) types.Osquer
 func TestBadBinaryPath(t *testing.T) {
 	t.Parallel()
 	requirePermissions(t)
-	downloadOnceFunc()
-	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 	setupOnceFunc()
 
 	rootDirectory := t.TempDir()
@@ -1018,8 +1016,6 @@ func TestOsqueryDies(t *testing.T) {
 func TestNotStarted(t *testing.T) {
 	t.Parallel()
 	requirePermissions(t)
-	downloadOnceFunc()
-	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 	setupOnceFunc()
 
 	rootDirectory := t.TempDir()
