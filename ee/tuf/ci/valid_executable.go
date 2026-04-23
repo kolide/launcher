@@ -11,12 +11,13 @@ import (
 )
 
 var testOsqueryBinary string
+var osqueryBinaryDownloadErr error
 
 // downloadOnceFunc downloads a real osquery binary for use in tests. This function
 // can be called multiple times but will only execute once -- the osquery binary is
 // stored at path `testOsqueryBinary` and can be reused by all subsequent tests.
 var downloadOnceFunc = sync.OnceFunc(func() {
-	testOsqueryBinary, _, _ = testutil.DownloadOsquery("nightly")
+	testOsqueryBinary, _, osqueryBinaryDownloadErr = testutil.DownloadOsquery("nightly")
 })
 
 // CopyBinary ensures we've downloaded a test osquery binary, then creates a symlink
@@ -24,6 +25,7 @@ var downloadOnceFunc = sync.OnceFunc(func() {
 // so the symlink will point to an executable binary.
 func CopyBinary(t *testing.T, executablePath string) {
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 
 	require.NoError(t, os.MkdirAll(filepath.Dir(executablePath), 0755))
 	require.NoError(t, os.Symlink(testOsqueryBinary, executablePath))

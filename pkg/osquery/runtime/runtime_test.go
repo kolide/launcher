@@ -44,12 +44,13 @@ import (
 )
 
 var testOsqueryBinary string
+var osqueryBinaryDownloadErr error
 
 // downloadOnceFunc downloads a real osquery binary for use in tests. This function
 // can be called multiple times but will only execute once -- the osquery binary is
 // stored at path `testOsqueryBinary` and can be reused by all subsequent tests.
 var downloadOnceFunc = sync.OnceFunc(func() {
-	testOsqueryBinary, _, _ = testutil.DownloadOsquery("stable")
+	testOsqueryBinary, _, osqueryBinaryDownloadErr = testutil.DownloadOsquery("stable")
 })
 
 // setupOnceFunc sets up test configuration that should only happen once.
@@ -93,6 +94,7 @@ func TestBadBinaryPath(t *testing.T) {
 	t.Parallel()
 	requirePermissions(t)
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 	setupOnceFunc()
 
 	rootDirectory := t.TempDir()
@@ -153,6 +155,7 @@ func TestWithOsqueryFlags(t *testing.T) {
 	t.Parallel()
 	requirePermissions(t)
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 	setupOnceFunc()
 
 	rootDirectory := testRootDirectory(t)
@@ -209,6 +212,7 @@ func TestFlagsChanged(t *testing.T) {
 	t.Parallel()
 	requirePermissions(t)
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 	setupOnceFunc()
 
 	rootDirectory := testRootDirectory(t)
@@ -346,6 +350,7 @@ func TestPing(t *testing.T) {
 	t.Parallel()
 	requirePermissions(t)
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 	setupOnceFunc()
 
 	// Set up all dependencies
@@ -621,6 +626,7 @@ func TestSimplePath(t *testing.T) {
 	t.Parallel()
 	requirePermissions(t)
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 	setupOnceFunc()
 
 	rootDirectory := testRootDirectory(t)
@@ -677,6 +683,7 @@ func TestMultipleInstances(t *testing.T) {
 	t.Parallel()
 	requirePermissions(t)
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 	setupOnceFunc()
 
 	rootDirectory := testRootDirectory(t)
@@ -774,6 +781,7 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	t.Parallel()
 	requirePermissions(t)
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 	setupOnceFunc()
 
 	rootDirectory := testRootDirectory(t)
@@ -864,6 +872,7 @@ func TestMultipleShutdowns(t *testing.T) {
 	t.Parallel()
 	requirePermissions(t)
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 	setupOnceFunc()
 
 	rootDirectory := testRootDirectory(t)
@@ -924,6 +933,7 @@ func TestOsqueryDies(t *testing.T) {
 	t.Parallel()
 	requirePermissions(t)
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 	setupOnceFunc()
 
 	rootDirectory := testRootDirectory(t)
@@ -1009,6 +1019,7 @@ func TestNotStarted(t *testing.T) {
 	t.Parallel()
 	requirePermissions(t)
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 	setupOnceFunc()
 
 	rootDirectory := t.TempDir()
@@ -1044,6 +1055,7 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 	t.Parallel()
 	requirePermissions(t)
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 	setupOnceFunc()
 
 	runner, logBytes, osqHistory := setupOsqueryInstanceForTests(t)
@@ -1076,6 +1088,7 @@ func TestRestart(t *testing.T) {
 	t.Parallel()
 	requirePermissions(t)
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 	setupOnceFunc()
 
 	runner, logBytes, osqHistory := setupOsqueryInstanceForTests(t)

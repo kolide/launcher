@@ -40,6 +40,7 @@ func TestOsquerySlowStart(t *testing.T) {
 	t.Parallel()
 	requirePermissions(t)
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 	setupOnceFunc()
 
 	rootDirectory := testRootDirectory(t)
@@ -114,6 +115,7 @@ func TestExtensionSocketPath(t *testing.T) {
 	t.Parallel()
 	requirePermissions(t)
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 	setupOnceFunc()
 
 	rootDirectory := testRootDirectory(t)

@@ -276,6 +276,7 @@ func Test_healthcheckWithRetries(t *testing.T) {
 func TestHealthy(t *testing.T) {
 	t.Parallel()
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 	setupOnceFunc()
 
 	// Set up instance dependencies
@@ -377,6 +378,7 @@ func TestHealthy(t *testing.T) {
 func TestLaunch(t *testing.T) {
 	t.Parallel()
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 	setupOnceFunc()
 
 	logBytes, slogger := setUpTestSlogger()
@@ -471,6 +473,7 @@ func TestLaunch(t *testing.T) {
 func TestReloadKatcExtension(t *testing.T) {
 	t.Parallel()
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 
 	// Set up all million dependencies
 	logBytes, slogger := setUpTestSlogger()

@@ -14,12 +14,13 @@ import (
 )
 
 var testOsqueryBinary string
+var osqueryBinaryDownloadErr error
 
 // downloadOnceFunc downloads a real osquery binary for use in tests. This function
 // can be called multiple times but will only execute once -- the osquery binary is
 // stored at path `testOsqueryBinary` and can be reused by all subsequent tests.
 var downloadOnceFunc = sync.OnceFunc(func() {
-	testOsqueryBinary, _, _ = testutil.DownloadOsquery("nightly")
+	testOsqueryBinary, _, osqueryBinaryDownloadErr = testutil.DownloadOsquery("nightly")
 })
 
 // Test_runLauncher confirms that runLauncher can start up without error,
@@ -47,6 +48,7 @@ func Test_runLauncher(t *testing.T) {
 			// Set up opts
 			testRootDir := t.TempDir()
 			downloadOnceFunc() // get an osquery binary
+			require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 			defaultOpts, err := launcher.ParseOptions("launcher", []string{
 				"--root_directory", testRootDir,
 				"--osqueryd_path", testOsqueryBinary,
