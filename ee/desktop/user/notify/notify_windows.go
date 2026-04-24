@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync/atomic"
 
 	"github.com/kolide/toast"
@@ -56,15 +57,17 @@ func (w *windowsNotifier) SendNotification(n Notification) error {
 	}
 
 	if n.ActionUri != "" {
+		actionUri := strings.ReplaceAll(n.ActionUri, "&", "&amp;")
+
 		// Set the default action when the user clicks on the notification
-		notification.ActivationArguments = n.ActionUri
+		notification.ActivationArguments = actionUri
 
 		// Additionally, create a "Learn more" button that will open the same URL
 		notification.Actions = []toast.Action{
 			{
 				Type:      "protocol",
 				Label:     "Learn More",
-				Arguments: n.ActionUri,
+				Arguments: actionUri,
 			},
 		}
 	}
