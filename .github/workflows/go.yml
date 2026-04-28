@@ -94,6 +94,8 @@ jobs:
 
   build_reproducible:
     name: launcher -- reproducible
+    permissions:
+      contents: read
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false # Consider changing this sometime
@@ -192,6 +194,8 @@ jobs:
   reproducible_verify:
     needs: [build, build_reproducible, build_linux, build_linux_reproducible]
     name: verify
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
