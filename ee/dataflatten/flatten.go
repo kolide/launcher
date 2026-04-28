@@ -162,13 +162,21 @@ func Flatten(data any, opts ...FlattenOpts) ([]Row, error) {
 func (fl *Flattener) descend(path []string, data any, depth int) error {
 	queryTerm, isQueryMatched := fl.queryAtDepth(depth)
 
-	slogger := fl.slogger.With(
-		"caller", "descend",
-		"depth", depth,
-		"rows_so_far", len(fl.rows),
-		"query", queryTerm,
-		"path", strings.Join(path, "/"),
-	)
+	// Gate the contextual logger build behind an Enabled check. descend is
+	// recursive and called many times per row; an unconditional Logger.With
+	// here propagates through the slog-multi handler chain on every call,
+	// allocating large amounts even when the level is filtered out.
+	slogger := fl.slogger
+	loggingEnabled := fl.slogger.Enabled(context.TODO(), fl.logLevel)
+	if loggingEnabled {
+		slogger = fl.slogger.With(
+			"caller", "descend",
+			"depth", depth,
+			"rows_so_far", len(fl.rows),
+			"query", queryTerm,
+			"path", strings.Join(path, "/"),
+		)
+	}
 
 	switch v := data.(type) {
 	case []any:
@@ -193,7 +201,10 @@ func (fl *Flattener) descend(path []string, data any, depth int) error {
 				keyQuery := strings.SplitN(after, "=>", 2)
 				keyName := keyQuery[0]
 
-				innerslogger := slogger.With("array_key_name", keyName)
+				innerslogger := slogger
+				if loggingEnabled {
+					innerslogger = slogger.With("array_key_name", keyName)
+				}
 				innerslogger.Log(context.TODO(), fl.logLevel,
 					"attempting to coerce array into map",
 				)
@@ -310,12 +321,17 @@ func (fl *Flattener) handleStringLike(slogger *slog.Logger, path []string, v any
 // embedded plist. In the case of failures, it falls back to treating
 // it like a plain string.
 func (fl *Flattener) descendMaybePlist(path []string, data []byte, depth int) error {
-	slogger := fl.slogger.With(
-		"caller", "descendMaybePlist",
-		"depth", depth,
-		"rows_so_far", len(fl.rows),
-		"path", strings.Join(path, "/"),
-	)
+	// Gate the contextual logger build behind an Enabled check; see the
+	// matching note in descend.
+	slogger := fl.slogger
+	if fl.slogger.Enabled(context.TODO(), fl.logLevel) {
+		slogger = fl.slogger.With(
+			"caller", "descendMaybePlist",
+			"depth", depth,
+			"rows_so_far", len(fl.rows),
+			"path", strings.Join(path, "/"),
+		)
+	}
 
 	// Skip if we're not expanding nested plists
 	if !fl.expandNestedPlist {
@@ -374,12 +390,17 @@ func (fl *Flattener) queryMatchNil(queryTerm string) bool {
 // We use `=>` as something that is reasonably intuitive, and not very
 // likely to occur on it's own. Unfortunately, `==` shows up in base64
 func (fl *Flattener) queryMatchArrayElement(data any, arrIndex int, queryTerm string) bool {
-	slogger := fl.slogger.With(
-		"caller", "queryMatchArrayElement",
-		"rows_so_far", len(fl.rows),
-		"query", queryTerm,
-		"arr_index", arrIndex,
-	)
+	// Gate the contextual logger build behind an Enabled check; see the
+	// matching note in descend.
+	slogger := fl.slogger
+	if fl.slogger.Enabled(context.TODO(), fl.logLevel) {
+		slogger = fl.slogger.With(
+			"caller", "queryMatchArrayElement",
+			"rows_so_far", len(fl.rows),
+			"query", queryTerm,
+			"arr_index", arrIndex,
+		)
+	}
 
 	// strip off the key re-write denotation before trying to match
 	queryTerm = strings.TrimPrefix(queryTerm, fl.queryKeyDenoter)
