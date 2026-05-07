@@ -15,7 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/snappy"
 	"github.com/kolide/launcher/v2/ee/observability"
 	"golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/transform"
@@ -69,11 +68,6 @@ const (
 	// They may signal something besides array termination.
 	tokenPossiblyArrayTermination0x03 byte = 0x03
 	tokenPossiblyArrayTermination0x01 byte = 0x01
-
-	// some headers may indicate that the payload is compressed with Snappy. look for kCompressedWithSnappy explanation here:
-	// https://chromium.googlesource.com/chromium/src/+/main/third_party/blink/renderer/modules/indexeddb/idb_value_wrapping.cc
-	tokenRequiresProcessingSSVPseudoVersion byte = 0x11
-	tokenCompressedWithSnappy               byte = 0x02
 )
 
 // DeserializeChrome deserializes a JS object that has been stored by Chrome
@@ -95,19 +89,6 @@ func DeserializeChrome(ctx context.Context, slogger *slog.Logger, row map[string
 		return nil, fmt.Errorf("reading uvarint as indexeddb version: %w", err)
 	}
 
-	// Grab a reference to the remaining bytes from the data as the payload,
-	// we'll need to read a few bytes from the header and snappy decompress if needed
-	payload := data[len(data)-srcReader.Len():]
-	// If the header does not indicate that the payload is compressed with Snappy,
-	// this will return unchanged
-	payload, err = snappyDecompressedIfNeeded(payload)
-	if err != nil {
-		return nil, fmt.Errorf("indexeddb version %d: %w", indexeddbVersion, err)
-	}
-
-	// Reset the source reader, this will have no effect if the payload is was not compressed with Snappy
-	srcReader = bytes.NewReader(payload)
-
 	// Next, read through the header to extract top-level data
 	serializerVersion, rootTag, err := readHeader(srcReader)
 	if err != nil {
@@ -121,32 +102,6 @@ func DeserializeChrome(ctx context.Context, slogger *slog.Logger, row map[string
 	}
 
 	return dataRows, nil
-}
-
-// snappyDecompressedIfNeeded decompresses the payload if it is compressed with Snappy.
-// this is determined by the presence of the following sequence in the header payload:
-// 1) 0xFF - kVersionTag
-// 2) 0x11 - kRequiresProcessingSSVPseudoVersion
-// 3) 0x02 - kCompressedWithSnappy
-// 4) the compressed data
-func snappyDecompressedIfNeeded(payload []byte) ([]byte, error) {
-	if len(payload) >= 4 &&
-		payload[0] == tokenVersion &&
-		payload[1] == tokenRequiresProcessingSSVPseudoVersion &&
-		payload[2] == tokenCompressedWithSnappy {
-		decompressed, err := snappy.Decode(nil, payload[3:])
-		if err != nil {
-			return nil, fmt.Errorf("snappy decompress after Chrome FF/11/02 wrapper: %w", err)
-		}
-
-		if len(decompressed) == 0 {
-			return nil, errors.New("snappy decompression yielded empty data set")
-		}
-
-		return decompressed, nil
-	}
-
-	return payload, nil
 }
 
 // readHeader reads through the header bytes at the start of `srcReader`,
@@ -415,15 +370,20 @@ func deserializeNext(ctx context.Context, slogger *slog.Logger, nextToken byte, 
 		case tokenHostObj:
 			return nil, errors.New("deserialization not implemented for host object")
 		default:
-			slogger.Log(ctx, slog.LevelWarn,
-				"unknown token type, will attempt to keep reading",
-				"token", fmt.Sprintf("%02x", nextToken),
-			)
+			currentToken := nextToken
 			var err error
 			nextToken, err = nextNonPaddingByte(srcReader)
 			if err != nil {
-				return nil, fmt.Errorf("reading next non-padding byte after unknown token byte: %w", err)
+				return nil, fmt.Errorf("reading next non-padding byte after unknown token byte %02x / %s: %w", currentToken, string(currentToken), err)
 			}
+
+			slogger.Log(ctx, slog.LevelWarn,
+				"unknown token type, will attempt to keep reading",
+				"token", fmt.Sprintf("%02x", currentToken),
+				"token_str", string(currentToken),
+				"next_token", fmt.Sprintf("%02x", nextToken),
+				"next_token_str", string(nextToken),
+			)
 		}
 	}
 }
@@ -519,7 +479,7 @@ func deserializeSparseArray(ctx context.Context, slogger *slog.Logger, srcReader
 		}
 		arrayItem, err := deserializeNext(ctx, slogger, nextByte, srcReader)
 		if err != nil {
-			return nil, fmt.Errorf("decoding next item in dense array: %w", err)
+			return nil, fmt.Errorf("decoding next item in sparse array at index %d (total length %d): %w", i, arrayLen, err)
 		}
 		arrItems[i] = string(arrayItem) // cast to string so it's readable when marshalled again below
 	}
@@ -555,7 +515,7 @@ func deserializeDenseArray(ctx context.Context, slogger *slog.Logger, srcReader 
 		// Array item! Unread the byte
 		arrayItem, err := deserializeNext(ctx, slogger, nextByte, srcReader)
 		if err != nil {
-			return nil, fmt.Errorf("decoding next item in dense array: %w", err)
+			return nil, fmt.Errorf("decoding next item in dense array at index %d (total length %d): %w", i, arrayLen, err)
 		}
 		arrItems[i] = string(arrayItem) // cast to string so it's readable when marshalled again below
 	}
@@ -931,7 +891,7 @@ func deserializeAsciiStr(srcReader *bytes.Reader) ([]byte, error) {
 	for i := 0; i < int(strLen); i += 1 {
 		nextByte, err := srcReader.ReadByte()
 		if err != nil {
-			return nil, fmt.Errorf("reading next byte at index %d in string with length %d: %w", i, strLen, err)
+			return nil, fmt.Errorf("reading next byte at index %d in ascii string with length %d: %w", i, strLen, err)
 		}
 
 		strBytes[i] = nextByte
@@ -951,7 +911,7 @@ func deserializeUtf16Str(srcReader *bytes.Reader) ([]byte, error) {
 	for i := 0; i < int(strLen); i += 1 {
 		nextByte, err := srcReader.ReadByte()
 		if err != nil {
-			return nil, fmt.Errorf("reading next byte at index %d in string with length %d: %w", i, strLen, err)
+			return nil, fmt.Errorf("reading next byte at index %d in utf16 string with length %d: %w", i, strLen, err)
 		}
 
 		strBytes[i] = nextByte

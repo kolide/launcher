@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	// See: https://github.com/chromium/chromium/blob/master/content/browser/indexed_db/indexed_db_leveldb_coding.cc
+	// See: https://github.com/chromium/chromium/blob/main/content/browser/indexed_db/indexed_db_leveldb_coding.cc
 	// Types
 	databaseNameTypeByte = 0xc9 // 201
 
@@ -19,6 +19,7 @@ const (
 
 	// Index IDs
 	objectStoreDataIndexId = 0x01 // 1
+	blobEntryIndexId       = 0x03 // 3
 
 	// When parsing the origin from the database location, I have to add @1 at the end for the origin to be complete.
 	// I don't know why.
@@ -80,6 +81,14 @@ func objectDataKeyPrefix(dbId uint64, objectStoreId uint64) []byte {
 	keyPrefix = append(keyPrefix, uvarintToBytes(objectStoreId)...)
 
 	return append(keyPrefix, objectStoreDataIndexId)
+}
+
+func blobKeyPrefix(dbId uint64, objectStoreId uint64) []byte {
+	keyPrefix := []byte{0x00}
+	keyPrefix = append(keyPrefix, uvarintToBytes(dbId)...)
+	keyPrefix = append(keyPrefix, uvarintToBytes(objectStoreId)...)
+
+	return append(keyPrefix, blobEntryIndexId)
 }
 
 func decodeUtf16BigEndianBytes(b []byte) ([]byte, error) {

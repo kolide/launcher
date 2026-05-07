@@ -8,11 +8,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/golang/snappy"
 	"github.com/kolide/goleveldb/leveldb"
 	leveldbcomparer "github.com/kolide/goleveldb/leveldb/comparer"
 	leveldberrors "github.com/kolide/goleveldb/leveldb/errors"
@@ -30,6 +32,18 @@ import (
 // number upward after further research, but for now this seems like a safe upper
 // bounds.)
 const maxNumberOfObjectStoresToCheck = 100
+
+const (
+	// some headers may indicate that the payload is compressed with Snappy. look for kCompressedWithSnappy explanation here:
+	// https://chromium.googlesource.com/chromium/src/+/main/third_party/blink/renderer/modules/indexeddb/idb_value_wrapping.cc
+	tokenRequiresProcessingSSVPseudoVersion byte = 0x11
+	tokenReplaceWithBlob                    byte = 0x01
+	tokenCompressedWithSnappy               byte = 0x02
+
+	externalObjectTypeBlob                   = 0x00 // 0
+	externalObjectTypeFile                   = 0x01 // 1
+	externalObjectTypeFileSystemAccessHandle = 0x02 // 2
+)
 
 // QueryIndexeddbObjectStore queries the indexeddb at the given location `dbLocation`,
 // returning all objects in the given database that live in the given object store.
@@ -99,20 +113,37 @@ func QueryIndexeddbObjectStore(ctx context.Context, slogger *slog.Logger, dbLoca
 
 	// Get the key prefix for all objects in this store.
 	keyPrefix := objectDataKeyPrefix(databaseId, objectStoreId)
+	blobPrefix := blobKeyPrefix(databaseId, objectStoreId)
 
 	// Now, we can read all records, keeping only the ones with our matching key prefix.
 	iter := db.NewIterator(nil, nil)
+	rawRows := make([][]byte, 0)
+	blobFilepathList := make([]string, 0)
 	for iter.Next() {
 		key := iter.Key()
-		if !bytes.HasPrefix(key, keyPrefix) {
+
+		if !bytes.HasPrefix(key, keyPrefix) && !bytes.HasPrefix(key, blobPrefix) {
 			continue
 		}
 
 		tmp := make([]byte, len(iter.Value()))
 		copy(tmp, iter.Value())
-		objs = append(objs, map[string][]byte{
-			"data": tmp,
-		})
+
+		if bytes.HasPrefix(key, blobPrefix) {
+			blobFilepath, err := filepathFromBlobData(tmp, databaseId, tempDbCopyLocation)
+			if err != nil {
+				slogger.Log(ctx, slog.LevelWarn,
+					"could not parse filepath from blob data, ignoring blob",
+					"err", err,
+				)
+			} else {
+				blobFilepathList = append(blobFilepathList, blobFilepath)
+			}
+
+			continue
+		}
+
+		rawRows = append(rawRows, tmp)
 	}
 	iter.Release()
 	if err := iter.Error(); err != nil {
@@ -120,7 +151,127 @@ func QueryIndexeddbObjectStore(ctx context.Context, slogger *slog.Logger, dbLoca
 	}
 	span.AddEvent("completed_iteration")
 
+	// Now that we have access to blobs, review our objects to see if any need to be unwrapped
+	for _, row := range rawRows {
+		// handleWrappedValues returns row unmodified if it is not a wrapped value
+		unwrapped, err := handleWrappedValues(row, blobFilepathList)
+		if err != nil {
+			return objs, fmt.Errorf("unwrapping value: %w", err)
+		}
+
+		objs = append(objs, map[string][]byte{
+			"data": unwrapped,
+		})
+	}
+
 	return objs, nil
+}
+
+func filepathFromBlobData(value []byte, databaseId uint64, blobRootDir string) (string, error) {
+	valueReader := bytes.NewReader(value)
+	// First up is the object type
+	objectType, err := valueReader.ReadByte()
+	if err != nil {
+		return "", fmt.Errorf("reading external object type: %w", err)
+	}
+
+	if objectType != externalObjectTypeBlob {
+		// Not supported
+		return "", fmt.Errorf("external object type %s not supported", string(objectType))
+	}
+
+	// blob_number (VarInt)
+	blobNumber, err := binary.ReadUvarint(valueReader)
+	if err != nil {
+		return "", fmt.Errorf("reading blob_number: %w", err)
+	}
+
+	// There are other fields (see https://github.com/chromium/chromium/blob/main/content/browser/indexed_db/docs/leveldb_coding_scheme.md#externalobject-value)
+	// but we don't need them to construct the filepath, so we stop here.
+	blobDir := fmt.Sprintf("%02x", (blobNumber&0xff00)>>8)
+	blobFilename := fmt.Sprintf("%x", blobNumber)
+	blobFilepath := filepath.Join(blobRootDir, fmt.Sprintf("%d", databaseId), blobDir, blobFilename)
+
+	return blobFilepath, nil
+}
+
+// handleWrappedValues examines `payload` to see if it is a wrapped value --
+// either a blob that must be replaced, or snappy-compressed data that must
+// be decompressed.
+func handleWrappedValues(payload []byte, blobFilepathList []string) ([]byte, error) {
+	// First, read the indexeddb version, which precedes the serialized value.
+	// See: https://github.com/chromium/chromium/blob/master/content/browser/indexed_db/docs/leveldb_coding_scheme.md#object-store-data
+	_, bytesRead := binary.Uvarint(payload)
+	header := payload[:bytesRead]
+
+	// Wrapped values are determined by the presence of the following sequence in the header payload:
+	// 1) 0xFF - kVersionTag
+	// 2) 0x11 - kRequiresProcessingSSVPseudoVersion
+	// 3) 0x01 - the wrap type -- kReplaceWithBlob or kCompressedWithSnappy
+	if len(payload) >= 4+bytesRead &&
+		payload[bytesRead] == tokenVersion &&
+		payload[bytesRead+1] == tokenRequiresProcessingSSVPseudoVersion {
+		var unwrapped []byte
+		var err error
+
+		switch payload[bytesRead+2] {
+		case tokenCompressedWithSnappy:
+			unwrapped, err = snappyDecompressedIfNeeded(payload[bytesRead+3:])
+		case tokenReplaceWithBlob:
+			unwrapped, err = replaceWithBlobIfNeeded(payload[bytesRead+3:], blobFilepathList)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("unwrapping value: %w", err)
+		}
+		return append(header, unwrapped...), nil
+	}
+
+	return payload, nil
+}
+
+// snappyDecompressedIfNeeded decompresses the payload if it is compressed with Snappy.
+// this is determined by the presence of the following sequence in the header payload:
+// 1) 0xFF - kVersionTag
+// 2) 0x11 - kRequiresProcessingSSVPseudoVersion
+// 3) 0x02 - kCompressedWithSnappy
+// 4) the compressed data
+func snappyDecompressedIfNeeded(payload []byte) ([]byte, error) {
+	decompressed, err := snappy.Decode(nil, payload)
+	if err != nil {
+		return nil, fmt.Errorf("snappy decompress after Chrome FF/11/02 wrapper: %w", err)
+	}
+
+	if len(decompressed) == 0 {
+		return nil, errors.New("snappy decompression yielded empty data set")
+	}
+
+	return decompressed, nil
+}
+
+func replaceWithBlobIfNeeded(payload []byte, blobFilepathList []string) ([]byte, error) {
+	payloadReader := bytes.NewReader(payload)
+
+	// Next up in the header is the blob size.
+	if _, err := binary.ReadUvarint(payloadReader); err != nil {
+		return nil, fmt.Errorf("reading blob size: %w", err)
+	}
+
+	// Next comes the blob offset, the offset of the SSV-wrapping Blob in the IDBValue list of Blobs.
+	blobOffset, err := binary.ReadUvarint(payloadReader)
+	if err != nil {
+		return nil, fmt.Errorf("reading blob offset: %w", err)
+	}
+
+	if int(blobOffset) > len(blobFilepathList)-1 {
+		return nil, fmt.Errorf("wanted blob with offset %d, but only have %d blobs", blobOffset, len(blobFilepathList))
+	}
+
+	blobBytes, err := os.ReadFile(blobFilepathList[blobOffset])
+	if err != nil {
+		return nil, fmt.Errorf("reading blob file %s: %w", blobFilepathList[blobOffset], err)
+	}
+
+	return blobBytes, nil
 }
 
 func CopyLeveldb(ctx context.Context, sourceDb string) (string, error) {
@@ -151,6 +302,35 @@ func CopyLeveldb(ctx context.Context, sourceDb string) (string, error) {
 		if err := copyFile(ctx, src, dest); err != nil {
 			return dbCopyLocation, fmt.Errorf("copying file: %w", err)
 		}
+	}
+
+	// We want to copy over both the leveldb files (in sourceDb, some/path/to/indexeddb.leveldb)
+	// and the blob files (in /some/path/to/indexeddb.blob) -- so let's look for the blob files
+	// now too.
+	blobDir := strings.TrimSuffix(sourceDb, ".leveldb") + ".blob"
+	if _, err := os.Stat(blobDir); err != nil {
+		return dbCopyLocation, nil
+	}
+	if err := filepath.WalkDir(blobDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return fmt.Errorf("error walking blob directory: %w", err)
+		}
+
+		dest := filepath.Join(dbCopyLocation, strings.TrimPrefix(path, blobDir))
+		if d.IsDir() {
+			if err := os.MkdirAll(dest, 0755); err != nil {
+				return fmt.Errorf("making directory %s: %w", dest, err)
+			}
+			return nil
+		}
+
+		if err := copyFile(ctx, path, dest); err != nil {
+			return fmt.Errorf("copying file %s: %w", path, err)
+		}
+
+		return nil
+	}); err != nil {
+		return dbCopyLocation, fmt.Errorf("copying blob files: %w", err)
 	}
 
 	return dbCopyLocation, nil
