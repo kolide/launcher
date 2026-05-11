@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/golang/snappy"
@@ -37,7 +38,7 @@ const maxNumberOfObjectStoresToCheck = 100
 
 const (
 	// Some headers may indicate that the payload is wrapped -- requiring snappy decompression
-	// or blob substition. See: https://chromium.googlesource.com/chromium/src/+/main/third_party/blink/renderer/modules/indexeddb/idb_value_wrapping.cc
+	// or blob substitution. See: https://chromium.googlesource.com/chromium/src/+/main/third_party/blink/renderer/modules/indexeddb/idb_value_wrapping.cc
 	tokenRequiresProcessingSSVPseudoVersion byte = 0x11
 	tokenReplaceWithBlob                    byte = 0x01
 	tokenCompressedWithSnappy               byte = 0x02
@@ -132,13 +133,13 @@ func QueryIndexeddbObjectStore(ctx context.Context, slogger *slog.Logger, dbLoca
 		// Check for external object data associated with this key, in case this value is wrapped
 		var externalObjectFilenames []string
 		userKey := bytes.TrimPrefix(key, keyPrefix)
-		blobKey := append(blobPrefix, userKey...)
+		blobKey := slices.Concat(blobPrefix, userKey)
 		externalObjectsRaw, err := db.Get(blobKey, nil)
 		if err != nil {
 			// We expect ErrNotFound when there is no external object data associated with this key
-			if !errors.Is(err, leveldb.ErrNotFound) {
+			if !errors.Is(err, leveldberrors.ErrNotFound) {
 				slogger.Log(ctx, slog.LevelWarn,
-					"reading blob data from db",
+					"failed to read blob data from db",
 					"err", err,
 				)
 			}
@@ -147,7 +148,7 @@ func QueryIndexeddbObjectStore(ctx context.Context, slogger *slog.Logger, dbLoca
 			externalObjectFilenames, err = readExternalObjects(externalObjectsRaw, databaseId, tempDbCopyLocation)
 			if err != nil {
 				slogger.Log(ctx, slog.LevelWarn,
-					"parsing external objects data from db",
+					"failed to parse external objects data from db",
 					"err", err,
 				)
 			}
@@ -190,6 +191,10 @@ func readExternalObjects(value []byte, databaseId uint64, blobRootDir string) ([
 				break
 			}
 			return nil, fmt.Errorf("reading external object type: %w", err)
+		}
+
+		if objectType != externalObjectTypeBlob && objectType != externalObjectTypeFile && objectType != externalObjectTypeFileSystemAccessHandle {
+			return nil, fmt.Errorf("unknown external object type 0x%02x", objectType)
 		}
 
 		// For blobs and files, the next fields are blob_number (varint), type (StringWithLength),
@@ -300,9 +305,9 @@ func readStringWithLength(valueReader *bytes.Reader) (string, error) {
 // be decompressed.
 func handleWrappedValues(payload []byte, blobFilepathList []string) ([]byte, error) {
 	// First, read the indexeddb version, which precedes the serialized value.
-	// See: https://github.com/chromium/chromium/blob/master/content/browser/indexed_db/docs/leveldb_coding_scheme.md#object-store-data
+	// See: https://github.com/chromium/chromium/blob/main/content/browser/indexed_db/docs/leveldb_coding_scheme.md#object-store-data
 	_, bytesRead := binary.Uvarint(payload)
-	if bytesRead == 0 {
+	if bytesRead <= 0 {
 		return payload, nil
 	}
 	header := payload[:bytesRead]
@@ -319,9 +324,9 @@ func handleWrappedValues(payload []byte, blobFilepathList []string) ([]byte, err
 
 		switch payload[bytesRead+2] {
 		case tokenCompressedWithSnappy:
-			unwrapped, err = snappyDecompressedIfNeeded(payload[bytesRead+3:])
+			unwrapped, err = snappyDecompress(payload[bytesRead+3:])
 		case tokenReplaceWithBlob:
-			unwrapped, err = replaceWithBlobIfNeeded(payload[bytesRead+3:], blobFilepathList)
+			unwrapped, err = replaceWithBlob(payload[bytesRead+3:], blobFilepathList)
 		default:
 			return payload, nil
 		}
@@ -334,8 +339,7 @@ func handleWrappedValues(payload []byte, blobFilepathList []string) ([]byte, err
 	return payload, nil
 }
 
-// snappyDecompressedIfNeeded decompresses the payload if it is compressed with Snappy.
-func snappyDecompressedIfNeeded(payload []byte) ([]byte, error) {
+func snappyDecompress(payload []byte) ([]byte, error) {
 	decompressed, err := snappy.Decode(nil, payload)
 	if err != nil {
 		return nil, fmt.Errorf("snappy decompress after Chrome FF/11/02 wrapper: %w", err)
@@ -348,7 +352,7 @@ func snappyDecompressedIfNeeded(payload []byte) ([]byte, error) {
 	return decompressed, nil
 }
 
-func replaceWithBlobIfNeeded(payload []byte, blobFilepathList []string) ([]byte, error) {
+func replaceWithBlob(payload []byte, blobFilepathList []string) ([]byte, error) {
 	payloadReader := bytes.NewReader(payload)
 
 	// Next up in the header is the blob size.
@@ -371,9 +375,9 @@ func replaceWithBlobIfNeeded(payload []byte, blobFilepathList []string) ([]byte,
 		return nil, fmt.Errorf("no blob file available at offset %d (may be file access handle)", blobOffset)
 	}
 
-	blobBytes, err := os.ReadFile(blobFilepathList[blobOffset])
+	blobBytes, err := os.ReadFile(blobFile)
 	if err != nil {
-		return nil, fmt.Errorf("reading blob file %s: %w", blobFilepathList[blobOffset], err)
+		return nil, fmt.Errorf("reading blob file %s: %w", blobFile, err)
 	}
 
 	return blobBytes, nil
