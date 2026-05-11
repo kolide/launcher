@@ -22,6 +22,8 @@ import (
 	"github.com/kolide/launcher/v2/ee/agent"
 	"github.com/kolide/launcher/v2/ee/observability"
 	"github.com/kolide/launcher/v2/pkg/indexeddbcomparator"
+	"golang.org/x/text/encoding/unicode"
+	"golang.org/x/text/transform"
 )
 
 // maxNumberOfObjectStoresToCheck is the number of indices for object stores we will check
@@ -117,44 +119,42 @@ func QueryIndexeddbObjectStore(ctx context.Context, slogger *slog.Logger, dbLoca
 
 	// Now, we can read all records, keeping only the ones with our matching key prefix.
 	iter := db.NewIterator(nil, nil)
-	rawRows := make([][]byte, 0)
-	blobFilepathList := make([]string, 0)
 	for iter.Next() {
 		key := iter.Key()
 
-		if !bytes.HasPrefix(key, keyPrefix) && !bytes.HasPrefix(key, blobPrefix) {
+		if !bytes.HasPrefix(key, keyPrefix) {
 			continue
 		}
 
 		tmp := make([]byte, len(iter.Value()))
 		copy(tmp, iter.Value())
 
-		if bytes.HasPrefix(key, blobPrefix) {
-			blobFilepath, err := filepathFromBlobData(tmp, databaseId, tempDbCopyLocation)
-			if err != nil {
+		// Check for external object data associated with this key, in case this value is wrapped
+		var externalObjectFilenames []string
+		userKey := bytes.TrimPrefix(key, keyPrefix)
+		blobKey := append(blobPrefix, userKey...)
+		externalObjectsRaw, err := db.Get(blobKey, nil)
+		if err != nil {
+			// We expect ErrNotFound when there is no external object data associated with this key
+			if !errors.Is(err, leveldb.ErrNotFound) {
 				slogger.Log(ctx, slog.LevelWarn,
-					"could not parse filepath from blob data, ignoring blob",
+					"reading blob data from db",
 					"err", err,
 				)
-			} else {
-				blobFilepathList = append(blobFilepathList, blobFilepath)
 			}
-
-			continue
+		} else {
+			// External objects data exists for this key -- parse it
+			externalObjectFilenames, err = readExternalObjects(externalObjectsRaw, databaseId, tempDbCopyLocation)
+			if err != nil {
+				slogger.Log(ctx, slog.LevelWarn,
+					"parsing external objects data from db",
+					"err", err,
+				)
+			}
 		}
 
-		rawRows = append(rawRows, tmp)
-	}
-	iter.Release()
-	if err := iter.Error(); err != nil {
-		return objs, fmt.Errorf("iterator error: %w", err)
-	}
-	span.AddEvent("completed_iteration")
-
-	// Now that we have access to blobs, review our objects to see if any need to be unwrapped
-	for _, row := range rawRows {
 		// handleWrappedValues returns row unmodified if it is not a wrapped value
-		unwrapped, err := handleWrappedValues(row, blobFilepathList)
+		unwrapped, err := handleWrappedValues(tmp, externalObjectFilenames)
 		if err != nil {
 			return objs, fmt.Errorf("unwrapping value: %w", err)
 		}
@@ -163,36 +163,128 @@ func QueryIndexeddbObjectStore(ctx context.Context, slogger *slog.Logger, dbLoca
 			"data": unwrapped,
 		})
 	}
+	iter.Release()
+	if err := iter.Error(); err != nil {
+		return objs, fmt.Errorf("iterator error: %w", err)
+	}
+	span.AddEvent("completed_iteration")
 
 	return objs, nil
 }
 
-func filepathFromBlobData(value []byte, databaseId uint64, blobRootDir string) (string, error) {
+// readExternalObjects reads through the list of external objects (blobs, files, and file handles)
+// contained in `value`.
+// See https://github.com/chromium/chromium/blob/main/content/browser/indexed_db/docs/leveldb_coding_scheme.md#externalobject-value
+func readExternalObjects(value []byte, databaseId uint64, blobRootDir string) ([]string, error) {
 	valueReader := bytes.NewReader(value)
-	// First up is the object type
-	objectType, err := valueReader.ReadByte()
-	if err != nil {
-		return "", fmt.Errorf("reading external object type: %w", err)
+	filepaths := make([]string, 0)
+
+	// There is no length for these objects -- read until we've read everything in `value`.
+	for {
+		// First up is the object type
+		objectType, err := valueReader.ReadByte()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return nil, fmt.Errorf("reading external object type: %w", err)
+		}
+
+		// For blobs and files, the next fields are blob_number (varint), type (StringWithLength),
+		// and size (varint)
+		if objectType == externalObjectTypeBlob || objectType == externalObjectTypeFile {
+			// blob_number
+			blobNumber, err := binary.ReadUvarint(valueReader)
+			if err != nil {
+				return nil, fmt.Errorf("reading blob_number: %w", err)
+			}
+
+			// With the blob number, we are now able to extract the filepath for blob types
+			if objectType == externalObjectTypeBlob {
+				filepaths = append(filepaths, filepathForBlob(blobNumber, databaseId, blobRootDir))
+			}
+
+			// type
+			if _, err := readStringWithLength(valueReader); err != nil {
+				return nil, fmt.Errorf("reading type: %w", err)
+			}
+
+			// size
+			if _, err := binary.ReadUvarint(valueReader); err != nil {
+				return nil, fmt.Errorf("reading size: %w", err)
+			}
+		}
+
+		// For files, the next field is filename (StringWithLength) and lastModified (varint)
+		if objectType == externalObjectTypeFile {
+			// filename
+			filename, err := readStringWithLength(valueReader)
+			if err != nil {
+				return nil, fmt.Errorf("reading filename: %w", err)
+			}
+			// TODO RM: does this filename require a directory or is it fully-qualified already?
+			filepaths = append(filepaths, filename)
+
+			// lastModified
+			if _, err := binary.ReadUvarint(valueReader); err != nil {
+				return nil, fmt.Errorf("reading lastModified: %w", err)
+			}
+		}
+
+		// For file system access handles, the next field is token (BinaryWithLength).
+		if objectType == externalObjectTypeFileSystemAccessHandle {
+			// Binary - VarInt prefix with length in bytes, followed by data bytes
+			binaryDataLength, err := binary.ReadUvarint(valueReader)
+			if err != nil {
+				return nil, fmt.Errorf("reading binary data length: %w", err)
+			}
+
+			rawData := make([]byte, binaryDataLength)
+			for i := 0; i < int(binaryDataLength); i++ {
+				nextByte, err := valueReader.ReadByte()
+				if err != nil {
+					return nil, fmt.Errorf("reading byte at index %d in binary data of length %d: %w", i, binaryDataLength, err)
+				}
+				rawData[i] = nextByte
+			}
+		}
 	}
 
-	if objectType != externalObjectTypeBlob {
-		// Not supported
-		return "", fmt.Errorf("external object type %s not supported", string(objectType))
-	}
+	return filepaths, nil
+}
 
-	// blob_number (VarInt)
-	blobNumber, err := binary.ReadUvarint(valueReader)
-	if err != nil {
-		return "", fmt.Errorf("reading blob_number: %w", err)
-	}
-
-	// There are other fields (see https://github.com/chromium/chromium/blob/main/content/browser/indexed_db/docs/leveldb_coding_scheme.md#externalobject-value)
-	// but we don't need them to construct the filepath, so we stop here.
+func filepathForBlob(blobNumber uint64, databaseId uint64, blobRootDir string) string {
 	blobDir := fmt.Sprintf("%02x", (blobNumber&0xff00)>>8)
 	blobFilename := fmt.Sprintf("%x", blobNumber)
 	blobFilepath := filepath.Join(blobRootDir, fmt.Sprintf("%d", databaseId), blobDir, blobFilename)
+	return blobFilepath
+}
 
-	return blobFilepath, nil
+// readStringWithLength reads the upcoming StringWithLength from the byte reader.
+// It takes the following format:
+// VarInt prefix with length in code units (i.e. bytes/2), followed by String (UTF-16 BE)
+func readStringWithLength(valueReader *bytes.Reader) (string, error) {
+	stringLengthInCodeUnits, err := binary.ReadUvarint(valueReader)
+	if err != nil {
+		return "", fmt.Errorf("reading string length: %w", err)
+	}
+
+	rawString := make([]byte, stringLengthInCodeUnits*2)
+	for i := 0; i < int(stringLengthInCodeUnits)*2; i++ {
+		nextByte, err := valueReader.ReadByte()
+		if err != nil {
+			return "", fmt.Errorf("reading byte at index %d in string of length %d: %w", i, stringLengthInCodeUnits*2, err)
+		}
+		rawString[i] = nextByte
+	}
+
+	// Strings are UTF-16 BE
+	decoded, _, err := transform.Bytes(unicode.UTF16(unicode.BigEndian, unicode.UseBOM).NewDecoder(), rawString)
+	if err != nil {
+		return "", fmt.Errorf("reading string as utf-16: %w", err)
+	}
+
+	return string(decoded), nil
 }
 
 // handleWrappedValues examines `payload` to see if it is a wrapped value --
