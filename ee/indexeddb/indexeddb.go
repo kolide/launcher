@@ -156,12 +156,9 @@ func QueryIndexeddbObjectStore(ctx context.Context, slogger *slog.Logger, dbLoca
 		// handleWrappedValues returns row unmodified if it is not a wrapped value
 		if unwrapped, err := handleWrappedValues(tmp, externalObjectFilenames); err != nil {
 			slogger.Log(ctx, slog.LevelError,
-				"could not unwrap wrapped value -- proceeding with original data instead",
+				"could not unwrap wrapped value -- skipping row",
 				"err", err,
 			)
-			objs = append(objs, map[string][]byte{
-				"data": tmp,
-			})
 		} else {
 			objs = append(objs, map[string][]byte{
 				"data": unwrapped,

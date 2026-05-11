@@ -65,13 +65,18 @@ func Test_deserializeIndexeddbValue_InvalidType(t *testing.T) {
 	require.Error(t, err, "should not have been able to deserialize malformed object")
 }
 
-func Test_snappyDecompressedIfNeeded(t *testing.T) {
+func Test_handleWrappedValues(t *testing.T) {
 	t.Parallel()
 
 	decompressedInner := []byte("hello indexeddb")
-	validWrapped := append(
-		[]byte{tokenVersion, tokenRequiresProcessingSSVPseudoVersion, tokenCompressedWithSnappy},
+	validSnappyHeaderWithoutIndexeddbVersion := append([]byte{tokenVersion}, tokenRequiresProcessingSSVPseudoVersion, tokenCompressedWithSnappy)
+	validWrappedWithoutIndexeddbVersion := append(
+		validSnappyHeaderWithoutIndexeddbVersion,
 		snappy.Encode(nil, decompressedInner)...,
+	)
+	emptyWrappedWithoutIndexeddbVersion := append(
+		validSnappyHeaderWithoutIndexeddbVersion,
+		snappy.Encode(nil, []byte{})...,
 	)
 
 	tests := []struct {
@@ -93,18 +98,18 @@ func Test_snappyDecompressedIfNeeded(t *testing.T) {
 		},
 		{
 			name:    "too short header returns unchanged",
-			payload: []byte{tokenVersion, tokenRequiresProcessingSSVPseudoVersion},
-			want:    []byte{tokenVersion, tokenRequiresProcessingSSVPseudoVersion},
+			payload: append(uvarintToBytes(100), tokenVersion, tokenRequiresProcessingSSVPseudoVersion),
+			want:    append(uvarintToBytes(100), tokenVersion, tokenRequiresProcessingSSVPseudoVersion),
 		},
 		{
 			name:    "prefix only does not attempt decompression",
-			payload: []byte{tokenVersion, tokenRequiresProcessingSSVPseudoVersion, tokenCompressedWithSnappy},
-			want:    []byte{tokenVersion, tokenRequiresProcessingSSVPseudoVersion, tokenCompressedWithSnappy},
+			payload: append(uvarintToBytes(200), tokenVersion, tokenRequiresProcessingSSVPseudoVersion, tokenCompressedWithSnappy),
+			want:    append(uvarintToBytes(200), tokenVersion, tokenRequiresProcessingSSVPseudoVersion, tokenCompressedWithSnappy),
 		},
 		{
 			name:    "unchanged without all token prefix bytes matching",
-			payload: []byte{0xfe, tokenRequiresProcessingSSVPseudoVersion, tokenCompressedWithSnappy, 0x00},
-			want:    []byte{0xfe, tokenRequiresProcessingSSVPseudoVersion, tokenCompressedWithSnappy, 0x00},
+			payload: append(uvarintToBytes(300), 0xfe, tokenRequiresProcessingSSVPseudoVersion, tokenCompressedWithSnappy, 0x00),
+			want:    append(uvarintToBytes(300), 0xfe, tokenRequiresProcessingSSVPseudoVersion, tokenCompressedWithSnappy, 0x00),
 		},
 		{
 			name:    "arbitrary payload without magic prefix returns unchanged",
@@ -113,24 +118,23 @@ func Test_snappyDecompressedIfNeeded(t *testing.T) {
 		},
 		{
 			name:    "valid snappy wrapper decompresses payload correctly",
-			payload: validWrapped,
-			want:    decompressedInner,
+			payload: append(uvarintToBytes(400), validWrappedWithoutIndexeddbVersion...),
+			want: append(
+				uvarintToBytes(400),
+				decompressedInner...,
+			),
 		},
 		{
 			name: "invalid snappy compression returns error",
-			payload: append(
-				[]byte{tokenVersion, tokenRequiresProcessingSSVPseudoVersion, tokenCompressedWithSnappy},
+			payload: append(uvarintToBytes(500), tokenVersion, tokenRequiresProcessingSSVPseudoVersion, tokenCompressedWithSnappy,
 				0x00, 0x01, 0x02, 0x03,
 			),
 			wantErr:   true,
 			errSubstr: "snappy decompress after Chrome FF/11/02 wrapper",
 		},
 		{
-			name: "empty snappy data returns error",
-			payload: append(
-				[]byte{tokenVersion, tokenRequiresProcessingSSVPseudoVersion, tokenCompressedWithSnappy},
-				snappy.Encode(nil, []byte{})...,
-			),
+			name:      "empty snappy data returns error",
+			payload:   append(uvarintToBytes(600), emptyWrappedWithoutIndexeddbVersion...),
 			wantErr:   true,
 			errSubstr: "snappy decompression yielded empty data set",
 		},
@@ -140,7 +144,7 @@ func Test_snappyDecompressedIfNeeded(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := snappyDecompressedIfNeeded(tt.payload)
+			got, err := handleWrappedValues(tt.payload, nil)
 			if tt.wantErr {
 				require.Error(t, err)
 				if tt.errSubstr != "" {
