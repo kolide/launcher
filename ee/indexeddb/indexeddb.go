@@ -36,8 +36,8 @@ import (
 const maxNumberOfObjectStoresToCheck = 100
 
 const (
-	// some headers may indicate that the payload is compressed with Snappy. look for kCompressedWithSnappy explanation here:
-	// https://chromium.googlesource.com/chromium/src/+/main/third_party/blink/renderer/modules/indexeddb/idb_value_wrapping.cc
+	// Some headers may indicate that the payload is wrapped -- requiring snappy decompression
+	// or blob substition. See: https://chromium.googlesource.com/chromium/src/+/main/third_party/blink/renderer/modules/indexeddb/idb_value_wrapping.cc
 	tokenRequiresProcessingSSVPseudoVersion byte = 0x11
 	tokenReplaceWithBlob                    byte = 0x01
 	tokenCompressedWithSnappy               byte = 0x02
@@ -154,14 +154,19 @@ func QueryIndexeddbObjectStore(ctx context.Context, slogger *slog.Logger, dbLoca
 		}
 
 		// handleWrappedValues returns row unmodified if it is not a wrapped value
-		unwrapped, err := handleWrappedValues(tmp, externalObjectFilenames)
-		if err != nil {
-			return objs, fmt.Errorf("unwrapping value: %w", err)
+		if unwrapped, err := handleWrappedValues(tmp, externalObjectFilenames); err != nil {
+			slogger.Log(ctx, slog.LevelError,
+				"could not unwrap wrapped value -- proceeding with original data instead",
+				"err", err,
+			)
+			objs = append(objs, map[string][]byte{
+				"data": tmp,
+			})
+		} else {
+			objs = append(objs, map[string][]byte{
+				"data": unwrapped,
+			})
 		}
-
-		objs = append(objs, map[string][]byte{
-			"data": unwrapped,
-		})
 	}
 	iter.Release()
 	if err := iter.Error(); err != nil {
@@ -200,9 +205,7 @@ func readExternalObjects(value []byte, databaseId uint64, blobRootDir string) ([
 			}
 
 			// With the blob number, we are now able to extract the filepath for blob types
-			if objectType == externalObjectTypeBlob {
-				filepaths = append(filepaths, filepathForBlob(blobNumber, databaseId, blobRootDir))
-			}
+			filepaths = append(filepaths, filepathForBlob(blobNumber, databaseId, blobRootDir))
 
 			// type
 			if _, err := readStringWithLength(valueReader); err != nil {
@@ -218,12 +221,9 @@ func readExternalObjects(value []byte, databaseId uint64, blobRootDir string) ([
 		// For files, the next field is filename (StringWithLength) and lastModified (varint)
 		if objectType == externalObjectTypeFile {
 			// filename
-			filename, err := readStringWithLength(valueReader)
-			if err != nil {
+			if _, err := readStringWithLength(valueReader); err != nil {
 				return nil, fmt.Errorf("reading filename: %w", err)
 			}
-			// TODO RM: does this filename require a directory or is it fully-qualified already?
-			filepaths = append(filepaths, filename)
 
 			// lastModified
 			if _, err := binary.ReadUvarint(valueReader); err != nil {
@@ -239,14 +239,20 @@ func readExternalObjects(value []byte, databaseId uint64, blobRootDir string) ([
 				return nil, fmt.Errorf("reading binary data length: %w", err)
 			}
 
-			rawData := make([]byte, binaryDataLength)
+			if binaryDataLength > uint64(valueReader.Len()) {
+				return nil, fmt.Errorf("cannot read BinaryWithLength: length %d but only %d bytes remaining to read", binaryDataLength, valueReader.Len())
+			}
+
+			// Read and discard data -- we don't do anything with it currently.
 			for i := 0; i < int(binaryDataLength); i++ {
-				nextByte, err := valueReader.ReadByte()
-				if err != nil {
+				if _, err := valueReader.ReadByte(); err != nil {
 					return nil, fmt.Errorf("reading byte at index %d in binary data of length %d: %w", i, binaryDataLength, err)
 				}
-				rawData[i] = nextByte
 			}
+
+			// We don't handle this type currently, but we still need an entry in the `filepaths` list
+			// so that indexing works correctly.
+			filepaths = append(filepaths, "")
 		}
 	}
 
@@ -269,17 +275,22 @@ func readStringWithLength(valueReader *bytes.Reader) (string, error) {
 		return "", fmt.Errorf("reading string length: %w", err)
 	}
 
-	rawString := make([]byte, stringLengthInCodeUnits*2)
-	for i := 0; i < int(stringLengthInCodeUnits)*2; i++ {
+	stringLength := stringLengthInCodeUnits * 2
+	if stringLength > uint64(valueReader.Len()) {
+		return "", fmt.Errorf("cannot read StringWithLength: length %d but only %d bytes remaining to read", stringLength, valueReader.Len())
+	}
+
+	rawString := make([]byte, stringLength)
+	for i := 0; i < int(stringLength); i++ {
 		nextByte, err := valueReader.ReadByte()
 		if err != nil {
-			return "", fmt.Errorf("reading byte at index %d in string of length %d: %w", i, stringLengthInCodeUnits*2, err)
+			return "", fmt.Errorf("reading byte at index %d in string of length %d: %w", i, stringLength, err)
 		}
 		rawString[i] = nextByte
 	}
 
 	// Strings are UTF-16 BE
-	decoded, _, err := transform.Bytes(unicode.UTF16(unicode.BigEndian, unicode.UseBOM).NewDecoder(), rawString)
+	decoded, _, err := transform.Bytes(unicode.UTF16(unicode.BigEndian, unicode.IgnoreBOM).NewDecoder(), rawString)
 	if err != nil {
 		return "", fmt.Errorf("reading string as utf-16: %w", err)
 	}
@@ -294,12 +305,15 @@ func handleWrappedValues(payload []byte, blobFilepathList []string) ([]byte, err
 	// First, read the indexeddb version, which precedes the serialized value.
 	// See: https://github.com/chromium/chromium/blob/master/content/browser/indexed_db/docs/leveldb_coding_scheme.md#object-store-data
 	_, bytesRead := binary.Uvarint(payload)
+	if bytesRead == 0 {
+		return payload, nil
+	}
 	header := payload[:bytesRead]
 
 	// Wrapped values are determined by the presence of the following sequence in the header payload:
 	// 1) 0xFF - kVersionTag
 	// 2) 0x11 - kRequiresProcessingSSVPseudoVersion
-	// 3) 0x01 - the wrap type -- kReplaceWithBlob or kCompressedWithSnappy
+	// 3) 0x01 or 0x02 - the wrap type -- kReplaceWithBlob or kCompressedWithSnappy
 	if len(payload) >= 4+bytesRead &&
 		payload[bytesRead] == tokenVersion &&
 		payload[bytesRead+1] == tokenRequiresProcessingSSVPseudoVersion {
@@ -311,6 +325,8 @@ func handleWrappedValues(payload []byte, blobFilepathList []string) ([]byte, err
 			unwrapped, err = snappyDecompressedIfNeeded(payload[bytesRead+3:])
 		case tokenReplaceWithBlob:
 			unwrapped, err = replaceWithBlobIfNeeded(payload[bytesRead+3:], blobFilepathList)
+		default:
+			return payload, nil
 		}
 		if err != nil {
 			return nil, fmt.Errorf("unwrapping value: %w", err)
@@ -322,11 +338,6 @@ func handleWrappedValues(payload []byte, blobFilepathList []string) ([]byte, err
 }
 
 // snappyDecompressedIfNeeded decompresses the payload if it is compressed with Snappy.
-// this is determined by the presence of the following sequence in the header payload:
-// 1) 0xFF - kVersionTag
-// 2) 0x11 - kRequiresProcessingSSVPseudoVersion
-// 3) 0x02 - kCompressedWithSnappy
-// 4) the compressed data
 func snappyDecompressedIfNeeded(payload []byte) ([]byte, error) {
 	decompressed, err := snappy.Decode(nil, payload)
 	if err != nil {
@@ -354,8 +365,13 @@ func replaceWithBlobIfNeeded(payload []byte, blobFilepathList []string) ([]byte,
 		return nil, fmt.Errorf("reading blob offset: %w", err)
 	}
 
-	if int(blobOffset) > len(blobFilepathList)-1 {
+	if blobOffset >= uint64(len(blobFilepathList)) {
 		return nil, fmt.Errorf("wanted blob with offset %d, but only have %d blobs", blobOffset, len(blobFilepathList))
+	}
+
+	blobFile := blobFilepathList[blobOffset]
+	if len(blobFile) == 0 {
+		return nil, fmt.Errorf("no blob file available at offset %d (may be file access handle)", blobOffset)
 	}
 
 	blobBytes, err := os.ReadFile(blobFilepathList[blobOffset])
@@ -401,6 +417,7 @@ func CopyLeveldb(ctx context.Context, sourceDb string) (string, error) {
 	// now too.
 	blobDir := strings.TrimSuffix(sourceDb, ".leveldb") + ".blob"
 	if _, err := os.Stat(blobDir); err != nil {
+		// Either the blob directory doesn't exist, or we can't access it -- proceed without.
 		return dbCopyLocation, nil
 	}
 	if err := filepath.WalkDir(blobDir, func(path string, d fs.DirEntry, err error) error {
