@@ -264,7 +264,7 @@ func readExternalObjects(value []byte, databaseId uint64, blobRootDir string) ([
 func filepathForBlob(blobNumber uint64, databaseId uint64, blobRootDir string) string {
 	blobDir := fmt.Sprintf("%02x", (blobNumber&0xff00)>>8)
 	blobFilename := fmt.Sprintf("%x", blobNumber)
-	blobFilepath := filepath.Join(blobRootDir, fmt.Sprintf("%d", databaseId), blobDir, blobFilename)
+	blobFilepath := filepath.Join(blobRootDir, fmt.Sprintf("%x", databaseId), blobDir, blobFilename)
 	return blobFilepath
 }
 
