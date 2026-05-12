@@ -221,6 +221,24 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader *byt
 				return obj, fmt.Errorf("deserializing object property UTF-16 string: %w", err)
 			}
 			currentPropertyName = string(objectPropertyNameBytes)
+		case tokenInt32:
+			propertyInt, err := binary.ReadVarint(srcReader)
+			if err != nil {
+				return nil, fmt.Errorf("decoding object property int32: %w", err)
+			}
+			currentPropertyName = strconv.Itoa(int(propertyInt))
+		case tokenUint32:
+			propertyInt, err := binary.ReadUvarint(srcReader)
+			if err != nil {
+				return nil, fmt.Errorf("decoding object property uint32: %w", err)
+			}
+			currentPropertyName = strconv.Itoa(int(propertyInt))
+		case tokenDouble:
+			var d float64
+			if err := binary.Read(srcReader, binary.NativeEndian, &d); err != nil {
+				return nil, fmt.Errorf("decoding object property double: %w", err)
+			}
+			currentPropertyName = strconv.FormatFloat(d, 'f', -1, 64)
 		default:
 			// Handle unexpected tokens here. Likely, if we run into this issue, we've
 			// already committed an error when parsing. Collect as much information as
@@ -613,6 +631,10 @@ func deserializeArrayBuffer(ctx context.Context, slogger *slog.Logger, srcReader
 	if err != nil {
 		return nil, fmt.Errorf("reading byte length for ArrayBuffer view: %w", err)
 	}
+	// We don't need the flags, but we must read them in
+	if _, err := binary.ReadUvarint(srcReader); err != nil {
+		return nil, fmt.Errorf("reading flags for ArrayBuffer view: %w", err)
+	}
 
 	// Handle the only non-TypedArray case
 	if arrayBufferViewTag == arrayBufferViewTagDataView {
@@ -817,7 +839,7 @@ func deserializeMap(ctx context.Context, slogger *slog.Logger, srcReader *bytes.
 		}
 		if tokenByteForKey == tokenMapEnd {
 			// All done with the map! Read the length and break
-			_, _ = srcReader.ReadByte()
+			_, _ = binary.ReadUvarint(srcReader)
 			break
 		}
 
@@ -860,7 +882,7 @@ func deserializeSet(ctx context.Context, slogger *slog.Logger, srcReader *bytes.
 		}
 		if nextToken == tokenSetEnd {
 			// All done with the set! Read the length and break
-			_, _ = srcReader.ReadByte()
+			_, _ = binary.ReadUvarint(srcReader)
 			break
 		}
 

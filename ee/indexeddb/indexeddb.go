@@ -302,7 +302,8 @@ func readStringWithLength(valueReader *bytes.Reader) (string, error) {
 
 // handleWrappedValues examines `payload` to see if it is a wrapped value --
 // either a blob that must be replaced, or snappy-compressed data that must
-// be decompressed.
+// be decompressed. Values can also be multiply-wrapped -- a blob that contains
+// snappy-compressed data. (Probably not vice versa.)
 func handleWrappedValues(payload []byte, blobFilepathList []string) ([]byte, error) {
 	// First, read the indexeddb version, which precedes the serialized value.
 	// See: https://github.com/chromium/chromium/blob/main/content/browser/indexed_db/docs/leveldb_coding_scheme.md#object-store-data
@@ -311,32 +312,36 @@ func handleWrappedValues(payload []byte, blobFilepathList []string) ([]byte, err
 		return payload, nil
 	}
 	header := payload[:bytesRead]
+	body := payload[bytesRead:]
 
-	// Wrapped values are determined by the presence of the following sequence in the header payload:
-	// 1) 0xFF - kVersionTag
-	// 2) 0x11 - kRequiresProcessingSSVPseudoVersion
-	// 3) 0x01 or 0x02 - the wrap type -- kReplaceWithBlob or kCompressedWithSnappy
-	if len(payload) >= 4+bytesRead &&
-		payload[bytesRead] == tokenVersion &&
-		payload[bytesRead+1] == tokenRequiresProcessingSSVPseudoVersion {
+	for {
+		// Wrapped values are determined by the presence of the following sequence in the header payload:
+		// 1) 0xFF - kVersionTag
+		// 2) 0x11 - kRequiresProcessingSSVPseudoVersion
+		// 3) 0x01 or 0x02 - the wrap type -- kReplaceWithBlob or kCompressedWithSnappy
+		if len(body) < 4 ||
+			body[0] != tokenVersion ||
+			body[1] != tokenRequiresProcessingSSVPseudoVersion {
+			break
+		}
 		var unwrapped []byte
 		var err error
 
-		switch payload[bytesRead+2] {
-		case tokenCompressedWithSnappy:
-			unwrapped, err = snappyDecompress(payload[bytesRead+3:])
-		case tokenReplaceWithBlob:
-			unwrapped, err = replaceWithBlob(payload[bytesRead+3:], blobFilepathList)
-		default:
-			return payload, nil
+		if body[2] == tokenCompressedWithSnappy {
+			unwrapped, err = snappyDecompress(body[3:])
+		} else if body[2] == tokenReplaceWithBlob {
+			unwrapped, err = replaceWithBlob(body[3:], blobFilepathList)
+		} else {
+			break
 		}
+
 		if err != nil {
 			return nil, fmt.Errorf("unwrapping value: %w", err)
 		}
-		return append(header, unwrapped...), nil
+		body = unwrapped
 	}
 
-	return payload, nil
+	return append(header, body...), nil
 }
 
 func snappyDecompress(payload []byte) ([]byte, error) {
