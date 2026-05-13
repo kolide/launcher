@@ -115,7 +115,7 @@ func (mw logmw) PublishLogs(ctx context.Context, nodeKey string, logType logger.
 		mw.knapsack.Slogger().Log(ctx, levelForError(err), message, // nolint:sloglint // it's fine to not have a constant or literal here
 			"method", "PublishLogs",
 			"uuid", uuid,
-			"logType", logType,
+			"log_type", logType,
 			"log_count", len(logs),
 			"errcode", errcode,
 			"reauth", reauth,
