@@ -45,7 +45,7 @@ func pacmanParse(reader io.Reader) (any, error) {
 		}
 
 		var key = strings.ToLower(strings.TrimSpace(kv[0]))
-		if slices.Contains(allowedKeys, key) {
+		if slices.Contains(allowedKeys, key) { //nolint:govet // fine not to inline this
 			row[key] = strings.TrimSpace(kv[1])
 		}
 	}
