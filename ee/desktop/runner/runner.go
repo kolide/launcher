@@ -41,7 +41,6 @@ import (
 	"github.com/shirou/gopsutil/v4/process"
 	"go.uber.org/atomic"
 	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 )
 
 const nonWindowsDesktopSocketPrefix = "desktop.sock"
@@ -432,7 +431,7 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses(ctx context.Context) 
 			)
 		}
 
-		maps.Clear(r.uidProcs)
+		maps.Clear(r.uidProcs) //nolint:govet // fine not to inline this
 		return
 	case <-time.After(r.interruptTimeout):
 		r.slogger.Log(ctx, slog.LevelInfo,
@@ -585,17 +584,17 @@ func (r *DesktopUsersProcessesRunner) FlagsChanged(ctx context.Context, flagKeys
 	defer span.End()
 
 	// Handle KolideServerURL changes -- update the hostname displayed in the debug menu
-	if slices.Contains(flagKeys, keys.KolideServerURL) {
+	if keys.Contains(flagKeys, keys.KolideServerURL) {
 		r.refreshMenu()
 	}
 
 	// Handle DesktopUpdateInterval changes
-	if slices.Contains(flagKeys, keys.DesktopUpdateInterval) {
+	if keys.Contains(flagKeys, keys.DesktopUpdateInterval) {
 		r.updateIntervalChanged(ctx, r.knapsack.DesktopUpdateInterval())
 	}
 
 	// Handle DesktopGoMaxProcs changes
-	if slices.Contains(flagKeys, keys.DesktopGoMaxProcs) {
+	if keys.Contains(flagKeys, keys.DesktopGoMaxProcs) {
 		r.slogger.Log(ctx, slog.LevelInfo,
 			"desktop go max procs changed by control server, restarting desktop processes",
 			"new_value", r.knapsack.DesktopGoMaxProcs(),
@@ -607,7 +606,7 @@ func (r *DesktopUsersProcessesRunner) FlagsChanged(ctx context.Context, flagKeys
 	}
 
 	// Handle DesktopEnabled changes
-	if !slices.Contains(flagKeys, keys.DesktopEnabled) {
+	if !keys.Contains(flagKeys, keys.DesktopEnabled) {
 		return
 	}
 

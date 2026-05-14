@@ -102,3 +102,12 @@ func Intersection(a, b []FlagKey) []FlagKey {
 
 	return result
 }
+
+func Contains(flagKeys []FlagKey, key FlagKey) bool {
+	for _, k := range flagKeys {
+		if k == key {
+			return true
+		}
+	}
+	return false
+}

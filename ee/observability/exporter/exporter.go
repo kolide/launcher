@@ -25,7 +25,6 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
-	"golang.org/x/exp/slices"
 	"google.golang.org/grpc"
 )
 
@@ -434,7 +433,7 @@ func (t *TelemetryExporter) FlagsChanged(ctx context.Context, flagKeys ...keys.F
 	needsNewProvider := false
 
 	// Handle export_traces toggle
-	if slices.Contains(flagKeys, keys.ExportTraces) {
+	if keys.Contains(flagKeys, keys.ExportTraces) {
 		if !t.enabled && t.knapsack.ExportTraces() {
 			// Newly enabled
 			// Get any attributes we may not have stored yet
@@ -471,7 +470,7 @@ func (t *TelemetryExporter) FlagsChanged(ctx context.Context, flagKeys ...keys.F
 	}
 
 	// Handle trace_sampling_rate updates
-	if slices.Contains(flagKeys, keys.TraceSamplingRate) {
+	if keys.Contains(flagKeys, keys.TraceSamplingRate) {
 		if t.traceSamplingRate != t.knapsack.TraceSamplingRate() {
 			t.traceSamplingRate = t.knapsack.TraceSamplingRate()
 			needsNewProvider = true
@@ -483,7 +482,7 @@ func (t *TelemetryExporter) FlagsChanged(ctx context.Context, flagKeys ...keys.F
 	}
 
 	// Handle ingest_url updates
-	if slices.Contains(flagKeys, keys.TraceIngestServerURL) {
+	if keys.Contains(flagKeys, keys.TraceIngestServerURL) {
 		if t.ingestUrl != t.knapsack.TraceIngestServerURL() {
 			t.ingestUrl = t.knapsack.TraceIngestServerURL()
 			needsNewProvider = true
@@ -495,7 +494,7 @@ func (t *TelemetryExporter) FlagsChanged(ctx context.Context, flagKeys ...keys.F
 	}
 
 	// Handle disable_trace_ingest_tls updates
-	if slices.Contains(flagKeys, keys.DisableTraceIngestTLS) {
+	if keys.Contains(flagKeys, keys.DisableTraceIngestTLS) {
 		if t.disableIngestTLS != t.knapsack.DisableTraceIngestTLS() {
 			t.ingestClientAuthenticator.setDisableTLS(t.knapsack.DisableTraceIngestTLS())
 			t.disableIngestTLS = t.knapsack.DisableTraceIngestTLS()
@@ -508,7 +507,7 @@ func (t *TelemetryExporter) FlagsChanged(ctx context.Context, flagKeys ...keys.F
 	}
 
 	// Handle trace_batch_timeout updates
-	if slices.Contains(flagKeys, keys.TraceBatchTimeout) {
+	if keys.Contains(flagKeys, keys.TraceBatchTimeout) {
 		if t.batchTimeout != t.knapsack.TraceBatchTimeout() {
 			t.batchTimeout = t.knapsack.TraceBatchTimeout()
 			needsNewProvider = true
@@ -520,7 +519,7 @@ func (t *TelemetryExporter) FlagsChanged(ctx context.Context, flagKeys ...keys.F
 	}
 
 	// If keys.LauncherGoMaxProcs changes, we want to update our relevant attr.
-	if slices.Contains(flagKeys, keys.LauncherGoMaxProcs) {
+	if keys.Contains(flagKeys, keys.LauncherGoMaxProcs) {
 		if t.gomaxprocsAttrValue.Load() != int64(t.knapsack.LauncherGoMaxProcs()) {
 			// Sleep just a couple seconds to give the gomaxprocsObserver a chance to actually update the runtime value.
 			time.Sleep(2 * time.Second)
