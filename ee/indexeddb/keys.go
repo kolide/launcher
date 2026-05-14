@@ -1,12 +1,14 @@
 package indexeddb
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"path/filepath"
 	"strings"
 
 	"golang.org/x/text/encoding/unicode"
+	"golang.org/x/text/transform"
 )
 
 const (
@@ -83,6 +85,8 @@ func objectDataKeyPrefix(dbId uint64, objectStoreId uint64) []byte {
 	return append(keyPrefix, objectStoreDataIndexId)
 }
 
+// blobKeyPrefix returns the key prefix for all ExternalObjects (blobs, files, and file system access handles)
+// for the given database and object store.
 func blobKeyPrefix(dbId uint64, objectStoreId uint64) []byte {
 	keyPrefix := []byte{0x00}
 	keyPrefix = append(keyPrefix, uvarintToBytes(dbId)...)
@@ -94,6 +98,38 @@ func blobKeyPrefix(dbId uint64, objectStoreId uint64) []byte {
 func decodeUtf16BigEndianBytes(b []byte) ([]byte, error) {
 	utf16BigEndianDecoder := unicode.UTF16(unicode.BigEndian, unicode.IgnoreBOM).NewDecoder()
 	return utf16BigEndianDecoder.Bytes(b)
+}
+
+// readStringWithLength reads the upcoming StringWithLength from the byte reader.
+// It takes the following format:
+// VarInt prefix with length in code units (i.e. bytes/2), followed by String (UTF-16 BE)
+func readStringWithLength(valueReader *bytes.Reader) (string, error) {
+	stringLengthInCodeUnits, err := binary.ReadUvarint(valueReader)
+	if err != nil {
+		return "", fmt.Errorf("reading string length: %w", err)
+	}
+
+	stringLength := stringLengthInCodeUnits * 2
+	if stringLength > uint64(valueReader.Len()) {
+		return "", fmt.Errorf("cannot read StringWithLength: length %d but only %d bytes remaining to read", stringLength, valueReader.Len())
+	}
+
+	rawString := make([]byte, stringLength)
+	for i := 0; i < int(stringLength); i++ {
+		nextByte, err := valueReader.ReadByte()
+		if err != nil {
+			return "", fmt.Errorf("reading byte at index %d in string of length %d: %w", i, stringLength, err)
+		}
+		rawString[i] = nextByte
+	}
+
+	// Strings are UTF-16 BE
+	decoded, _, err := transform.Bytes(unicode.UTF16(unicode.BigEndian, unicode.IgnoreBOM).NewDecoder(), rawString)
+	if err != nil {
+		return "", fmt.Errorf("reading string as utf-16: %w", err)
+	}
+
+	return string(decoded), nil
 }
 
 // stringWithLength constructs an appropriate representation of `s`.
