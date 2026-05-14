@@ -314,20 +314,15 @@ func handleWrappedValues(payload []byte, blobFilepathList []string) ([]byte, err
 	header := payload[:bytesRead]
 	body := payload[bytesRead:]
 
-	for {
-		// Wrapped values are determined by the presence of the following sequence in the header payload:
-		// 1) 0xFF - kVersionTag
-		// 2) 0x11 - kRequiresProcessingSSVPseudoVersion
-		// 3) 0x01 or 0x02 - the wrap type -- kReplaceWithBlob or kCompressedWithSnappy
-		if len(body) < 4 ||
-			body[0] != tokenVersion ||
-			body[1] != tokenRequiresProcessingSSVPseudoVersion {
-			break
-		}
+	// Wrapped values are determined by the presence of the following sequence in the header payload:
+	// 1) 0xFF - kVersionTag
+	// 2) 0x11 - kRequiresProcessingSSVPseudoVersion
+	// 3) 0x01 or 0x02 - the wrap type -- kReplaceWithBlob or kCompressedWithSnappy
+	for len(body) >= 4 && body[0] == tokenVersion && body[1] == tokenRequiresProcessingSSVPseudoVersion {
 		var unwrapped []byte
 		var err error
 
-		if body[2] == tokenCompressedWithSnappy {
+		if body[2] == tokenCompressedWithSnappy { //nolint:staticcheck // Do not want to use a switch, so that we can break effectively
 			unwrapped, err = snappyDecompress(body[3:])
 		} else if body[2] == tokenReplaceWithBlob {
 			unwrapped, err = replaceWithBlob(body[3:], blobFilepathList)
