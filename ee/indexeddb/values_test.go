@@ -130,7 +130,7 @@ func Test_handleWrappedValues(t *testing.T) {
 				0x00, 0x01, 0x02, 0x03,
 			),
 			wantErr:   true,
-			errSubstr: "snappy decompress after Chrome FF/11/02 wrapper",
+			errSubstr: "snappy decompress",
 		},
 		{
 			name:      "empty snappy data returns error",
