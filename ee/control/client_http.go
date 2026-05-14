@@ -23,7 +23,6 @@ import (
 	"github.com/kolide/launcher/v2/ee/agent/types"
 	"github.com/kolide/launcher/v2/ee/observability"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
-	"golang.org/x/exp/slices"
 )
 
 // HTTPClient handles retrieving control data via HTTP
@@ -294,7 +293,7 @@ func (c *HTTPClient) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey)
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
-	if !slices.Contains(flagKeys, keys.ControlServerURL) {
+	if !keys.Contains(flagKeys, keys.ControlServerURL) {
 		return
 	}
 

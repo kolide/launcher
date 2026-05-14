@@ -99,7 +99,7 @@ func (t *xfconfTable) getDefaultConfig() (map[string]map[string]interface{}, err
 		if err != nil {
 			return nil, fmt.Errorf("error getting config from default directory %s: %w", dir, err)
 		}
-		maps.Copy(results, defaultConfig)
+		maps.Copy(results, defaultConfig) //nolint:govet // fine not to inline this
 	}
 
 	return results, nil
