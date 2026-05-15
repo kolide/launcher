@@ -2,6 +2,7 @@
     const databaseName = "launchertestdb";
     const objectStoreName = "launchertestobjstore";
     const mixedKeysObjectStoreName = "launchertestobjstore-mixedkeys";
+    const blobObjectStoreName = "launchertestobjstore-blob";
     const objectStoreKeyPath = "uuid";
     const databaseVersion = 1;
 
@@ -301,5 +302,43 @@
     secondRequest.onsuccess = (event) => {
         event.target.result.close();
         console.log("Successfully created database with second object store");
+    };
+
+    // Incrementing the db version again to force a new object store creation (same as above)
+    const thirdRequest = window.indexedDB.open(databaseName, databaseVersion + 2);
+    thirdRequest.onupgradeneeded = (event) => {
+        const db3 = event.target.result;
+        const blobObjectStore = db3.createObjectStore(blobObjectStoreName, { keyPath: objectStoreKeyPath });
+
+        blobObjectStore.transaction.oncomplete = (event) => {
+            const blobTransaction = db3
+                .transaction(blobObjectStoreName, "readwrite")
+                .objectStore(blobObjectStoreName);
+
+            // We are trying to exceed kIDBWrapThreshold = 65536.
+            // 2000 UUIDs is adequate.
+            let bigArray = [];
+            for (let i = 0; i < 2000; i++) {
+                bigArray[i] = crypto.randomUUID();
+            }
+            blobTransaction.add({ uuid: bigArray });
+
+            blobTransaction.onsuccess = (event) => {
+                console.log("Added all blob data to IndexedDB");
+            };
+            blobTransaction.onerror = (event) => {
+                console.log("Error adding blob data to database", event.error);
+            };
+        };
+        blobObjectStore.transaction.onerror = (event) => {
+            console.log("Error creating blob object store", event.error);
+        };
+    };
+    thirdRequest.onerror = (event) => {
+        console.log("Error creating database with third object store", request.error);
+    };
+    thirdRequest.onsuccess = (event) => {
+        event.target.result.close();
+        console.log("Successfully created database with third object store");
     };
 })();

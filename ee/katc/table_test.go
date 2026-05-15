@@ -32,6 +32,9 @@ var basicFirefoxIndexeddb []byte
 //go:embed test_data/indexeddbs/file__0.indexeddb.leveldb.zip
 var basicChromeIndexeddb []byte
 
+//go:embed test_data/indexeddbs/file__0.indexeddb.blob.zip
+var chromeIndexeddbBlob []byte
+
 //go:embed test_data/indexeddbs/bytewise.leveldb.zip
 var bytewiseLeveldb []byte
 
@@ -506,6 +509,85 @@ func TestQueryChromeIndexedDB(t *testing.T) {
 				require.Contains(t, results[i], "errorWithCause", "expected errorWithCause column missing")
 			}
 		})
+	}
+}
+
+func TestQueryChromeIndexedDBBlob(t *testing.T) {
+	t.Parallel()
+
+	// Write zip bytes to file
+	tempDir := t.TempDir()
+	indexeddbZipFile := filepath.Join(tempDir, "file__0.indexeddb.leveldb.zip")
+	require.NoError(t, os.WriteFile(indexeddbZipFile, basicChromeIndexeddb, 0755), "writing indexeddb zip to temp dir")
+	blobZipFile := filepath.Join(tempDir, "file__0.indexeddb.blob.zip")
+	require.NoError(t, os.WriteFile(blobZipFile, chromeIndexeddbBlob, 0755), "writing indexeddb blob zip to temp dir")
+
+	// Prepare indexeddb dir
+	indexeddbDest := strings.TrimSuffix(indexeddbZipFile, ".zip")
+	require.NoError(t, os.MkdirAll(indexeddbDest, 0755), "creating indexeddb dir")
+
+	// Unzip to temp dir
+	indexeddbZipReader, err := zip.OpenReader(indexeddbZipFile)
+	require.NoError(t, err, "opening reader to zip file")
+	defer indexeddbZipReader.Close()
+	for _, fileInZip := range indexeddbZipReader.File {
+		unzipFile(t, fileInZip, tempDir)
+	}
+	blobZipReader, err := zip.OpenReader(blobZipFile)
+	require.NoError(t, err, "opening reader to blob zip file")
+	defer blobZipReader.Close()
+	for _, fileInZip := range blobZipReader.File {
+		unzipFile(t, fileInZip, tempDir)
+	}
+
+	// Construct table
+	sourceQuery := `launchertestdb.launchertestobjstore-blob`
+	cfg := katcTableConfig{
+		Columns: []string{"uuid"},
+		katcTableDefinition: katcTableDefinition{
+			SourceType: &katcSourceType{
+				name:     indexeddbLeveldbSourceType,
+				dataFunc: indexeddbLeveldbData,
+			},
+			SourcePaths: &[]string{filepath.Join("some", "incorrect", "path")},
+			SourceQuery: &sourceQuery,
+			RowTransformSteps: &[]rowTransformStep{
+				{
+					name:          deserializeChromeTransformStep,
+					transformFunc: indexeddb.DeserializeChrome,
+				},
+			},
+		},
+		Overlays: []katcTableConfigOverlay{
+			{
+				Filters: map[string]string{
+					"goos": runtime.GOOS,
+				},
+				katcTableDefinition: katcTableDefinition{
+					SourcePaths: &[]string{indexeddbDest},
+				},
+			},
+		},
+	}
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+	testTable, _ := newKatcTable("test_katc_table_blob", cfg, slogger)
+
+	// Make a query context restricting the source to our exact source sqlite database
+	queryContext := table.QueryContext{}
+
+	// At long last: run a query
+	results, err := testTable.generate(t.Context(), queryContext)
+	require.NoError(t, err, "expected no error on generate: logs:", logBytes.String())
+
+	require.Less(t, 0, len(results))
+	for _, result := range results {
+		require.Contains(t, result, pathColumnName, "missing source column")
+		require.Equal(t, indexeddbDest, result[pathColumnName])
+		require.Contains(t, result, "uuid", "expected uuid column missing")
+		require.Less(t, 0, len(result["uuid"]), "uuid column missing data")
 	}
 }
 
