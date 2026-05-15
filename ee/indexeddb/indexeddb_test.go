@@ -7,6 +7,65 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func Test_isWrapped(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name              string
+		payload           []byte
+		expectedIsWrapped bool
+	}{
+		{
+			name:              "nil",
+			payload:           nil,
+			expectedIsWrapped: false,
+		},
+		{
+			name:              "empty",
+			payload:           []byte{},
+			expectedIsWrapped: false,
+		},
+		{
+			name:              "too short header",
+			payload:           append(uvarintToBytes(100), tokenVersion, tokenRequiresProcessingSSVPseudoVersion),
+			expectedIsWrapped: false,
+		},
+		{
+			name:              "prefix only",
+			payload:           append(uvarintToBytes(200), tokenVersion, tokenRequiresProcessingSSVPseudoVersion, tokenCompressedWithSnappy),
+			expectedIsWrapped: false,
+		},
+		{
+			name:              "prefix does not match",
+			payload:           append(uvarintToBytes(300), 0xfe, tokenRequiresProcessingSSVPseudoVersion, tokenCompressedWithSnappy, 0x00),
+			expectedIsWrapped: false,
+		},
+		{
+			name:              "arbitrary payload does not match",
+			payload:           []byte{0x6f, 0x22, 0x02, 0x61, 0x62},
+			expectedIsWrapped: false,
+		},
+		{
+			name:              "valid snappy wrapper",
+			payload:           append(uvarintToBytes(400), tokenVersion, tokenRequiresProcessingSSVPseudoVersion, tokenCompressedWithSnappy, 0x00),
+			expectedIsWrapped: true,
+		},
+		{
+			name:              "valid blob wrapper",
+			payload:           append(uvarintToBytes(300), tokenVersion, tokenRequiresProcessingSSVPseudoVersion, tokenReplaceWithBlob, 0x00),
+			expectedIsWrapped: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			require.Equal(t, tt.expectedIsWrapped, isWrapped(tt.payload))
+		})
+	}
+}
+
 func Test_handleWrappedValues(t *testing.T) {
 	t.Parallel()
 

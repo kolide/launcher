@@ -127,7 +127,16 @@ func QueryIndexeddbObjectStore(ctx context.Context, slogger *slog.Logger, dbLoca
 		tmp := make([]byte, len(iter.Value()))
 		copy(tmp, iter.Value())
 
-		// Check for external object data associated with this key, in case this value is wrapped --
+		// Most values don't require further transformation -- if they are not wrapped,
+		// add them to our list and continue to the next key.
+		if !isWrapped(tmp) {
+			objs = append(objs, map[string][]byte{
+				"data": tmp,
+			})
+			continue
+		}
+
+		// Check for external object data associated with this key, since this value is wrapped --
 		// we want to unwrap it before any additional processing happens.
 		// We can find external object data for this value by taking the portion of the key after the key prefix,
 		// called the "user key", and concatenating it with the blob prefix. If there is external object data
@@ -139,6 +148,7 @@ func QueryIndexeddbObjectStore(ctx context.Context, slogger *slog.Logger, dbLoca
 		externalObjectsRaw, err := db.Get(blobKey, nil)
 		if err != nil {
 			// We expect ErrNotFound when there is no external object data associated with this key.
+			// This is expected when the value is snappy-compressed, but not stored in a blob file.
 			// If there is another error, it is unexpected and we will log it.
 			if !errors.Is(err, leveldberrors.ErrNotFound) {
 				slogger.Log(ctx, slog.LevelWarn,
@@ -158,7 +168,6 @@ func QueryIndexeddbObjectStore(ctx context.Context, slogger *slog.Logger, dbLoca
 			}
 		}
 
-		// handleWrappedValues returns row unmodified if it is not a wrapped value
 		if unwrapped, err := handleWrappedValues(tmp, externalObjectFilenames); err != nil {
 			slogger.Log(ctx, slog.LevelError,
 				"could not unwrap wrapped value -- skipping row",
@@ -277,6 +286,25 @@ func filepathForBlob(blobNumber uint64, databaseId uint64, blobRootDir string) s
 	blobFilename := fmt.Sprintf("%x", blobNumber)
 	blobFilepath := filepath.Join(blobRootDir, fmt.Sprintf("%x", databaseId), blobDir, blobFilename)
 	return blobFilepath
+}
+
+// isWrapped determines if the given value is wrapped. If the value is wrapped, it will start with
+// the standard indexeddb version, and then the following bytes:
+// 1) 0xFF - kVersionTag
+// 2) 0x11 - kRequiresProcessingSSVPseudoVersion
+// 3) 0x01 or 0x02 - the wrap type -- kReplaceWithBlob or kCompressedWithSnappy
+func isWrapped(payload []byte) bool {
+	// First, read the indexeddb version, which precedes the serialized value.
+	// See: https://github.com/chromium/chromium/blob/main/content/browser/indexed_db/docs/leveldb_coding_scheme.md#object-store-data
+	_, bytesRead := binary.Uvarint(payload)
+	if bytesRead <= 0 {
+		return false
+	}
+
+	body := payload[bytesRead:]
+
+	return len(body) >= 4 && body[0] == tokenVersion && body[1] == tokenRequiresProcessingSSVPseudoVersion &&
+		(body[2] == tokenCompressedWithSnappy || body[2] == tokenReplaceWithBlob)
 }
 
 // handleWrappedValues examines `payload` to see if it is a wrapped value --
