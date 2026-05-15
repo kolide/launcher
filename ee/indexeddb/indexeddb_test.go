@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_isWrapped(t *testing.T) {
+func Test_bodyIsWrapped(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -27,17 +27,17 @@ func Test_isWrapped(t *testing.T) {
 		},
 		{
 			name:              "too short header",
-			payload:           append(uvarintToBytes(100), tokenVersion, tokenRequiresProcessingSSVPseudoVersion),
+			payload:           []byte{tokenVersion, tokenRequiresProcessingSSVPseudoVersion},
 			expectedIsWrapped: false,
 		},
 		{
 			name:              "prefix only",
-			payload:           append(uvarintToBytes(200), tokenVersion, tokenRequiresProcessingSSVPseudoVersion, tokenCompressedWithSnappy),
+			payload:           []byte{tokenVersion, tokenRequiresProcessingSSVPseudoVersion, tokenCompressedWithSnappy},
 			expectedIsWrapped: false,
 		},
 		{
 			name:              "prefix does not match",
-			payload:           append(uvarintToBytes(300), 0xfe, tokenRequiresProcessingSSVPseudoVersion, tokenCompressedWithSnappy, 0x00),
+			payload:           []byte{0xfe, tokenRequiresProcessingSSVPseudoVersion, tokenCompressedWithSnappy, 0x00},
 			expectedIsWrapped: false,
 		},
 		{
@@ -47,12 +47,12 @@ func Test_isWrapped(t *testing.T) {
 		},
 		{
 			name:              "valid snappy wrapper",
-			payload:           append(uvarintToBytes(400), tokenVersion, tokenRequiresProcessingSSVPseudoVersion, tokenCompressedWithSnappy, 0x00),
+			payload:           []byte{tokenVersion, tokenRequiresProcessingSSVPseudoVersion, tokenCompressedWithSnappy, 0x00},
 			expectedIsWrapped: true,
 		},
 		{
 			name:              "valid blob wrapper",
-			payload:           append(uvarintToBytes(300), tokenVersion, tokenRequiresProcessingSSVPseudoVersion, tokenReplaceWithBlob, 0x00),
+			payload:           []byte{tokenVersion, tokenRequiresProcessingSSVPseudoVersion, tokenReplaceWithBlob, 0x00},
 			expectedIsWrapped: true,
 		},
 	}
@@ -61,7 +61,7 @@ func Test_isWrapped(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			require.Equal(t, tt.expectedIsWrapped, isWrapped(tt.payload))
+			require.Equal(t, tt.expectedIsWrapped, bodyIsWrapped(tt.payload))
 		})
 	}
 }
@@ -99,18 +99,18 @@ func Test_handleWrappedValues(t *testing.T) {
 		},
 		{
 			name:    "too short header returns unchanged",
-			payload: append(uvarintToBytes(100), tokenVersion, tokenRequiresProcessingSSVPseudoVersion),
-			want:    append(uvarintToBytes(100), tokenVersion, tokenRequiresProcessingSSVPseudoVersion),
+			payload: []byte{tokenVersion, tokenRequiresProcessingSSVPseudoVersion},
+			want:    []byte{tokenVersion, tokenRequiresProcessingSSVPseudoVersion},
 		},
 		{
 			name:    "prefix only does not attempt decompression",
-			payload: append(uvarintToBytes(200), tokenVersion, tokenRequiresProcessingSSVPseudoVersion, tokenCompressedWithSnappy),
-			want:    append(uvarintToBytes(200), tokenVersion, tokenRequiresProcessingSSVPseudoVersion, tokenCompressedWithSnappy),
+			payload: []byte{tokenVersion, tokenRequiresProcessingSSVPseudoVersion, tokenCompressedWithSnappy},
+			want:    []byte{tokenVersion, tokenRequiresProcessingSSVPseudoVersion, tokenCompressedWithSnappy},
 		},
 		{
 			name:    "unchanged without all token prefix bytes matching",
-			payload: append(uvarintToBytes(300), 0xfe, tokenRequiresProcessingSSVPseudoVersion, tokenCompressedWithSnappy, 0x00),
-			want:    append(uvarintToBytes(300), 0xfe, tokenRequiresProcessingSSVPseudoVersion, tokenCompressedWithSnappy, 0x00),
+			payload: []byte{0xfe, tokenRequiresProcessingSSVPseudoVersion, tokenCompressedWithSnappy, 0x00},
+			want:    []byte{0xfe, tokenRequiresProcessingSSVPseudoVersion, tokenCompressedWithSnappy, 0x00},
 		},
 		{
 			name:    "arbitrary payload without magic prefix returns unchanged",
@@ -119,23 +119,20 @@ func Test_handleWrappedValues(t *testing.T) {
 		},
 		{
 			name:    "valid snappy wrapper decompresses payload correctly",
-			payload: append(uvarintToBytes(400), validWrappedWithoutIndexeddbVersion...),
-			want: append(
-				uvarintToBytes(400),
-				decompressedInner...,
-			),
+			payload: validWrappedWithoutIndexeddbVersion,
+			want:    decompressedInner,
 		},
 		{
 			name: "invalid snappy compression returns error",
-			payload: append(uvarintToBytes(500), tokenVersion, tokenRequiresProcessingSSVPseudoVersion, tokenCompressedWithSnappy,
+			payload: []byte{tokenVersion, tokenRequiresProcessingSSVPseudoVersion, tokenCompressedWithSnappy,
 				0x00, 0x01, 0x02, 0x03,
-			),
+			},
 			wantErr:   true,
 			errSubstr: "snappy decompress",
 		},
 		{
 			name:      "empty snappy data returns error",
-			payload:   append(uvarintToBytes(600), emptyWrappedWithoutIndexeddbVersion...),
+			payload:   emptyWrappedWithoutIndexeddbVersion,
 			wantErr:   true,
 			errSubstr: "snappy decompression yielded empty data set",
 		},

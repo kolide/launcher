@@ -127,9 +127,13 @@ func QueryIndexeddbObjectStore(ctx context.Context, slogger *slog.Logger, dbLoca
 		tmp := make([]byte, len(iter.Value()))
 		copy(tmp, iter.Value())
 
+		// Check to see if this value is wrapped. First, separate out the header --
+		// the markers for wrapped data occur after the indexeddb version.
+		header, body := splitOnIndexeddbVersion(tmp)
+
 		// Most values don't require further transformation -- if they are not wrapped,
-		// add them to our list and continue to the next key.
-		if !isWrapped(tmp) {
+		// add them to our list as they are, and continue to the next key.
+		if !bodyIsWrapped(body) {
 			objs = append(objs, map[string][]byte{
 				"data": tmp,
 			})
@@ -168,14 +172,16 @@ func QueryIndexeddbObjectStore(ctx context.Context, slogger *slog.Logger, dbLoca
 			}
 		}
 
-		if unwrapped, err := handleWrappedValues(tmp, externalObjectFilenames); err != nil {
+		// Unwrap the value.
+		if unwrapped, err := handleWrappedValues(body, externalObjectFilenames); err != nil {
 			slogger.Log(ctx, slog.LevelError,
 				"could not unwrap wrapped value -- skipping row",
 				"err", err,
 			)
 		} else {
+			// Unwrapping was successful -- add back the header and add it to our list.
 			objs = append(objs, map[string][]byte{
-				"data": unwrapped,
+				"data": append(header, unwrapped...),
 			})
 		}
 	}
@@ -288,21 +294,28 @@ func filepathForBlob(blobNumber uint64, databaseId uint64, blobRootDir string) s
 	return blobFilepath
 }
 
-// isWrapped determines if the given value is wrapped. If the value is wrapped, it will start with
-// the standard indexeddb version, and then the following bytes:
+// splitOnIndexeddbVersion splits the given indexeddb value after the indexeddb version.
+func splitOnIndexeddbVersion(value []byte) ([]byte, []byte) {
+	// The indexeddb version precedes the serialized value.
+	// See: https://github.com/chromium/chromium/blob/main/content/browser/indexed_db/docs/leveldb_coding_scheme.md#object-store-data
+	_, bytesRead := binary.Uvarint(value)
+	if bytesRead <= 0 {
+		return nil, value
+	}
+
+	header := value[:bytesRead]
+	body := value[bytesRead:]
+
+	return header, body
+}
+
+// isWrapped determines if the given body is wrapped, where the body is an indexeddb value
+// with the indexeddb version header already removed. If it is wrapped, the serialized value
+// will start with the following data:
 // 1) 0xFF - kVersionTag
 // 2) 0x11 - kRequiresProcessingSSVPseudoVersion
 // 3) 0x01 or 0x02 - the wrap type -- kReplaceWithBlob or kCompressedWithSnappy
-func isWrapped(payload []byte) bool {
-	// First, read the indexeddb version, which precedes the serialized value.
-	// See: https://github.com/chromium/chromium/blob/main/content/browser/indexed_db/docs/leveldb_coding_scheme.md#object-store-data
-	_, bytesRead := binary.Uvarint(payload)
-	if bytesRead <= 0 {
-		return false
-	}
-
-	body := payload[bytesRead:]
-
+func bodyIsWrapped(body []byte) bool {
 	return len(body) >= 4 && body[0] == tokenVersion && body[1] == tokenRequiresProcessingSSVPseudoVersion &&
 		(body[2] == tokenCompressedWithSnappy || body[2] == tokenReplaceWithBlob)
 }
@@ -313,19 +326,7 @@ func isWrapped(payload []byte) bool {
 // a blob that contains snappy-compressed data. (Probably not vice versa.)
 // IndexedDB wraps large values like this in order to store them more efficiently,
 // because LevelDB is not very efficient at storing large values.
-func handleWrappedValues(payload []byte, blobFilepathList []string) ([]byte, error) {
-	// First, read the indexeddb version, which precedes the serialized value.
-	// See: https://github.com/chromium/chromium/blob/main/content/browser/indexed_db/docs/leveldb_coding_scheme.md#object-store-data
-	_, bytesRead := binary.Uvarint(payload)
-	if bytesRead <= 0 {
-		return payload, nil
-	}
-	// Save the bytes we read for the indexeddb version, so that we can tack them back on after unwrapping.
-	header := payload[:bytesRead]
-
-	// Process the remainder of the payload.
-	body := payload[bytesRead:]
-
+func handleWrappedValues(body []byte, blobFilepathList []string) ([]byte, error) {
 	// Wrapped values are determined by the presence of the following sequence in the header payload:
 	// 1) 0xFF - kVersionTag
 	// 2) 0x11 - kRequiresProcessingSSVPseudoVersion
@@ -349,8 +350,8 @@ func handleWrappedValues(payload []byte, blobFilepathList []string) ([]byte, err
 		body = unwrapped
 	}
 
-	// Return the header and the unwrapped body.
-	return append(header, body...), nil
+	// Return the unwrapped body
+	return body, nil
 }
 
 // snappyDecompress decompresses the given payload.
