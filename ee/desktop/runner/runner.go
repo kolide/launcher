@@ -36,10 +36,10 @@ import (
 	"github.com/kolide/launcher/v2/ee/observability"
 	"github.com/kolide/launcher/v2/ee/presencedetection"
 	"github.com/kolide/launcher/v2/ee/ui/assets"
+	"github.com/kolide/launcher/v2/pkg/atomic"
 	"github.com/kolide/launcher/v2/pkg/backoff"
 	"github.com/kolide/launcher/v2/pkg/rungroup"
 	"github.com/shirou/gopsutil/v4/process"
-	"go.uber.org/atomic"
 	"golang.org/x/exp/maps"
 )
 
