@@ -1,26 +1,14 @@
 // Package atomic provides convenience wrappers around the standard
-// library's sync/atomic primitives for the types launcher uses most
-// frequently: bool, time.Duration, and string.
+// library's sync/atomic primitives for the types it doesn't cover
+// directly: time.Duration and string.
+//
+// For atomic booleans, use sync/atomic.Bool from the standard library.
 package atomic
 
 import (
 	"sync/atomic"
 	"time"
 )
-
-// Bool is an atomic boolean.
-type Bool struct {
-	v atomic.Bool
-}
-
-// Load atomically loads and returns the value.
-func (b *Bool) Load() bool { return b.v.Load() }
-
-// Store atomically stores val.
-func (b *Bool) Store(val bool) { b.v.Store(val) }
-
-// Swap atomically stores new and returns the previous value.
-func (b *Bool) Swap(val bool) bool { return b.v.Swap(val) }
 
 // Duration is an atomic time.Duration.
 type Duration struct {

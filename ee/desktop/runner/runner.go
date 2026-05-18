@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	syncatomic "sync/atomic"
 	"time"
 
 	"github.com/kolide/kit/ulid"
@@ -122,7 +123,7 @@ type DesktopUsersProcessesRunner struct {
 	// menuRefreshInterval is the interval on which the desktop menu will be refreshed
 	menuRefreshInterval time.Duration
 	interrupt           chan struct{}
-	interrupted         atomic.Bool
+	interrupted         syncatomic.Bool
 	// uidProcs is a map of uid to desktop process
 	uidProcs     map[string]processRecord
 	uidProcsLock *sync.Mutex

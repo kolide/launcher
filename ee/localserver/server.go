@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	syncatomic "sync/atomic"
 	"time"
 
 	"github.com/kolide/krypto/pkg/echelper"
@@ -52,7 +53,7 @@ type localServer struct {
 	querier                Querier
 	kolideServer           string
 	cancel                 context.CancelFunc
-	interrupted            *atomic.Bool
+	interrupted            *syncatomic.Bool
 
 	myLocalDbSigner crypto.Signer
 	serverEcKey     *ecdsa.PublicKey
@@ -82,7 +83,7 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 		dt4aLimiter:     rate.NewLimiter(defaultRateLimit, defaultRateBurst),
 		kolideServer:    k.KolideServerURL(),
 		myLocalDbSigner: agent.LocalDbKeys(),
-		interrupted:     &atomic.Bool{},
+		interrupted:     &syncatomic.Bool{},
 	}
 
 	// TODO: As there may be things that adjust the keys during runtime, we need to persist that across

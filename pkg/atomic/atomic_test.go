@@ -7,22 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBool(t *testing.T) {
-	t.Parallel()
-
-	var b Bool
-	require.False(t, b.Load(), "zero value should be false")
-
-	b.Store(true)
-	require.True(t, b.Load())
-
-	require.True(t, b.Swap(false), "Swap should return previous value")
-	require.False(t, b.Load())
-
-	require.False(t, b.Swap(true))
-	require.True(t, b.Load())
-}
-
 func TestDuration(t *testing.T) {
 	t.Parallel()
 
