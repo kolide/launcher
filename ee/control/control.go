@@ -14,7 +14,7 @@ import (
 	"github.com/kolide/launcher/v2/ee/agent/flags/keys"
 	"github.com/kolide/launcher/v2/ee/agent/types"
 	"github.com/kolide/launcher/v2/ee/observability"
-	"go.uber.org/atomic"
+	"github.com/kolide/launcher/v2/pkg/atomic"
 )
 
 const ForceFullControlDataFetchAction = "force_full_control_data_fetch"

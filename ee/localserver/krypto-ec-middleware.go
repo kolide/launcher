@@ -25,9 +25,9 @@ import (
 	"github.com/kolide/launcher/v2/ee/gowrapper"
 	"github.com/kolide/launcher/v2/ee/observability"
 	"github.com/kolide/launcher/v2/ee/presencedetection"
+	"github.com/kolide/launcher/v2/pkg/atomic"
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"go.opentelemetry.io/otel/attribute"
-	"go.uber.org/atomic"
 )
 
 const (
