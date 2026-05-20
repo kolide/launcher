@@ -591,6 +591,142 @@ func TestQueryChromeIndexedDBBlob(t *testing.T) {
 	}
 }
 
+func TestQueryChromeIndexedDBDataFlatten(t *testing.T) {
+	t.Parallel()
+
+	// Reuses the Chrome IndexedDB fixture from TestQueryChromeIndexedDB,
+	// but enables data_flatten so each post-deserialize row is expanded into
+	// dataflatten-style rows (fullkey/parent/key/value/query). Values produced by
+	// indexeddb.DeserializeChrome are JSON-encoded strings; the dataflatten path
+	// must recursively unmarshal them before flattening.
+
+	tempDir := t.TempDir()
+	zipFile := filepath.Join(tempDir, "file__0.indexeddb.leveldb.zip")
+	require.NoError(t, os.WriteFile(zipFile, basicChromeIndexeddb, 0755), "writing zip to temp dir")
+
+	indexeddbDest := strings.TrimSuffix(zipFile, ".zip")
+	require.NoError(t, os.MkdirAll(indexeddbDest, 0755), "creating indexeddb dir")
+
+	zipReader, err := zip.OpenReader(zipFile)
+	require.NoError(t, err, "opening reader to zip file")
+	defer zipReader.Close()
+	for _, fileInZip := range zipReader.File {
+		unzipFile(t, fileInZip, tempDir)
+	}
+
+	sourceQuery := "launchertestdb.launchertestobjstore"
+	dataFlatten := true
+	cfg := katcTableConfig{
+		// Columns are ignored when data_flatten is enabled.
+		Columns: []string{"data"},
+		katcTableDefinition: katcTableDefinition{
+			SourceType: &katcSourceType{
+				name:     indexeddbLeveldbSourceType,
+				dataFunc: indexeddbLeveldbData,
+			},
+			SourcePaths: &[]string{filepath.Join("some", "incorrect", "path")},
+			SourceQuery: &sourceQuery,
+			RowTransformSteps: &[]rowTransformStep{
+				{
+					name:          deserializeChromeTransformStep,
+					transformFunc: indexeddb.DeserializeChrome,
+				},
+			},
+			DataFlatten: &dataFlatten,
+		},
+		Overlays: []katcTableConfigOverlay{
+			{
+				Filters: map[string]string{"goos": runtime.GOOS},
+				katcTableDefinition: katcTableDefinition{
+					SourcePaths: &[]string{indexeddbDest},
+				},
+			},
+		},
+	}
+
+	testTable, columns := newKatcTable("test_katc_table_dataflatten", cfg, multislogger.NewNopLogger())
+
+	// Columns should be path + dataflattentable columns, not the user-supplied "data".
+	columnNames := make(map[string]struct{}, len(columns))
+	for _, c := range columns {
+		columnNames[c.Name] = struct{}{}
+	}
+	for _, expected := range []string{pathColumnName, "fullkey", "parent", "key", "value", "query"} {
+		require.Contains(t, columnNames, expected, "expected dataflatten column %q", expected)
+	}
+	require.NotContains(t, columnNames, "data", "configured column should be ignored when data_flatten is enabled")
+
+	queryContext := table.QueryContext{
+		Constraints: map[string]table.ConstraintList{
+			pathColumnName: {
+				Constraints: []table.Constraint{
+					{Operator: table.OperatorEquals, Expression: indexeddbDest},
+				},
+			},
+		},
+	}
+
+	results, err := testTable.generate(t.Context(), queryContext)
+	require.NoError(t, err)
+
+	// Flattening 2 rich rows should produce many more than 2 leaf rows.
+	require.Greater(t, len(results), 2, "expected dataflatten to expand rows")
+
+	sawUUID := false
+	sawNestedArrayIndex := false
+	for _, row := range results {
+		require.Equal(t, indexeddbDest, row[pathColumnName])
+		require.Contains(t, row, "fullkey")
+		require.Contains(t, row, "parent")
+		require.Contains(t, row, "key")
+		require.Contains(t, row, "value")
+		require.Contains(t, row, "query")
+		// With no query constraint supplied, default dataflatten query "*"
+		// should be reflected in every row.
+		require.Equal(t, "*", row["query"], "query column should default to *")
+
+		if row["fullkey"] == "uuid" {
+			sawUUID = true
+			require.NotEmpty(t, row["value"], "uuid leaf should carry the uuid value")
+		}
+		// Array values like "aliases" / "linkedIds" / "numArray" should expand into
+		// fullkeys with numeric path components (e.g. "aliases/0").
+		if strings.Contains(row["fullkey"], "/") {
+			parts := strings.Split(row["fullkey"], "/")
+			if _, err := strconv.Atoi(parts[len(parts)-1]); err == nil {
+				sawNestedArrayIndex = true
+			}
+		}
+	}
+	require.True(t, sawUUID, "expected to find a flattened row for the uuid column")
+	require.True(t, sawNestedArrayIndex, "expected at least one array element to flatten to a numeric leaf path")
+
+	// With a "query" constraint supplied, dataflatten should restrict results
+	// to matching paths and echo the query back in the "query" column. This
+	// matches the established secedit/jwt/airport pattern.
+	queryContextFiltered := table.QueryContext{
+		Constraints: map[string]table.ConstraintList{
+			pathColumnName: {
+				Constraints: []table.Constraint{
+					{Operator: table.OperatorEquals, Expression: indexeddbDest},
+				},
+			},
+			"query": {
+				Constraints: []table.Constraint{
+					{Operator: table.OperatorEquals, Expression: "uuid"},
+				},
+			},
+		},
+	}
+	filtered, err := testTable.generate(t.Context(), queryContextFiltered)
+	require.NoError(t, err)
+	require.NotEmpty(t, filtered, "expected at least one row when filtering query = uuid")
+	for _, row := range filtered {
+		require.Equal(t, "uuid", row["query"], "query column should echo the supplied constraint")
+		require.Equal(t, "uuid", row["fullkey"], "filtering should restrict results to uuid leaves")
+	}
+}
+
 func TestQueryChromeIndexedDBMixedKeyIteration(t *testing.T) {
 	t.Parallel()
 
