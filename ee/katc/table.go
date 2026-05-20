@@ -10,6 +10,8 @@ import (
 	"strings"
 
 	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/dataflattentable"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -24,33 +26,16 @@ type katcTable struct {
 	sourceQuery       string
 	comparer          string
 	rowTransformSteps []rowTransformStep
+	dataFlatten       bool
 	columnLookup      map[string]struct{}
 	slogger           *slog.Logger
 }
 
 // newKatcTable returns a new table with the given `cfg`, as well as the osquery columns for that table.
 func newKatcTable(tableName string, cfg katcTableConfig, slogger *slog.Logger) (*katcTable, []table.ColumnDefinition) {
-	columns := []table.ColumnDefinition{
-		{
-			Name: pathColumnName,
-			Type: table.ColumnTypeText,
-		},
-	}
-	columnLookup := map[string]struct{}{
-		pathColumnName: {},
-	}
-	for i := 0; i < len(cfg.Columns); i += 1 {
-		columns = append(columns, table.ColumnDefinition{
-			Name: cfg.Columns[i],
-			Type: table.ColumnTypeText,
-		})
-		columnLookup[cfg.Columns[i]] = struct{}{}
-	}
-
 	k := katcTable{
-		tableName:    tableName,
-		columnLookup: columnLookup,
-		slogger:      slogger,
+		tableName: tableName,
+		slogger:   slogger,
 	}
 
 	if cfg.SourceType != nil {
@@ -69,6 +54,9 @@ func newKatcTable(tableName string, cfg katcTableConfig, slogger *slog.Logger) (
 	}
 	if cfg.RowTransformSteps != nil {
 		k.rowTransformSteps = *cfg.RowTransformSteps
+	}
+	if cfg.DataFlatten != nil {
+		k.dataFlatten = *cfg.DataFlatten
 	}
 
 	// Check overlays to see if any of the filters apply to us;
@@ -93,9 +81,35 @@ func newKatcTable(tableName string, cfg katcTableConfig, slogger *slog.Logger) (
 		if overlay.RowTransformSteps != nil {
 			k.rowTransformSteps = *overlay.RowTransformSteps
 		}
+		if overlay.DataFlatten != nil {
+			k.dataFlatten = *overlay.DataFlatten
+		}
 
 		break
 	}
+
+	// Build columns after overlay resolution: when dataFlatten is enabled the
+	// row shape is determined by the dataflatten package rather than the
+	// caller's configured columns.
+	columns := []table.ColumnDefinition{
+		{Name: pathColumnName, Type: table.ColumnTypeText},
+	}
+	columnLookup := map[string]struct{}{pathColumnName: {}}
+	if k.dataFlatten {
+		for _, c := range dataflattentable.Columns() {
+			columns = append(columns, c)
+			columnLookup[c.Name] = struct{}{}
+		}
+	} else {
+		for i := 0; i < len(cfg.Columns); i += 1 {
+			columns = append(columns, table.ColumnDefinition{
+				Name: cfg.Columns[i],
+				Type: table.ColumnTypeText,
+			})
+			columnLookup[cfg.Columns[i]] = struct{}{}
+		}
+	}
+	k.columnLookup = columnLookup
 
 	// Add extra fields to slogger
 	k.slogger = slogger.With(
@@ -131,6 +145,14 @@ func (k *katcTable) generate(ctx context.Context, queryContext table.QueryContex
 			"err", err,
 		)
 		return nil, fmt.Errorf("fetching data: %w", err)
+	}
+
+	// When data_flatten is enabled, honor the standard dataflatten "query"
+	// constraint so callers can filter to a path with WHERE query = 'a/b/*'.
+	// Defaults to "*" (match everything) when no constraint is supplied.
+	var dataQueries []string
+	if k.dataFlatten {
+		dataQueries = tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*"))
 	}
 
 	// Process data
@@ -169,8 +191,25 @@ func (k *katcTable) generate(ctx context.Context, queryContext table.QueryContex
 			}
 
 			// After transformations have been applied, we can cast the data from []byte
-			// to string to return to osquery.
+			// to string to return to osquery. When dataFlatten is enabled, each row
+			// is run through dataflatten and may expand into multiple output rows.
 			for _, dataRawRow := range rowBatch {
+				if k.dataFlatten {
+					for _, dataQuery := range dataQueries {
+						flatRows, err := flattenRow(k.slogger, dataRawRow, s.path, dataQuery)
+						if err != nil {
+							k.slogger.Log(ctx, slog.LevelWarn,
+								"flattening row",
+								"path", s.path,
+								"query", dataQuery,
+								"err", err,
+							)
+							continue
+						}
+						transformedResults = append(transformedResults, flatRows...)
+					}
+					continue
+				}
 				rowData := map[string]string{
 					pathColumnName: s.path,
 				}

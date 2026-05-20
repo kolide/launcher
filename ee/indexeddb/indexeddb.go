@@ -447,7 +447,7 @@ func CopyLeveldb(ctx context.Context, sourceDb string) (string, error) {
 			return fmt.Errorf("error walking blob directory: %w", err)
 		}
 
-		dest := filepath.Join(dbCopyLocation, strings.TrimPrefix(path, blobDir))
+		dest := filepath.Join(dbCopyLocation, strings.TrimPrefix(strings.TrimPrefix(path, blobDir), string(filepath.Separator)))
 		if d.IsDir() {
 			if err := os.MkdirAll(dest, 0755); err != nil {
 				return fmt.Errorf("making directory %s: %w", dest, err)

@@ -243,6 +243,21 @@ func TestConstructKATCTables(t *testing.T) {
 			expectedPluginCount: 1,
 		},
 		{
+			testCaseName: "with data_flatten enabled",
+			katcConfig: map[string]string{
+				"kolide_dataflatten_test": `{
+					"source_type": "indexeddb_leveldb",
+					"columns": ["data"],
+					"source_paths": ["/some/path/to/db.indexeddb.leveldb"],
+					"source_query": "db.store",
+					"row_transform_steps": ["deserialize_chrome"],
+					"data_flatten": true,
+					"overlays": []
+				}`,
+			},
+			expectedPluginCount: 1,
+		},
+		{
 			testCaseName: "invalid comparer option",
 			katcConfig: map[string]string{
 				"kolide_leveldb_test": `{
