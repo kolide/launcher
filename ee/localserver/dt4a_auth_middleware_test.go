@@ -371,7 +371,7 @@ func Test_originIsAllowlisted(t *testing.T) {
 		},
 	}
 
-	for allowlistedOrigin := range allowlistedDt4aOriginsLookup {
+	for allowlistedOrigin := range AllowlistedDt4aOriginsLookup {
 		testCases = append(testCases, testCase{
 			testCaseName:      allowlistedOrigin,
 			requestOrigin:     allowlistedOrigin,

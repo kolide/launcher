@@ -186,7 +186,7 @@ func Test_requestDt4aInfoHandlerWithDt4aIdsNoData(t *testing.T) {
 func acceptableOrigin(t *testing.T) string {
 	// Just grab the first origin available in our allowlist
 	acceptableOrigin := ""
-	for k := range allowlistedDt4aOriginsLookup {
+	for k := range AllowlistedDt4aOriginsLookup {
 		acceptableOrigin = k
 		break
 	}

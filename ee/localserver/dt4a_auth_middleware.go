@@ -24,8 +24,8 @@ const (
 )
 
 var (
-	// allowlistedDt4aOriginsLookup contains the complete list of origins that are permitted to access the /dt4a endpoint.
-	allowlistedDt4aOriginsLookup = map[string]struct{}{
+	// AllowlistedDt4aOriginsLookup contains the complete list of origins that are permitted to access the /dt4a endpoint.
+	AllowlistedDt4aOriginsLookup = map[string]struct{}{
 		// Release extension
 		"chrome-extension://gejiddohjgogedgjnonbofjigllpkmbf":  {},
 		"chrome-extension://khgocmkkpikpnmmkgmdnfckapcdkgfaf":  {},
@@ -72,7 +72,7 @@ func originIsAllowlisted(requestOrigin string) bool {
 	}
 
 	// Allow origins in the allowlist
-	if _, ok := allowlistedDt4aOriginsLookup[requestOrigin]; ok {
+	if _, ok := AllowlistedDt4aOriginsLookup[requestOrigin]; ok {
 		return true
 	}
 
