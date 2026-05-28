@@ -19,6 +19,7 @@ import (
 	"github.com/kolide/launcher/v2/ee/agent"
 	"github.com/kolide/launcher/v2/ee/control/consumers/remoterestartconsumer"
 	"github.com/kolide/launcher/v2/ee/disclaim"
+	"github.com/kolide/launcher/v2/ee/localserver"
 	"github.com/kolide/launcher/v2/ee/tuf"
 	"github.com/kolide/launcher/v2/ee/watchdog"
 	"github.com/kolide/launcher/v2/pkg/contexts/ctxlog"
@@ -38,6 +39,16 @@ func main() {
 // or running `runLauncher`. We wrap it so that all our deferred calls will execute before we call
 // `os.Exit` in `main()`.
 func runMain() int {
+	// Check to see if this is a native messaging host invocation. We have to check this first,
+	// before even initializing logging, because we should not write logs to os.Stdout when following
+	// the native messaging protocol.
+	if len(os.Args) == 2 {
+		if _, ok := localserver.AllowlistedDt4aOriginsLookup[strings.TrimSuffix(os.Args[1], "/")]; ok {
+			// Native messaging host invocation -- continues reading until closed
+			readNativeMessages()
+			return 0
+		}
+	}
 	systemSlogger, logCloser, err := multislogger.SystemSlogger()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error creating system logger: %v\n", err)
