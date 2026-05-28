@@ -78,7 +78,7 @@ func buildManifest() (*manifest, error) {
 		if !strings.HasPrefix(allowedOrigin, "chrome-extension") {
 			continue
 		}
-		allowedOrigins = append(allowedOrigins, allowedOrigin)
+		allowedOrigins = append(allowedOrigins, allowedOrigin+"/")
 	}
 	return &manifest{
 		Name:           nativeMessagingHostName,
