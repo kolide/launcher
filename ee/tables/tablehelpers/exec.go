@@ -45,8 +45,9 @@ func RunSimple(ctx context.Context, slogger *slog.Logger, timeoutSeconds int, cm
 	defer span.End()
 
 	var stdout bytes.Buffer
-	if err := Run(ctx, slogger, timeoutSeconds, cmd, args, &stdout, io.Discard, opts...); err != nil {
-		return nil, err
+	var stderr bytes.Buffer // capture stderr for logging purposes in case of failure
+	if err := Run(ctx, slogger, timeoutSeconds, cmd, args, &stdout, &stderr, opts...); err != nil {
+		return nil, fmt.Errorf("running %s: stderr: %s: %w", cmd.Name(), stderr.String(), err)
 	}
 
 	return stdout.Bytes(), nil
