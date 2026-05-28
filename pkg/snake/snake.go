@@ -92,14 +92,10 @@ func CamelToSnake(s string) string {
 		words = append(words, s[lastPos:])
 	}
 
-	var b strings.Builder
-	for k, word := range words {
-		if k > 0 {
-			b.WriteByte('_')
-		}
-		b.WriteString(strings.ToLower(word))
-	}
-	return b.String()
+	// Every word is lower-cased and the separator is "_", which ToLower leaves
+	// untouched, so joining then lower-casing once is equivalent to lower-casing
+	// each word individually.
+	return strings.ToLower(strings.Join(words, "_"))
 }
 
 // SnakeToCamel converts a snake_case string to PascalCase, capitalizing the
