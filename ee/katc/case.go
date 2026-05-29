@@ -5,7 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/kolide/launcher/v2/ee/observability"
-	"github.com/serenize/snaker"
+	"github.com/kolide/launcher/v2/pkg/snake"
 )
 
 func camelToSnake(ctx context.Context, _ *slog.Logger, row map[string][]byte) ([]map[string][]byte, error) {
@@ -14,7 +14,7 @@ func camelToSnake(ctx context.Context, _ *slog.Logger, row map[string][]byte) ([
 
 	snakeCaseRow := make(map[string][]byte)
 	for k, v := range row {
-		snakeCaseKey := snaker.CamelToSnake(k)
+		snakeCaseKey := snake.CamelToSnake(k)
 		snakeCaseRow[snakeCaseKey] = v
 	}
 

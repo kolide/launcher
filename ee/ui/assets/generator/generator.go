@@ -13,7 +13,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/logutil"
-	"github.com/serenize/snaker"
+	"github.com/kolide/launcher/v2/pkg/snake"
 )
 
 // icoSizes are the ico sizes we generate. It's a tradeoff between size and quality.
@@ -211,7 +211,7 @@ func constName(name string) string {
 		"\\", "_",
 	)
 
-	return snaker.SnakeToCamel(r.Replace(name))
+	return snake.SnakeToCamel(r.Replace(name))
 }
 
 // skipFile implements timestamp logic akin to how Make does. This allows us to skip processing if the file
