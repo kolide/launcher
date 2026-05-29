@@ -20,6 +20,7 @@ import (
 	"github.com/kolide/launcher/v2/ee/control/consumers/remoterestartconsumer"
 	"github.com/kolide/launcher/v2/ee/disclaim"
 	"github.com/kolide/launcher/v2/ee/localserver"
+	"github.com/kolide/launcher/v2/ee/nativemessaging"
 	"github.com/kolide/launcher/v2/ee/tuf"
 	"github.com/kolide/launcher/v2/ee/watchdog"
 	"github.com/kolide/launcher/v2/pkg/contexts/ctxlog"
@@ -45,7 +46,7 @@ func runMain() int {
 	if len(os.Args) == 2 {
 		if _, ok := localserver.AllowlistedDt4aOriginsLookup[strings.TrimSuffix(os.Args[1], "/")]; ok {
 			// Native messaging host invocation -- continues reading until closed
-			readNativeMessages()
+			nativemessaging.ReadNativeMessages()
 			return 0
 		}
 	}
