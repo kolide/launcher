@@ -21,7 +21,6 @@ require (
 	github.com/osquery/osquery-go v0.0.0-20260226222546-0cc22f415e57
 	github.com/peterbourgon/ff/v3 v3.1.2
 	github.com/pkg/errors v0.9.1
-	github.com/serenize/snaker v0.0.0-20171204205717-a683aaf2d516
 	github.com/stretchr/testify v1.11.1
 	github.com/theupdateframework/go-tuf v0.5.2
 	github.com/tklauser/go-sysconf v0.3.15 // indirect
@@ -29,7 +28,7 @@ require (
 	go.etcd.io/bbolt v1.3.6
 	golang.org/x/crypto v0.52.0
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0
-	golang.org/x/image v0.39.0
+	golang.org/x/image v0.41.0
 	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/sync v0.20.0
 	golang.org/x/sys v0.45.0

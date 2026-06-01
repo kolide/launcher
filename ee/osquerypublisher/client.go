@@ -129,11 +129,12 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 	}
 
 	batches := batchRequest(logs, lpc.slogger)
-	logger := lpc.slogger.With(
-		"log_type", logType.String(),
-		"log_count", len(logs),
-		"batch_count", len(batches),
-	)
+
+	logAttrs := map[string]any{
+		"log_type":    logType.String(),
+		"log_count":   len(logs),
+		"batch_count": len(batches),
+	}
 
 	pubResponse := types.OsqueryPublicationResponse{}
 
@@ -143,11 +144,12 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 			Logs:    logBatch,
 		}
 
-		resp, err := lpc.publish(ctx, logger, payload, publicationPathLogs)
+		resp, err := lpc.publish(ctx, payload, publicationPathLogs, logAttrs)
 		if err != nil {
-			logger.Log(ctx, slog.LevelError, "encountered error publishing log batch",
+			lpc.slogger.Log(ctx, slog.LevelError, "encountered error publishing log batch",
 				"err", err,
 				"batch_index", idx,
+				"batch_metadata", logAttrs,
 			)
 
 			return nil, err
@@ -171,10 +173,11 @@ func (lpc *LogPublisherClient) PublishResults(ctx context.Context, results []dis
 	}
 
 	batches := batchRequest(results, lpc.slogger)
-	logger := lpc.slogger.With(
-		"result_count", len(results),
-		"batch_count", len(batches),
-	)
+
+	logAttrs := map[string]any{
+		"result_count": len(results),
+		"batch_count":  len(batches),
+	}
 
 	pubResponse := types.OsqueryPublicationResponse{}
 
@@ -183,11 +186,12 @@ func (lpc *LogPublisherClient) PublishResults(ctx context.Context, results []dis
 			Results: resultBatch,
 		}
 
-		resp, err := lpc.publish(ctx, logger, payload, publicationPathResults)
+		resp, err := lpc.publish(ctx, payload, publicationPathResults, logAttrs)
 		if err != nil {
-			logger.Log(ctx, slog.LevelError, "encountered error publishing results batch",
+			lpc.slogger.Log(ctx, slog.LevelError, "encountered error publishing results batch",
 				"err", err,
 				"batch_index", idx,
+				"batch_metadata", logAttrs,
 			)
 
 			return nil, err
@@ -203,7 +207,7 @@ func (lpc *LogPublisherClient) PublishResults(ctx context.Context, results []dis
 
 // publish handles the common logic for publishing logs and results to the agent-ingester service. This
 // includes marshalling the payload, fetching the auth token, issuing the request, and handling the response/logging.
-func (lpc *LogPublisherClient) publish(ctx context.Context, slogger *slog.Logger, payload any, publicationPath string) (*types.OsqueryPublicationResponse, error) {
+func (lpc *LogPublisherClient) publish(ctx context.Context, payload any, publicationPath string, logAttrs map[string]any) (*types.OsqueryPublicationResponse, error) {
 	var err error
 	metaPtr := lpc.metadataJSON.Load()
 	if metaPtr == nil || len(*metaPtr) == 0 {
@@ -243,13 +247,13 @@ func (lpc *LogPublisherClient) publish(ctx context.Context, slogger *slog.Logger
 	// the pre-compression max batch size values, but can likely increase that value depending on the compression ratio
 	// we see for this data.
 	if uncompressedPayloadLen > 0 {
-		slogger.Log(ctx, slog.LevelInfo,
-			"osquery publication zlib compression stats",
+		lpc.slogger.Log(ctx, slog.LevelInfo, "osquery publication zlib compression stats",
 			"publication_type", publicationPath,
 			"raw_payload_length", uncompressedPayloadLen,
 			"compressed_payload_length", compressedPayloadLen,
 			"compression_ratio", float64(uncompressedPayloadLen)/float64(compressedPayloadLen),
 			"bytes_saved", uncompressedPayloadLen-compressedPayloadLen,
+			"batch_metadata", logAttrs,
 		)
 	}
 
@@ -271,13 +275,14 @@ func (lpc *LogPublisherClient) publish(ctx context.Context, slogger *slog.Logger
 	var publicationResponse types.OsqueryPublicationResponse
 
 	defer func(begin time.Time) {
-		slogger.Log(ctx, levelForError(err), "attempted osquery publication",
+		lpc.slogger.Log(ctx, levelForError(err), "attempted osquery publication",
 			"request_uuid", requestUUID,
 			"publication_type", publicationPath,
 			"response", publicationResponse,
 			"status_code", resp.StatusCode,
 			"err", err,
 			"took", time.Since(begin),
+			"batch_metadata", logAttrs,
 		)
 	}(time.Now())
 
@@ -490,7 +495,6 @@ func (lpc *LogPublisherClient) shouldPublishLogs() bool {
 // that will fit within maxRequestSizeBytes (set for kafka performance). If a single log/result exceeds the max request size,
 // it is added as its own batch.
 func batchRequest[Measureable string | distributed.Result](logs []Measureable, logger *slog.Logger) [][]Measureable {
-	logger = logger.With("batch_type", fmt.Sprintf("%T", logs))
 	batches := make([][]Measureable, 0)
 	currentLogBatchSize := 0
 	currentBatch := make([]Measureable, 0)
@@ -502,6 +506,7 @@ func batchRequest[Measureable string | distributed.Result](logs []Measureable, l
 			logger.Log(context.TODO(), slog.LevelError,
 				"failed to marshal osquery result",
 				"err", err,
+				"batch_type", fmt.Sprintf("%T", logs),
 			)
 			continue
 		}
@@ -513,6 +518,7 @@ func batchRequest[Measureable string | distributed.Result](logs []Measureable, l
 				"single osquery log or result exceeds max request size",
 				"log_length", logLength,
 				"max_request_size", maxRequestSizeBytes,
+				"batch_type", fmt.Sprintf("%T", logs),
 			)
 			// add the log as its own batch but don't alter any of the current batch size state, that can continue
 			// in case there are other smaller logs that can still fit in the current batch

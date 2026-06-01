@@ -206,9 +206,6 @@ func (t *Table) generateRawData(ctx context.Context, qc table.QueryContext, rawd
 }
 
 func (t *Table) generatePath(ctx context.Context, qc table.QueryContext, filePath string, dataQuery string, flattenOpts ...dataflatten.FlattenOpts) ([]map[string]string, error) {
-	ctx, span := observability.StartSpan(ctx, "path", filePath)
-	defer span.End()
-
 	var data []dataflatten.Row
 	var err error
 	if t.flattenFileFunc != nil {

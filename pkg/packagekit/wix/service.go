@@ -6,7 +6,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/serenize/snaker"
+	"github.com/kolide/launcher/v2/pkg/snake"
 )
 
 // http://wixtoolset.org/documentation/manual/v3/xsd/wix/serviceinstall.html
@@ -309,5 +309,5 @@ func cleanServiceName(in string) string {
 		"\\", "_",
 	)
 
-	return snaker.SnakeToCamel(r.Replace(in))
+	return snake.SnakeToCamel(r.Replace(in))
 }

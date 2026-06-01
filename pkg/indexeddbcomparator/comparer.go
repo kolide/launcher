@@ -128,25 +128,24 @@ func (prefix *keyPrefix) Type() int {
 }
 
 func (c *idbCmp1Comparer) Compare(a, b []byte) int {
-	slogger := c.slogger.With(
-		"key_a", fmt.Sprintf("%x", a),
-		"key_b", fmt.Sprintf("%x", b),
-	)
-
 	aWithoutPrefix, prefixA, err := decodeKeyPrefix(a)
 	if err != nil {
-		slogger.Log(context.TODO(), slog.LevelError,
+		c.slogger.Log(context.TODO(), slog.LevelError,
 			"error decoding key prefix a",
 			"err", err,
+			"key_a", fmt.Sprintf("%x", a),
+			"key_b", fmt.Sprintf("%x", b),
 		)
 		return 0
 	}
 
 	bWithoutPrefix, prefixB, err := decodeKeyPrefix(b)
 	if err != nil {
-		slogger.Log(context.TODO(), slog.LevelError,
+		c.slogger.Log(context.TODO(), slog.LevelError,
 			"error decoding key prefix b",
 			"err", err,
+			"key_a", fmt.Sprintf("%x", a),
+			"key_b", fmt.Sprintf("%x", b),
 		)
 		return 0
 	}
@@ -224,6 +223,8 @@ func (c *idbCmp1Comparer) Compare(a, b []byte) int {
 				"invalid key prefix type byte for prefix a",
 				"prefix", prefixA,
 				"type_byte", fmt.Sprintf("%x", typeByte),
+				"key_a", fmt.Sprintf("%x", a),
+				"key_b", fmt.Sprintf("%x", b),
 			)
 			return 0
 		}
@@ -379,6 +380,8 @@ func (c *idbCmp1Comparer) Compare(a, b []byte) int {
 			c.slogger.Log(context.TODO(), slog.LevelError,
 				"invalid key prefix type byte for databaseMetadata case",
 				"type_byte", fmt.Sprintf("%x", typeByte),
+				"key_a", fmt.Sprintf("%x", a),
+				"key_b", fmt.Sprintf("%x", b),
 			)
 			return 0
 		}
@@ -388,6 +391,8 @@ func (c *idbCmp1Comparer) Compare(a, b []byte) int {
 			c.slogger.Log(context.TODO(), slog.LevelError,
 				"encountered error comparing encoded IDB keys",
 				"err", err,
+				"key_a", fmt.Sprintf("%x", a),
+				"key_b", fmt.Sprintf("%x", b),
 			)
 			return 0
 		}
@@ -398,6 +403,8 @@ func (c *idbCmp1Comparer) Compare(a, b []byte) int {
 			c.slogger.Log(context.TODO(), slog.LevelError,
 				"encountered error comparing encoded IDB keys",
 				"err", err,
+				"key_a", fmt.Sprintf("%x", a),
+				"key_b", fmt.Sprintf("%x", b),
 			)
 			return 0
 		}
@@ -408,6 +415,8 @@ func (c *idbCmp1Comparer) Compare(a, b []byte) int {
 			c.slogger.Log(context.TODO(), slog.LevelError,
 				"encountered error comparing encoded IDB keys",
 				"err", err,
+				"key_a", fmt.Sprintf("%x", a),
+				"key_b", fmt.Sprintf("%x", b),
 			)
 			return 0
 		}
@@ -418,6 +427,8 @@ func (c *idbCmp1Comparer) Compare(a, b []byte) int {
 			c.slogger.Log(context.TODO(), slog.LevelError,
 				"encountered error comparing encoded IDB keys",
 				"err", err,
+				"key_a", fmt.Sprintf("%x", a),
+				"key_b", fmt.Sprintf("%x", b),
 			)
 			return 0
 		}
@@ -448,6 +459,8 @@ func (c *idbCmp1Comparer) Compare(a, b []byte) int {
 			c.slogger.Log(context.TODO(), slog.LevelError,
 				"encountered error comparing encoded IDB keys",
 				"err", err,
+				"key_a", fmt.Sprintf("%x", a),
+				"key_b", fmt.Sprintf("%x", b),
 			)
 			return 0
 		}
@@ -460,6 +473,8 @@ func (c *idbCmp1Comparer) Compare(a, b []byte) int {
 		c.slogger.Log(context.TODO(), slog.LevelError,
 			"invalid key prefix type",
 			"prefix_type", prefixA.Type(),
+			"key_a", fmt.Sprintf("%x", a),
+			"key_b", fmt.Sprintf("%x", b),
 		)
 		return 0
 	}
