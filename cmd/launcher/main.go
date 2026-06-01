@@ -46,7 +46,7 @@ func runMain() int {
 	if len(os.Args) == 2 {
 		if _, ok := localserver.AllowlistedDt4aOriginsLookup[strings.TrimSuffix(os.Args[1], "/")]; ok {
 			// Native messaging host invocation -- continues reading until closed
-			nativemessaging.ReadNativeMessages()
+			nativemessaging.ReadNativeMessages(context.Background())
 			return 0
 		}
 	}
