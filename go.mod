@@ -28,7 +28,7 @@ require (
 	go.etcd.io/bbolt v1.3.6
 	golang.org/x/crypto v0.52.0
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0
-	golang.org/x/image v0.39.0
+	golang.org/x/image v0.41.0
 	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/sync v0.20.0
 	golang.org/x/sys v0.45.0
