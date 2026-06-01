@@ -805,12 +805,12 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 	err = store.ForEach(func(k, v []byte) error {
 		// A somewhat cumbersome if block...
 		//
-		// 1. If the log is too big, skip it and mark for deletion.
+		// 1. If the log is larger than our largest possible batch threshold size, skip it and mark for deletion
 		// 2. If the buffer would be too big with the log, break for
 		// 3. Else append it
 		//
 		// Note that (1) must come first, otherwise (2) will always trigger.
-		if e.logPublicationState.ExceedsCurrentBatchThreshold(len(v)) {
+		if e.logPublicationState.ExceedsMaxBatchThreshold(len(v)) {
 			// Discard logs that are too big
 			logheadSize := minInt(len(v), 100)
 			e.slogger.Log(context.TODO(), slog.LevelInfo,
@@ -820,7 +820,7 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 				"limit", e.Opts.MaxBytesPerBatch,
 				"loghead", string(v)[0:logheadSize],
 			)
-		} else if e.logPublicationState.ExceedsCurrentBatchThreshold(totalBytes + len(v)) {
+		} else if e.logPublicationState.ExceedsCurrentBatchThreshold(totalBytes+len(v)) && totalBytes > 0 {
 			// Buffer is filled. Break the loop and come back later.
 			return iterationTerminatedError{}
 		} else {
