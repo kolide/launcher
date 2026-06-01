@@ -58,6 +58,16 @@ var newConfigOnce = sync.OnceFunc(func() {
 		return
 	}
 
+	// Note: You may see this Translate call come up as a major consumer of inuse_space in memprofiles
+	// (depending on how the sampling works out). This has been investigated and there are not great options
+	// to improve it, just know that there is no leak here, it does one large allocation during this sync.OnceFunc,
+	// and maintains it for the lifetime of the process. This is due to our inclusion of the default gitleaks config,
+	// which contains a large allowlist for Generic API Keys. During the translate call validation of the allowlist
+	// it calls aho-corasick.NewTrieBuilder().AddStrings(values).Build() with the (currently) ~1.5k stopwords in
+	// the default allowlist. The tries are built with dense transition tables, and with the ~1.5k overlapping stopwords
+	// this ends up allocating enough states to consume ~14MB of memory very fast. This is something we can live with but
+	// should be aware of. If it becomes more of a problem down the road we can consider keeping a slimmer allowlist outside
+	// of the default, but this seems like an uneccessary maintenance burden for the current memory usage incurred.
 	cfg, err := vc.Translate()
 	if err != nil {
 		configErr = fmt.Errorf("translating: %w", err)
