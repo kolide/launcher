@@ -353,8 +353,6 @@ func (cs *ControlService) fetchAndUpdate(ctx context.Context, subsystem, hash st
 	ctx, span := observability.StartSpan(ctx, "subsystem", subsystem)
 	defer span.End()
 
-	slogger := cs.slogger.With("subsystem", subsystem)
-
 	data, err := cs.fetcher.GetSubsystemData(ctx, hash)
 	if err != nil {
 		return fmt.Errorf("failed to get control data: %w", err)
@@ -367,8 +365,9 @@ func (cs *ControlService) fetchAndUpdate(ctx context.Context, subsystem, hash st
 	// Consumer and subscriber(s) notified now
 	if err := cs.update(ctx, subsystem, data); err != nil {
 		// Returning the error so we don't store the hash and we can try again next time
-		slogger.Log(ctx, slog.LevelWarn,
+		cs.slogger.Log(ctx, slog.LevelWarn,
 			"failed to update consumers and subscribers",
+			"subsystem", subsystem,
 			"err", err,
 		)
 		return err
@@ -384,8 +383,9 @@ func (cs *ControlService) fetchAndUpdate(ctx context.Context, subsystem, hash st
 
 	// Store the hash so we can persist the last fetched data across launcher restarts
 	if err := cs.store.Set([]byte(subsystem), []byte(hash)); err != nil {
-		slogger.Log(ctx, slog.LevelError,
+		cs.slogger.Log(ctx, slog.LevelError,
 			"failed to store last fetched control data",
+			"subsystem", subsystem,
 			"err", err,
 		)
 	}
