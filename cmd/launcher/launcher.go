@@ -600,6 +600,14 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 
 		ls.SetQuerier(osqueryRunner)
 		runGroup.Add("localserver", ls.Start, ls.Interrupt)
+
+		// Support native messaging as an alternative to the localserver
+		if err := nativemessaging.WriteManifest(rootDirectory); err != nil {
+			slogger.Log(ctx, slog.LevelError,
+				"could not write native messaging manifest",
+				"err", err,
+			)
+		}
 	}
 
 	// If autoupdating is enabled, run the autoupdater
@@ -655,13 +663,6 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 
 			startupSpan.AddEvent("osqueryd_startup_download_completed")
 		}
-	}
-
-	if err := nativemessaging.WriteManifest(rootDirectory); err != nil {
-		slogger.Log(ctx, slog.LevelError,
-			"could not write native messaging manifest",
-			"err", err,
-		)
 	}
 
 	startupSpan.End()
