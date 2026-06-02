@@ -36,6 +36,11 @@ func Test_extractIdentifierFromExecutable(t *testing.T) {
 			expectedIdentifier: "kolide-test-k2",
 		},
 		{
+			testCaseName:       "darwin - localdev location - non-default",
+			executablePath:     "/User/kolide-engineer/Repos/launcher/build/launcher",
+			expectedIdentifier: "kolide-nababe-k2",
+		},
+		{
 			testCaseName:       "linux - install location - default",
 			executablePath:     "/usr/local/kolide-k2/bin/launcher",
 			expectedIdentifier: launcher.DefaultLauncherIdentifier,

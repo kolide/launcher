@@ -23,9 +23,8 @@ import (
 type storeName int
 
 const (
-	StartupSettingsStore        storeName = iota
-	WatchdogLogStore            storeName = 1
-	NativeMessagingHostLogStore storeName = 2
+	StartupSettingsStore storeName = iota
+	WatchdogLogStore     storeName = 1
 )
 
 var missingMigrationErrFormat = regexp.MustCompile(`no migration found for version \d+`)
@@ -38,8 +37,6 @@ func (s storeName) String() string {
 		return "startup_settings"
 	case WatchdogLogStore:
 		return "watchdog_logs"
-	case NativeMessagingHostLogStore:
-		return "native_messaging_host_logs"
 	}
 
 	return ""
@@ -379,8 +376,6 @@ func (s *sqliteStore) getColumns() *sqliteColumns {
 	case StartupSettingsStore.String():
 		return &sqliteColumns{pk: "name", valueColumn: "value", isLogstore: false}
 	case WatchdogLogStore.String():
-		return &sqliteColumns{pk: "timestamp", valueColumn: "log", isLogstore: true}
-	case NativeMessagingHostLogStore.String():
 		return &sqliteColumns{pk: "timestamp", valueColumn: "log", isLogstore: true}
 	}
 

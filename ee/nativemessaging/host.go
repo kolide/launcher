@@ -8,11 +8,13 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 
-	agentsqlite "github.com/kolide/launcher/v2/ee/agent/storage/sqlite"
+	"github.com/kolide/kit/env"
 	"github.com/kolide/launcher/v2/ee/localserver"
 	"github.com/kolide/launcher/v2/pkg/launcher"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/peterbourgon/ff/v3"
 	"github.com/shirou/gopsutil/v4/process"
 )
@@ -34,36 +36,42 @@ func newNopCloser(w io.Writer) io.WriteCloser {
 func (nopCloser) Close() error { return nil }
 
 func ReadNativeMessages(ctx context.Context) {
-	// Set up a log writer to our kv.sqlite log store, if possible.
-	// If not possible, we write logs to io.Discard instead.
+	// Set up logging so that we can capture any errors that occur when processing messages.
+	// We can't write to kv.sqlite (as the watchdog does) because this process
+	// won't have sufficient permissions. For now, we write to a file in the root
+	// directory. If that's not possible, we write logs to io.Discard instead.
 	var logWriter io.WriteCloser
 	var err error
-	logWriter, err = agentsqlite.OpenRW(ctx, determineRootDirectory(), agentsqlite.NativeMessagingHostLogStore)
+	logFile := filepath.Join(determineRootDirectory(), fmt.Sprintf("desktop_%d", os.Getuid()), "nativemessaging.log")
+	logWriter, err = os.OpenFile(logFile, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
 	if err != nil {
 		logWriter = newNopCloser(io.Discard)
 	}
 	defer logWriter.Close()
-	slogger := slog.New(slog.NewJSONHandler(logWriter, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	slogHandler := slog.NewJSONHandler(logWriter, &slog.HandlerOptions{Level: slog.LevelDebug})
+	slogger := multislogger.New(slogHandler)
 
+	// Validate the request that started this process
 	extension, err := validateNativeMessagingRequest(ctx)
 	if err != nil {
-		slogger.Log(context.TODO(), slog.LevelError,
+		slogger.Logger.Log(context.TODO(), slog.LevelError,
 			"invalid native messaging request",
 			"err", err,
 		)
 	}
 
-	slogger.Log(context.TODO(), slog.LevelInfo,
+	slogger.Logger.Log(context.TODO(), slog.LevelInfo,
 		"native messaging app opened",
 		"extension", extension,
 	)
 
+	// Handle input until the connection is closed
 	stdinReader := bufio.NewReaderSize(bufio.NewReader(os.Stdin), msgBufferSize)
 	header := make([]byte, 4)
 	for {
 		headerBytesRead, err := stdinReader.Read(header)
 		if headerBytesRead == 0 || err != nil {
-			slogger.Log(context.TODO(), slog.LevelWarn,
+			slogger.Logger.Log(context.TODO(), slog.LevelWarn,
 				"could not read next header",
 				"err", err,
 			)
@@ -72,7 +80,7 @@ func ReadNativeMessages(ctx context.Context) {
 
 		msgLength := binary.NativeEndian.Uint32(header)
 
-		slogger.Log(context.TODO(), slog.LevelInfo,
+		slogger.Logger.Log(context.TODO(), slog.LevelInfo,
 			"received message with length",
 			"length", msgLength,
 		)
@@ -87,20 +95,20 @@ func ReadNativeMessages(ctx context.Context) {
 			)
 			break
 		} else if err != nil {
-			slogger.Log(context.TODO(), slog.LevelWarn,
+			slogger.Logger.Log(context.TODO(), slog.LevelWarn,
 				"could not read message",
 				"err", err,
 			)
 			break
 		}
 
-		slogger.Log(context.TODO(), slog.LevelWarn,
+		slogger.Logger.Log(context.TODO(), slog.LevelInfo,
 			"message",
 			"contents", string(msgContent),
 		)
 	}
 
-	slogger.Log(context.TODO(), slog.LevelInfo,
+	slogger.Logger.Log(context.TODO(), slog.LevelInfo,
 		"shutting down",
 	)
 }
@@ -155,6 +163,12 @@ func extractIdentifierFromExecutable(executablePath string) string {
 	if strings.Contains(executablePath, identifier) {
 		// Default identifier
 		return identifier
+	}
+
+	// Assume that local paths use the kolide-nababe-k2 identifier, since we don't
+	// have another way of determining it for them.
+	if strings.Contains(executablePath, filepath.Join("launcher", "build")) && !env.Bool("LAUNCHER_FORCE_UPDATE_IN_BUILD", false) {
+		return "kolide-nababe-k2"
 	}
 
 	// We have a custom identifier, taking the format `kolide-<id>-k2`
