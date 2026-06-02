@@ -82,6 +82,10 @@ func (lps *logPublicationState) EndBatch(logs []string, successful bool) {
 	lps.reduceBatchThreshold()
 }
 
+func (lps *logPublicationState) ExceedsMaxBatchThreshold(amountBytes int) bool {
+	return amountBytes > lps.maxBytesPerBatch
+}
+
 func (lps *logPublicationState) ExceedsCurrentBatchThreshold(amountBytes int) bool {
 	return amountBytes > lps.currentMaxBytesPerBatch
 }

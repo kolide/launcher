@@ -1096,7 +1096,7 @@ func TestExtensionWriteBufferedLogsLimit(t *testing.T) {
 	assert.Nil(t, gotResultLogs)
 }
 
-func TestExtensionWriteBufferedLogsDropsBigLog(t *testing.T) {
+func TestExtensionWriteBufferedLogsDropsBigLogIfLargerThanMax(t *testing.T) {
 	k, expectedNodeKey := makeKnapsackEnrolled(t)
 
 	var gotStatusLogs, gotResultLogs []string
@@ -1161,6 +1161,112 @@ func TestExtensionWriteBufferedLogsDropsBigLog(t *testing.T) {
 	e.writeBufferedLogsForType(logger.LogTypeString)
 	assert.True(t, m.PublishLogsFuncInvoked)
 	assert.Equal(t, expectedResultLogs[3:], gotResultLogs)
+
+	// No more logs to write
+	m.PublishLogsFuncInvoked = false
+	gotResultLogs = nil
+	gotStatusLogs = nil
+	e.writeBufferedLogsForType(logger.LogTypeString)
+	assert.False(t, m.PublishLogsFuncInvoked)
+	assert.Nil(t, gotResultLogs)
+	assert.Nil(t, gotStatusLogs)
+
+	finalLogCount, err := e.knapsack.ResultLogsStore().Count()
+	require.NoError(t, err)
+	require.Equal(t, 0, finalLogCount, "no more queued logs")
+}
+
+func TestExtensionWriteBufferedLogsSendsBigLogIfLessThanMax(t *testing.T) {
+	k, expectedNodeKey := makeKnapsackEnrolled(t)
+
+	var gotStatusLogs, gotResultLogs []string
+	m := &mock.KolideService{
+		PublishLogsFunc: func(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error) {
+			if nodeKey != expectedNodeKey {
+				return "", "", false, nil // invalid
+			}
+
+			switch logType {
+			case logger.LogTypeStatus:
+				gotStatusLogs = logs
+			case logger.LogTypeString:
+				gotResultLogs = logs
+			case logger.LogTypeSnapshot, logger.LogTypeHealth, logger.LogTypeInit:
+				t.Errorf("unexpected log type %v", logType)
+			default:
+				t.Error("Unknown log type")
+			}
+			return "", "", false, nil
+		},
+	}
+
+	lpc := makeTestOsqLogPublisher(t, k)
+	// Create these buckets ahead of time
+	resultLogsStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ResultLogsStore.String())
+	require.NoError(t, err)
+	k.On("ResultLogsStore").Return(resultLogsStore)
+
+	maxBytes := 100
+	e, err := NewExtension(t.Context(), lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
+		MaxBytesPerBatch: maxBytes,
+	})
+	require.Nil(t, err)
+	e.serviceClient = m
+
+	startLogCount, err := e.knapsack.ResultLogsStore().Count()
+	require.NoError(t, err)
+	require.Equal(t, 0, startLogCount, "start with no buffered logs")
+
+	expectedResultLogs := []string{
+		"this_result_is_tooooooo_big! oh noes",
+		"res1", "res2",
+		"this_result_is_tooooooo_big! wow",
+	}
+	for _, log := range expectedResultLogs {
+		e.LogString(t.Context(), logger.LogTypeString, log)
+	}
+
+	queuedLogCount, err := e.knapsack.ResultLogsStore().Count()
+	require.NoError(t, err)
+	require.Equal(t, len(expectedResultLogs), queuedLogCount, "correct number of enqueued logs")
+
+	// Now, reduce current_batch_limit_bytes to 15, so that "this_result_is_tooooooo_big" would be
+	// larger than current_batch_limit_bytes but still smaller than options_batch_limit_bytes.
+	e.logPublicationState.currentMaxBytesPerBatch = 15
+
+	// Should write the first log in a batch of its own
+	e.writeBufferedLogsForType(logger.LogTypeString)
+	require.True(t, m.PublishLogsFuncInvoked)
+	require.Equal(t, 1, len(gotResultLogs))
+	require.Equal(t, expectedResultLogs[0], gotResultLogs[0])
+
+	// That should have counted as publishing a full batch, so our current_batch_limit_bytes
+	// should have increased. Confirm that it did, then reset it back down to 15 for the next
+	// test.
+	require.Equal(t, maxBytes, e.logPublicationState.currentMaxBytesPerBatch)
+	e.logPublicationState.currentMaxBytesPerBatch = 15
+
+	// Should write the next two logs together
+	m.PublishLogsFuncInvoked = false
+	gotResultLogs = nil
+	e.writeBufferedLogsForType(logger.LogTypeString)
+	require.True(t, m.PublishLogsFuncInvoked)
+	require.Equal(t, 2, len(gotResultLogs))
+
+	// Same as before:
+	// That should have counted as publishing a full batch, so our current_batch_limit_bytes
+	// should have increased. Confirm that it did, then reset it back down to 15 for the next
+	// test.
+	require.Equal(t, maxBytes, e.logPublicationState.currentMaxBytesPerBatch)
+	e.logPublicationState.currentMaxBytesPerBatch = 15
+
+	// Should write the next log in a batch of its own
+	m.PublishLogsFuncInvoked = false
+	gotResultLogs = nil
+	e.writeBufferedLogsForType(logger.LogTypeString)
+	require.True(t, m.PublishLogsFuncInvoked)
+	require.Equal(t, 1, len(gotResultLogs))
+	require.Equal(t, expectedResultLogs[3], gotResultLogs[0])
 
 	// No more logs to write
 	m.PublishLogsFuncInvoked = false
