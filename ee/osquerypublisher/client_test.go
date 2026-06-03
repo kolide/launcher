@@ -35,6 +35,9 @@ type mockHTTPClient struct {
 
 func (m *mockHTTPClient) Do(req *http.Request) (*http.Response, error) {
 	args := m.Called(req)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
 	return args.Get(0).(*http.Response), args.Error(1)
 }
 
@@ -302,6 +305,45 @@ func TestLogPublisherClient_PublishLogs(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestLogPublisherClient_PublishLogs_httpClientErrorNilResponse verifies that a
+// nil *http.Response from Client.Do does not panic in the publication logging defer
+func TestLogPublisherClient_PublishLogs_httpClientErrorNilResponse(t *testing.T) {
+	t.Parallel()
+
+	mockKnapsack := mocks.NewKnapsack(t)
+	mockHTTPClient := &mockHTTPClient{}
+	slogger := multislogger.NewNopLogger()
+
+	mockKnapsack.On("OsqueryPublisherURL").Return("https://example.com")
+	mockKnapsack.On("OsqueryPublisherPercentEnabled").Return(100)
+	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
+	require.NoError(t, err)
+	require.NoError(t, tokenStore.Set(storage.AgentIngesterAuthTokenKey, []byte("test-token")))
+	suite := hpke.NewSuite(hpke.KEM_X25519_HKDF_SHA256, hpke.KDF_HKDF_SHA256, hpke.AEAD_AES256GCM)
+	kemID, _, _ := suite.Params()
+	kemScheme := kemID.Scheme()
+	pkR, _, err := kemScheme.GenerateKeyPair()
+	require.NoError(t, err)
+	pkRBytes, err := pkR.MarshalBinary()
+	require.NoError(t, err)
+	require.NoError(t, tokenStore.Set(storage.AgentIngesterHPKEPublicKey, []byte("test-hpke-id:"+base64.StdEncoding.EncodeToString(pkRBytes))))
+	require.NoError(t, tokenStore.Set(storage.AgentIngesterHPKEPresharedKey, []byte("test-psk-id:"+base64.StdEncoding.EncodeToString([]byte("test-psk-key-data")))))
+	mockKnapsack.On("TokenStore").Return(tokenStore).Maybe()
+	mockKnapsack.On("ServerProvidedDataStore").Return(makeTestServerProvidedDataStore(t)).Maybe()
+
+	doErr := errors.New("connection refused")
+	mockHTTPClient.On("Do", mock.AnythingOfType("*http.Request")).Return((*http.Response)(nil), doErr)
+
+	client := NewLogPublisherClient(slogger, mockKnapsack, mockHTTPClient)
+
+	_, err = client.PublishLogs(t.Context(), osqlog.LogTypeStatus, []string{"log1"})
+	mockHTTPClient.AssertExpectations(t)
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, doErr)
+	assert.Contains(t, err.Error(), "issuing publication request")
 }
 
 func TestLogPublisherClient_PublishResults(t *testing.T) {
