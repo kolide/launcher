@@ -338,9 +338,9 @@ func TestLogPublisherClient_PublishLogs_httpClientErrorNilResponse(t *testing.T)
 
 	client := NewLogPublisherClient(slogger, mockKnapsack, mockHTTPClient)
 
-	_, err = client.PublishLogs(t.Context(), osqlog.LogTypeStatus, []string{"log1"})
+	resp, err := client.PublishLogs(t.Context(), osqlog.LogTypeStatus, []string{"log1"})
 	mockHTTPClient.AssertExpectations(t)
-
+	require.Nil(t, resp)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, doErr)
 	assert.Contains(t, err.Error(), "issuing publication request")
