@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -478,6 +479,10 @@ func checkRootDirACLs(logger *slog.Logger, rootDirectory string) {
 }
 
 func checkRestrictedFileACLs(logger *slog.Logger, restrictedFilePath string) {
+	if _, err := os.Stat(restrictedFilePath); err != nil && os.IsNotExist(err) {
+		// Probably launcher.db hasn't been created yet
+		return
+	}
 	if err := permissions.RestrictFileAccessToRootOnly(restrictedFilePath); err != nil {
 		logger.Log(context.TODO(), slog.LevelError,
 			"could not update ACLs for file",
