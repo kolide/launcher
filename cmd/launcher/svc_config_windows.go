@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/v2/ee/agent/permissions"
 	"github.com/kolide/launcher/v2/pkg/launcher"
 
 	"golang.org/x/sys/windows"
@@ -475,115 +476,17 @@ func checkRootDirACLs(logger *slog.Logger, rootDirectory string) {
 }
 
 func checkRestrictedFileACLs(logger *slog.Logger, restrictedFilePath string) {
-	logger = logger.With(
-		"component", "checkRestrictedFileACLs",
-		"path", restrictedFilePath,
-	)
-
-	if strings.TrimSpace(restrictedFilePath) == "" {
-		logger.Log(context.TODO(), slog.LevelDebug,
-			"unable to check permissions without path set, skipping",
-		)
-
-		return
-	}
-
-	adminsSID, err := windows.CreateWellKnownSid(windows.WinBuiltinAdministratorsSid)
-	if err != nil {
+	if err := permissions.RestrictFileAccessToRootOnly(restrictedFilePath); err != nil {
 		logger.Log(context.TODO(), slog.LevelError,
-			"failed getting builtin admins SID",
-			"err", err,
-		)
-
-		return
-	}
-
-	creatorOwnerSID, err := windows.CreateWellKnownSid(windows.WinCreatorOwnerSid)
-	if err != nil {
-		logger.Log(context.TODO(), slog.LevelError,
-			"failed getting creator/owner SID",
-			"err", err,
-		)
-
-		return
-	}
-
-	systemSID, err := windows.CreateWellKnownSid(windows.WinLocalSystemSid)
-	if err != nil {
-		logger.Log(context.TODO(), slog.LevelError,
-			"failed getting SYSTEM SID",
-			"err", err,
-		)
-
-		return
-	}
-
-	// SYSTEM, admin, and creator/owner have full control and standard users are not granted any permissions.
-	explicitAccessPolicies := []windows.EXPLICIT_ACCESS{
-		{
-			AccessPermissions: windows.GENERIC_ALL,
-			AccessMode:        windows.SET_ACCESS,
-			Inheritance:       windows.SUB_CONTAINERS_AND_OBJECTS_INHERIT,
-			Trustee: windows.TRUSTEE{
-				TrusteeForm:  windows.TRUSTEE_IS_SID,
-				TrusteeType:  windows.TRUSTEE_IS_GROUP,
-				TrusteeValue: windows.TrusteeValueFromSID(systemSID),
-			},
-		},
-		{
-			AccessPermissions: windows.GENERIC_ALL,
-			AccessMode:        windows.SET_ACCESS,
-			Inheritance:       windows.SUB_CONTAINERS_AND_OBJECTS_INHERIT,
-			Trustee: windows.TRUSTEE{
-				TrusteeForm:  windows.TRUSTEE_IS_SID,
-				TrusteeType:  windows.TRUSTEE_IS_GROUP,
-				TrusteeValue: windows.TrusteeValueFromSID(adminsSID),
-			},
-		},
-		{
-			AccessPermissions: windows.GENERIC_ALL,
-			AccessMode:        windows.SET_ACCESS,
-			Inheritance:       windows.SUB_CONTAINERS_AND_OBJECTS_INHERIT,
-			Trustee: windows.TRUSTEE{
-				TrusteeForm:  windows.TRUSTEE_IS_SID,
-				TrusteeType:  windows.TRUSTEE_IS_GROUP,
-				TrusteeValue: windows.TrusteeValueFromSID(creatorOwnerSID),
-			},
-		},
-	}
-
-	// Overwrite the existing DACL
-	newDACL, err := windows.ACLFromEntries(explicitAccessPolicies, nil)
-	if err != nil {
-		logger.Log(context.TODO(), slog.LevelError,
-			"generating new DACL from access entries",
-			"err", err,
-		)
-
-		return
-	}
-
-	// apply the new DACL to the secret file
-	err = windows.SetNamedSecurityInfo(
-		restrictedFilePath,
-		windows.SE_FILE_OBJECT,
-		// PROTECTED_DACL_SECURITY_INFORMATION here ensures we don't re-inherit the parent permissions
-		windows.DACL_SECURITY_INFORMATION|windows.PROTECTED_DACL_SECURITY_INFORMATION,
-		nil, nil, newDACL, nil,
-	)
-
-	if err != nil {
-		logger.Log(context.TODO(), slog.LevelError,
-			"setting named security info for file from new DACL",
+			"could not update ACLs for file",
 			"path", restrictedFilePath,
 			"err", err,
 		)
-
-		return
+	} else {
+		logger.Log(context.TODO(), slog.LevelInfo,
+			"updated ACLs for file",
+			"path", restrictedFilePath,
+		)
 	}
 
-	logger.Log(context.TODO(), slog.LevelInfo,
-		"updated ACLs for file",
-		"path", restrictedFilePath,
-	)
 }

@@ -1,36 +1,29 @@
 //go:build windows
 
-package listener
+package permissions
 
 import (
-	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 	"unsafe"
 
-	typesmocks "github.com/kolide/launcher/v2/ee/agent/types/mocks"
-	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
 )
 
-// TestPermissions confirms that the socket file is created with appropriately-restricted permissions.
-func TestPermissions(t *testing.T) {
+func TestRestrictFileAccessToRootOnly(t *testing.T) {
 	t.Parallel()
 
 	// Set up dependencies
 	rootDir := t.TempDir()
-	testPrefix := "test"
-	mockKnapsack := typesmocks.NewKnapsack(t)
-	mockKnapsack.On("RootDirectory").Return(rootDir).Maybe()
-
-	// Set up listener
-	testListener, err := NewLauncherListener(mockKnapsack, multislogger.NewNopLogger(), testPrefix)
+	testFile := filepath.Join(rootDir, "test.txt")
+	fh, err := os.Create(testFile)
 	require.NoError(t, err)
-	require.NotNil(t, testListener.listener)
-	t.Cleanup(func() { testListener.Interrupt(errors.New("test error")) })
+	require.NoError(t, fh.Close())
 
 	// Check permissions on socket path match what we expect -- get the security info for the socket
-	socketSecurityInfo, err := windows.GetNamedSecurityInfo(testListener.socketPath, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION)
+	socketSecurityInfo, err := windows.GetNamedSecurityInfo(testFile, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION)
 	require.NoError(t, err, "getting named security info for socket")
 	require.True(t, socketSecurityInfo.IsValid())
 	socketDacl, _, err := socketSecurityInfo.DACL()
