@@ -110,8 +110,10 @@ func checkServiceConfiguration(logger *slog.Logger, opts *launcher.Options) {
 	checkRootDirACLs(logger, opts.RootDirectory)
 
 	restrictedReadFiles := []string{
-		opts.EnrollSecretPath,
 		filepath.Join(opts.RootDirectory, "launcher.db"),
+	}
+	if opts.EnrollSecretPath != "" {
+		restrictedReadFiles = append(restrictedReadFiles, opts.EnrollSecretPath)
 	}
 	if backupDbs, err := filepath.Glob(filepath.Join(opts.RootDirectory, "launcher.db.bak*")); err != nil {
 		logger.Log(context.TODO(), slog.LevelWarn,
