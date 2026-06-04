@@ -100,17 +100,24 @@ func (d *databaseBackupSaver) backupDb() error {
 	} else if err != nil {
 		return fmt.Errorf("backup succeeded, but error checking if file was created at %s: %w", backupLocation, err)
 	} else {
-		if err := permissions.RestrictFileAccessToRootOnly(backupLocation); err != nil {
+		// Log success
+		d.slogger.Log(context.TODO(), slog.LevelDebug,
+			"took backup",
+			"backup_location", backupLocation,
+		)
+	}
+
+	// Handle permissions for all backup files (rotated/renamed files and/or new files)
+	backups, err := filepath.Glob(backupLauncherDbLocation(d.knapsack.RootDirectory()) + "*")
+	if err != nil {
+		return fmt.Errorf("globbing for files after backup to check permissions: %w", err)
+	}
+	for _, backup := range backups {
+		if err := permissions.RestrictFileAccessToRootOnly(backup); err != nil {
 			d.slogger.Log(context.TODO(), slog.LevelError,
 				"took backup, but could not restrict access",
-				"backup_location", backupLocation,
+				"backup_location", backup,
 				"err", err,
-			)
-		} else {
-			// Log success
-			d.slogger.Log(context.TODO(), slog.LevelDebug,
-				"took backup",
-				"backup_location", backupLocation,
 			)
 		}
 	}
