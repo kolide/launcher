@@ -10,8 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestPermissions confirms that the socket file is created with appropriately-restricted permissions.
-func TestPermissions(t *testing.T) {
+func TestRestrictFileAccessToRootOnly(t *testing.T) {
 	t.Parallel()
 
 	// Set up dependencies
