@@ -2,8 +2,14 @@
 
 package permissions
 
-// RestrictFileAccessToRootOnly is a no-op on non-Windows platforms because permissions
-// are set on file creation instead.
-func RestrictFileAccessToRootOnly(_ string) error {
+import (
+	"fmt"
+	"os"
+)
+
+func RestrictFileAccessToRootOnly(filePathToRestrict string) error {
+	if err := os.Chmod(filePathToRestrict, 0600); err != nil {
+		return fmt.Errorf("chmodding %s: %w", filePathToRestrict, err)
+	}
 	return nil
 }

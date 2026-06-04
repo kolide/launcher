@@ -22,6 +22,8 @@ func TestRestrictFileAccessToRootOnly(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, fh.Close())
 
+	require.NoError(t, RestrictFileAccessToRootOnly(testFile))
+
 	// Check permissions on socket path match what we expect -- get the security info for the socket
 	socketSecurityInfo, err := windows.GetNamedSecurityInfo(testFile, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION)
 	require.NoError(t, err, "getting named security info for socket")
