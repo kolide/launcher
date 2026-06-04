@@ -79,7 +79,7 @@ func Test_checkRootDirACLs(t *testing.T) {
 	require.Equal(t, rootDirInfo.String(), rootDirInfoUpdated.String(), "permissions should not have changed")
 }
 
-func Test_checkEnrollSecretACLs(t *testing.T) {
+func Test_checkRestrictedFileACLs(t *testing.T) {
 	t.Parallel()
 
 	confDir := t.TempDir()
@@ -98,8 +98,8 @@ func Test_checkEnrollSecretACLs(t *testing.T) {
 		Level: slog.LevelDebug,
 	}))
 
-	// Check the secret ACLs -- expect that we update the permissions
-	checkEnrollSecretACLs(slogger, secretPath)
+	// Check the ACLs -- expect that we update the permissions
+	checkRestrictedFileACLs(slogger, secretPath)
 	require.Contains(t, logBytes.String(), "updated ACLs for enroll secret")
 
 	// Get our updated permissions
@@ -124,7 +124,7 @@ func Test_checkEnrollSecretACLs(t *testing.T) {
 	}
 
 	// Run checkEnrollSecretACLs and confirm that the permissions do not change
-	checkEnrollSecretACLs(slogger, secretPath)
+	checkRestrictedFileACLs(slogger, secretPath)
 
 	// Get permissions again
 	secretInfoFinal, err := windows.GetNamedSecurityInfo(secretPath, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION)

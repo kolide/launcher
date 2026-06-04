@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -107,7 +108,22 @@ func checkServiceConfiguration(logger *slog.Logger, opts *launcher.Options) {
 
 	checkRootDirACLs(logger, opts.RootDirectory)
 
-	checkEnrollSecretACLs(logger, opts.EnrollSecretPath)
+	restrictedReadFiles := []string{
+		opts.EnrollSecretPath,
+		filepath.Join(opts.RootDirectory, "launcher.db"),
+	}
+	if backupDbs, err := filepath.Glob(filepath.Join(opts.RootDirectory, "launcher.db.bak*")); err != nil {
+		logger.Log(context.TODO(), slog.LevelWarn,
+			"could not glob for backup dbs to check permissions",
+			"err", err,
+		)
+	} else {
+		restrictedReadFiles = append(restrictedReadFiles, backupDbs...)
+	}
+
+	for _, fileToRestrict := range restrictedReadFiles {
+		checkRestrictedFileACLs(logger, fileToRestrict)
+	}
 }
 
 // checkDelayedAutostart checks the current value of `DelayedAutostart` (whether to wait ~2 minutes
@@ -458,15 +474,15 @@ func checkRootDirACLs(logger *slog.Logger, rootDirectory string) {
 	logger.Log(context.TODO(), slog.LevelInfo, "updated ACLs for root directory")
 }
 
-func checkEnrollSecretACLs(logger *slog.Logger, enrollSecretPath string) {
+func checkRestrictedFileACLs(logger *slog.Logger, restrictedFilePath string) {
 	logger = logger.With(
-		"component", "checkEnrollSecretACLs",
-		"enroll_secret_path", enrollSecretPath,
+		"component", "checkRestrictedFileACLs",
+		"path", restrictedFilePath,
 	)
 
-	if strings.TrimSpace(enrollSecretPath) == "" {
+	if strings.TrimSpace(restrictedFilePath) == "" {
 		logger.Log(context.TODO(), slog.LevelDebug,
-			"unable to check permissions without enroll secret path set, skipping",
+			"unable to check permissions without path set, skipping",
 		)
 
 		return
@@ -549,7 +565,7 @@ func checkEnrollSecretACLs(logger *slog.Logger, enrollSecretPath string) {
 
 	// apply the new DACL to the secret file
 	err = windows.SetNamedSecurityInfo(
-		enrollSecretPath,
+		restrictedFilePath,
 		windows.SE_FILE_OBJECT,
 		// PROTECTED_DACL_SECURITY_INFORMATION here ensures we don't re-inherit the parent permissions
 		windows.DACL_SECURITY_INFORMATION|windows.PROTECTED_DACL_SECURITY_INFORMATION,
@@ -558,12 +574,16 @@ func checkEnrollSecretACLs(logger *slog.Logger, enrollSecretPath string) {
 
 	if err != nil {
 		logger.Log(context.TODO(), slog.LevelError,
-			"setting named security info for enroll secret from new DACL",
+			"setting named security info for file from new DACL",
+			"path", restrictedFilePath,
 			"err", err,
 		)
 
 		return
 	}
 
-	logger.Log(context.TODO(), slog.LevelInfo, "updated ACLs for enroll secret")
+	logger.Log(context.TODO(), slog.LevelInfo,
+		"updated ACLs for file",
+		"path", restrictedFilePath,
+	)
 }
