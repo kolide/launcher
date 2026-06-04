@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/kolide/launcher/v2/ee/agent/permissions"
 	"github.com/kolide/launcher/v2/ee/agent/types"
 	"go.etcd.io/bbolt"
 )
@@ -99,11 +100,19 @@ func (d *databaseBackupSaver) backupDb() error {
 	} else if err != nil {
 		return fmt.Errorf("backup succeeded, but error checking if file was created at %s: %w", backupLocation, err)
 	} else {
-		// Log success
-		d.slogger.Log(context.TODO(), slog.LevelDebug,
-			"took backup",
-			"backup_location", backupLocation,
-		)
+		if err := permissions.RestrictFileAccessToRootOnly(backupLocation); err != nil {
+			d.slogger.Log(context.TODO(), slog.LevelError,
+				"took backup, but could not restrict access",
+				"backup_location", backupLocation,
+				"err", err,
+			)
+		} else {
+			// Log success
+			d.slogger.Log(context.TODO(), slog.LevelDebug,
+				"took backup",
+				"backup_location", backupLocation,
+			)
+		}
 	}
 
 	return nil
