@@ -369,6 +369,11 @@ func Test_originIsAllowlisted(t *testing.T) {
 			requestOrigin:     "https://example.com",
 			expectAllowlisted: false,
 		},
+		{
+			testCaseName:      "crafted origin not on allowlist",
+			requestOrigin:     "https://evil.1password.com.evilbaddomain.com",
+			expectAllowlisted: false,
+		},
 	}
 
 	for allowlistedOrigin := range allowlistedDt4aOriginsLookup {
