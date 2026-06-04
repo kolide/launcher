@@ -16,14 +16,10 @@ import (
 	"time"
 
 	"github.com/kolide/launcher/v2/ee/tuf"
+	"github.com/kolide/launcher/v2/pkg/launcher"
 	tufv2metadata "github.com/theupdateframework/go-tuf/v2/metadata"
 	tufv2config "github.com/theupdateframework/go-tuf/v2/metadata/config"
 	tufv2updater "github.com/theupdateframework/go-tuf/v2/metadata/updater"
-)
-
-const (
-	DefaultMetadataURL = "https://tuf.kolide.com"
-	DefaultMirrorURL   = "https://dl.kolide.co"
 )
 
 // Options configures the Download and ListTargets operations.
@@ -37,14 +33,14 @@ func (o *Options) metadataURL() string {
 	if o.MetadataURL != "" {
 		return o.MetadataURL
 	}
-	return DefaultMetadataURL
+	return launcher.DefaultTufServer
 }
 
 func (o *Options) mirrorURL() string {
 	if o.MirrorURL != "" {
 		return o.MirrorURL
 	}
-	return DefaultMirrorURL
+	return launcher.DefaultMirror
 }
 
 func (o *Options) httpClient() *http.Client {

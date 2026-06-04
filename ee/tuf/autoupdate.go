@@ -835,6 +835,15 @@ func PlatformArch() string {
 	return ArchForPlatform(runtime.GOOS, runtime.GOARCH)
 }
 
+// ArchForPlatform returns the TUF arch string for the given platform.
+// Darwin uses "universal"; others use the provided arch.
+func ArchForPlatform(platform, arch string) string {
+	if platform == "darwin" {
+		return "universal"
+	}
+	return arch
+}
+
 // shouldDelayDownload determines whether to delay downloading an update based on our AutoupdateDownloadSplay mechanism.
 // It returns false (no delay) if:
 // - AutoupdateDownloadSplay is disabled (set to 0s)
