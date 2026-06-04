@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/kolide/launcher/v2/ee/agent/permissions"
 	"github.com/kolide/launcher/v2/ee/agent/types"
 	"go.etcd.io/bbolt"
 )
@@ -104,6 +105,21 @@ func (d *databaseBackupSaver) backupDb() error {
 			"took backup",
 			"backup_location", backupLocation,
 		)
+	}
+
+	// Handle permissions for all backup files (rotated/renamed files and/or new files)
+	backups, err := filepath.Glob(backupLauncherDbLocation(d.knapsack.RootDirectory()) + "*")
+	if err != nil {
+		return fmt.Errorf("globbing for files after backup to check permissions: %w", err)
+	}
+	for _, backup := range backups {
+		if err := permissions.RestrictFileAccessToRootOnly(backup); err != nil {
+			d.slogger.Log(context.TODO(), slog.LevelError,
+				"took backup, but could not restrict access",
+				"backup_location", backup,
+				"err", err,
+			)
+		}
 	}
 
 	return nil
