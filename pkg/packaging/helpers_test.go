@@ -28,35 +28,60 @@ func TestSanitizeHostname(t *testing.T) {
 	}
 }
 
-func Test_osqueryVersionFromVersionOutput(t *testing.T) {
+func TestFormatVersion(t *testing.T) {
 	t.Parallel()
 
-	for _, tt := range []struct {
-		testCaseName    string
-		versionOutput   string
-		expectedVersion string
+	var tests = []struct {
+		in       string
+		platform PlatformFlavor
+		out      string
 	}{
 		{
-			testCaseName:    "windows",
-			versionOutput:   "osqueryd.exe version 5.14.1",
-			expectedVersion: "5.14.1",
+			in:       "0.9.2-26-g6146437",
+			platform: Windows,
+			out:      "0.9.2.26",
 		},
 		{
-			testCaseName:    "non-windows",
-			versionOutput:   "osqueryd version 5.13.1",
-			expectedVersion: "5.13.1",
+			in:       "0.9.3-44",
+			platform: Windows,
+			out:      "0.9.3.44",
+		},
+
+		{
+			in:       "0.9.5",
+			platform: Windows,
+			out:      "0.9.5.0",
 		},
 		{
-			testCaseName: "extra spaces",
-			versionOutput: `
-osqueryd version 5.13.1
-`,
-			expectedVersion: "5.13.1",
+			in:       "0.9.2-26-g6146437",
+			platform: Darwin,
+			out:      "0.9.2",
 		},
-	} {
-		t.Run(tt.testCaseName, func(t *testing.T) {
-			t.Parallel()
-			require.Equal(t, tt.expectedVersion, osqueryVersionFromVersionOutput(tt.versionOutput))
-		})
+		{
+			in:       "0.9.3-44",
+			platform: Darwin,
+			out:      "0.9.3",
+		},
+		{
+			in:       "v0.9.5",
+			platform: Darwin,
+			out:      "0.9.5",
+		},
+		{
+			in:       "v10.8.2-1002df",
+			platform: Darwin,
+			out:      "10.8.2",
+		},
+		{
+			in:       "0.9.2-26-g6146437",
+			platform: Linux,
+			out:      "0.9.2-26-g6146437",
+		},
+	}
+
+	for _, tt := range tests {
+		version, err := formatVersion(tt.in, tt.platform)
+		require.NoError(t, err)
+		require.Equal(t, tt.out, version)
 	}
 }

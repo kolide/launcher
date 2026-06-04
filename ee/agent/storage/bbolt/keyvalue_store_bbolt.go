@@ -1,6 +1,7 @@
 package agentbbolt
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
@@ -73,7 +74,9 @@ func (s *bboltKeyValueStore) Get(key []byte) (value []byte, err error) {
 			return NewNoBucketError(s.bucketName)
 		}
 
-		value = b.Get(key)
+		// The value returned by b.Get is only valid for the lifetime of this transaction.
+		// Clone the returned value, so that we don't lose it if bbolt remaps.
+		value = bytes.Clone(b.Get(key))
 		return nil
 	}); err != nil {
 		return nil, err

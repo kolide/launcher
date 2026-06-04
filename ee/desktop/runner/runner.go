@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	syncatomic "sync/atomic"
 	"time"
 
 	"github.com/kolide/kit/ulid"
@@ -36,12 +37,11 @@ import (
 	"github.com/kolide/launcher/v2/ee/observability"
 	"github.com/kolide/launcher/v2/ee/presencedetection"
 	"github.com/kolide/launcher/v2/ee/ui/assets"
+	"github.com/kolide/launcher/v2/pkg/atomic"
 	"github.com/kolide/launcher/v2/pkg/backoff"
 	"github.com/kolide/launcher/v2/pkg/rungroup"
 	"github.com/shirou/gopsutil/v4/process"
-	"go.uber.org/atomic"
 	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 )
 
 const nonWindowsDesktopSocketPrefix = "desktop.sock"
@@ -123,7 +123,7 @@ type DesktopUsersProcessesRunner struct {
 	// menuRefreshInterval is the interval on which the desktop menu will be refreshed
 	menuRefreshInterval time.Duration
 	interrupt           chan struct{}
-	interrupted         atomic.Bool
+	interrupted         syncatomic.Bool
 	// uidProcs is a map of uid to desktop process
 	uidProcs     map[string]processRecord
 	uidProcsLock *sync.Mutex
@@ -432,7 +432,7 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses(ctx context.Context) 
 			)
 		}
 
-		maps.Clear(r.uidProcs)
+		maps.Clear(r.uidProcs) //nolint:govet // fine not to inline this
 		return
 	case <-time.After(r.interruptTimeout):
 		r.slogger.Log(ctx, slog.LevelInfo,
@@ -585,17 +585,17 @@ func (r *DesktopUsersProcessesRunner) FlagsChanged(ctx context.Context, flagKeys
 	defer span.End()
 
 	// Handle KolideServerURL changes -- update the hostname displayed in the debug menu
-	if slices.Contains(flagKeys, keys.KolideServerURL) {
+	if keys.Contains(flagKeys, keys.KolideServerURL) {
 		r.refreshMenu()
 	}
 
 	// Handle DesktopUpdateInterval changes
-	if slices.Contains(flagKeys, keys.DesktopUpdateInterval) {
+	if keys.Contains(flagKeys, keys.DesktopUpdateInterval) {
 		r.updateIntervalChanged(ctx, r.knapsack.DesktopUpdateInterval())
 	}
 
 	// Handle DesktopGoMaxProcs changes
-	if slices.Contains(flagKeys, keys.DesktopGoMaxProcs) {
+	if keys.Contains(flagKeys, keys.DesktopGoMaxProcs) {
 		r.slogger.Log(ctx, slog.LevelInfo,
 			"desktop go max procs changed by control server, restarting desktop processes",
 			"new_value", r.knapsack.DesktopGoMaxProcs(),
@@ -607,7 +607,7 @@ func (r *DesktopUsersProcessesRunner) FlagsChanged(ctx context.Context, flagKeys
 	}
 
 	// Handle DesktopEnabled changes
-	if !slices.Contains(flagKeys, keys.DesktopEnabled) {
+	if !keys.Contains(flagKeys, keys.DesktopEnabled) {
 		return
 	}
 
@@ -749,7 +749,7 @@ func (r *DesktopUsersProcessesRunner) generateMenuFile() error {
 	}
 
 	// Convert the raw JSON to a string and feed it to the parser for template expansion
-	parser := menu.NewTemplateParser(td)
+	parser := menu.NewTemplateParser(td, r.knapsack.LocalizationData())
 	parsedMenuDataStr, err := parser.Parse(string(menuTemplateFileBytes))
 	if err != nil {
 		return fmt.Errorf("failed to parse menu data: %w", err)
@@ -815,7 +815,10 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 		return fmt.Errorf("determining executable path: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// We use a slightly longer timeout here in case we've just booted up
+	// and are waiting for dependent services to start before we start up
+	// the desktop process.
+	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 	defer cancel()
 
 	consoleUsers, err := consoleuser.CurrentUids(ctx)
@@ -827,6 +830,10 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 		if r.userHasDesktopProcess(uid) {
 			continue
 		}
+
+		// Check to see if necessary dependencies are running on macOS before we spawn the desktop process.
+		// This will block for up to 30 seconds, at which point we proceed with trying to spawn anyway.
+		r.waitForReadyToSpawnDesktopState(ctx, uid)
 
 		// we've decided to spawn a new desktop user process for this user
 		if err := r.spawnForUser(ctx, uid, executablePath); err != nil {

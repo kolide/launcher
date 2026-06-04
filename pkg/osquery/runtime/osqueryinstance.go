@@ -544,11 +544,13 @@ func (i *OsqueryInstance) Launch() error {
 
 	// All done with osquery setup! Mark instance as connected, then proceed
 	// with setting up remaining errgroups.
-	if err := i.history.SetConnected(i.runId, i); err != nil {
-		i.slogger.Log(ctx, slog.LevelWarn,
-			"could not set connection time for osquery instance history",
-			"err", err,
-		)
+	if i.history != nil {
+		if err := i.history.SetConnected(i.runId, i); err != nil {
+			i.slogger.Log(ctx, slog.LevelWarn,
+				"could not set connection time for osquery instance history",
+				"err", err,
+			)
+		}
 	}
 
 	// Health check on interval
@@ -715,11 +717,10 @@ func (i *OsqueryInstance) startKolideSaasExtension(ctx context.Context) error {
 // osqueryFilePaths is a struct which contains the relevant file paths needed to
 // launch an osqueryd instance.
 type osqueryFilePaths struct {
-	augeasPath            string
-	databasePath          string
-	extensionAutoloadPath string
-	extensionSocketPath   string
-	pidfilePath           string
+	augeasPath          string
+	databasePath        string
+	extensionSocketPath string
+	pidfilePath         string
 }
 
 // calculateOsqueryPaths accepts a path to a working osqueryd binary and a root
@@ -735,28 +736,19 @@ func calculateOsqueryPaths(rootDirectory string, enrollmentId string, runId stri
 		extensionSocketPath = SocketPath(rootDirectory, runId)
 	}
 
-	extensionAutoloadPath := filepath.Join(rootDirectory, "osquery.autoload")
-
 	// We want to use a unique pidfile per launcher run to avoid file locking issues.
 	// See: https://github.com/kolide/launcher/issues/1599
 	osqueryFilePaths := &osqueryFilePaths{
-		pidfilePath:           filepath.Join(rootDirectory, fmt.Sprintf("osquery-%s.pid", runId)),
-		databasePath:          filepath.Join(rootDirectory, fmt.Sprintf("osquery-%s.db", enrollmentId)),
-		augeasPath:            filepath.Join(rootDirectory, "augeas-lenses"),
-		extensionSocketPath:   extensionSocketPath,
-		extensionAutoloadPath: extensionAutoloadPath,
+		pidfilePath:         filepath.Join(rootDirectory, fmt.Sprintf("osquery-%s.pid", runId)),
+		databasePath:        filepath.Join(rootDirectory, fmt.Sprintf("osquery-%s.db", enrollmentId)),
+		augeasPath:          filepath.Join(rootDirectory, "augeas-lenses"),
+		extensionSocketPath: extensionSocketPath,
 	}
 
 	// Keep default database path for default instance
 	if enrollmentId == types.DefaultEnrollmentID {
 		osqueryFilePaths.databasePath = filepath.Join(rootDirectory, "osquery.db")
 	}
-
-	osqueryAutoloadFile, err := os.Create(extensionAutoloadPath)
-	if err != nil {
-		return nil, fmt.Errorf("creating autoload file: %w", err)
-	}
-	defer osqueryAutoloadFile.Close()
 
 	return osqueryFilePaths, nil
 }
@@ -853,7 +845,6 @@ func (i *OsqueryInstance) createOsquerydCommand(osquerydBinary string) (*exec.Cm
 		fmt.Sprintf("--pidfile=%s", i.paths.pidfilePath),
 		fmt.Sprintf("--database_path=%s", i.paths.databasePath),
 		fmt.Sprintf("--extensions_socket=%s", i.paths.extensionSocketPath),
-		fmt.Sprintf("--extensions_autoload=%s", i.paths.extensionAutoloadPath),
 		"--disable_extensions=false",
 		"--extensions_timeout=20",
 		fmt.Sprintf("--config_plugin=%s", KolideSaasExtensionName),

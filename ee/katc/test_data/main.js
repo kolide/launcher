@@ -2,6 +2,7 @@
     const databaseName = "launchertestdb";
     const objectStoreName = "launchertestobjstore";
     const mixedKeysObjectStoreName = "launchertestobjstore-mixedkeys";
+    const blobObjectStoreName = "launchertestobjstore-blob";
     const objectStoreKeyPath = "uuid";
     const databaseVersion = 1;
 
@@ -258,6 +259,31 @@
             mixedKeysTransaction.add({ test: 7 }, "plainString3")
             mixedKeysTransaction.add({ test: 8 }, 111222)
             mixedKeysTransaction.add({ test: 9 }, ["seven", 8, 9])
+            // create an array of objects that we will store as the root value to test decoding
+            // a root array value
+            const rootArrayStoreData = [
+                {
+                    uuid: "0b438872-8b65-4e99-9cd4-95f0eeac2ad6",
+                    name: "rootArrayStoreData1",
+                    test: 10,
+                },
+                {
+                    uuid: "03b3e669-3e7a-482c-83b2-8a800b9f804f",
+                    name: "rootArrayStoreData2",
+                    test: 11,
+                },
+            ]
+
+            const rootArrayCompressedStoreData = [
+                {
+                    id: 1,
+                    data: "SNAPPY".repeat(170000), // a large chunk of highly compressible data to trigger automatic compression
+                    test: 12,
+                },
+            ]
+            // key names don't matter for us here, but note that you can only add arbitrary types (e.g. array) as root value if using self-provided keys
+            mixedKeysTransaction.add(rootArrayStoreData, "rootArrayStoreData");
+            mixedKeysTransaction.add(rootArrayCompressedStoreData, "rootArrayCompressedStoreData");
 
             mixedKeysTransaction.onsuccess = (event) => {
                 console.log("Added all mixed key data to IndexedDB");
@@ -276,5 +302,43 @@
     secondRequest.onsuccess = (event) => {
         event.target.result.close();
         console.log("Successfully created database with second object store");
+    };
+
+    // Incrementing the db version again to force a new object store creation (same as above)
+    const thirdRequest = window.indexedDB.open(databaseName, databaseVersion + 2);
+    thirdRequest.onupgradeneeded = (event) => {
+        const db3 = event.target.result;
+        const blobObjectStore = db3.createObjectStore(blobObjectStoreName, { keyPath: objectStoreKeyPath });
+
+        blobObjectStore.transaction.oncomplete = (event) => {
+            const blobTransaction = db3
+                .transaction(blobObjectStoreName, "readwrite")
+                .objectStore(blobObjectStoreName);
+
+            // We are trying to exceed kIDBWrapThreshold = 65536.
+            // 2000 UUIDs is adequate.
+            let bigArray = [];
+            for (let i = 0; i < 2000; i++) {
+                bigArray[i] = crypto.randomUUID();
+            }
+            blobTransaction.add({ uuid: bigArray });
+
+            blobTransaction.onsuccess = (event) => {
+                console.log("Added all blob data to IndexedDB");
+            };
+            blobTransaction.onerror = (event) => {
+                console.log("Error adding blob data to database", event.error);
+            };
+        };
+        blobObjectStore.transaction.onerror = (event) => {
+            console.log("Error creating blob object store", event.error);
+        };
+    };
+    thirdRequest.onerror = (event) => {
+        console.log("Error creating database with third object store", request.error);
+    };
+    thirdRequest.onsuccess = (event) => {
+        event.target.result.close();
+        console.log("Successfully created database with third object store");
     };
 })();

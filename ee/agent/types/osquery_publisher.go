@@ -10,6 +10,8 @@ import (
 // OsqueryPublisher is an interface for publishing osquery logs/results.
 // The concrete implementation is provided by osquerypublisher.LogPublisherClient.
 type OsqueryPublisher interface {
+	// Close closes any client idle connections and releases/resets any compression state
+	Close() error
 	// Ping refreshes the token cache. also satisfies the control subscriber interface to handle token updates
 	Ping()
 	// PublishLogs publishes logs from the osquery process. These may be

@@ -191,6 +191,14 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:      "blank first line with explicit delimiter is skipped",
+			input:     []byte("\nname,age\nalice,30\n"),
+			delimiter: ",",
+			expected: []map[string]string{
+				{"name": "alice", "age": "30"},
+			},
+		},
 	}
 
 	for _, tt := range tests {

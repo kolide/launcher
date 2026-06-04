@@ -29,8 +29,6 @@ func main() {
 		flXml   = flagset.String("xml", "", "Path to xml file")
 		flIni   = flagset.String("ini", "", "Path to ini file")
 		flQuery = flagset.String("q", "", "query")
-
-		flDebug = flagset.Bool("debug", false, "use a debug logger")
 	)
 
 	if err := ff.Parse(flagset, os.Args[1:],
@@ -44,9 +42,6 @@ func main() {
 		dataflatten.WithSlogger(multislogger.NewNopLogger()),
 		dataflatten.WithNestedPlist(),
 		dataflatten.WithQuery(strings.Split(*flQuery, `/`)),
-	}
-	if *flDebug {
-		opts = append(opts, dataflatten.WithDebugLogging())
 	}
 
 	rows := []dataflatten.Row{}

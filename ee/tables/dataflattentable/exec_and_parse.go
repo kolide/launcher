@@ -29,7 +29,6 @@ type execTableV2 struct {
 	description         string
 	flattener           bytesFlattener
 	timeoutSeconds      int
-	tabledebug          bool
 	includeStderr       bool
 	reportStderr        bool
 	reportMissingBinary bool
@@ -42,12 +41,6 @@ type execTableV2Opt func(*execTableV2)
 func WithTimeoutSeconds(ts int) execTableV2Opt {
 	return func(t *execTableV2) {
 		t.timeoutSeconds = ts
-	}
-}
-
-func WithTableDebug() execTableV2Opt {
-	return func(t *execTableV2) {
-		t.tabledebug = true
 	}
 }
 
@@ -208,9 +201,6 @@ func (tbl *execTableV2) generate(ctx context.Context, queryContext table.QueryCo
 		flattenOpts := []dataflatten.FlattenOpts{
 			dataflatten.WithSlogger(tbl.slogger),
 			dataflatten.WithQuery(strings.Split(dataQuery, "/")),
-		}
-		if tbl.tabledebug {
-			flattenOpts = append(flattenOpts, dataflatten.WithDebugLogging())
 		}
 
 		flattened, err := tbl.flattener.FlattenBytes(stdout.Bytes(), flattenOpts...)

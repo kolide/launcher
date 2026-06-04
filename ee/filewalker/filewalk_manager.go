@@ -4,13 +4,26 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"sync"
 	"sync/atomic"
 
 	"github.com/kolide/launcher/v2/ee/agent/types"
 	"github.com/kolide/launcher/v2/ee/gowrapper"
+	"github.com/kolide/launcher/v2/ee/observability"
 )
+
+// FilewalkNowAction is the control server action forwarded by the actionqueue
+// to the filewalk manager to trigger ad hoc filewalks.
+const FilewalkNowAction = "filewalk_now"
+
+// controlServerFilewalkRequest is the request sent down by the control server
+// to trigger ad hoc filewalks. If the list of filewalks is empty, the manager
+// will trigger filewalks for all of its filewalkers.
+type controlServerFilewalkRequest struct {
+	FilewalkNames []string `json:"filewalks"`
+}
 
 // FilewalkManager creates and starts all configured filewalkers, and handles
 // updates to the filewalker configs.
@@ -149,4 +162,71 @@ func (fm *FilewalkManager) Ping() {
 		"completed filewalk config updates",
 		"filewalker_count", len(fm.filewalkers),
 	)
+}
+
+// Do satisfies the actionqueue.actor interface; it allows the control server to send
+// requests down to filewalk immediately.
+func (fm *FilewalkManager) Do(data io.Reader) error {
+	ctx, span := observability.StartSpan(context.TODO())
+	defer span.End()
+
+	var req controlServerFilewalkRequest
+	if err := json.NewDecoder(data).Decode(&req); err != nil {
+		fm.slogger.Log(ctx, slog.LevelWarn,
+			"received filewalk request in unexpected format from control server, discarding",
+			"err", err,
+		)
+		// We don't return an error because we don't want the actionqueue to retry this request
+		return nil
+	}
+
+	fm.slogger.Log(ctx, slog.LevelInfo,
+		"received request from control server to perform filewalks now",
+		"requested_filewalks", req.FilewalkNames,
+	)
+
+	fm.filewalkersLock.Lock()
+	defer fm.filewalkersLock.Unlock()
+
+	if len(req.FilewalkNames) > 0 {
+		startedFilewalks := make([]string, 0)
+		for _, filewalkName := range req.FilewalkNames {
+			fw, fwFound := fm.filewalkers[filewalkName]
+			if !fwFound {
+				fm.slogger.Log(ctx, slog.LevelWarn,
+					"filewalk request from control server contained unknown filewalk name",
+					"filewalk_name", filewalkName,
+				)
+				continue
+			}
+			// Filewalks can take a while -- kick off the filewalk in the background so we don't
+			// slow down control server processing.
+			gowrapper.Go(context.TODO(), fm.slogger, func() { fw.Filewalk(context.TODO()) })
+			startedFilewalks = append(startedFilewalks, filewalkName)
+		}
+
+		fm.slogger.Log(ctx, slog.LevelInfo,
+			"kicked off specified filewalks per control server request",
+			"requested_filewalks", req.FilewalkNames,
+			"started_filewalks", startedFilewalks,
+		)
+
+		return nil
+	}
+
+	// If no filewalks were specified, kick off filewalks for all known filewalkers
+	startedFilewalks := make([]string, 0)
+	for filewalkName, fw := range fm.filewalkers {
+		// Filewalks can take a while -- kick off the filewalk in the background so we don't
+		// slow down control server processing.
+		gowrapper.Go(context.TODO(), fm.slogger, func() { fw.Filewalk(context.TODO()) })
+		startedFilewalks = append(startedFilewalks, filewalkName)
+	}
+
+	fm.slogger.Log(ctx, slog.LevelInfo,
+		"kicked off all filewalks per control server request",
+		"started_filewalks", startedFilewalks,
+	)
+
+	return nil
 }

@@ -5,6 +5,7 @@ package menu
 import (
 	"context"
 	"fmt"
+	"strings"
 	"syscall"
 
 	"github.com/kolide/launcher/v2/ee/allowedcmd"
@@ -13,6 +14,7 @@ import (
 // open opens the specified URL in the default browser of the user
 // See https://stackoverflow.com/a/39324149/1705598
 func open(url string) error {
+	url = strings.ReplaceAll(url, "&", "^&")
 	cmd, err := allowedcmd.CommandPrompt.Cmd(context.TODO(), "/C", "start", url)
 	if err != nil {
 		return fmt.Errorf("creating command: %w", err)

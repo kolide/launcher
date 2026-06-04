@@ -34,7 +34,7 @@ func rpmParse(reader io.Reader) (any, error) {
 		// We split each line by ":" to get a key/value pair.
 		kv := strings.SplitN(line, ":", 2)
 		var key = strings.ToLower(strings.TrimSpace(kv[0]))
-		if slices.Contains(allowedKeys, key) {
+		if slices.Contains(allowedKeys, key) { //nolint:govet // fine not to inline this
 			// rpm doesn't provide a clean break. Description seems
 			// to come last, so once that is found we set a flag to
 			// say we are reading it, then I'm appending each line

@@ -20,16 +20,18 @@ func TestMain(m *testing.M) {
 }
 
 var testOsqueryBinary string
+var osqueryBinaryDownloadErr error
 
 // downloadOnceFunc downloads a real osquery binary for use in tests. This function
 // can be called multiple times but will only execute once -- the osquery binary is
 // stored at path `testOsqueryBinary` and can be reused by all subsequent tests.
 var downloadOnceFunc = sync.OnceFunc(func() {
-	testOsqueryBinary, _, _ = testutil.DownloadOsquery("stable")
+	testOsqueryBinary, _, osqueryBinaryDownloadErr = testutil.DownloadOsquery("stable")
 })
 
 func Test_OsqueryRunSqlNoIO(t *testing.T) {
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 
 	osq, err := NewOsqueryProcess(testOsqueryBinary)
 	require.NoError(t, err)
@@ -39,6 +41,7 @@ func Test_OsqueryRunSqlNoIO(t *testing.T) {
 
 func Test_OsqueryRunSql(t *testing.T) {
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 
 	tests := []struct {
 		name      string

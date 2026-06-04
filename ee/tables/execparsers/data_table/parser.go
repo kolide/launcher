@@ -73,8 +73,11 @@ func (p parser) parseLines(reader io.Reader) ([]map[string]string, error) {
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		// headers weren't provided, so retrieve them from the first available line.
+		// headers weren't provided, so retrieve them from the first non-blank line.
 		if headerCount == 0 {
+			if strings.TrimSpace(line) == "" {
+				continue
+			}
 			p.headers = p.lineSplit(line, headerCount)
 			headerCount = len(p.headers)
 			continue

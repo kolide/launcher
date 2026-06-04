@@ -93,8 +93,10 @@ func TestControlServiceRegisterConsumer(t *testing.T) {
 
 			mockKnapsack := typesMocks.NewKnapsack(t)
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
+			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.InModernStandby)
 			mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
 			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+			mockKnapsack.On("InModernStandby").Return(false).Maybe()
 
 			data := nopDataProvider{}
 			controlOpts := []Option{}
@@ -125,6 +127,7 @@ func TestControlServiceRegisterConsumerMultiple(t *testing.T) {
 
 			mockKnapsack := typesMocks.NewKnapsack(t)
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
+			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.InModernStandby)
 			mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
 			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 
@@ -172,8 +175,10 @@ func TestControlServiceUpdate(t *testing.T) {
 
 			mockKnapsack := typesMocks.NewKnapsack(t)
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
+			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.InModernStandby)
 			mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
 			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+			mockKnapsack.On("InModernStandby").Return(false).Maybe()
 
 			data := nopDataProvider{}
 			controlOpts := []Option{}
@@ -208,8 +213,10 @@ func TestControlServiceUpdateErr(t *testing.T) {
 
 	mockKnapsack := typesMocks.NewKnapsack(t)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.InModernStandby)
 	mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+	mockKnapsack.On("InModernStandby").Return(false).Maybe()
 
 	// Set up test data with known hash
 	subsystems := map[string]string{"actions": "abc123"}
@@ -245,8 +252,10 @@ func TestControlServiceRetryAfterUpdateErr(t *testing.T) {
 
 	mockKnapsack := typesMocks.NewKnapsack(t)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.InModernStandby)
 	mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+	mockKnapsack.On("InModernStandby").Return(false)
 
 	// First fetch data
 	subsystems := map[string]string{"actions": "abc123"}
@@ -316,9 +325,11 @@ func TestControlServiceFetch(t *testing.T) {
 
 			mockKnapsack := typesMocks.NewKnapsack(t)
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
+			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.InModernStandby)
 			mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
 			mockKnapsack.On("ForceControlSubsystems").Return(false)
 			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+			mockKnapsack.On("InModernStandby").Return(false).Maybe()
 
 			data, _ := NewControlTestClient(tt.subsystems, tt.hashData)
 			controlOpts := []Option{}
@@ -346,14 +357,67 @@ func TestControlServiceFetch(t *testing.T) {
 	}
 }
 
+func TestFetch_DoesNotExecuteInModernStandby(t *testing.T) {
+	t.Parallel()
+
+	mockKnapsack := typesMocks.NewKnapsack(t)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.InModernStandby)
+	mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
+	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+	mockKnapsack.On("InModernStandby").Return(true)
+
+	data, _ := NewControlTestClient(map[string]string{"desktop": "502a42f0"}, map[string]any{"502a42f0": "status"})
+	cs := New(mockKnapsack, data)
+
+	// Register a consumer so we can see if we got updates or not
+	c := &mockConsumer{}
+	err := cs.RegisterConsumer("desktop", c)
+	require.NoError(t, err)
+
+	// Call fetch and confirm it doesn't execute
+	require.NoError(t, cs.Fetch(t.Context()))
+	require.Equal(t, 0, c.updates)
+}
+
+func TestFlagsChanged_TriggersFetch(t *testing.T) {
+	t.Parallel()
+
+	mockKnapsack := typesMocks.NewKnapsack(t)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.InModernStandby)
+	mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
+	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+	mockKnapsack.On("InModernStandby").Return(false)
+
+	data, _ := NewControlTestClient(map[string]string{"desktop": "502a42f0"}, map[string]any{"502a42f0": "status"})
+	cs := New(mockKnapsack, data)
+
+	// Register a consumer so we can see if we got updates or not
+	c := &mockConsumer{}
+	err := cs.RegisterConsumer("desktop", c)
+	require.NoError(t, err)
+
+	// Confirm we start out with zero updates
+	require.Equal(t, 0, c.updates)
+
+	// Call FlagsChanged
+	cs.FlagsChanged(t.Context(), keys.InModernStandby)
+
+	// Confirm Fetch executed
+	require.Equal(t, 1, c.updates)
+}
+
 func TestControlServiceFetch_IgnoresUnknownSubsystems(t *testing.T) {
 	t.Parallel()
 
 	mockKnapsack := typesMocks.NewKnapsack(t)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.InModernStandby)
 	mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
 	mockKnapsack.On("ForceControlSubsystems").Return(false)
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+	mockKnapsack.On("InModernStandby").Return(false)
 
 	unknownSubsystemHash := "602a42f1"
 	subsystems := map[string]string{"desktop": "502a42f0", "unknown": unknownSubsystemHash}
@@ -471,8 +535,10 @@ func TestControlServicePersistLastFetched(t *testing.T) {
 
 				mockKnapsack := typesMocks.NewKnapsack(t)
 				mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
+				mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.InModernStandby)
 				mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
 				mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+				mockKnapsack.On("InModernStandby").Return(false)
 
 				if j >= tt.expectedUpdates {
 					// ForceControlSubsystems is only called when no update would normally be triggered
@@ -537,8 +603,10 @@ func Test_knownSubsystem(t *testing.T) {
 
 			mockKnapsack := typesMocks.NewKnapsack(t)
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
+			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.InModernStandby)
 			mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
 			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+			mockKnapsack.On("InModernStandby").Return(false).Maybe()
 
 			controlOpts := []Option{}
 			cs := New(mockKnapsack, nil, controlOpts...)
@@ -571,6 +639,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 		Level: slog.LevelDebug,
 	}))
 	k.On("Slogger").Return(slogger)
+	k.On("InModernStandby").Return(false).Maybe()
 	data := &TestClient{}
 	control := New(k, data)
 

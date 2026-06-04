@@ -54,17 +54,14 @@ func TestCalculateOsqueryPaths(t *testing.T) {
 	} else {
 		require.Equal(t, fmt.Sprintf(`\\.\pipe\kolide-osquery-%s`, runId), paths.extensionSocketPath)
 	}
-
-	require.Equal(t, rootDir, filepath.Dir(paths.extensionAutoloadPath))
 }
 
 func TestCreateOsqueryCommand(t *testing.T) {
 	t.Parallel()
 	paths := &osqueryFilePaths{
-		pidfilePath:           "/foo/bar/osquery-abcd.pid",
-		databasePath:          "/foo/bar/osquery.db",
-		extensionSocketPath:   "/foo/bar/osquery.sock",
-		extensionAutoloadPath: "/foo/bar/osquery.autoload",
+		pidfilePath:         "/foo/bar/osquery-abcd.pid",
+		databasePath:        "/foo/bar/osquery.db",
+		extensionSocketPath: "/foo/bar/osquery.sock",
 	}
 
 	rootDir := t.TempDir()
@@ -116,8 +113,9 @@ func TestCreateOsqueryCommandWithFlags(t *testing.T) {
 	cmd, err := i.createOsquerydCommand("") // we do not actually exec so don't need to download a real osquery for this test
 	require.NoError(t, err)
 
-	// count of flags that cannot be overridden with this option
-	const nonOverridableFlagsCount = 8
+	// count of flags that cannot be overridden with this option:
+	// pidfile, database_path, extensions_socket, disable_extensions, extensions_timeout, config_plugin, extensions_require
+	const nonOverridableFlagsCount = 7
 
 	// Ensure that the provided flags were placed last (so that they can override)
 	assert.Equal(
@@ -276,6 +274,7 @@ func Test_healthcheckWithRetries(t *testing.T) {
 func TestHealthy(t *testing.T) {
 	t.Parallel()
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 	setupOnceFunc()
 
 	// Set up instance dependencies
@@ -297,7 +296,11 @@ func TestHealthy(t *testing.T) {
 	k.On("NodeKey", types.DefaultEnrollmentID).Return(ulid.New(), nil).Maybe()
 	k.On("EnsureEnrollmentStored", types.DefaultEnrollmentID).Return(nil).Maybe()
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
-	k.On("OsqueryHealthcheckStartupDelay").Return(10 * time.Second)
+	// OsqueryHealthcheckStartupDelay defaults to ten minutes, which is too long for tests.
+	// We don't want an extremely short interval, though, because we need to give the osquery instance
+	// time to actually start before we begin healthchecking it. So, we wait for at least the
+	// amount of time that we give for the socket to appear.
+	k.On("OsqueryHealthcheckStartupDelay").Return(socketOpenTimeout)
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
@@ -377,6 +380,7 @@ func TestHealthy(t *testing.T) {
 func TestLaunch(t *testing.T) {
 	t.Parallel()
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 	setupOnceFunc()
 
 	logBytes, slogger := setUpTestSlogger()
@@ -398,7 +402,11 @@ func TestLaunch(t *testing.T) {
 	k.On("NodeKey", types.DefaultEnrollmentID).Return(ulid.New(), nil).Maybe()
 	k.On("EnsureEnrollmentStored", types.DefaultEnrollmentID).Return(nil).Maybe()
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
-	k.On("OsqueryHealthcheckStartupDelay").Return(10 * time.Second)
+	// OsqueryHealthcheckStartupDelay defaults to ten minutes, which is too long for tests.
+	// We don't want an extremely short interval, though, because we need to give the osquery instance
+	// time to actually start before we begin healthchecking it. So, we wait for at least the
+	// amount of time that we give for the socket to appear.
+	k.On("OsqueryHealthcheckStartupDelay").Return(socketOpenTimeout)
 	k.On("InModernStandby").Return(false).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
@@ -471,6 +479,7 @@ func TestLaunch(t *testing.T) {
 func TestReloadKatcExtension(t *testing.T) {
 	t.Parallel()
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 
 	// Set up all million dependencies
 	logBytes, slogger := setUpTestSlogger()
@@ -504,7 +513,11 @@ func TestReloadKatcExtension(t *testing.T) {
 	k.On("EnsureEnrollmentStored", types.DefaultEnrollmentID).Return(nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
-	k.On("OsqueryHealthcheckStartupDelay").Return(10 * time.Second)
+	// OsqueryHealthcheckStartupDelay defaults to ten minutes, which is too long for tests.
+	// We don't want an extremely short interval, though, because we need to give the osquery instance
+	// time to actually start before we begin healthchecking it. So, we wait for at least the
+	// amount of time that we give for the socket to appear.
+	k.On("OsqueryHealthcheckStartupDelay").Return(socketOpenTimeout)
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()

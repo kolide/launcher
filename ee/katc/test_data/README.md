@@ -19,22 +19,54 @@ cd .. && zip -r test_data/indexeddbs/bytewise.leveldb.zip test_data/bytewise_lev
 
 ## Instructions for generating new test IndexedDBs
 
-Edit [main.js](./main.js) as desired. Open [index.html](./index.html) using Chrome or Firefox,
+Edit [main.js](./main.js) as desired. Open [index.html](./index.html) using Chrome, Firefox, or Safari,
 depending on the desired outcome.
 
 Loading the page will populate IndexedDB with the desired data. You should also see a
 console log message to this effect.
 
 The file will now be available with other IndexedDB files. On macOS, Chrome indexeddb files
-can be found at `/Users/<my-username>/Library/Application Support/Google/Chrome/<Profile Name>/IndexedDB/file__0.indexeddb.leveldb`.
+can be found at `/Users/<my-username>/Library/Application Support/Google/Chrome/<Profile Name>/IndexedDB/file__0.indexeddb.leveldb` and `file__0.indexeddb.blob`.
 (The name of the indexeddb file will likely be the same, but you can confirm the origin
 matches in Dev Tools in your browser by going to Application => IndexedDB => launchertestdb.)
 On macOS, Firefox sqlite files can be found at a path similar to this one:
 `/Users/<your-username>/Library/Application Support/Firefox/Profiles/*.default*/storage/default/file++++*+launcher+ee+katc+test_data+index.html/idb/*.sqlite`.
+On macOS, Safari sqlite files can be found at a path similar to this one: `/Users/<my-username>/Library/Containers/com.apple.Safari/Data/Library/WebKit/WebsiteData/Default/*/*/IndexedDB/*/IndexedDB.sqlite3`.
+The path is random, so check the mod time for the file to determine which one you just modified.
+Unless your Terminal has FDA, you will need to find this file via Finder.
 
-Zip the .indexeddb.leveldb directory (for Chrome) or the .sqlite file (for Firefox),
+Zip the .indexeddb.leveldb and .indexeddb.blob directory (for Chrome) or the .sqlite file (for Firefox)
+or the .sqlite3 file (for Safari), using `zip` on the command-line, and
 then move the zipped file to [indexeddbs](./indexeddbs). You can then reference this file
 in the indexeddb tests.
+
+### Commands for the above
+
+#### Chrome
+
+Open the file in a new profile:
+
+```
+mkdir /tmp/chrome-launchertestdb
+open -a "Google Chrome" file:///<path-to-launcher-repo>/ee/katc/test_data/index.html --args --user-data-dir=/tmp/chrome-launchertestdb --allow-file-access-from-files
+```
+
+After confirming that the database was created, create zips and clean up profile:
+
+```
+cd <path-to-launcher-repo>/ee/katc/test_data/indexeddbs
+cp -r /tmp/chrome-launchertestdb/Default/IndexedDB/file__0.indexeddb.leveldb .
+rm file__0.indexeddb.leveldb.zip
+zip -r file__0.indexeddb.leveldb.zip file__0.indexeddb.leveldb/
+rm -r file__0.indexeddb.leveldb/
+
+cp -r /tmp/chrome-launchertestdb/Default/IndexedDB/file__0.indexeddb.blob .
+rm file__0.indexeddb.blob.zip
+zip -r file__0.indexeddb.blob.zip file__0.indexeddb.blob/
+rm -r file__0.indexeddb.blob/
+
+rm -r /tmp/chrome-launchertestdb
+```
 
 ## Troubleshooting parsing errors
 
@@ -60,6 +92,7 @@ The exact deserialization process differs a bit between the two browsers, but in
 
 For Chrome, review the code [here](https://github.com/v8/v8/blob/master/src/objects/value-serializer.cc).
 For Firefox, review the code [here](https://searchfox.org/mozilla-central/source/js/src/vm/StructuredClone.cpp).
+For Safari, review the code [here](https://github.com/WebKit/WebKit/blob/main/Source/WebCore/bindings/js/SerializedScriptValue.cpp).
 
 ### Most likely parsing issues
 
@@ -87,8 +120,17 @@ you handcrafted this database, you should not commit it to launcher, in case it 
 Otherwise, for new data types, you can add the new data type to [main.js](./main.js) and update the existing
 databases in order to test your fixes.
 
+### Missing data in test database only
+
+If the database gets too large, then `TestQueryChromeIndexedDBMixedKeyIteration` starts missing data
+on disk. It is not clear why this is the case.
+
+Previously, repeatedly clearing state for Chrome (closing Chrome entirely, re-generating the database,
+refreshing it, closing Chrome entirely again, maybe rebooting computer) helped fix this issue.
+
 ## References
 
 * [Helpful tutorial for working with the IndexedDB API](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API/Using_IndexedDB)
 * [Chrome serialization code](https://github.com/v8/v8/blob/master/src/objects/value-serializer.cc)
 * [Firefox serialization code](https://searchfox.org/mozilla-central/source/js/src/vm/StructuredClone.cpp)
+* [Safari serialization code](https://github.com/WebKit/WebKit/blob/main/Source/WebCore/bindings/js/SerializedScriptValue.cpp)

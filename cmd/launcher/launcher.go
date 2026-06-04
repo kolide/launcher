@@ -410,6 +410,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	logPublisherHTTPClient := osquerypublisher.NewPublisherHTTPClient()
 	logPublishClient := osquerypublisher.NewLogPublisherClient(slogger, k, logPublisherHTTPClient)
 	k.SetOsqueryPublisher(logPublishClient)
+	defer logPublishClient.Close()
 
 	// create the runner that will launch osquery
 	osqueryRunner := osqueryruntime.New(
@@ -511,6 +512,8 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		actionsQueue.RegisterActor(flareconsumer.FlareSubsystem, flareconsumer.New(k))
 		// register force full control data fetch consumer
 		actionsQueue.RegisterActor(control.ForceFullControlDataFetchAction, controlService)
+		// register "filewalk now" consumer
+		actionsQueue.RegisterActor(filewalker.FilewalkNowAction, filewalkManager)
 
 		// create notification consumer
 		notificationConsumer, err := notificationconsumer.NewNotifyConsumer(
@@ -545,7 +548,10 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			controlService.RegisterSubscriber(authTokensSubsystemName, telemetryExporter)
 		}
 
+		// logPublishClient handles refreshing its own auth tokens and encryption keys from the token store
 		controlService.RegisterSubscriber(authTokensSubsystemName, logPublishClient)
+		// logPublishClient handles embedding device metadata into encrypted payloads, subscribe to any changes in e.g. device ID
+		controlService.RegisterSubscriber(serverDataSubsystemName, logPublishClient)
 
 		if metadataWriter := internal.NewMetadataWriter(slogger, k); metadataWriter == nil {
 			slogger.Log(ctx, slog.LevelError,

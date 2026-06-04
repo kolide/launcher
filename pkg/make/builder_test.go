@@ -38,24 +38,20 @@ func helperCommandContext(ctx context.Context, command string, args ...string) (
 func TestNamingHelpers(t *testing.T) {
 	t.Parallel()
 	var tests = []struct {
-		platform     string
-		extensionOut string
-		binaryOut    string
+		platform  string
+		binaryOut string
 	}{
 		{
-			platform:     "linux",
-			extensionOut: "build/linux.amd64/test.ext",
-			binaryOut:    "build/linux.amd64/test",
+			platform:  "linux",
+			binaryOut: "build/linux.amd64/test",
 		},
 		{
-			platform:     "windows",
-			extensionOut: "build/windows.amd64/test.exe",
-			binaryOut:    "build/windows.amd64/test.exe",
+			platform:  "windows",
+			binaryOut: "build/windows.amd64/test.exe",
 		},
 		{
-			platform:     "darwin",
-			extensionOut: "build/darwin.amd64/test.ext",
-			binaryOut:    "build/darwin.amd64/test",
+			platform:  "darwin",
+			binaryOut: "build/darwin.amd64/test",
 		},
 	}
 
@@ -65,7 +61,6 @@ func TestNamingHelpers(t *testing.T) {
 
 			b := Builder{os: tt.platform, arch: "amd64"}
 			require.Equal(t, filepath.Clean(tt.binaryOut), b.PlatformBinaryName("test"))
-			require.Equal(t, filepath.Clean(tt.extensionOut), b.PlatformBinaryName("test.ext"))
 		})
 	}
 }

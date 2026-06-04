@@ -78,3 +78,6 @@ func logIndicatesSystrayNeedsRestart(logLine string) bool {
 	return strings.Contains(logLine, systray.ErrTrayNotReadyYet.Error()) ||
 		strings.Contains(logLine, "systray error: unable to init instance")
 }
+
+// waitForReadyToSpawnDesktopState is currently a macOS-only check.
+func (r *DesktopUsersProcessesRunner) waitForReadyToSpawnDesktopState(_ context.Context, _ string) {}

@@ -66,7 +66,7 @@ const (
 // References:
 // * https://stackoverflow.com/a/59923297
 // * https://searchfox.org/mozilla-central/source/js/src/vm/StructuredClone.cpp (see especially JSStructuredCloneReader::read)
-func deserializeFirefox(ctx context.Context, slogger *slog.Logger, row map[string][]byte) (map[string][]byte, error) {
+func deserializeFirefox(ctx context.Context, slogger *slog.Logger, row map[string][]byte) ([]map[string][]byte, error) {
 	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -103,7 +103,7 @@ func deserializeFirefox(ctx context.Context, slogger *slog.Logger, row map[strin
 		return nil, fmt.Errorf("reading top-level object: %w", err)
 	}
 
-	return resultObj, nil
+	return []map[string][]byte{resultObj}, nil
 }
 
 // nextPair returns the next (tag, data) pair from `srcReader`.

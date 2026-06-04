@@ -91,6 +91,32 @@ You Should Not See this erroneous L1n3
 			},
 		},
 		{
+			name: "deeper-indented first line followed by top-level line does not panic",
+			input: []byte(`    Nested Key: deeply indented value
+Top Level Key: value
+`),
+			expected: resultMap{
+				"nested_key":    "deeply indented value",
+				"top_level_key": "value",
+			},
+		},
+		{
+			name: "key reused as section header after leaf value does not panic",
+			input: []byte(`Section:
+    Key: leaf value
+Section:
+    Key:
+        Nested: nested value
+`),
+			expected: resultMap{
+				"section": resultMap{
+					"key": resultMap{
+						"nested": "nested value",
+					},
+				},
+			},
+		},
+		{
 			name:  "repcli mac status",
 			input: repcli_mac_status,
 			expected: resultMap{

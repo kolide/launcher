@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -15,11 +16,15 @@ import (
 	"github.com/kolide/goleveldb/leveldb/opt"
 	"github.com/kolide/launcher/v2/ee/indexeddb"
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/pkg/threadsafebuffer"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/stretchr/testify/require"
 
 	_ "modernc.org/sqlite"
 )
+
+//go:embed test_data/indexeddbs/IndexedDB.sqlite3.zip
+var basicWebkitIndexeddb []byte
 
 //go:embed test_data/indexeddbs/1985929987lbadutnscehter.sqlite.zip
 var basicFirefoxIndexeddb []byte
@@ -27,8 +32,158 @@ var basicFirefoxIndexeddb []byte
 //go:embed test_data/indexeddbs/file__0.indexeddb.leveldb.zip
 var basicChromeIndexeddb []byte
 
+//go:embed test_data/indexeddbs/file__0.indexeddb.blob.zip
+var chromeIndexeddbBlob []byte
+
 //go:embed test_data/indexeddbs/bytewise.leveldb.zip
 var bytewiseLeveldb []byte
+
+func TestQuerySafariIndexedDB(t *testing.T) {
+	t.Parallel()
+
+	// This test validates generation of table results. It uses a sqlite-backed
+	// WebKit IndexedDB as a source, which means it also exercises functionality from
+	// sqlite.go and deserialize_webkit.go.
+
+	for _, tt := range []struct {
+		fileName     string
+		objStoreName string
+		expectedRows int
+		zipBytes     []byte
+	}{
+		{
+			fileName:     "IndexedDB.sqlite3.zip",
+			objStoreName: "launchertestobjstore",
+			expectedRows: 2,
+			zipBytes:     basicWebkitIndexeddb,
+		},
+	} {
+		t.Run(tt.fileName, func(t *testing.T) {
+			t.Parallel()
+
+			// Write zip bytes to file
+			tempDir := t.TempDir()
+			zipFile := filepath.Join(tempDir, tt.fileName)
+			require.NoError(t, os.WriteFile(zipFile, tt.zipBytes, 0755), "writing zip to temp dir")
+
+			// Unzip to file in temp dir
+			indexeddbDest := strings.TrimSuffix(zipFile, ".zip")
+			zipReader, err := zip.OpenReader(zipFile)
+			require.NoError(t, err, "opening reader to zip file")
+			defer zipReader.Close()
+			for _, fileInZip := range zipReader.File {
+				unzipFile(t, fileInZip, tempDir)
+			}
+
+			// Construct table
+			sourceQuery := fmt.Sprintf(`
+SELECT QUOTE(Records.value) AS data FROM Records
+JOIN ObjectStoreInfo ON (Records.objectStoreID = ObjectStoreInfo.id)
+WHERE ObjectStoreInfo.name = '%s';
+`, tt.objStoreName)
+			cfg := katcTableConfig{
+				Columns: []string{
+					"uuid", "name", "version", "preferences", "flags", "aliases",
+					"linkedIds", "anotherSparseArray", "someDetails", "noDetails",
+					"numArray", "email", "someTimestamp", "someDate", "someMap",
+					"someComplexMap", "someSet", "someRegex", "someStringObject",
+					"someNumberObject", "someDouble", "someBoolean", "someTypedArray",
+					"someArrayBuffer", "anotherTypedArray", "yetAnotherTypedArray",
+					"basicError", "evalError", "rangeError", "referenceError",
+					"syntaxError", "typeError", "uriError", "errorWithCause",
+				},
+				katcTableDefinition: katcTableDefinition{
+					SourceType: &katcSourceType{
+						name:     sqliteSourceType,
+						dataFunc: sqliteData,
+					},
+					SourcePaths: &[]string{filepath.Join("some", "incorrect", "path")},
+					SourceQuery: &sourceQuery,
+					RowTransformSteps: &[]rowTransformStep{
+						{
+							name:          deserializeWebkitTransformStep,
+							transformFunc: deserializeWebkit,
+						},
+					},
+				},
+				Overlays: []katcTableConfigOverlay{
+					{
+						Filters: map[string]string{
+							"goos": runtime.GOOS,
+						},
+						katcTableDefinition: katcTableDefinition{
+							SourcePaths: &[]string{indexeddbDest}, // All sqlite files in the test directory
+						},
+					},
+				},
+			}
+			var logBytes threadsafebuffer.ThreadSafeBuffer
+			slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+				Level: slog.LevelDebug,
+			}))
+			testTable, _ := newKatcTable("test_katc_table", cfg, slogger)
+
+			// Make a query context restricting the source to our exact source sqlite database
+			queryContext := table.QueryContext{
+				Constraints: map[string]table.ConstraintList{
+					pathColumnName: {
+						Constraints: []table.Constraint{
+							{
+								Operator:   table.OperatorEquals,
+								Expression: indexeddbDest,
+							},
+						},
+					},
+				},
+			}
+
+			// At long last: run a query
+			results, err := testTable.generate(t.Context(), queryContext)
+			require.NoError(t, err, "expected no error on generate: logs:", logBytes.String())
+
+			// We should have the expected number of results in the row
+			require.Equal(t, tt.expectedRows, len(results), "unexpected number of rows returned: logs:", logBytes.String())
+
+			for i := 0; i < tt.expectedRows; i += 1 {
+				require.Contains(t, results[i], pathColumnName, "missing source column")
+				require.Equal(t, indexeddbDest, results[i][pathColumnName])
+				require.Contains(t, results[i], "uuid", "expected uuid column missing")
+				require.Contains(t, results[i], "name", "expected name column missing")
+				require.Contains(t, results[i], "version", "expected version column missing")
+				require.Contains(t, results[i], "preferences", "expected preferences column missing")
+				require.Contains(t, results[i], "flags", "expected flags column missing")
+				require.Contains(t, results[i], "aliases", "expected aliases column missing")
+				require.Contains(t, results[i], "linkedIds", "expected linkedIds column missing")
+				require.Contains(t, results[i], "anotherSparseArray", "expected anotherSparseArray column missing")
+				require.Contains(t, results[i], "someDetails", "expected someDetails column missing")
+				require.Contains(t, results[i], "noDetails", "expected noDetails column missing")
+				require.Contains(t, results[i], "numArray", "expected numArray column missing")
+				require.Contains(t, results[i], "email", "expected email column missing")
+				require.Contains(t, results[i], "someTimestamp", "expected someTimestamp column missing")
+				require.Contains(t, results[i], "someDate", "expected someDate column missing")
+				require.Contains(t, results[i], "someMap", "expected someMap column missing")
+				require.Contains(t, results[i], "someComplexMap", "expected someComplexMap column missing")
+				require.Contains(t, results[i], "someRegex", "expected someRegex column missing")
+				require.Contains(t, results[i], "someStringObject", "expected someStringObject column missing")
+				require.Contains(t, results[i], "someNumberObject", "expected someNumberObject column missing")
+				require.Contains(t, results[i], "someDouble", "expected someDouble column missing")
+				require.Contains(t, results[i], "someBoolean", "expected someBoolean column missing")
+				require.Contains(t, results[i], "someTypedArray", "expected someTypedArray column missing")
+				require.Contains(t, results[i], "someArrayBuffer", "expected someArrayBuffer column missing")
+				require.Contains(t, results[i], "anotherTypedArray", "expected anotherTypedArray column missing")
+				require.Contains(t, results[i], "yetAnotherTypedArray", "expected yetAnotherTypedArray column missing")
+				require.Contains(t, results[i], "basicError", "expected basicError column missing")
+				require.Contains(t, results[i], "evalError", "expected evalError column missing")
+				require.Contains(t, results[i], "rangeError", "expected rangeError column missing")
+				require.Contains(t, results[i], "referenceError", "expected referenceError column missing")
+				require.Contains(t, results[i], "syntaxError", "expected syntaxError column missing")
+				require.Contains(t, results[i], "typeError", "expected typeError column missing")
+				require.Contains(t, results[i], "uriError", "expected uriError column missing")
+				require.Contains(t, results[i], "errorWithCause", "expected errorWithCause column missing")
+			}
+		})
+	}
+}
 
 func TestQueryFirefoxIndexedDB(t *testing.T) {
 	t.Parallel()
@@ -357,6 +512,221 @@ func TestQueryChromeIndexedDB(t *testing.T) {
 	}
 }
 
+func TestQueryChromeIndexedDBBlob(t *testing.T) {
+	t.Parallel()
+
+	// Write zip bytes to file
+	tempDir := t.TempDir()
+	indexeddbZipFile := filepath.Join(tempDir, "file__0.indexeddb.leveldb.zip")
+	require.NoError(t, os.WriteFile(indexeddbZipFile, basicChromeIndexeddb, 0755), "writing indexeddb zip to temp dir")
+	blobZipFile := filepath.Join(tempDir, "file__0.indexeddb.blob.zip")
+	require.NoError(t, os.WriteFile(blobZipFile, chromeIndexeddbBlob, 0755), "writing indexeddb blob zip to temp dir")
+
+	// Prepare indexeddb dir
+	indexeddbDest := strings.TrimSuffix(indexeddbZipFile, ".zip")
+	require.NoError(t, os.MkdirAll(indexeddbDest, 0755), "creating indexeddb dir")
+
+	// Unzip to temp dir
+	indexeddbZipReader, err := zip.OpenReader(indexeddbZipFile)
+	require.NoError(t, err, "opening reader to zip file")
+	defer indexeddbZipReader.Close()
+	for _, fileInZip := range indexeddbZipReader.File {
+		unzipFile(t, fileInZip, tempDir)
+	}
+	blobZipReader, err := zip.OpenReader(blobZipFile)
+	require.NoError(t, err, "opening reader to blob zip file")
+	defer blobZipReader.Close()
+	for _, fileInZip := range blobZipReader.File {
+		unzipFile(t, fileInZip, tempDir)
+	}
+
+	// Construct table
+	sourceQuery := `launchertestdb.launchertestobjstore-blob`
+	cfg := katcTableConfig{
+		Columns: []string{"uuid"},
+		katcTableDefinition: katcTableDefinition{
+			SourceType: &katcSourceType{
+				name:     indexeddbLeveldbSourceType,
+				dataFunc: indexeddbLeveldbData,
+			},
+			SourcePaths: &[]string{filepath.Join("some", "incorrect", "path")},
+			SourceQuery: &sourceQuery,
+			RowTransformSteps: &[]rowTransformStep{
+				{
+					name:          deserializeChromeTransformStep,
+					transformFunc: indexeddb.DeserializeChrome,
+				},
+			},
+		},
+		Overlays: []katcTableConfigOverlay{
+			{
+				Filters: map[string]string{
+					"goos": runtime.GOOS,
+				},
+				katcTableDefinition: katcTableDefinition{
+					SourcePaths: &[]string{indexeddbDest},
+				},
+			},
+		},
+	}
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+	testTable, _ := newKatcTable("test_katc_table_blob", cfg, slogger)
+
+	// Make a query context restricting the source to our exact source sqlite database
+	queryContext := table.QueryContext{}
+
+	// At long last: run a query
+	results, err := testTable.generate(t.Context(), queryContext)
+	require.NoError(t, err, "expected no error on generate: logs:", logBytes.String())
+
+	require.Less(t, 0, len(results))
+	for _, result := range results {
+		require.Contains(t, result, pathColumnName, "missing source column")
+		require.Equal(t, indexeddbDest, result[pathColumnName])
+		require.Contains(t, result, "uuid", "expected uuid column missing")
+		require.Less(t, 0, len(result["uuid"]), "uuid column missing data")
+	}
+}
+
+func TestQueryChromeIndexedDBDataFlatten(t *testing.T) {
+	t.Parallel()
+
+	// Reuses the Chrome IndexedDB fixture from TestQueryChromeIndexedDB,
+	// but enables data_flatten so each post-deserialize row is expanded into
+	// dataflatten-style rows (fullkey/parent/key/value/query). Values produced by
+	// indexeddb.DeserializeChrome are JSON-encoded strings; the dataflatten path
+	// must recursively unmarshal them before flattening.
+
+	tempDir := t.TempDir()
+	zipFile := filepath.Join(tempDir, "file__0.indexeddb.leveldb.zip")
+	require.NoError(t, os.WriteFile(zipFile, basicChromeIndexeddb, 0755), "writing zip to temp dir")
+
+	indexeddbDest := strings.TrimSuffix(zipFile, ".zip")
+	require.NoError(t, os.MkdirAll(indexeddbDest, 0755), "creating indexeddb dir")
+
+	zipReader, err := zip.OpenReader(zipFile)
+	require.NoError(t, err, "opening reader to zip file")
+	defer zipReader.Close()
+	for _, fileInZip := range zipReader.File {
+		unzipFile(t, fileInZip, tempDir)
+	}
+
+	sourceQuery := "launchertestdb.launchertestobjstore"
+	dataFlatten := true
+	cfg := katcTableConfig{
+		// Columns are ignored when data_flatten is enabled.
+		Columns: []string{"data"},
+		katcTableDefinition: katcTableDefinition{
+			SourceType: &katcSourceType{
+				name:     indexeddbLeveldbSourceType,
+				dataFunc: indexeddbLeveldbData,
+			},
+			SourcePaths: &[]string{filepath.Join("some", "incorrect", "path")},
+			SourceQuery: &sourceQuery,
+			RowTransformSteps: &[]rowTransformStep{
+				{
+					name:          deserializeChromeTransformStep,
+					transformFunc: indexeddb.DeserializeChrome,
+				},
+			},
+			DataFlatten: &dataFlatten,
+		},
+		Overlays: []katcTableConfigOverlay{
+			{
+				Filters: map[string]string{"goos": runtime.GOOS},
+				katcTableDefinition: katcTableDefinition{
+					SourcePaths: &[]string{indexeddbDest},
+				},
+			},
+		},
+	}
+
+	testTable, columns := newKatcTable("test_katc_table_dataflatten", cfg, multislogger.NewNopLogger())
+
+	// Columns should be path + dataflattentable columns, not the user-supplied "data".
+	columnNames := make(map[string]struct{}, len(columns))
+	for _, c := range columns {
+		columnNames[c.Name] = struct{}{}
+	}
+	for _, expected := range []string{pathColumnName, "fullkey", "parent", "key", "value", "query"} {
+		require.Contains(t, columnNames, expected, "expected dataflatten column %q", expected)
+	}
+	require.NotContains(t, columnNames, "data", "configured column should be ignored when data_flatten is enabled")
+
+	queryContext := table.QueryContext{
+		Constraints: map[string]table.ConstraintList{
+			pathColumnName: {
+				Constraints: []table.Constraint{
+					{Operator: table.OperatorEquals, Expression: indexeddbDest},
+				},
+			},
+		},
+	}
+
+	results, err := testTable.generate(t.Context(), queryContext)
+	require.NoError(t, err)
+
+	// Flattening 2 rich rows should produce many more than 2 leaf rows.
+	require.Greater(t, len(results), 2, "expected dataflatten to expand rows")
+
+	sawUUID := false
+	sawNestedArrayIndex := false
+	for _, row := range results {
+		require.Equal(t, indexeddbDest, row[pathColumnName])
+		require.Contains(t, row, "fullkey")
+		require.Contains(t, row, "parent")
+		require.Contains(t, row, "key")
+		require.Contains(t, row, "value")
+		require.Contains(t, row, "query")
+		// With no query constraint supplied, default dataflatten query "*"
+		// should be reflected in every row.
+		require.Equal(t, "*", row["query"], "query column should default to *")
+
+		if row["fullkey"] == "uuid" {
+			sawUUID = true
+			require.NotEmpty(t, row["value"], "uuid leaf should carry the uuid value")
+		}
+		// Array values like "aliases" / "linkedIds" / "numArray" should expand into
+		// fullkeys with numeric path components (e.g. "aliases/0").
+		if strings.Contains(row["fullkey"], "/") {
+			parts := strings.Split(row["fullkey"], "/")
+			if _, err := strconv.Atoi(parts[len(parts)-1]); err == nil {
+				sawNestedArrayIndex = true
+			}
+		}
+	}
+	require.True(t, sawUUID, "expected to find a flattened row for the uuid column")
+	require.True(t, sawNestedArrayIndex, "expected at least one array element to flatten to a numeric leaf path")
+
+	// With a "query" constraint supplied, dataflatten should restrict results
+	// to matching paths and echo the query back in the "query" column. This
+	// matches the established secedit/jwt/airport pattern.
+	queryContextFiltered := table.QueryContext{
+		Constraints: map[string]table.ConstraintList{
+			pathColumnName: {
+				Constraints: []table.Constraint{
+					{Operator: table.OperatorEquals, Expression: indexeddbDest},
+				},
+			},
+			"query": {
+				Constraints: []table.Constraint{
+					{Operator: table.OperatorEquals, Expression: "uuid"},
+				},
+			},
+		},
+	}
+	filtered, err := testTable.generate(t.Context(), queryContextFiltered)
+	require.NoError(t, err)
+	require.NotEmpty(t, filtered, "expected at least one row when filtering query = uuid")
+	for _, row := range filtered {
+		require.Equal(t, "uuid", row["query"], "query column should echo the supplied constraint")
+		require.Equal(t, "uuid", row["fullkey"], "filtering should restrict results to uuid leaves")
+	}
+}
+
 func TestQueryChromeIndexedDBMixedKeyIteration(t *testing.T) {
 	t.Parallel()
 
@@ -386,6 +756,7 @@ func TestQueryChromeIndexedDBMixedKeyIteration(t *testing.T) {
 	cfg := katcTableConfig{
 		Columns: []string{
 			"test",
+			"data",
 		},
 		katcTableDefinition: katcTableDefinition{
 			SourceType: &katcSourceType{
@@ -430,11 +801,15 @@ func TestQueryChromeIndexedDBMixedKeyIteration(t *testing.T) {
 
 	results, err := testTable.generate(t.Context(), queryContext)
 	require.NoError(t, err)
-	// we expect exactly 9 rows added to the mixed keys object store. see test_data/main.js for details
-	// on how this is created with various key types
-	require.Equal(t, 9, len(results))
+	// we expect exactly 11 entries added to the mixed keys object store, resulting in 12 rows yielded here:
+	// - 9 entries for the individual key/value pairs
+	// - 1 entry for the root level array containing 2 objects (which should yield 2 rows here)
+	// - 1 entry for the object with compressed data field
+	// see test_data/main.js for details on how this is created with various key types
+	require.Equal(t, 12, len(results))
 
 	resultsSeen := make([]bool, len(results))
+	snappyFound := false
 	// all rows are a simple json object in the format {"test": "<insertionNumber>"}
 	// we do not expect these to come out in the order they were inserted (it is done with mixed key types),
 	// but we do expect to see a row with each individual number 1-9, ensuring no corruption during iteration
@@ -444,11 +819,22 @@ func TestQueryChromeIndexedDBMixedKeyIteration(t *testing.T) {
 		require.NoError(t, err)
 		require.Less(t, insertionNumber-1, len(resultsSeen)) // sanity check
 		resultsSeen[insertionNumber-1] = true
+		if result["test"] == "12" {
+			// note that nothing about this test explicitly ensures that the data field is compressed,
+			// but the test data is large enough to trigger automatic compression, and I've walked through this with the debugger
+			// to ensure that's what's happening here. it seemed like overkill to add and check logging just for this, but the data
+			// in our test db does have the required SSV prefix and snappy decode directive as expected.
+			require.Contains(t, result, "data")
+			// ensure decoding worked as expected
+			require.True(t, strings.HasPrefix(result["data"], "SNAPPY"), "compressed data field should start with SNAPPY")
+			snappyFound = true
+		}
 	}
 	// verify that all 9 have been seen
 	for i, seen := range resultsSeen {
 		require.True(t, seen, "test number %d was not seen during iteration", i)
 	}
+	require.True(t, snappyFound, "compressed snappy data entry was not seen")
 }
 
 func TestQueryLevelDB(t *testing.T) {

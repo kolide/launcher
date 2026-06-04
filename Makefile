@@ -44,7 +44,7 @@ build_%: ARCHARG = $(if $(ARCH), --arch $(ARCH))
 build_%: GOARG = $(if $(CROSSGOPATH), --go $(CROSSGOPATH))
 build_%: GOBUILD = $(if $(CROSSGOPATH), $(CROSSGOPATH), go)
 build_%: .pre-build
-	$(GOBUILD) run cmd/make/make.go -targets=$(TARGET) -linkstamp $(OSARG) $(ARCHARG) $(GOARG)
+	BUILD_DATE=$(BUILD_DATE) $(GOBUILD) run cmd/make/make.go -targets=$(TARGET) -linkstamp $(OSARG) $(ARCHARG) $(GOARG)
 
 fake_%: TARGET =  $(word 2, $(subst _, ,$@))
 fake_%: OS = $(word 3, $(subst _, ,$@))
@@ -52,7 +52,7 @@ fake_%: OSARG = $(if $(OS), --os $(OS))
 fake_%: ARCH = $(word 4, $(subst _, ,$@))
 fake_%: ARCHARG = $(if $(ARCH), --arch $(ARCH))
 fake_%: .pre-build
-	go run cmd/make/make.go -targets=$(TARGET) -linkstamp -fakedata $(OSARG) $(ARCHARG)
+	BUILD_DATE=$(BUILD_DATE) go run cmd/make/make.go -targets=$(TARGET) -linkstamp -fakedata $(OSARG) $(ARCHARG)
 
 # The lipo command will combine things into universal
 # binaries. Because of the go path needs, there is little point in
@@ -121,6 +121,15 @@ rel-launcherapp: $(foreach arch, $(DARWIN_ARCHES), build/darwin.$(arch)/Kolide.a
 RELEASE_VERSION = $(shell git describe --tags --always --dirty)
 # RELEASE_VERSION_SHORT contains only <major>.<minor>.<patch>
 RELEASE_VERSION_SHORT = $(shell git describe --tags --always --dirty | sed -En 's/v([[:digit:]]+)\.([[:digit:]]+)\.([[:digit:]]+).*/\1.\2.\3/p')
+# We use BUILD_DATE to create reproducible builds with consistent embedded timestamps --
+# we default to using the commit timestamp.
+# See https://reproducible-builds.org/docs/source-date-epoch/ for SOURCE_DATE_EPOCH documentation
+DATE_FMT = +%Y-%m-%d
+ifdef SOURCE_DATE_EPOCH
+    BUILD_DATE ?= $(shell date -u -d "@$(SOURCE_DATE_EPOCH)" "$(DATE_FMT)" 2>/dev/null || date -u -r "$(SOURCE_DATE_EPOCH)" "$(DATE_FMT)" 2>/dev/null || date -u "$(DATE_FMT)")
+else
+    BUILD_DATE ?= $(shell git show -s --format=%ct)
+endif
 
 release:
 	@echo "Run 'make release-phase1' on the m1 machine"
@@ -214,10 +223,10 @@ codesign-windows-%:
 codesign: notarize-darwin codesign-windows
 
 package-builder: .pre-build deps
-	go run cmd/make/make.go -targets=package-builder -linkstamp
+	BUILD_DATE=$(BUILD_DATE) go run cmd/make/make.go -targets=package-builder -linkstamp
 
 package-builder-windows: .pre-build deps
-	go run cmd/make/make.go -targets=package-builder -linkstamp --os windows
+	BUILD_DATE=$(BUILD_DATE) go run cmd/make/make.go -targets=package-builder -linkstamp --os windows
 
 deps-go:
 	go run cmd/make/make.go -targets=deps-go

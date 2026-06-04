@@ -23,14 +23,15 @@ type (
 	// windowsUpdatesCacher queries for fresh Windows updates data every `cacheInterval`,
 	// and stores it in the `cacheStore`.
 	windowsUpdatesCacher struct {
-		flags         types.Flags
-		cacheStore    types.GetterSetter
-		cacheInterval time.Duration
-		cacheLock     *sync.Mutex
-		queryCancel   context.CancelFunc
-		slogger       *slog.Logger
-		interrupt     chan struct{}
-		interrupted   atomic.Bool
+		flags           types.Flags
+		cacheStore      types.GetterSetter
+		cacheInterval   time.Duration
+		cacheLock       *sync.Mutex
+		queryCancel     context.CancelFunc
+		queryCancelLock *sync.Mutex
+		slogger         *slog.Logger
+		interrupt       chan struct{}
+		interrupted     atomic.Bool
 	}
 
 	// cachedQueryResults stores the results of querying the Windows Update Agent API;
@@ -43,12 +44,13 @@ type (
 
 func NewWindowsUpdatesCacher(flags types.Flags, cacheStore types.GetterSetter, cacheInterval time.Duration, slogger *slog.Logger) *windowsUpdatesCacher {
 	w := &windowsUpdatesCacher{
-		flags:         flags,
-		cacheStore:    cacheStore,
-		cacheInterval: cacheInterval,
-		cacheLock:     &sync.Mutex{},
-		slogger:       slogger.With("component", "windows_updates_cacher"),
-		interrupt:     make(chan struct{}, 1), // provide a buffer for the channel so that Interrupt can send to it and return immediately
+		flags:           flags,
+		cacheStore:      cacheStore,
+		cacheInterval:   cacheInterval,
+		cacheLock:       &sync.Mutex{},
+		queryCancelLock: &sync.Mutex{},
+		slogger:         slogger.With("component", "windows_updates_cacher"),
+		interrupt:       make(chan struct{}, 1), // provide a buffer for the channel so that Interrupt can send to it and return immediately
 	}
 	flags.RegisterChangeObserver(w, keys.InModernStandby)
 
@@ -98,9 +100,11 @@ func (w *windowsUpdatesCacher) Interrupt(_ error) {
 
 	// If we have a long-running query going right now, cancel it so that it doesn't prevent
 	// shutdown.
+	w.queryCancelLock.Lock()
 	if w.queryCancel != nil {
 		w.queryCancel()
 	}
+	w.queryCancelLock.Unlock()
 
 	w.interrupt <- struct{}{}
 }
@@ -160,8 +164,11 @@ func (w *windowsUpdatesCacher) queryAndStoreData(ctx context.Context) error {
 	// Since this query happens in the background and will not block auth, we can use
 	// a much longer timeout than we use for our tables. We set queryCancel on windowsUpdateCacher
 	// so that we can `Interrupt` ongoing query attempts on launcher shutdown if needed.
-	ctx, w.queryCancel = context.WithTimeout(ctx, 20*time.Minute)
-	defer w.queryCancel()
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Minute)
+	defer cancel()
+	w.queryCancelLock.Lock()
+	w.queryCancel = cancel
+	w.queryCancelLock.Unlock()
 
 	queryTime := time.Now()
 	res, err := callQueryWindowsUpdatesSubcommand(ctx, defaultLocale, UpdatesTable)

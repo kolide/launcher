@@ -152,12 +152,12 @@ func TestParse(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
+			p := New()
+			result, err := p.Parse(bytes.NewReader(tt.input))
+			require.NoError(t, err, "unexpected error parsing input")
+
+			require.ElementsMatch(t, tt.expected, result)
 		})
-
-		p := New()
-		result, err := p.Parse(bytes.NewReader(tt.input))
-		require.NoError(t, err, "unexpected error parsing input")
-
-		require.ElementsMatch(t, tt.expected, result)
 	}
 }

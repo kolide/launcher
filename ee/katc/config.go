@@ -73,7 +73,7 @@ func (kst *katcSourceType) String() string {
 // JSON KATC config.
 type rowTransformStep struct {
 	name          string
-	transformFunc func(ctx context.Context, slogger *slog.Logger, row map[string][]byte) (map[string][]byte, error)
+	transformFunc func(ctx context.Context, slogger *slog.Logger, row map[string][]byte) ([]map[string][]byte, error)
 }
 
 const (
@@ -82,6 +82,7 @@ const (
 	zstdDecodeTransformStep         = "zstd"
 	deserializeFirefoxTransformStep = "deserialize_firefox"
 	deserializeChromeTransformStep  = "deserialize_chrome"
+	deserializeWebkitTransformStep  = "deserialize_webkit"
 	camelToSnakeTransformStep       = "camel_to_snake"
 	utf16DecodeTransformStep        = "utf16_decode"
 )
@@ -117,6 +118,10 @@ func (r *rowTransformStep) UnmarshalJSON(data []byte) error {
 	case deserializeChromeTransformStep:
 		r.name = deserializeChromeTransformStep
 		r.transformFunc = indexeddb.DeserializeChrome
+		return nil
+	case deserializeWebkitTransformStep:
+		r.name = deserializeWebkitTransformStep
+		r.transformFunc = deserializeWebkit
 		return nil
 	case camelToSnakeTransformStep:
 		r.name = camelToSnakeTransformStep
@@ -178,7 +183,8 @@ type (
 		SourcePaths       *[]string           `json:"source_paths,omitempty"` // Describes how to connect to source (e.g. path to db) -- % and _ wildcards supported
 		SourceQuery       *string             `json:"source_query,omitempty"` // Query to run against each source path
 		RowTransformSteps *[]rowTransformStep `json:"row_transform_steps,omitempty"`
-		Comparer          *comparerOption     `json:"comparer,omitempty"` // LevelDB/indexeddb comparer: "historical_bytewise", "default_bytewise", or "idb_cmp1" (default)
+		Comparer          *comparerOption     `json:"comparer,omitempty"`     // LevelDB/indexeddb comparer: "historical_bytewise", "default_bytewise", or "idb_cmp1" (default)
+		DataFlatten       *bool               `json:"data_flatten,omitempty"` // If true, flatten each post-transform row through the dataflatten package; the configured Columns are then ignored in favor of dataflattentable.Columns()
 	}
 )
 

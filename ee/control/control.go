@@ -14,8 +14,7 @@ import (
 	"github.com/kolide/launcher/v2/ee/agent/flags/keys"
 	"github.com/kolide/launcher/v2/ee/agent/types"
 	"github.com/kolide/launcher/v2/ee/observability"
-	"go.uber.org/atomic"
-	"golang.org/x/exp/slices"
+	"github.com/kolide/launcher/v2/pkg/atomic"
 )
 
 const ForceFullControlDataFetchAction = "force_full_control_data_fetch"
@@ -81,6 +80,8 @@ func New(k types.Knapsack, fetcher dataProvider, opts ...Option) *ControlService
 
 	// Observe ControlRequestInterval changes to know when to accelerate/decelerate fetching frequency
 	cs.knapsack.RegisterChangeObserver(cs, keys.ControlRequestInterval)
+	// Observe InModernStandby changes so that we can kick off a fresh Fetch request on modern standby exit
+	cs.knapsack.RegisterChangeObserver(cs, keys.InModernStandby)
 
 	return cs
 }
@@ -207,8 +208,18 @@ func (cs *ControlService) FlagsChanged(ctx context.Context, flagKeys ...keys.Fla
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
-	if slices.Contains(flagKeys, keys.ControlRequestInterval) {
+	if keys.Contains(flagKeys, keys.ControlRequestInterval) {
 		cs.requestIntervalChanged(ctx, cs.knapsack.ControlRequestInterval())
+	}
+
+	// On modern standby exit, call Fetch in case we missed any data changes while in modern standby
+	if keys.Contains(flagKeys, keys.InModernStandby) && !cs.knapsack.InModernStandby() {
+		if err := cs.Fetch(ctx); err != nil {
+			cs.slogger.Log(ctx, slog.LevelWarn,
+				"failed to fetch data from control server after modern standby exit",
+				"err", err,
+			)
+		}
 	}
 }
 
@@ -255,6 +266,12 @@ func (cs *ControlService) requestIntervalChanged(ctx context.Context, newInterva
 func (cs *ControlService) Fetch(ctx context.Context) error {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
+
+	// Skip control server requests while in modern standby -- we don't want to cause unnecessary work
+	// in the consumers during modern standby. We will queue up a new `Fetch` once we exit InModernStandby.
+	if cs.knapsack.InModernStandby() {
+		return nil
+	}
 
 	// Do not block in the case where:
 	// 1. `Start` called `Fetch` on an interval
@@ -336,8 +353,6 @@ func (cs *ControlService) fetchAndUpdate(ctx context.Context, subsystem, hash st
 	ctx, span := observability.StartSpan(ctx, "subsystem", subsystem)
 	defer span.End()
 
-	slogger := cs.slogger.With("subsystem", subsystem)
-
 	data, err := cs.fetcher.GetSubsystemData(ctx, hash)
 	if err != nil {
 		return fmt.Errorf("failed to get control data: %w", err)
@@ -350,8 +365,9 @@ func (cs *ControlService) fetchAndUpdate(ctx context.Context, subsystem, hash st
 	// Consumer and subscriber(s) notified now
 	if err := cs.update(ctx, subsystem, data); err != nil {
 		// Returning the error so we don't store the hash and we can try again next time
-		slogger.Log(ctx, slog.LevelWarn,
+		cs.slogger.Log(ctx, slog.LevelWarn,
 			"failed to update consumers and subscribers",
+			"subsystem", subsystem,
 			"err", err,
 		)
 		return err
@@ -367,8 +383,9 @@ func (cs *ControlService) fetchAndUpdate(ctx context.Context, subsystem, hash st
 
 	// Store the hash so we can persist the last fetched data across launcher restarts
 	if err := cs.store.Set([]byte(subsystem), []byte(hash)); err != nil {
-		slogger.Log(ctx, slog.LevelError,
+		cs.slogger.Log(ctx, slog.LevelError,
 			"failed to store last fetched control data",
+			"subsystem", subsystem,
 			"err", err,
 		)
 	}

@@ -11,6 +11,8 @@ on:
 
 jobs:
   golangci:
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -30,7 +32,7 @@ jobs:
       - run: make deps
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v9
+        uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9
         with:
           skip-save-cache: true
 
@@ -39,6 +41,8 @@ jobs:
         if: ${{ always() }}
         run: golangci-lint run
   govulncheck:
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -64,10 +68,11 @@ jobs:
 
       # If we need to exclude future go-tuf findings that do not apply to our version of go-tuf prior to v2,
       # adding a final select to JQ will do the trick: `select(. != "GO-2024-3166")`
+      # TODO: remove exclusion for GO-2026-4923 as soon as a new version of go.etcd.io/bbolt is available.
       - name: Evaluate govulncheck results
         shell: bash
         run: |
-          findingCount=$(jq -r '.finding | select ( . != null ) | .osv ' govulncheck.json | wc -l)
+          findingCount=$(jq -r '.finding | select ( . != null ) | .osv | select(. != "GO-2026-4923")' govulncheck.json | wc -l)
           findingCount=$((findingCount + 0))
           if [[ $findingCount -ne 0 ]]; then
             printf "govulncheck reports %d findings" "$findingCount"
@@ -76,6 +81,8 @@ jobs:
           fi
 
   table_specs:
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -104,6 +111,8 @@ jobs:
   # the merge dependency from being on all the jobs to this single
   # one.
   lint_mergeable:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - run: true

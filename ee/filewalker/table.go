@@ -37,6 +37,10 @@ func NewFilewalkTable(flags types.Flags, resultsStore types.Getter, slogger *slo
 }
 
 func (ft *filewalkTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	if ft.resultsStore == nil {
+		return nil, errors.New("results store not available")
+	}
+
 	walkNames := tablehelpers.GetConstraints(queryContext, "walk_name")
 	if len(walkNames) == 0 {
 		return nil, errors.New("the kolide_filewalk table requires that you specify an equals constraint for walk_name")

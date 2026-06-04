@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/serenize/snaker"
+	"github.com/kolide/launcher/v2/pkg/snake"
 )
 
 var nonAlphanumericRegex = regexp.MustCompile(`[^a-zA-Z0-9]+`)
@@ -22,7 +22,7 @@ func ServiceName(identifier string) string {
 
 	sanitizedServiceName := nonAlphanumericRegex.ReplaceAllString(identifier, "_") // e.g. identifier=kolide-k2 becomes kolide_k2
 	sanitizedServiceName = fmt.Sprintf("launcher_%s_svc", sanitizedServiceName)    // wrapped as launcher_kolide_k2_svc
-	return snaker.SnakeToCamel(sanitizedServiceName)                               // will produce LauncherKolideK2Svc
+	return snake.SnakeToCamel(sanitizedServiceName)                                // will produce LauncherKolideK2Svc
 }
 
 // TaskName embeds the given identifier into our task name template after sanitization,
@@ -35,5 +35,5 @@ func TaskName(identifier, taskType string) string {
 	sanitizedIdentifier := nonAlphanumericRegex.ReplaceAllString(identifier, "_")                   // e.g. identifier=kolide-k2 becomes kolide_k2
 	sanitizedTaskType := nonAlphanumericRegex.ReplaceAllString(taskType, "_")                       // e.g. taskName=watchdog
 	sanitizedTaskName := fmt.Sprintf("launcher_%s_%s_task", sanitizedIdentifier, sanitizedTaskType) // wrapped as launcher_kolide_k2_watchdog_task
-	return snaker.SnakeToCamel(sanitizedTaskName)                                                   // will produce LauncherKolideK2WatchdogTask
+	return snake.SnakeToCamel(sanitizedTaskName)                                                    // will produce LauncherKolideK2WatchdogTask
 }

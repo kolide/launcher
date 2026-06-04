@@ -43,7 +43,8 @@ func Test_camelToSnake(t *testing.T) {
 				tt.input: nil,
 			})
 			require.NoError(t, err)
-			require.Contains(t, outputRows, tt.expectedOutput)
+			require.Len(t, outputRows, 1)
+			require.Contains(t, outputRows[0], tt.expectedOutput)
 		})
 	}
 }

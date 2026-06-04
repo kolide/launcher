@@ -44,12 +44,13 @@ import (
 )
 
 var testOsqueryBinary string
+var osqueryBinaryDownloadErr error
 
 // downloadOnceFunc downloads a real osquery binary for use in tests. This function
 // can be called multiple times but will only execute once -- the osquery binary is
 // stored at path `testOsqueryBinary` and can be reused by all subsequent tests.
 var downloadOnceFunc = sync.OnceFunc(func() {
-	testOsqueryBinary, _, _ = testutil.DownloadOsquery("stable")
+	testOsqueryBinary, _, osqueryBinaryDownloadErr = testutil.DownloadOsquery("stable")
 })
 
 // setupOnceFunc sets up test configuration that should only happen once.
@@ -74,6 +75,13 @@ func makeTestOsqLogPublisher(t *testing.T, mk *typesMocks.Knapsack) types.Osquer
 	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	mk.On("TokenStore").Return(tokenStore).Maybe()
+	serverProvidedDataStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ServerProvidedDataStore.String())
+	require.NoError(t, err)
+	err = serverProvidedDataStore.Set([]byte("device_id"), []byte("12345"))
+	require.NoError(t, err)
+	err = serverProvidedDataStore.Set([]byte("organization_id"), []byte("54321"))
+	require.NoError(t, err)
+	mk.On("ServerProvidedDataStore").Return(serverProvidedDataStore).Maybe()
 	slogger := multislogger.NewNopLogger()
 	client := &http.Client{}
 	t.Cleanup(func() {
@@ -85,7 +93,6 @@ func makeTestOsqLogPublisher(t *testing.T, mk *typesMocks.Knapsack) types.Osquer
 func TestBadBinaryPath(t *testing.T) {
 	t.Parallel()
 	requirePermissions(t)
-	downloadOnceFunc()
 	setupOnceFunc()
 
 	rootDirectory := t.TempDir()
@@ -146,6 +153,7 @@ func TestWithOsqueryFlags(t *testing.T) {
 	t.Parallel()
 	requirePermissions(t)
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 	setupOnceFunc()
 
 	rootDirectory := testRootDirectory(t)
@@ -154,7 +162,11 @@ func TestWithOsqueryFlags(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("EnrollmentIDs").Return([]string{types.DefaultEnrollmentID})
-	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
+	// OsqueryHealthcheckStartupDelay defaults to ten minutes, which is too long for tests.
+	// We don't want an extremely short interval, though, because we need to give the osquery instance
+	// time to actually start before we begin healthchecking it. So, we wait for at least the
+	// amount of time that we give for the socket to appear.
+	k.On("OsqueryHealthcheckStartupDelay").Return(socketOpenTimeout).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
@@ -202,6 +214,7 @@ func TestFlagsChanged(t *testing.T) {
 	t.Parallel()
 	requirePermissions(t)
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 	setupOnceFunc()
 
 	rootDirectory := testRootDirectory(t)
@@ -210,8 +223,12 @@ func TestFlagsChanged(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("EnrollmentIDs").Return([]string{types.DefaultEnrollmentID})
-	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
-	k.On("WatchdogEnabled").Return(false).Once() // WatchdogEnabled should initially return false
+	// OsqueryHealthcheckStartupDelay defaults to ten minutes, which is too long for tests.
+	// We don't want an extremely short interval, though, because we need to give the osquery instance
+	// time to actually start before we begin healthchecking it. So, we wait for at least the
+	// amount of time that we give for the socket to appear.
+	k.On("OsqueryHealthcheckStartupDelay").Return(socketOpenTimeout).Maybe()
+	k.On("WatchdogEnabled").Return(false)
 	k.On("WatchdogMemoryLimitMB").Return(150)
 	k.On("WatchdogUtilizationLimitPercent").Return(20)
 	k.On("WatchdogDelaySec").Return(120)
@@ -250,7 +267,7 @@ func TestFlagsChanged(t *testing.T) {
 	s.On("WriteSettings").Return(nil).Maybe()
 
 	// set to false initially so osq can start
-	k.On("InModernStandby").Return(false).Twice()
+	k.On("InModernStandby").Return(false)
 
 	// Start the runner
 	runner := New(k, lpc, s)
@@ -276,18 +293,22 @@ func TestFlagsChanged(t *testing.T) {
 	require.False(t, runner.needsRestart.Load(), "runner should not be flagged as needing restart since it just started")
 
 	// change just the InModernStandby flag -- this should not trigger a restart, since no changes need to be applied
-	k.On("InModernStandby").Return(true).Once()
+	k.On("InModernStandby").Unset()
+	k.On("InModernStandby").Return(true)
 	runner.FlagsChanged(t.Context(), keys.InModernStandby)
 	require.False(t, runner.needsRestart.Load(), "runner should not be marked as needing a restart when only InModernStandby changed")
 
 	// change both the InModernStandby and WatchdogEnabled flags -- this should trigger a restart, but not until InModernStandby is false again
-	k.On("WatchdogEnabled").Return(true).Once()
-	k.On("InModernStandby").Return(true).Twice()
+	k.On("WatchdogEnabled").Unset()
+	k.On("WatchdogEnabled").Return(true)
+	k.On("InModernStandby").Unset()
+	k.On("InModernStandby").Return(true)
 	runner.FlagsChanged(t.Context(), keys.WatchdogEnabled, keys.InModernStandby)
 
 	require.True(t, runner.needsRestart.Load(), "runner should be marked as needing a restart after WatchdogEnabled changed while in modern standby")
 
 	// no simulate coming out of modern standby -- this should trigger a restart
+	k.On("InModernStandby").Unset()
 	k.On("InModernStandby").Return(false)
 	runner.FlagsChanged(t.Context(), keys.InModernStandby)
 
@@ -296,7 +317,7 @@ func TestFlagsChanged(t *testing.T) {
 	waitHealthy(t, runner, logBytes, osqHistory)
 
 	// Now confirm that the instance is new
-	require.NotEqual(t, startingInstance, runner.instances[types.DefaultEnrollmentID], "instance not replaced")
+	require.NotEqual(t, startingInstance, runner.instances[types.DefaultEnrollmentID], "instance not replaced", logBytes.String())
 
 	require.False(t, runner.needsRestart.Load(), "runner should no longer be marked as needing a restart after restart completed")
 
@@ -339,6 +360,7 @@ func TestPing(t *testing.T) {
 	t.Parallel()
 	requirePermissions(t)
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 	setupOnceFunc()
 
 	// Set up all dependencies
@@ -346,7 +368,11 @@ func TestPing(t *testing.T) {
 	logBytes, slogger := setUpTestSlogger()
 	k := typesMocks.NewKnapsack(t)
 	k.On("EnrollmentIDs").Return([]string{types.DefaultEnrollmentID})
-	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
+	// OsqueryHealthcheckStartupDelay defaults to ten minutes, which is too long for tests.
+	// We don't want an extremely short interval, though, because we need to give the osquery instance
+	// time to actually start before we begin healthchecking it. So, we wait for at least the
+	// amount of time that we give for the socket to appear.
+	k.On("OsqueryHealthcheckStartupDelay").Return(socketOpenTimeout).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
@@ -614,6 +640,7 @@ func TestSimplePath(t *testing.T) {
 	t.Parallel()
 	requirePermissions(t)
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 	setupOnceFunc()
 
 	rootDirectory := testRootDirectory(t)
@@ -622,7 +649,11 @@ func TestSimplePath(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("EnrollmentIDs").Return([]string{types.DefaultEnrollmentID})
-	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
+	// OsqueryHealthcheckStartupDelay defaults to ten minutes, which is too long for tests.
+	// We don't want an extremely short interval, though, because we need to give the osquery instance
+	// time to actually start before we begin healthchecking it. So, we wait for at least the
+	// amount of time that we give for the socket to appear.
+	k.On("OsqueryHealthcheckStartupDelay").Return(socketOpenTimeout).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
@@ -670,6 +701,7 @@ func TestMultipleInstances(t *testing.T) {
 	t.Parallel()
 	requirePermissions(t)
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 	setupOnceFunc()
 
 	rootDirectory := testRootDirectory(t)
@@ -681,7 +713,11 @@ func TestMultipleInstances(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("EnrollmentIDs").Return([]string{types.DefaultEnrollmentID, extraEnrollmentId})
-	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
+	// OsqueryHealthcheckStartupDelay defaults to ten minutes, which is too long for tests.
+	// We don't want an extremely short interval, though, because we need to give the osquery instance
+	// time to actually start before we begin healthchecking it. So, we wait for at least the
+	// amount of time that we give for the socket to appear.
+	k.On("OsqueryHealthcheckStartupDelay").Return(socketOpenTimeout).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
@@ -767,6 +803,7 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	t.Parallel()
 	requirePermissions(t)
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 	setupOnceFunc()
 
 	rootDirectory := testRootDirectory(t)
@@ -775,7 +812,11 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("EnrollmentIDs").Return([]string{types.DefaultEnrollmentID})
-	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
+	// OsqueryHealthcheckStartupDelay defaults to ten minutes, which is too long for tests.
+	// We don't want an extremely short interval, though, because we need to give the osquery instance
+	// time to actually start before we begin healthchecking it. So, we wait for at least the
+	// amount of time that we give for the socket to appear.
+	k.On("OsqueryHealthcheckStartupDelay").Return(socketOpenTimeout).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
@@ -857,6 +898,7 @@ func TestMultipleShutdowns(t *testing.T) {
 	t.Parallel()
 	requirePermissions(t)
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 	setupOnceFunc()
 
 	rootDirectory := testRootDirectory(t)
@@ -865,7 +907,11 @@ func TestMultipleShutdowns(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("EnrollmentIDs").Return([]string{types.DefaultEnrollmentID})
-	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
+	// OsqueryHealthcheckStartupDelay defaults to ten minutes, which is too long for tests.
+	// We don't want an extremely short interval, though, because we need to give the osquery instance
+	// time to actually start before we begin healthchecking it. So, we wait for at least the
+	// amount of time that we give for the socket to appear.
+	k.On("OsqueryHealthcheckStartupDelay").Return(socketOpenTimeout).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
@@ -917,6 +963,7 @@ func TestOsqueryDies(t *testing.T) {
 	t.Parallel()
 	requirePermissions(t)
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 	setupOnceFunc()
 
 	rootDirectory := testRootDirectory(t)
@@ -925,7 +972,11 @@ func TestOsqueryDies(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("EnrollmentIDs").Return([]string{types.DefaultEnrollmentID})
-	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
+	// OsqueryHealthcheckStartupDelay defaults to ten minutes, which is too long for tests.
+	// We don't want an extremely short interval, though, because we need to give the osquery instance
+	// time to actually start before we begin healthchecking it. So, we wait for at least the
+	// amount of time that we give for the socket to appear.
+	k.On("OsqueryHealthcheckStartupDelay").Return(socketOpenTimeout).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
@@ -1001,7 +1052,6 @@ func TestOsqueryDies(t *testing.T) {
 func TestNotStarted(t *testing.T) {
 	t.Parallel()
 	requirePermissions(t)
-	downloadOnceFunc()
 	setupOnceFunc()
 
 	rootDirectory := t.TempDir()
@@ -1037,6 +1087,7 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 	t.Parallel()
 	requirePermissions(t)
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 	setupOnceFunc()
 
 	runner, logBytes, osqHistory := setupOsqueryInstanceForTests(t)
@@ -1069,6 +1120,7 @@ func TestRestart(t *testing.T) {
 	t.Parallel()
 	requirePermissions(t)
 	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 	setupOnceFunc()
 
 	runner, logBytes, osqHistory := setupOsqueryInstanceForTests(t)
@@ -1113,7 +1165,11 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("EnrollmentIDs").Return([]string{types.DefaultEnrollmentID})
-	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
+	// OsqueryHealthcheckStartupDelay defaults to ten minutes, which is too long for tests.
+	// We don't want an extremely short interval, though, because we need to give the osquery instance
+	// time to actually start before we begin healthchecking it. So, we wait for at least the
+	// amount of time that we give for the socket to appear.
+	k.On("OsqueryHealthcheckStartupDelay").Return(socketOpenTimeout).Maybe()
 	k.On("WatchdogEnabled").Return(true)
 	k.On("WatchdogMemoryLimitMB").Return(150)
 	k.On("WatchdogUtilizationLimitPercent").Return(20)

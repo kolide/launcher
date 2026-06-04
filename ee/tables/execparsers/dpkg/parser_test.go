@@ -155,6 +155,13 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:  "no trailing blank line",
+			input: []byte("Package: foo\nVersion: 1.0\nSection: admin\n"),
+			expected: []map[string]string{
+				{"package": "foo", "version": "1.0", "section": "admin"},
+			},
+		},
 	}
 
 	for _, tt := range tests {

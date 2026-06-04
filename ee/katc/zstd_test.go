@@ -31,7 +31,8 @@ func Test_zstdDecode(t *testing.T) {
 
 	results, err := zstdDecode(t.Context(), multislogger.NewNopLogger(), encodedRow)
 	require.NoError(t, err)
+	require.Len(t, results, 1)
 
 	// Validate that the keys are unchanged, and that the data was correctly decoded
-	require.Equal(t, expectedRow, results)
+	require.Equal(t, expectedRow, results[0])
 }

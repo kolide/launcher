@@ -35,7 +35,7 @@ func aptParse(reader io.Reader) (any, error) {
 		row["package"] = packageName
 		row["sources"] = strings.TrimSpace(values[0])
 		row["update_version"] = strings.TrimSpace(values[1])
-		row["current_version"] = strings.TrimRight(values[5], "]")
+		row["current_version"] = strings.TrimRight(strings.TrimSpace(values[5]), "]")
 
 		results = append(results, row)
 	}

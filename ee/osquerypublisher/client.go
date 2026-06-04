@@ -2,14 +2,17 @@ package osquerypublisher
 
 import (
 	"bytes"
+	"compress/zlib"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"math/rand"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/kolide/kit/contexts/uuid"
@@ -35,30 +38,77 @@ type (
 	// LogPublisherClient adheres to the Publisher interface. It handles log publication
 	// to the agent-ingester microservice
 	LogPublisherClient struct {
-		slogger     *slog.Logger
-		knapsack    types.Knapsack
-		client      PublisherHTTPClient
-		authTokens  map[string]string
-		hpkeKeys    map[string]*KeyData
-		psks        map[string]*KeyData
-		tokensMutex *sync.RWMutex // used to protect the authTokens, hpkeKeys, and psks maps
+		slogger      *slog.Logger
+		knapsack     types.Knapsack
+		client       PublisherHTTPClient
+		authTokens   map[string]string
+		hpkeKeys     map[string]*KeyData
+		psks         map[string]*KeyData
+		tokensMutex  *sync.RWMutex          // used to protect the authTokens, hpkeKeys, and psks maps
+		metadataJSON atomic.Pointer[[]byte] // cached JSON for encrypted blob metadata (see refreshServerMetadata)
+		// zlibWriter compresses marshaled JSON prior to HPKE.
+		zlibWriter      *zlib.Writer
+		zlibCompressBuf bytes.Buffer
+		// zlibWriterMutex protects against concurrent Write/Close/Reset operations on our zlibWriter and zlibCompressBuf
+		zlibWriterMutex *sync.Mutex
 	}
 )
 
 func NewLogPublisherClient(logger *slog.Logger, k types.Knapsack, client PublisherHTTPClient) types.OsqueryPublisher {
+	compressionBuffer := bytes.Buffer{}
 	lpc := LogPublisherClient{
-		slogger:     logger.With("component", "osquery_log_publisher"),
-		knapsack:    k,
-		client:      client,
-		authTokens:  make(map[string]string),
-		tokensMutex: &sync.RWMutex{},
-		hpkeKeys:    make(map[string]*KeyData),
-		psks:        make(map[string]*KeyData),
+		slogger:         logger.With("component", "osquery_log_publisher"),
+		knapsack:        k,
+		client:          client,
+		authTokens:      make(map[string]string),
+		tokensMutex:     &sync.RWMutex{},
+		hpkeKeys:        make(map[string]*KeyData),
+		psks:            make(map[string]*KeyData),
+		zlibWriter:      zlib.NewWriter(&compressionBuffer),
+		zlibCompressBuf: compressionBuffer,
+		zlibWriterMutex: &sync.Mutex{},
 	}
 
 	lpc.refreshTokenCache()
+	lpc.refreshServerMetadata()
 
 	return &lpc
+}
+
+// Close closes any client idle connections and releases the zlib writer.
+func (lpc *LogPublisherClient) Close() error {
+	if lpc.client != nil { // safe to call more than once
+		lpc.client.CloseIdleConnections()
+	}
+
+	lpc.zlibWriterMutex.Lock()
+	defer lpc.zlibWriterMutex.Unlock()
+	// compressPayload already Closes the zlib writer after each encode, just nil out the field and
+	// reset the buffer to clear any residual state
+	lpc.zlibWriter = nil
+	lpc.zlibCompressBuf.Reset()
+	return nil
+}
+
+// compressPayload returns a zlib-compressed copy of the marshaled JSON request body.
+func (lpc *LogPublisherClient) compressPayload(src []byte) ([]byte, error) {
+	lpc.zlibWriterMutex.Lock()
+	defer lpc.zlibWriterMutex.Unlock()
+
+	// to prevent excessive allocations across many small writes, we reset the buffer and writer
+	// before each compress operation instead of initializing a new writer and buffer each time
+	lpc.zlibCompressBuf.Reset()
+	lpc.zlibWriter.Reset(&lpc.zlibCompressBuf)
+
+	if _, err := lpc.zlibWriter.Write(src); err != nil {
+		return nil, fmt.Errorf("zlib write: %w", err)
+	}
+
+	if err := lpc.zlibWriter.Close(); err != nil {
+		return nil, fmt.Errorf("zlib close: %w", err)
+	}
+
+	return bytes.Clone(lpc.zlibCompressBuf.Bytes()), nil
 }
 
 // NewPublisherHTTPClient is a helper method to allow us to make any http client tweaks as we learn realistic
@@ -79,11 +129,12 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 	}
 
 	batches := batchRequest(logs, lpc.slogger)
-	logger := lpc.slogger.With(
-		"log_type", logType.String(),
-		"log_count", len(logs),
-		"batch_count", len(batches),
-	)
+
+	logAttrs := map[string]any{
+		"log_type":    logType.String(),
+		"log_count":   len(logs),
+		"batch_count": len(batches),
+	}
 
 	pubResponse := types.OsqueryPublicationResponse{}
 
@@ -93,11 +144,12 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 			Logs:    logBatch,
 		}
 
-		resp, err := lpc.publish(ctx, logger, payload, publicationPathLogs)
+		resp, err := lpc.publish(ctx, payload, publicationPathLogs, logAttrs)
 		if err != nil {
-			logger.Log(ctx, slog.LevelError, "encountered error publishing log batch",
+			lpc.slogger.Log(ctx, slog.LevelError, "encountered error publishing log batch",
 				"err", err,
 				"batch_index", idx,
+				"batch_metadata", logAttrs,
 			)
 
 			return nil, err
@@ -121,10 +173,11 @@ func (lpc *LogPublisherClient) PublishResults(ctx context.Context, results []dis
 	}
 
 	batches := batchRequest(results, lpc.slogger)
-	logger := lpc.slogger.With(
-		"result_count", len(results),
-		"batch_count", len(batches),
-	)
+
+	logAttrs := map[string]any{
+		"result_count": len(results),
+		"batch_count":  len(batches),
+	}
 
 	pubResponse := types.OsqueryPublicationResponse{}
 
@@ -133,11 +186,12 @@ func (lpc *LogPublisherClient) PublishResults(ctx context.Context, results []dis
 			Results: resultBatch,
 		}
 
-		resp, err := lpc.publish(ctx, logger, payload, publicationPathResults)
+		resp, err := lpc.publish(ctx, payload, publicationPathResults, logAttrs)
 		if err != nil {
-			logger.Log(ctx, slog.LevelError, "encountered error publishing results batch",
+			lpc.slogger.Log(ctx, slog.LevelError, "encountered error publishing results batch",
 				"err", err,
 				"batch_index", idx,
+				"batch_metadata", logAttrs,
 			)
 
 			return nil, err
@@ -153,8 +207,13 @@ func (lpc *LogPublisherClient) PublishResults(ctx context.Context, results []dis
 
 // publish handles the common logic for publishing logs and results to the agent-ingester service. This
 // includes marshalling the payload, fetching the auth token, issuing the request, and handling the response/logging.
-func (lpc *LogPublisherClient) publish(ctx context.Context, slogger *slog.Logger, payload any, publicationPath string) (*types.OsqueryPublicationResponse, error) {
+func (lpc *LogPublisherClient) publish(ctx context.Context, payload any, publicationPath string, logAttrs map[string]any) (*types.OsqueryPublicationResponse, error) {
 	var err error
+	metaPtr := lpc.metadataJSON.Load()
+	if metaPtr == nil || len(*metaPtr) == 0 {
+		return nil, errors.New("no publication metadata available, skipping publication")
+	}
+	metadataJSON := *metaPtr
 	// in the future we will want to plumb an enrollment ID through here, for now just use the default
 	enrollmentID := types.DefaultEnrollmentID
 	authToken := lpc.getTokenForEnrollment(enrollmentID)
@@ -177,9 +236,29 @@ func (lpc *LogPublisherClient) publish(ctx context.Context, slogger *slog.Logger
 		return nil, fmt.Errorf("marshaling unencrypted request payload: %w", err)
 	}
 
-	// TODO: (upcoming PR) data should be compressed here prior to encryption
+	uncompressedPayloadLen := len(jsonData)
+	jsonData, err = lpc.compressPayload(jsonData)
+	if err != nil {
+		return nil, fmt.Errorf("zlib compressing publication payload: %w", err)
+	}
+	compressedPayloadLen := len(jsonData)
+	// the following log is temporary and will be used to evaluate how we should change the batching logic
+	// to account for compression. this can be removed once we've made that determination. for now we'll maintain
+	// the pre-compression max batch size values, but can likely increase that value depending on the compression ratio
+	// we see for this data.
+	if uncompressedPayloadLen > 0 {
+		lpc.slogger.Log(ctx, slog.LevelInfo, "osquery publication zlib compression stats",
+			"publication_type", publicationPath,
+			"raw_payload_length", uncompressedPayloadLen,
+			"compressed_payload_length", compressedPayloadLen,
+			"compression_ratio", float64(uncompressedPayloadLen)/float64(compressedPayloadLen),
+			"bytes_saved", uncompressedPayloadLen-compressedPayloadLen,
+			"batch_metadata", logAttrs,
+		)
+	}
+
 	// encrypt the payload
-	encryptedBlob, err := encryptWithHPKE(jsonData, hpkeKey, psk)
+	encryptedBlob, err := encryptWithHPKE(jsonData, hpkeKey, psk, metadataJSON)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encrypt payload with HPKE: %w", err)
 	}
@@ -192,17 +271,22 @@ func (lpc *LogPublisherClient) publish(ctx context.Context, slogger *slog.Logger
 
 	requestUUID := uuid.NewForRequest()
 	ctx = uuid.NewContext(ctx, requestUUID)
-	resp := &http.Response{}
+	var resp *http.Response
 	var publicationResponse types.OsqueryPublicationResponse
 
 	defer func(begin time.Time) {
-		slogger.Log(ctx, levelForError(err), "attempted osquery publication",
+		statusCode := 0
+		if resp != nil {
+			statusCode = resp.StatusCode
+		}
+		lpc.slogger.Log(ctx, levelForError(err), "attempted osquery publication",
 			"request_uuid", requestUUID,
 			"publication_type", publicationPath,
 			"response", publicationResponse,
-			"status_code", resp.StatusCode,
+			"status_code", statusCode,
 			"err", err,
 			"took", time.Since(begin),
+			"batch_metadata", logAttrs,
 		)
 	}(time.Now())
 
@@ -243,7 +327,60 @@ func (lpc *LogPublisherClient) publish(ctx context.Context, slogger *slog.Logger
 }
 
 func (lpc *LogPublisherClient) Ping() {
+	lpc.refreshServerMetadata()
 	lpc.refreshTokenCache()
+}
+
+func (lpc *LogPublisherClient) refreshServerMetadata() {
+	store := lpc.knapsack.ServerProvidedDataStore()
+
+	if store == nil { // should never happen but sanity check
+		lpc.slogger.Log(context.TODO(), slog.LevelWarn,
+			"ServerProvidedDataStore is not set, skipping metadata refresh",
+		)
+		return
+	}
+
+	// any errors encountered here are likely transient, don't clear the metadata cache on failure
+	deviceID, err := store.Get([]byte("device_id"))
+	if err != nil {
+		lpc.slogger.Log(context.TODO(), slog.LevelWarn,
+			"failed to fetch device ID from ServerProvidedDataStore, skipping metadata refresh",
+			"err", err,
+		)
+		return
+	}
+
+	organizationID, err := store.Get([]byte("organization_id"))
+	if err != nil {
+		lpc.slogger.Log(context.TODO(), slog.LevelWarn,
+			"failed to fetch organization ID from ServerProvidedDataStore, skipping metadata refresh",
+			"err", err,
+		)
+		return
+	}
+
+	// if we legitimately don't have a device or organization ID, clear the metadata cache so we
+	// do not attempt to publish any logs/results. These would not be able to be routed or decrypted correctly
+	if len(deviceID) == 0 || len(organizationID) == 0 {
+		lpc.metadataJSON.Store(nil)
+		return
+	}
+
+	metadata := &blobMetadata{
+		DeviceID:       string(deviceID),
+		OrganizationID: string(organizationID),
+	}
+	encoded, err := json.Marshal(metadata)
+	if err != nil {
+		lpc.slogger.Log(context.TODO(), slog.LevelWarn,
+			"failed to marshal publication metadata, skipping metadata refresh",
+			"err", err,
+		)
+		return
+	}
+
+	lpc.metadataJSON.Store(&encoded)
 }
 
 // refreshTokenCache loads in the agent ingester auth token, HPKE keys, and PSKs from the TokenStore
@@ -362,7 +499,6 @@ func (lpc *LogPublisherClient) shouldPublishLogs() bool {
 // that will fit within maxRequestSizeBytes (set for kafka performance). If a single log/result exceeds the max request size,
 // it is added as its own batch.
 func batchRequest[Measureable string | distributed.Result](logs []Measureable, logger *slog.Logger) [][]Measureable {
-	logger = logger.With("batch_type", fmt.Sprintf("%T", logs))
 	batches := make([][]Measureable, 0)
 	currentLogBatchSize := 0
 	currentBatch := make([]Measureable, 0)
@@ -374,6 +510,7 @@ func batchRequest[Measureable string | distributed.Result](logs []Measureable, l
 			logger.Log(context.TODO(), slog.LevelError,
 				"failed to marshal osquery result",
 				"err", err,
+				"batch_type", fmt.Sprintf("%T", logs),
 			)
 			continue
 		}
@@ -385,6 +522,7 @@ func batchRequest[Measureable string | distributed.Result](logs []Measureable, l
 				"single osquery log or result exceeds max request size",
 				"log_length", logLength,
 				"max_request_size", maxRequestSizeBytes,
+				"batch_type", fmt.Sprintf("%T", logs),
 			)
 			// add the log as its own batch but don't alter any of the current batch size state, that can continue
 			// in case there are other smaller logs that can still fit in the current batch

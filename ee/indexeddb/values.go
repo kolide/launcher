@@ -15,7 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/snappy"
 	"github.com/kolide/launcher/v2/ee/observability"
 	"golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/transform"
@@ -69,16 +68,11 @@ const (
 	// They may signal something besides array termination.
 	tokenPossiblyArrayTermination0x03 byte = 0x03
 	tokenPossiblyArrayTermination0x01 byte = 0x01
-
-	// some headers may indicate that the payload is compressed with Snappy. look for kCompressedWithSnappy explanation here:
-	// https://chromium.googlesource.com/chromium/src/+/main/third_party/blink/renderer/modules/indexeddb/idb_value_wrapping.cc
-	tokenRequiresProcessingSSVPseudoVersion byte = 0x11
-	tokenCompressedWithSnappy               byte = 0x02
 )
 
 // DeserializeChrome deserializes a JS object that has been stored by Chrome
 // in IndexedDB LevelDB-backed databases.
-func DeserializeChrome(ctx context.Context, slogger *slog.Logger, row map[string][]byte) (map[string][]byte, error) {
+func DeserializeChrome(ctx context.Context, slogger *slog.Logger, row map[string][]byte) ([]map[string][]byte, error) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -95,19 +89,6 @@ func DeserializeChrome(ctx context.Context, slogger *slog.Logger, row map[string
 		return nil, fmt.Errorf("reading uvarint as indexeddb version: %w", err)
 	}
 
-	// Grab a reference to the remaining bytes from the data as the payload,
-	// we'll need to read a few bytes from the header and snappy decompress if needed
-	payload := data[len(data)-srcReader.Len():]
-	// If the header does not indicate that the payload is compressed with Snappy,
-	// this will return unchanged
-	payload, err = snappyDecompressedIfNeeded(payload)
-	if err != nil {
-		return nil, fmt.Errorf("indexeddb version %d: %w", indexeddbVersion, err)
-	}
-
-	// Reset the source reader, this will have no effect if the payload is was not compressed with Snappy
-	srcReader = bytes.NewReader(payload)
-
 	// Next, read through the header to extract top-level data
 	serializerVersion, rootTag, err := readHeader(srcReader)
 	if err != nil {
@@ -115,38 +96,12 @@ func DeserializeChrome(ctx context.Context, slogger *slog.Logger, row map[string
 	}
 
 	// Now, parse the actual data in this row
-	objData, err := chromeRootValueToFlatMap(ctx, slogger, rootTag, srcReader)
+	dataRows, err := deserializeChromeRootValue(ctx, slogger, rootTag, srcReader)
 	if err != nil {
 		return nil, fmt.Errorf("decoding obj for indexeddb version %d and serializer version %d: %w", indexeddbVersion, serializerVersion, err)
 	}
 
-	return objData, nil
-}
-
-// snappyDecompressedIfNeeded decompresses the payload if it is compressed with Snappy.
-// this is determined by the presence of the following sequence in the header payload:
-// 1) 0xFF - kVersionTag
-// 2) 0x11 - kRequiresProcessingSSVPseudoVersion
-// 3) 0x02 - kCompressedWithSnappy
-// 4) the compressed data
-func snappyDecompressedIfNeeded(payload []byte) ([]byte, error) {
-	if len(payload) >= 4 &&
-		payload[0] == tokenVersion &&
-		payload[1] == tokenRequiresProcessingSSVPseudoVersion &&
-		payload[2] == tokenCompressedWithSnappy {
-		decompressed, err := snappy.Decode(nil, payload[3:])
-		if err != nil {
-			return nil, fmt.Errorf("snappy decompress after Chrome FF/11/02 wrapper: %w", err)
-		}
-
-		if len(decompressed) == 0 {
-			return nil, errors.New("snappy decompression yielded empty data set")
-		}
-
-		return decompressed, nil
-	}
-
-	return payload, nil
+	return dataRows, nil
 }
 
 // readHeader reads through the header bytes at the start of `srcReader`,
@@ -174,7 +129,9 @@ func readHeader(srcReader *bytes.Reader) (uint64, byte, error) {
 			if err != nil {
 				return serializerVersion, rootTag, fmt.Errorf("decoding uint32 for version in header: %w", err)
 			}
-		case tokenObjectBegin, tokenBeginDenseArray, tokenBeginSparseArray:
+			// the following case should match any tokens that we support deserializing as the root value
+			// (see deserializeChromeRootValue)
+		case tokenObjectBegin, tokenBeginDenseArray, tokenBeginSparseArray, tokenArrayBuffer:
 			// Done reading header
 			return serializerVersion, nextByte, nil
 		default:
@@ -183,14 +140,19 @@ func readHeader(srcReader *bytes.Reader) (uint64, byte, error) {
 	}
 }
 
-// chromeRootValueToFlatMap coerces root JS Array values into the flat map this transformFunc has historically returned.
-// follow-up work will be done in a subsequent PR to support returning all array entries, but we'll need to change the transformFunc
-// signature to support this, so for now just unmarshal and return the first element of any array
-func chromeRootValueToFlatMap(ctx context.Context, slogger *slog.Logger, rootTag byte, srcReader *bytes.Reader) (map[string][]byte, error) {
+// deserializeChromeRootValue deserializes the root value of a Chrome IndexedDB row.
+// It returns a slice of maps, one for each element in the root value. The root value can be an object, or an array.
+// If the root value is an object, it returns a slice with a single map with the object's properties.
+// If the root value is an array, it returns a slice with a map for each element in the array.
+func deserializeChromeRootValue(ctx context.Context, slogger *slog.Logger, rootTag byte, srcReader *bytes.Reader) ([]map[string][]byte, error) {
 	switch rootTag {
 	case tokenObjectBegin:
-		return deserializeObject(ctx, slogger, srcReader)
-	case tokenBeginDenseArray, tokenBeginSparseArray:
+		row, err := deserializeObject(ctx, slogger, srcReader)
+		if err != nil {
+			return []map[string][]byte{}, err
+		}
+		return []map[string][]byte{row}, nil
+	case tokenBeginDenseArray, tokenBeginSparseArray, tokenArrayBuffer:
 		arrBytes, err := deserializeNext(ctx, slogger, rootTag, srcReader)
 		if err != nil {
 			return nil, err
@@ -200,21 +162,22 @@ func chromeRootValueToFlatMap(ctx context.Context, slogger *slog.Logger, rootTag
 			return nil, fmt.Errorf("unmarshaling root JS array wrapper: %w", err)
 		}
 		if len(elems) == 0 {
-			return map[string][]byte{}, nil
+			return []map[string][]byte{}, nil
 		}
-		var firstArrItem map[string]string
-		// only grab the first one for now (temporary).
-		// this would technically fail if the root array did not contain valid json objects,
-		// but since we're going to be filtering on columns anyway we would not use that data, let it fail
-		// and we'll log and continue parsing other rows.
-		if err := json.Unmarshal([]byte(elems[0]), &firstArrItem); err != nil {
-			return nil, fmt.Errorf("unmarshaling first array element as object: %w", err)
+
+		dataRows := make([]map[string][]byte, len(elems))
+		for i, elem := range elems {
+			var arrItem map[string]string
+			if err := json.Unmarshal([]byte(elem), &arrItem); err != nil {
+				return nil, fmt.Errorf("unmarshaling array element as object: %w", err)
+			}
+			dataRows[i] = make(map[string][]byte, len(arrItem))
+			for k, v := range arrItem {
+				dataRows[i][k] = []byte(v)
+			}
 		}
-		out := make(map[string][]byte, len(firstArrItem))
-		for k, v := range firstArrItem {
-			out[k] = []byte(v)
-		}
-		return out, nil
+
+		return dataRows, nil
 	default:
 		return nil, fmt.Errorf("unsupported root serialized value tag 0x%02x / `%s` (expected object or array)", rootTag, string(rootTag))
 	}
@@ -258,6 +221,24 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader *byt
 				return obj, fmt.Errorf("deserializing object property UTF-16 string: %w", err)
 			}
 			currentPropertyName = string(objectPropertyNameBytes)
+		case tokenInt32:
+			propertyInt, err := binary.ReadVarint(srcReader)
+			if err != nil {
+				return nil, fmt.Errorf("decoding object property int32: %w", err)
+			}
+			currentPropertyName = strconv.Itoa(int(propertyInt))
+		case tokenUint32:
+			propertyInt, err := binary.ReadUvarint(srcReader)
+			if err != nil {
+				return nil, fmt.Errorf("decoding object property uint32: %w", err)
+			}
+			currentPropertyName = strconv.Itoa(int(propertyInt))
+		case tokenDouble:
+			var d float64
+			if err := binary.Read(srcReader, binary.NativeEndian, &d); err != nil {
+				return nil, fmt.Errorf("decoding object property double: %w", err)
+			}
+			currentPropertyName = strconv.FormatFloat(d, 'f', -1, 64)
 		default:
 			// Handle unexpected tokens here. Likely, if we run into this issue, we've
 			// already committed an error when parsing. Collect as much information as
@@ -407,15 +388,20 @@ func deserializeNext(ctx context.Context, slogger *slog.Logger, nextToken byte, 
 		case tokenHostObj:
 			return nil, errors.New("deserialization not implemented for host object")
 		default:
-			slogger.Log(ctx, slog.LevelWarn,
-				"unknown token type, will attempt to keep reading",
-				"token", fmt.Sprintf("%02x", nextToken),
-			)
+			currentToken := nextToken
 			var err error
 			nextToken, err = nextNonPaddingByte(srcReader)
 			if err != nil {
-				return nil, fmt.Errorf("reading next non-padding byte after unknown token byte: %w", err)
+				return nil, fmt.Errorf("reading next non-padding byte after unknown token byte %02x / %s: %w", currentToken, string(currentToken), err)
 			}
+
+			slogger.Log(ctx, slog.LevelWarn,
+				"unknown token type, will attempt to keep reading",
+				"token", fmt.Sprintf("%02x", currentToken),
+				"token_str", string(currentToken),
+				"next_token", fmt.Sprintf("%02x", nextToken),
+				"next_token_str", string(nextToken),
+			)
 		}
 	}
 }
@@ -511,7 +497,7 @@ func deserializeSparseArray(ctx context.Context, slogger *slog.Logger, srcReader
 		}
 		arrayItem, err := deserializeNext(ctx, slogger, nextByte, srcReader)
 		if err != nil {
-			return nil, fmt.Errorf("decoding next item in dense array: %w", err)
+			return nil, fmt.Errorf("decoding next item in sparse array at index %d (total length %d): %w", i, arrayLen, err)
 		}
 		arrItems[i] = string(arrayItem) // cast to string so it's readable when marshalled again below
 	}
@@ -547,7 +533,7 @@ func deserializeDenseArray(ctx context.Context, slogger *slog.Logger, srcReader 
 		// Array item! Unread the byte
 		arrayItem, err := deserializeNext(ctx, slogger, nextByte, srcReader)
 		if err != nil {
-			return nil, fmt.Errorf("decoding next item in dense array: %w", err)
+			return nil, fmt.Errorf("decoding next item in dense array at index %d (total length %d): %w", i, arrayLen, err)
 		}
 		arrItems[i] = string(arrayItem) // cast to string so it's readable when marshalled again below
 	}
@@ -644,6 +630,10 @@ func deserializeArrayBuffer(ctx context.Context, slogger *slog.Logger, srcReader
 	byteLength, err := binary.ReadUvarint(srcReader)
 	if err != nil {
 		return nil, fmt.Errorf("reading byte length for ArrayBuffer view: %w", err)
+	}
+	// We don't need the flags, but we must read them in
+	if _, err := binary.ReadUvarint(srcReader); err != nil {
+		return nil, fmt.Errorf("reading flags for ArrayBuffer view: %w", err)
 	}
 
 	// Handle the only non-TypedArray case
@@ -849,7 +839,7 @@ func deserializeMap(ctx context.Context, slogger *slog.Logger, srcReader *bytes.
 		}
 		if tokenByteForKey == tokenMapEnd {
 			// All done with the map! Read the length and break
-			_, _ = srcReader.ReadByte()
+			_, _ = binary.ReadUvarint(srcReader)
 			break
 		}
 
@@ -892,7 +882,7 @@ func deserializeSet(ctx context.Context, slogger *slog.Logger, srcReader *bytes.
 		}
 		if nextToken == tokenSetEnd {
 			// All done with the set! Read the length and break
-			_, _ = srcReader.ReadByte()
+			_, _ = binary.ReadUvarint(srcReader)
 			break
 		}
 
@@ -923,7 +913,7 @@ func deserializeAsciiStr(srcReader *bytes.Reader) ([]byte, error) {
 	for i := 0; i < int(strLen); i += 1 {
 		nextByte, err := srcReader.ReadByte()
 		if err != nil {
-			return nil, fmt.Errorf("reading next byte at index %d in string with length %d: %w", i, strLen, err)
+			return nil, fmt.Errorf("reading next byte at index %d in ascii string with length %d: %w", i, strLen, err)
 		}
 
 		strBytes[i] = nextByte
@@ -943,7 +933,7 @@ func deserializeUtf16Str(srcReader *bytes.Reader) ([]byte, error) {
 	for i := 0; i < int(strLen); i += 1 {
 		nextByte, err := srcReader.ReadByte()
 		if err != nil {
-			return nil, fmt.Errorf("reading next byte at index %d in string with length %d: %w", i, strLen, err)
+			return nil, fmt.Errorf("reading next byte at index %d in utf16 string with length %d: %w", i, strLen, err)
 		}
 
 		strBytes[i] = nextByte

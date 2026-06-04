@@ -470,8 +470,8 @@ func toJWK(key any, kid string) (*jwk, error) {
 		}
 
 		// Encode x and y coordinates using base64 URL encoding (unpadded).
-		xStr := base64.RawURLEncoding.EncodeToString(k.X.Bytes())
-		yStr := base64.RawURLEncoding.EncodeToString(k.Y.Bytes())
+		xStr := base64.RawURLEncoding.EncodeToString(k.X.Bytes()) //nolint:staticcheck
+		yStr := base64.RawURLEncoding.EncodeToString(k.Y.Bytes()) //nolint:staticcheck
 
 		return &jwk{
 			Curve: crv,

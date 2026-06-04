@@ -31,11 +31,11 @@ const (
 // PackageOptions encapsulates the launcher build options. It's
 // populated by callers, such as command line flags. It may change.
 type PackageOptions struct {
-	PackageVersion       string // What version in this package. If unset, autodetection will be attempted.
-	OsqueryVersion       string
+	PackageVersion       string   // What version in this package. If unset, autodetection will be attempted.
+	OsqueryVersion       string   // Usually a channel ("stable"), but can also be a version
 	OsqueryFlags         []string // Additional flags to pass to the runtime osquery instance
 	ContainerTool        string
-	LauncherVersion      string
+	LauncherVersion      string // Usually a channel ("stable"), but can also be a version
 	LauncherPath         string
 	LauncherArmPath      string
 	ExtensionVersion     string
@@ -224,6 +224,9 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 
 	launcherVersion := p.LauncherVersion
 	if p.LauncherPath != "" {
+		if p.PackageVersion == "" {
+			return errors.New("PackageVersion is required when LauncherPath is set")
+		}
 		launcherVersion = p.LauncherPath
 	}
 
@@ -275,16 +278,17 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		}
 	}
 
-	// The version string is the version of _launcher_ which we don't
-	// know until we've downloaded it.
+	// The version string is the version of _launcher_, which we retrieve from p.LauncherVersion --
+	// directly, if p.LauncherVersion is actually a version, or via TUF, if p.LauncherVersion is actually
+	// an update channel.
 	if p.PackageVersion == "" {
-		if err := p.detectLauncherVersion(ctx); err != nil {
-			return fmt.Errorf("version detection: %w", err)
+		if err := p.setPackageVersion(launcherVersion, p.CacheDir); err != nil {
+			return fmt.Errorf("determining package version: %w", err)
 		}
 	}
 
 	// Record the osquery version, now that we've downloaded it
-	p.setOsqueryVersionInCtx(ctx)
+	p.setOsqueryVersionInCtx(ctx, p.OsqueryVersion, p.CacheDir)
 
 	p.initOptions = &packagekit.InitOptions{
 		Name:        "launcher",

@@ -11,7 +11,7 @@ import (
 
 // snappyDecode is a dataProcessingStep that decodes data compressed with snappy.
 // We use this to decode data retrieved from Firefox IndexedDB sqlite-backed databases.
-func snappyDecode(ctx context.Context, _ *slog.Logger, row map[string][]byte) (map[string][]byte, error) {
+func snappyDecode(ctx context.Context, _ *slog.Logger, row map[string][]byte) ([]map[string][]byte, error) {
 	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -26,5 +26,5 @@ func snappyDecode(ctx context.Context, _ *slog.Logger, row map[string][]byte) (m
 		decodedRow[k] = decodedResultBytes
 	}
 
-	return decodedRow, nil
+	return []map[string][]byte{decodedRow}, nil
 }

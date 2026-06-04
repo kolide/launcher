@@ -38,9 +38,10 @@ func socketfilterfwParse(reader io.Reader) (any, error) {
 			appRow := parseAppList(line)
 			if appRow != nil {
 				results = append(results, appRow)
+				continue
 			}
-
-			continue
+			// Fall through to parseLine: feature-state lines (e.g. stealth, logging)
+			// can appear after the app list section.
 		}
 
 		k, v := parseLine(line)

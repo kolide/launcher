@@ -2,10 +2,14 @@ package secretscan
 
 import (
 	"context"
+	_ "embed"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -28,34 +32,58 @@ const (
 	directoryScanConcurrency = 4
 )
 
-func newDefaultConfig() (config.Config, error) {
+var (
+	//go:embed config.toml
+	rawKolideConfig string
+	kolideConfig    *config.Config
+	configErr       error
+)
+
+// newConfigOnce sets up our config, which pulls in the default gitleaks config as our base.
+// When gitleaks pulls in the default config, it updates multiple global vars (`viper.SetConfigType("toml")`,
+// and a private variable extendDepth). We use a OnceFunc here to avoid both the data race
+// and undesirable behavior resulting from extendDepth being modified multiple times.
+var newConfigOnce = sync.OnceFunc(func() {
 	v := viper.New() // init viper here so we don't update a global var
 	v.SetConfigType("toml")
-	err := v.ReadConfig(strings.NewReader(config.DefaultConfig))
+	err := v.ReadConfig(strings.NewReader(rawKolideConfig))
 	if err != nil {
-		return config.Config{}, err
+		configErr = fmt.Errorf("reading config: %w", err)
+		return
 	}
 	var vc config.ViperConfig
 	err = v.Unmarshal(&vc)
 	if err != nil {
-		return config.Config{}, err
+		configErr = fmt.Errorf("unmarshalling config: %w", err)
+		return
 	}
+
+	// Note: You may see this Translate call come up as a major consumer of inuse_space in memprofiles
+	// (depending on how the sampling works out). This has been investigated and there are not great options
+	// to improve it, just know that there is no leak here, it does one large allocation during this sync.OnceFunc,
+	// and maintains it for the lifetime of the process. This is due to our inclusion of the default gitleaks config,
+	// which contains a large allowlist for Generic API Keys. During the translate call validation of the allowlist
+	// it calls aho-corasick.NewTrieBuilder().AddStrings(values).Build() with the (currently) ~1.5k stopwords in
+	// the default allowlist. The tries are built with dense transition tables, and with the ~1.5k overlapping stopwords
+	// this ends up allocating enough states to consume ~14MB of memory very fast. This is something we can live with but
+	// should be aware of. If it becomes more of a problem down the road we can consider keeping a slimmer allowlist outside
+	// of the default, but this seems like an uneccessary maintenance burden for the current memory usage incurred.
 	cfg, err := vc.Translate()
 	if err != nil {
-		return config.Config{}, err
+		configErr = fmt.Errorf("translating: %w", err)
+		return
 	}
-	return cfg, nil
-}
+
+	kolideConfig = &cfg
+})
 
 type Table struct {
-	slogger       *slog.Logger
-	defaultConfig *config.Config
-	configOnce    sync.Once
-	configErr     error
+	slogger *slog.Logger
 }
 
 func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
+		table.TextColumn("name"),
 		table.TextColumn("path"),
 		table.TextColumn("raw_data"),
 		table.TextColumn("rule_id"),
@@ -79,16 +107,9 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	t.configOnce.Do(func() {
-		cfg, err := newDefaultConfig()
-		if err != nil {
-			t.configErr = fmt.Errorf("creating default config: %w", err)
-			return
-		}
-		t.defaultConfig = &cfg
-	})
-	if t.configErr != nil {
-		return nil, t.configErr
+	newConfigOnce()
+	if configErr != nil {
+		return nil, configErr
 	}
 
 	var results []map[string]string
@@ -157,7 +178,7 @@ func (t *Table) scanPath(ctx context.Context, argon2idSalts []string, targetPath
 	}
 
 	// Fresh detector per scan - gitleaks accumulates findings internally
-	detector := detect.NewDetector(*t.defaultConfig)
+	detector := detect.NewDetector(*kolideConfig)
 
 	var source sources.Source
 	var file *os.File
@@ -195,7 +216,7 @@ func (t *Table) scanPath(ctx context.Context, argon2idSalts []string, targetPath
 
 func (t *Table) scanContent(ctx context.Context, argon2idSalts []string, content []byte) ([]map[string]string, error) {
 	// Fresh detector per scan - gitleaks accumulates findings internally
-	detector := detect.NewDetector(*t.defaultConfig)
+	detector := detect.NewDetector(*kolideConfig)
 
 	fileSource := &sources.File{
 		Content: strings.NewReader(string(content)),
@@ -225,7 +246,20 @@ func (t *Table) findingsToRows(ctx context.Context, argon2idSalts []string, find
 		keepHashing = false
 	}
 
-	for _, f := range findings {
+	keyNamesInFindings := findingsToKeyNames(findings)
+
+	// Just for logging purposes -- we're curious how frequently we detect false positives
+	encryptedJwtFalsePositiveCount := 0
+	for idx, f := range findings {
+		// We sometimes see false positives under the "generic-api-key" rule.
+		// Check for these.
+		if f.RuleID == "generic-api-key" {
+			if isEncryptedJWTFamilyValue(f) {
+				encryptedJwtFalsePositiveCount += 1
+				continue
+			}
+		}
+
 		// Get the hash of this secret. If there's an error, log it, and allow the rest of the data to be returned.
 		// But note that there's an error, since it's probably a salting issue, and we don't need to log a billion times.
 		var argon2idHash string
@@ -253,9 +287,123 @@ func (t *Table) findingsToRows(ctx context.Context, argon2idSalts []string, find
 			"entropy":            fmt.Sprintf("%.2f", f.Entropy),
 			"hash_argon2id":      argon2idHash,
 			"hash_argon2id_salt": argon2idSalt,
+			"name":               keyNamesInFindings[idx],
 		}
 		results = append(results, row)
 	}
 
+	if encryptedJwtFalsePositiveCount > 0 {
+		t.slogger.Log(ctx, slog.LevelInfo,
+			"detected and skipped false positive generic-api-key findings",
+			"jwt_family_count", encryptedJwtFalsePositiveCount,
+		)
+	}
+
 	return results
 }
+
+type jwtFamilyHeader struct {
+	Alg string `json:"alg,omitempty"`
+	Enc string `json:"enc,omitempty"`
+	Cty string `json:"cty,omitempty"`
+}
+
+// isEncryptedJWTFamilyValue inspects the given finding to determine if it is encrypted content
+// somewhere in the JWT family (JWE or encrypted JWK). For JWEs, we only support the compact
+// serialization format currently.
+func isEncryptedJWTFamilyValue(finding report.Finding) bool {
+	// Grab just the header to examine.
+	header, _, _ := strings.Cut(finding.Secret, ".")
+
+	// We expect these values to be b64-encoded.
+	decoded, err := base64.RawURLEncoding.DecodeString(header)
+	if err != nil {
+		// Not base64 -- not a JWE/JWK
+		return false
+	}
+
+	var h jwtFamilyHeader
+	if err := json.Unmarshal(decoded, &h); err != nil {
+		// Not a valid header -- not a JWE/JWK
+		return false
+	}
+
+	// Check for JWEs. The presence of the Algorithm and Encryption Algorithm
+	// header params suggest that this is a JWE.
+	// https://datatracker.ietf.org/doc/html/rfc7516#section-4.1.1
+	// https://datatracker.ietf.org/doc/html/rfc7516#section-4.1.2
+	if len(h.Alg) > 0 && len(h.Enc) > 0 {
+		return true
+	}
+	// Check for encrypted JWKs.
+	// https://datatracker.ietf.org/doc/html/rfc7517#section-7
+	if strings.Contains(h.Cty, "jwk+json") {
+		return true
+	}
+
+	return false
+}
+
+// findingsToKeyNames attempts to extract the key names (eg: in an .env file) to help understand the context
+// of the discovered secret. Because of the multitude of possible ways people can stash secrets, and the myriad of
+// secret types, this is very hard to get right. So instead, we aim to solve the simple case, and ignore the rest.
+func findingsToKeyNames(findings []report.Finding) []string {
+	// Perticular problems...
+	//
+	// We can't use f.StartColumn, because in the case of CONFIG_KEY=abc123, it returns the start of CONFIG_KEY, not abc
+	// So instead we remove the secret, from the match block, and then strip out any characters we don't want.
+	//
+	// f.Line seems appealing, but a line contains more than one secret, we cannot cleanly get the prior one.
+	//
+	// The behavior of f.Match is inconsistent across rules -- for the `generic-api-key` rule, it includes the KEY=
+	// portion, but for an explicit rule (ie: `npm-access-token`) it does not.
+	//
+	// These combine to make it hard to write a generic routine
+
+	keyNames := make([]string, len(findings))
+
+	if len(findings) == 0 {
+		return keyNames
+	}
+
+	// Because we're trying to guess the key name by looking at prior token on the line, we only want to skip lines where
+	// multiple secrets are detected. (eg: `KEY1=foo KEY2=bar` or a dense json block). There are probably ways to work on
+	// a multiple secret line, but let's do the "easy" thing
+	secretsPerLine := make(map[int]int)
+	for _, finding := range findings {
+		secretsPerLine[finding.StartLine] += 1
+	}
+
+	// Now, we can finally examine the findings and try to get the key name
+	for idx, finding := range findings {
+		// check that we only have 1 secret on this line
+		if secretsPerLine[finding.StartLine] != 1 {
+			continue
+		}
+
+		// To find the token _prior_ to the secret, we split on the secret, and then take the first word
+		beforeSecret, _, found := strings.Cut(finding.Line, finding.Secret)
+		if !found || beforeSecret == "" {
+			// this is a weird case, probably an error, but we may as well try to detect it
+			continue
+		}
+
+		// Next up, replace everything we don't want with spaces
+		cleanedStr := strings.Trim(nonAllowedInKeyNames.ReplaceAllString(beforeSecret, " "), " ")
+
+		// And finally, let's find the _last_ word
+		lastSpaceIndex := strings.LastIndex(cleanedStr, " ")
+
+		if lastSpaceIndex != -1 {
+			lastWord := cleanedStr[lastSpaceIndex+1:]
+			keyNames[idx] = lastWord
+		} else {
+			// Handle the case where there are no spaces (single word or empty string)
+			keyNames[idx] = cleanedStr
+		}
+	}
+
+	return keyNames
+}
+
+var nonAllowedInKeyNames = regexp.MustCompile(`[^a-zA-Z0-9+./_^ -]+`)

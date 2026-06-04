@@ -5,10 +5,15 @@ package runner
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os/exec"
 	"os/user"
+	"strings"
+	"time"
 
+	"github.com/kolide/launcher/v2/ee/allowedcmd"
 	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/pkg/backoff"
 	"golang.org/x/sys/unix"
 )
 
@@ -63,4 +68,43 @@ func osversion() (string, error) {
 // logIndicatesSystrayNeedsRestart is Windows-only functionality
 func logIndicatesSystrayNeedsRestart(_ string) bool {
 	return false
+}
+
+// waitForReadyToSpawnDesktopState repeatedly checks to see if the ControlCenter is running,
+// since we need it for our menu bar icon to appear.
+func (r *DesktopUsersProcessesRunner) waitForReadyToSpawnDesktopState(ctx context.Context, uid string) {
+	if err := backoff.WaitFor(func() error {
+		controlCenterService := fmt.Sprintf("gui/%s/com.apple.controlcenter", uid)
+		cmd, err := allowedcmd.Launchctl.Cmd(ctx, "print", controlCenterService)
+		if err != nil {
+			return fmt.Errorf("creating `launchctl print %s` command: %w", controlCenterService, err)
+		}
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("running `launchctl print %s`: %w", controlCenterService, err)
+		}
+		outStr := string(out)
+		// The output for launchctl print is not guaranteed to remain the same,
+		// so we have a couple different checks here to see if we have a running Control Center.
+		// First, we check for "state = running" in the output. If it's there, then
+		// we assume the service is running.
+		if strings.Contains(outStr, "state = running") {
+			return nil
+		}
+		// Next, we look for our expected error string, "Could not find service".
+		// Usually when we see this case, launchctl print exits with a non-zero error code,
+		// returning an error on `CombinedOutput` above. But just in case that changes,
+		// we check for the error output string here as well.
+		if strings.Contains(outStr, "Could not find service") {
+			return fmt.Errorf("%s not yet running", controlCenterService)
+		}
+		// If we make it here, we assume the service isn't running yet. We separate
+		// this case out from the above for improving output parsing in the future.
+		return fmt.Errorf("unexpected launchctl output, assuming service is not running: %s", outStr)
+	}, 30*time.Second, 1*time.Second); err != nil {
+		r.slogger.Log(ctx, slog.LevelWarn,
+			"ControlCenter process not found before timeout",
+			"err", err,
+		)
+	}
 }

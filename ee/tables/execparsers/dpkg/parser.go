@@ -45,9 +45,14 @@ func dpkgParse(reader io.Reader) (any, error) {
 		}
 
 		var key = strings.ToLower(strings.TrimSpace(kv[0]))
-		if slices.Contains(allowedKeys, key) {
+		if slices.Contains(allowedKeys, key) { //nolint:govet // fine not to inline this
 			row[key] = strings.TrimSpace(kv[1])
 		}
+	}
+
+	// Flush the last record if input ended without a trailing blank line.
+	if len(row) > 0 {
+		results = append(results, row)
 	}
 
 	return results, nil

@@ -14,6 +14,7 @@ func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m)
 }
 
+//nolint:sloglint // fine to not use snake_case here (we use the original. prefix for these keys)
 func TestLogRawLogRecord(t *testing.T) {
 	t.Parallel()
 
