@@ -11,7 +11,6 @@ import (
 	"maps"
 	"net/http"
 	"path"
-	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -32,9 +31,6 @@ type Options struct {
 	MetadataURL string
 	MirrorURL   string
 	HTTPClient  *http.Client
-	// LocalStorePath is the directory for the TUF local metadata store.
-	// If empty, an in-memory store is used (no persistent cache).
-	LocalStorePath string
 }
 
 func (o *Options) metadataURL() string {
@@ -58,22 +54,19 @@ func (o *Options) httpClient() *http.Client {
 	return &http.Client{Timeout: 2 * time.Minute}
 }
 
-// initUpdater creates a go-tuf v2 Updater: loads trusted root and refreshes metadata.
-func initUpdater(ctx context.Context, slogger *slog.Logger, opts *Options) (*tufv2updater.Updater, error) {
+// newUpdater creates a go-tuf v2 Updater: loads trusted root and refreshes metadata.
+// Metadata is kept in memory only (no persistent local cache), which avoids the need
+// for write access to a local TUF store.
+func newUpdater(ctx context.Context, slogger *slog.Logger, opts *Options) (*tufv2updater.Updater, error) {
 	metadataBase := strings.TrimSuffix(opts.metadataURL(), "/") + "/repository"
 	cfg, err := tufv2config.New(metadataBase, tuf.RootJSON())
 	if err != nil {
 		return nil, fmt.Errorf("creating TUF config: %w", err)
 	}
 
-	if opts.LocalStorePath != "" {
-		cfg.LocalMetadataDir = filepath.Join(opts.LocalStorePath, "metadata")
-		cfg.LocalTargetsDir = filepath.Join(opts.LocalStorePath, "targets")
-	} else {
-		cfg.DisableLocalCache = true
-		cfg.LocalMetadataDir = ""
-		cfg.LocalTargetsDir = ""
-	}
+	cfg.DisableLocalCache = true
+	cfg.LocalMetadataDir = ""
+	cfg.LocalTargetsDir = ""
 	cfg.PrefixTargetsWithHash = false
 
 	if err := cfg.SetDefaultFetcherHTTPClient(opts.httpClient()); err != nil {
@@ -97,21 +90,21 @@ func initUpdater(ctx context.Context, slogger *slog.Logger, opts *Options) (*tuf
 	return up, nil
 }
 
-// resolveTarget returns the TUF target path and metadata for the given target name,
-// platform, arch, and version or channel (same semantics as ee/tuf.ResolveTarget).
-func resolveTarget(up *tufv2updater.Updater, targetName, platform, arch, versionOrChannel string) (targetPath string, targetMeta *tufv2metadata.TargetFiles, err error) {
+// resolveTarget returns the fully-qualified TUF target path and metadata for the given
+// binary (e.g. "launcher", "osqueryd"), platform, arch, and version or channel.
+func resolveTarget(up *tufv2updater.Updater, binary, platform, arch, versionOrChannel string) (targetPath string, targetMeta *tufv2metadata.TargetFiles, err error) {
 	tufArch := tuf.ArchForPlatform(platform, arch)
 	isChannel := versionOrChannel == "stable" || versionOrChannel == "beta" ||
 		versionOrChannel == "nightly" || versionOrChannel == "alpha"
 
 	if isChannel {
-		return resolveTargetForChannel(up, targetName, platform, tufArch, versionOrChannel)
+		return resolveTargetForChannel(up, binary, platform, tufArch, versionOrChannel)
 	}
-	return resolveTargetForVersion(up, targetName, platform, tufArch, versionOrChannel)
+	return resolveTargetForVersion(up, binary, platform, tufArch, versionOrChannel)
 }
 
-func resolveTargetForChannel(up *tufv2updater.Updater, targetName, platform, arch, channel string) (string, *tufv2metadata.TargetFiles, error) {
-	releasePath := path.Join(targetName, platform, arch, channel, "release.json")
+func resolveTargetForChannel(up *tufv2updater.Updater, binary, platform, arch, channel string) (string, *tufv2metadata.TargetFiles, error) {
+	releasePath := path.Join(binary, platform, arch, channel, "release.json")
 	releaseMeta, err := up.GetTargetInfo(releasePath)
 	if err != nil {
 		return "", nil, fmt.Errorf("release file %s not found: %w", releasePath, err)
@@ -135,8 +128,8 @@ func resolveTargetForChannel(up *tufv2updater.Updater, targetName, platform, arc
 	return custom.Target, meta, nil
 }
 
-func resolveTargetForVersion(up *tufv2updater.Updater, targetName, platform, arch, version string) (string, *tufv2metadata.TargetFiles, error) {
-	targetPath := path.Join(targetName, platform, arch, fmt.Sprintf("%s-%s.tar.gz", targetName, version))
+func resolveTargetForVersion(up *tufv2updater.Updater, binary, platform, arch, version string) (string, *tufv2metadata.TargetFiles, error) {
+	targetPath := path.Join(binary, platform, arch, fmt.Sprintf("%s-%s.tar.gz", binary, version))
 	meta, err := up.GetTargetInfo(targetPath)
 	if err != nil {
 		return "", nil, fmt.Errorf("target %s not found: %w", targetPath, err)
@@ -144,48 +137,49 @@ func resolveTargetForVersion(up *tufv2updater.Updater, targetName, platform, arc
 	return targetPath, meta, nil
 }
 
-// ListTargets fetches TUF metadata and returns the sorted list of top-level
-// target names (e.g. "launcher", "osqueryd").
+// ListTargets fetches TUF metadata and returns the sorted list of distinct binary
+// names (e.g. "launcher", "osqueryd"). go-tuf reports every fully-qualified target
+// path (e.g. "launcher/darwin/universal/launcher-1.2.3.tar.gz"); we derive the binary
+// name from the first path segment and deduplicate.
 func ListTargets(ctx context.Context, slogger *slog.Logger, opts *Options) ([]string, error) {
 	if opts == nil {
 		opts = &Options{}
 	}
 
-	up, err := initUpdater(ctx, slogger, opts)
+	up, err := newUpdater(ctx, slogger, opts)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("creating TUF updater: %w", err)
 	}
 
-	targets := up.GetTopLevelTargets()
 	seen := make(map[string]any)
-	for p := range targets {
-		name, _, _ := strings.Cut(p, "/")
-		seen[name] = nil
+	for targetPath := range up.GetTopLevelTargets() {
+		binary, _, _ := strings.Cut(targetPath, "/")
+		seen[binary] = nil
 	}
 
 	return slices.Sorted(maps.Keys(seen)), nil
 }
 
-// Download fetches a target from the TUF mirror and verifies it against TUF metadata.
+// Download fetches a binary from the TUF mirror and verifies it against TUF metadata.
 // Returns the verified tarball bytes.
 //
-// target is the TUF target name (e.g. "launcher", "osqueryd").
+// binary is the binary name (e.g. "launcher", "osqueryd").
 // platform must be "darwin", "linux", or "windows".
 // arch must be "amd64" or "arm64" (darwin uses "universal" automatically).
 // versionOrChannel is a channel ("stable", "beta", etc.) or specific version ("1.2.3").
-func Download(ctx context.Context, slogger *slog.Logger, target, platform, arch, versionOrChannel string, opts *Options) ([]byte, error) {
+func Download(ctx context.Context, slogger *slog.Logger, binary, platform, arch, versionOrChannel string, opts *Options) ([]byte, error) {
 	if opts == nil {
 		opts = &Options{}
 	}
 
-	target = strings.ToLower(target)
+	binary = strings.ToLower(binary)
 
-	up, err := initUpdater(ctx, slogger, opts)
+	up, err := newUpdater(ctx, slogger, opts)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("creating TUF updater: %w", err)
 	}
 
-	targetPath, targetMeta, err := resolveTarget(up, target, platform, arch, versionOrChannel)
+	targetPath, targetMeta, err := resolveTarget(up, binary, platform, arch, versionOrChannel)
 	if err != nil {
 		return nil, fmt.Errorf("resolving target: %w", err)
 	}

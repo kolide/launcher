@@ -25,56 +25,51 @@ func runDownload(slogger *multislogger.MultiSlogger, args []string) error {
 	fs := flag.NewFlagSet("launcher download", flag.ExitOnError)
 
 	var (
-		flTarget   = fs.String("target", "", "Target to download (omit to list available targets)")
+		flBinary   = fs.String("binary", "", "Binary to download, e.g. launcher or osqueryd (omit to list available binaries)")
 		flChannel  = fs.String("channel", "stable", "What channel to download from (or a specific version)")
-		flDir      = fs.String("directory", ".", "Parent directory (a subdirectory named after the target will be created)")
+		flDir      = fs.String("directory", ".", "Output directory (unless -raw is set, a subdirectory named after the binary will be created)")
 		flPlatform = fs.String("platform", runtime.GOOS, "Target platform (darwin, linux, windows)")
-		flArch     = fs.String("arch", runtime.GOARCH, "Target architecture (amd64, arm64)")
+		flArch     = fs.String("arch", runtime.GOARCH, "Target architecture (amd64, arm64; darwin always uses universal)")
 		flRaw      = fs.Bool("raw", false, "Write verified tarball as-is instead of extracting")
-		flTufStore = fs.String("tuf-store", "", "Directory for TUF local metadata (omit for in-memory)")
 		flDebug    = fs.Bool("debug", false, "Enable debug logging")
 	)
 
 	if err := fs.Parse(args); err != nil {
-		return err
+		return fmt.Errorf("parsing flags: %w", err)
 	}
 
 	level := slog.LevelInfo
 	if *flDebug {
 		level = slog.LevelDebug
 	}
-	slogger.AddHandler(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
+	slogger.AddHandler(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
 
-	target := strings.ToLower(*flTarget)
+	binary := strings.ToLower(*flBinary)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
 	defer cancel()
 
-	opts := &simpleclient.Options{
-		LocalStorePath: *flTufStore,
-	}
-
-	if target == "" {
-		targets, err := simpleclient.ListTargets(ctx, slogger.Logger, opts)
+	if binary == "" {
+		binaries, err := simpleclient.ListTargets(ctx, slogger.Logger, nil)
 		if err != nil {
-			return fmt.Errorf("listing targets: %w", err)
+			return fmt.Errorf("listing binaries: %w", err)
 		}
-		for _, t := range targets {
-			fmt.Println(t)
+		for _, b := range binaries {
+			fmt.Println(b)
 		}
 		return nil
 	}
 
-	tarGzBytes, err := simpleclient.Download(ctx, slogger.Logger, target, *flPlatform, *flArch, *flChannel, opts)
+	tarGzBytes, err := simpleclient.Download(ctx, slogger.Logger, binary, *flPlatform, *flArch, *flChannel, nil)
 	if err != nil {
-		return fmt.Errorf("error fetching %s: %w", target, err)
+		return fmt.Errorf("error fetching %s: %w", binary, err)
 	}
 
 	if *flRaw {
 		if err := os.MkdirAll(*flDir, 0755); err != nil {
 			return fmt.Errorf("creating directory %s: %w", *flDir, err)
 		}
-		outFile := filepath.Join(*flDir, target+".tar.gz")
+		outFile := filepath.Join(*flDir, binary+".tar.gz")
 		if err := os.WriteFile(outFile, tarGzBytes, 0644); err != nil {
 			return fmt.Errorf("writing %s: %w", outFile, err)
 		}
@@ -82,7 +77,7 @@ func runDownload(slogger *multislogger.MultiSlogger, args []string) error {
 		return nil
 	}
 
-	destDir := filepath.Join(*flDir, target)
+	destDir := filepath.Join(*flDir, binary)
 	if err := os.MkdirAll(destDir, 0755); err != nil {
 		return fmt.Errorf("creating directory %s: %w", destDir, err)
 	}
@@ -91,7 +86,7 @@ func runDownload(slogger *multislogger.MultiSlogger, args []string) error {
 		return fmt.Errorf("error extracting: %w", err)
 	}
 
-	fmt.Printf("Downloaded and extracted %s to: %s\n", target, destDir)
+	fmt.Printf("Downloaded and extracted %s to: %s\n", binary, destDir)
 
 	return nil
 }
@@ -129,7 +124,7 @@ func extractTarGz(r io.Reader, destDir string) error {
 				return fmt.Errorf("creating parent directory for %s: %w", target, err)
 			}
 			if err := extractFile(target, header.Mode, tr); err != nil {
-				return err
+				return fmt.Errorf("extracting file %s: %w", target, err)
 			}
 		}
 	}
