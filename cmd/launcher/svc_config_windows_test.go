@@ -100,7 +100,7 @@ func Test_checkRestrictedFileACLs(t *testing.T) {
 
 	// Check the ACLs -- expect that we update the permissions
 	checkRestrictedFileACLs(slogger, secretPath)
-	require.Contains(t, logBytes.String(), "updated ACLs for enroll secret")
+	require.Contains(t, logBytes.String(), "updated ACLs for file")
 
 	// Get our updated permissions
 	updatedSecretInfo, err := windows.GetNamedSecurityInfo(secretPath, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION)

@@ -24,13 +24,13 @@ func TestRestrictFileAccessToRootOnly(t *testing.T) {
 
 	require.NoError(t, RestrictFileAccessToRootOnly(testFile))
 
-	// Check permissions on socket path match what we expect -- get the security info for the socket
-	socketSecurityInfo, err := windows.GetNamedSecurityInfo(testFile, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION)
-	require.NoError(t, err, "getting named security info for socket")
-	require.True(t, socketSecurityInfo.IsValid())
-	socketDacl, _, err := socketSecurityInfo.DACL()
-	require.NoError(t, err, "getting DACL for socket")
-	require.NotNil(t, socketDacl)
+	// Check permissions on the file path match what we expect -- get the security info for the file
+	fileSecurityInfo, err := windows.GetNamedSecurityInfo(testFile, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION)
+	require.NoError(t, err, "getting named security info for file")
+	require.True(t, fileSecurityInfo.IsValid())
+	fileDacl, _, err := fileSecurityInfo.DACL()
+	require.NoError(t, err, "getting DACL for file")
+	require.NotNil(t, fileDacl)
 
 	// Confirm that users have not been granted any permissions -- get the allowed SIDs
 	adminSid, err := windows.CreateWellKnownSid(windows.WinBuiltinAdministratorsSid)
@@ -41,9 +41,9 @@ func TestRestrictFileAccessToRootOnly(t *testing.T) {
 	require.NoError(t, err, "getting system SID")
 
 	// Iterate through all access control entries and confirm they only apply to the allowed SIDs
-	for i := 0; i < int(socketDacl.AceCount); i++ {
+	for i := 0; i < int(fileDacl.AceCount); i++ {
 		var ace *windows.ACCESS_ALLOWED_ACE
-		require.NoError(t, windows.GetAce(socketDacl, uint32(i), &ace), "getting ACE")
+		require.NoError(t, windows.GetAce(fileDacl, uint32(i), &ace), "getting ACE")
 		sid := (*windows.SID)(unsafe.Pointer(uintptr(unsafe.Pointer(ace)) + unsafe.Offsetof(ace.SidStart)))
 		require.True(t, sid.Equals(adminSid) || sid.Equals(creatorOwnerSid) || sid.Equals(systemSid), "invalid SID")
 	}
