@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/kolide/launcher/v2/ee/agent/types"
 	"github.com/shirou/gopsutil/v4/process"
 )
 
@@ -25,6 +26,7 @@ import (
 // see if osquery was quarantined.
 
 type quarantine struct {
+	k                          types.Knapsack
 	status                     Status
 	summary                    string
 	quarantineDirPathFilenames map[string][]string
@@ -63,6 +65,7 @@ func (q *quarantine) searchPathDepths() map[string]int {
 func (q *quarantine) Run(ctx context.Context, extraFh io.Writer) error {
 	q.quarantineDirPathFilenames = make(map[string][]string)
 
+	// First, check whether any processes are running that could quarantine launcher
 	var (
 		meddlesomeProcessPatterns = []string{
 			`crowdstrike`,
@@ -89,6 +92,22 @@ func (q *quarantine) Run(ctx context.Context, extraFh io.Writer) error {
 
 	fmt.Fprint(extraFh, "starting quarantine check\n")
 	q.logMeddlesomeProccesses(ctx, extraFh, meddlesomeProcessPatterns)
+
+	// Next, check to see if gatekeeper has set the quarantine xattr on any of the
+	// launcher or osquery app bundles (macOS check only)
+	fmt.Fprintf(extraFh, "\nchecking for quarantine attributes:\n")
+	bundlesWithQuarantineAttrSet, err := q.quarantinedAppBundles(ctx)
+	if err != nil {
+		fmt.Fprintf(extraFh, "error checking quarantine xattr: %+v\n", err)
+	}
+	if len(bundlesWithQuarantineAttrSet) > 0 {
+		fmt.Fprint(extraFh, "Kolide app bundle(s) found with quarantine xattr set:\n")
+		for _, b := range bundlesWithQuarantineAttrSet {
+			fmt.Fprintln(extraFh, b)
+		}
+	}
+
+	// Finally, search for files that have been moved to a known quarantine location
 	fmt.Fprintf(extraFh, "\nsearching for quarantined files:\n")
 
 	for path, maxDepth := range q.searchPathDepths() {
@@ -109,9 +128,16 @@ func (q *quarantine) Run(ctx context.Context, extraFh io.Writer) error {
 	fmt.Fprintf(extraFh, "total directories checked: %d\n", q.dirsChecked)
 
 	if len(q.quarantineDirPathFilenames) == 0 {
-		q.status = Passing
-		q.summary = "no quarantine directories found"
 		fmt.Fprint(extraFh, "no quarantine directories found\n")
+
+		if len(bundlesWithQuarantineAttrSet) == 0 {
+			q.status = Passing
+			q.summary = "no quarantine directories or files found"
+		} else {
+			q.status = Warning
+			q.summary = fmt.Sprintf("found %d quarantined app bundles", len(bundlesWithQuarantineAttrSet))
+		}
+
 		return nil
 	}
 
@@ -128,14 +154,15 @@ func (q *quarantine) Run(ctx context.Context, extraFh io.Writer) error {
 		}
 	}
 
-	if totalQuarantinedFiles == 0 {
+	if totalQuarantinedFiles == 0 && len(bundlesWithQuarantineAttrSet) == 0 {
 		q.status = Passing
-		q.summary = "no files found in quarantine directories"
+		q.summary = "no files found in quarantine directories or with quarantine attributes set"
 		return nil
 	}
 
 	q.status = Warning
-	q.summary = fmt.Sprintf("found %d quarantined files", totalQuarantinedFiles)
+	q.summary = fmt.Sprintf("found %d quarantined files and %d files with quarantine attr set", totalQuarantinedFiles, len(bundlesWithQuarantineAttrSet))
+
 	return nil
 }
 
