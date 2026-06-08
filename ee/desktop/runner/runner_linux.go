@@ -405,34 +405,75 @@ func (r *DesktopUsersProcessesRunner) getWaylandDisplay(ctx context.Context, uid
 func (r *DesktopUsersProcessesRunner) getXauthority(ctx context.Context, uid string, username string) string {
 	xdgRuntimeDir := getXdgRuntimeDir(uid)
 
-	// Check known locations for Wayland first
 	mutterWaylandXAuthorityLocationPattern := filepath.Join(xdgRuntimeDir, ".mutter-Xwaylandauth.*")
 	if matches, err := filepath.Glob(mutterWaylandXAuthorityLocationPattern); err == nil && len(matches) > 0 {
 		return matches[0]
 	}
+
 	waylandXAuthorityLocationPattern := filepath.Join(xdgRuntimeDir, "xauth_*")
 	if matches, err := filepath.Glob(waylandXAuthorityLocationPattern); err == nil && len(matches) > 0 {
 		return matches[0]
 	}
 
-	// Next, check default X11 location
-	x11XauthorityLocation := filepath.Join(xdgRuntimeDir, "gdm", "Xauthority")
-	if _, err := os.Stat(x11XauthorityLocation); err == nil {
-		return x11XauthorityLocation
+	gdmLocation := filepath.Join(xdgRuntimeDir, "gdm", "Xauthority")
+	if _, err := os.Stat(gdmLocation); err == nil {
+		return gdmLocation
+	}
+	secondGdmLocationPattern := filepath.Join("/run", "gdm", fmt.Sprintf("auth-for-%s-*", username), "database")
+	if matches, err := filepath.Glob(secondGdmLocationPattern); err == nil && len(matches) > 0 {
+		return matches[0]
 	}
 
-	// Default location is $HOME/.Xauthority -- try that before giving up
+	lightdmLocation := filepath.Join("/run", "lightdm", username, "xauthority")
+	if _, err := os.Stat(lightdmLocation); err == nil {
+		return lightdmLocation
+	}
+
+	// Check matches
+	firstSddmLocationPattern := filepath.Join("/tmp", "xauth_*")
+	matches, _ := filepath.Glob(firstSddmLocationPattern)
+	secondSddmLocationPattern := filepath.Join("/run", "sddm", "xauth_*")
+	additionalMatches, _ := filepath.Glob(secondSddmLocationPattern)
+	matches = append(matches, additionalMatches...)
+	// Check ownership for matches to see if any belong to the specified user,
+	// since we don't have a username or uid in the path
+	for _, match := range matches {
+		fi, err := os.Stat(match)
+		if err != nil {
+			continue
+		}
+
+		fileStats, ok := fi.Sys().(*syscall.Stat_t)
+		if !ok {
+			continue
+		}
+
+		if strconv.Itoa(int(fileStats.Uid)) == uid {
+			return match
+		}
+	}
+
+	// Check our two default locations $HOME/.Xauthority and $XDG_RUNTIME_DIR/xauthority before giving up
 	homeLocation := filepath.Join("/home", username, ".Xauthority")
 	if _, err := os.Stat(homeLocation); err == nil {
 		return homeLocation
+	}
+	systemdDefaultLocation := filepath.Join(xdgRuntimeDir, "xauthority")
+	if _, err := os.Stat(systemdDefaultLocation); err == nil {
+		return systemdDefaultLocation
 	}
 
 	r.slogger.Log(ctx, slog.LevelDebug,
 		"could not find xauthority in any known location",
 		"mutter_wayland_location", mutterWaylandXAuthorityLocationPattern,
 		"wayland_location", waylandXAuthorityLocationPattern,
-		"x11_location", x11XauthorityLocation,
+		"gdm_location", gdmLocation,
+		"second_gdm_location", secondGdmLocationPattern,
+		"lightdm_location", lightdmLocation,
+		"sddm_location_1", firstSddmLocationPattern,
+		"sddm_location_2", secondSddmLocationPattern,
 		"default_location", homeLocation,
+		"systemd_default_location", systemdDefaultLocation,
 	)
 
 	return ""
