@@ -429,7 +429,6 @@ func (r *DesktopUsersProcessesRunner) getXauthority(ctx context.Context, uid str
 		return lightdmLocation
 	}
 
-	// Check matches
 	firstSddmLocationPattern := filepath.Join("/tmp", "xauth_*")
 	matches, _ := filepath.Glob(firstSddmLocationPattern)
 	secondSddmLocationPattern := filepath.Join("/run", "sddm", "xauth_*")
