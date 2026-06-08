@@ -196,6 +196,7 @@ func validateNativeMessagingRequest(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("native messaging called from unexpected extension %s", potentialExtension)
 	}
 
+	// Validate the calling process -- it should be a path in our allowlist
 	ppid := os.Getppid()
 	parentProcess, err := process.NewProcessWithContext(ctx, int32(ppid))
 	if err != nil {
