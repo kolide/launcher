@@ -405,8 +405,12 @@ func (r *DesktopUsersProcessesRunner) getWaylandDisplay(ctx context.Context, uid
 func (r *DesktopUsersProcessesRunner) getXauthority(ctx context.Context, uid string, username string) string {
 	xdgRuntimeDir := getXdgRuntimeDir(uid)
 
-	// Glob for Wayland matches first
-	waylandXAuthorityLocationPattern := filepath.Join(xdgRuntimeDir, ".mutter-Xwaylandauth.*")
+	// Check known locations for Wayland first
+	mutterWaylandXAuthorityLocationPattern := filepath.Join(xdgRuntimeDir, ".mutter-Xwaylandauth.*")
+	if matches, err := filepath.Glob(mutterWaylandXAuthorityLocationPattern); err == nil && len(matches) > 0 {
+		return matches[0]
+	}
+	waylandXAuthorityLocationPattern := filepath.Join(xdgRuntimeDir, "xauth_*")
 	if matches, err := filepath.Glob(waylandXAuthorityLocationPattern); err == nil && len(matches) > 0 {
 		return matches[0]
 	}
@@ -425,6 +429,7 @@ func (r *DesktopUsersProcessesRunner) getXauthority(ctx context.Context, uid str
 
 	r.slogger.Log(ctx, slog.LevelDebug,
 		"could not find xauthority in any known location",
+		"mutter_wayland_location", mutterWaylandXAuthorityLocationPattern,
 		"wayland_location", waylandXAuthorityLocationPattern,
 		"x11_location", x11XauthorityLocation,
 		"default_location", homeLocation,
