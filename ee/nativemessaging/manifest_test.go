@@ -16,45 +16,79 @@ func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m)
 }
 
-func Test_writeManifestToPaths(t *testing.T) {
+func Test_writeManifest_removeManifest(t *testing.T) {
 	t.Parallel()
 
 	rootDir := t.TempDir()
-	manifestPaths := make([]string, 0)
+	manifestRegistrationPaths := make([]string, 0)
 	switch runtime.GOOS {
 	case "windows":
-		// Only one path on Windows
-		manifestPaths = append(manifestPaths, filepath.Join(rootDir, "nmh-manifest.json"))
+		// Only one registry key on Windows
+		manifestRegistrationPaths = append(manifestRegistrationPaths, `SOFTWARE\Kolide\Launcher\Test_writeManifest_removeManifest\Google\Chrome\NativeMessagingHosts\`+nativeMessagingHostName)
 	default:
-		// Three paths on macOS
-		manifestPaths = append(manifestPaths,
+		// Multiple paths on macOS/Linux
+		manifestRegistrationPaths = append(manifestRegistrationPaths,
 			filepath.Join(rootDir, fmt.Sprintf("chrome_%s.json", nativeMessagingHostName)),
-			filepath.Join(rootDir, fmt.Sprintf("chrome_for_testing_%s.json", nativeMessagingHostName)),
+			filepath.Join(rootDir, "some", "deeper", "path", fmt.Sprintf("chrome_for_testing_%s.json", nativeMessagingHostName)), // tests having to make directories on the fly
 			filepath.Join(rootDir, fmt.Sprintf("chromium_%s.json", nativeMessagingHostName)),
 		)
 	}
 
-	testRegistryKey := `SOFTWARE\Kolide\Launcher\Test_writeManifestToPaths\Google\Chrome\NativeMessagingHosts\` + nativeMessagingHostName
+	expectedManifestPath := launcherManifestFilePath(rootDir)
+	require.NoError(t, writeManifest(expectedManifestPath, manifestRegistrationPaths))
 
-	require.NoError(t, writeManifestToPaths(manifestPaths, testRegistryKey))
-
-	// Confirm valid data written to each path
+	// Confirm valid data written to expected path
 	currentExe, err := os.Executable()
 	require.NoError(t, err)
-	for _, manifestPath := range manifestPaths {
-		_, err := os.Stat(manifestPath)
+	_, err = os.Stat(expectedManifestPath)
+	require.NoError(t, err)
+
+	fileContents, err := os.ReadFile(expectedManifestPath)
+	require.NoError(t, err)
+
+	var currentManifest manifest
+	require.NoError(t, json.Unmarshal(fileContents, &currentManifest))
+
+	require.Equal(t, nativeMessagingHostName, currentManifest.Name)
+	require.Equal(t, nativeMessagingHostDescription, currentManifest.Description)
+	require.Equal(t, currentExe, currentManifest.Path)
+	require.Equal(t, nativeMessagingInterfaceType, currentManifest.Type)
+	require.Less(t, 0, len(currentManifest.AllowedOrigins))
+
+	// Check existence of symlinks on macOS/Linux (registry key for Windows tested separately in Test_registerManifestFileLocation)
+	if runtime.GOOS != "windows" {
+		// Resolve the expected path (so that instead of `/var/...` on macOS we have `/private/var/...`)
+		resolvedExpectedManifestPath, err := filepath.EvalSymlinks(expectedManifestPath)
 		require.NoError(t, err)
+		for _, manifestRegistrationPath := range manifestRegistrationPaths {
+			fi, err := os.Lstat(manifestRegistrationPath)
+			require.NoError(t, err)
 
-		fileContents, err := os.ReadFile(manifestPath)
-		require.NoError(t, err)
+			// Confirm it's a symlink, pointing at the correct file
+			require.NotEqual(t, 0, fi.Mode()&os.ModeSymlink)
+			resolvedPath, err := filepath.EvalSymlinks(manifestRegistrationPath)
+			require.NoError(t, err)
+			require.Equal(t, resolvedExpectedManifestPath, resolvedPath)
+		}
+	}
 
-		var currentManifest manifest
-		require.NoError(t, json.Unmarshal(fileContents, &currentManifest))
+	// Confirm no error on re-writing manifest
+	require.NoError(t, writeManifest(expectedManifestPath, manifestRegistrationPaths))
 
-		require.Equal(t, nativeMessagingHostName, currentManifest.Name)
-		require.Equal(t, nativeMessagingHostDescription, currentManifest.Description)
-		require.Equal(t, currentExe, currentManifest.Path)
-		require.Equal(t, nativeMessagingInterfaceType, currentManifest.Type)
-		require.Less(t, 0, len(currentManifest.AllowedOrigins))
+	// Now, remove the manifest
+	require.NoError(t, removeManifest(expectedManifestPath, manifestRegistrationPaths))
+
+	// Confirm manifest file is gone
+	_, err = os.Stat(expectedManifestPath)
+	require.Error(t, err)
+	require.True(t, os.IsNotExist(err))
+
+	// Check that symlinks are gone on macOS/Linux
+	if runtime.GOOS != "windows" {
+		for _, manifestRegistrationPath := range manifestRegistrationPaths {
+			_, err := os.Lstat(manifestRegistrationPath)
+			require.Error(t, err)
+			require.True(t, os.IsNotExist(err))
+		}
 	}
 }

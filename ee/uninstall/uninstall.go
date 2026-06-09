@@ -9,6 +9,7 @@ import (
 	"github.com/kolide/launcher/v2/ee/agent"
 	agentbbolt "github.com/kolide/launcher/v2/ee/agent/storage/bbolt"
 	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/nativemessaging"
 )
 
 const (
@@ -43,6 +44,13 @@ func Uninstall(ctx context.Context, k types.Knapsack, exitOnCompletion bool) {
 				"err", err,
 			)
 		}
+	}
+
+	if err := nativemessaging.RemoveNativeMessagingManifest(k.RootDirectory()); err != nil {
+		slogger.Log(ctx, slog.LevelError,
+			"removing native messaging manifest",
+			"err", err,
+		)
 	}
 
 	if !exitOnCompletion {

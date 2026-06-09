@@ -19,7 +19,6 @@ import (
 	"github.com/kolide/launcher/v2/ee/agent"
 	"github.com/kolide/launcher/v2/ee/control/consumers/remoterestartconsumer"
 	"github.com/kolide/launcher/v2/ee/disclaim"
-	"github.com/kolide/launcher/v2/ee/localserver"
 	"github.com/kolide/launcher/v2/ee/nativemessaging"
 	"github.com/kolide/launcher/v2/ee/tuf"
 	"github.com/kolide/launcher/v2/ee/watchdog"
@@ -44,7 +43,7 @@ func runMain() int {
 	// before even initializing logging, because we should not write logs to os.Stdout when following
 	// the native messaging protocol.
 	if len(os.Args) == 2 {
-		if _, ok := localserver.AllowlistedDt4aOriginsLookup[strings.TrimSuffix(os.Args[1], "/")]; ok {
+		if _, ok := nativemessaging.AllowlistedDt4aOriginsLookup()[strings.TrimSuffix(os.Args[1], "/")]; ok {
 			// Native messaging host invocation -- continues reading until closed
 			nativemessaging.ReadNativeMessages(context.Background())
 			return 0

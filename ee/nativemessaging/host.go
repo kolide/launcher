@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/kolide/kit/env"
-	"github.com/kolide/launcher/v2/ee/localserver"
 	"github.com/kolide/launcher/v2/pkg/launcher"
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/peterbourgon/ff/v3"
@@ -193,7 +192,7 @@ func validateNativeMessagingRequest(ctx context.Context) (string, error) {
 	// The extension should be one that we know about. It will have an extra / at the end, which we remove
 	// before performing the lookup against our known origins.
 	potentialExtension := strings.TrimSuffix(os.Args[1], "/")
-	if _, ok := localserver.AllowlistedDt4aOriginsLookup[potentialExtension]; !ok {
+	if _, ok := allowlistedDt4aOriginsLookup[potentialExtension]; !ok {
 		return "", fmt.Errorf("native messaging called from unexpected extension %s", potentialExtension)
 	}
 

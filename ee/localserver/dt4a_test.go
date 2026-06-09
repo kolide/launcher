@@ -14,6 +14,7 @@ import (
 	storageci "github.com/kolide/launcher/v2/ee/agent/storage/ci"
 	"github.com/kolide/launcher/v2/ee/agent/types"
 	typesmocks "github.com/kolide/launcher/v2/ee/agent/types/mocks"
+	"github.com/kolide/launcher/v2/ee/nativemessaging"
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -186,7 +187,7 @@ func Test_requestDt4aInfoHandlerWithDt4aIdsNoData(t *testing.T) {
 func acceptableOrigin(t *testing.T) string {
 	// Just grab the first origin available in our allowlist
 	acceptableOrigin := ""
-	for k := range AllowlistedDt4aOriginsLookup {
+	for k := range nativemessaging.AllowlistedDt4aOriginsLookup() {
 		acceptableOrigin = k
 		break
 	}

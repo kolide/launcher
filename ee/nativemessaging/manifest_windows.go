@@ -3,44 +3,40 @@
 package nativemessaging
 
 import (
+	"errors"
 	"fmt"
-	"path/filepath"
+	"os"
 
 	"golang.org/x/sys/windows/registry"
 )
 
-const (
-	notYetCreatedRegistryErrStr = "The system cannot find the file specified."
-)
-
-// manifestFilePaths returns the paths where the native messaging manifest file should exist
-// for this OS. On Windows, the location can be anywhere (we specify the location via a
-// well-known registry key), so we write it to the root directory.
+// manifestFileRegistrationLocations returns the registry key where we should write the path to the
+// native messaging manifest file.
 // See: https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging#native-messaging-host-location
-func manifestFilePaths(rootDir string) []string {
-	return []string{filepath.Join(rootDir, "nmh-manifest.json")}
+func manifestFileRegistrationLocations() []string {
+	return []string{`SOFTWARE\Google\Chrome\NativeMessagingHosts\` + nativeMessagingHostName}
 }
 
-// registerManifestFileLocation writes the manifest file location to the expected registry key,
-// so that Chrome knows where to find it.
+// registerManifestFileLocation writes the manifest file location to the expected registry key
+// at `registrationPath` so that Chrome knows where to find it.
 // See: https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging#native-messaging-host-location
-func registerManifestFileLocation(manifestFileLocation string, registryKeyPath string) error {
-	manifestLocationKey, err := registry.OpenKey(registry.LOCAL_MACHINE, registryKeyPath, registry.ALL_ACCESS)
+func registerManifestFileLocation(manifestFileLocation string, registrationPath string) error {
+	manifestLocationKey, err := registry.OpenKey(registry.LOCAL_MACHINE, registrationPath, registry.ALL_ACCESS)
 
 	// If the key doesn't exist, create it
-	if err != nil && err.Error() == notYetCreatedRegistryErrStr {
-		manifestLocationKey, _, err = registry.CreateKey(registry.LOCAL_MACHINE, registryKeyPath, registry.ALL_ACCESS)
+	if err != nil && errors.Is(err, os.ErrNotExist) {
+		manifestLocationKey, _, err = registry.CreateKey(registry.LOCAL_MACHINE, registrationPath, registry.ALL_ACCESS)
 	}
 	if err != nil {
-		return fmt.Errorf("creating or opening registry key at %s: %w", registryKeyPath, err)
+		return fmt.Errorf("creating or opening registry key at %s: %w", registrationPath, err)
 	}
 
 	defer manifestLocationKey.Close()
 
 	// Get the default value of the key by passing in an empty string.
 	currentValue, _, err := manifestLocationKey.GetStringValue("")
-	if err != nil && err.Error() != notYetCreatedRegistryErrStr {
-		return fmt.Errorf("getting current default value of %s: %w", registryKeyPath, err)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("getting current default value of %s: %w", registrationPath, err)
 	}
 
 	// Already set correctly -- no need to edit
@@ -49,7 +45,15 @@ func registerManifestFileLocation(manifestFileLocation string, registryKeyPath s
 	}
 
 	if err := manifestLocationKey.SetStringValue("", manifestFileLocation); err != nil {
-		return fmt.Errorf("setting default value of %s to %s: %w", registryKeyPath, manifestFileLocation, err)
+		return fmt.Errorf("setting default value of %s to %s: %w", registrationPath, manifestFileLocation, err)
+	}
+
+	return nil
+}
+
+func deregisterManifestFileLocation(registrationPath string) error {
+	if err := registry.DeleteKey(registry.LOCAL_MACHINE, registrationPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("deleting registry key at %s: %w", registrationPath, err)
 	}
 
 	return nil
