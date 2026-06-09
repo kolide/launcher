@@ -54,13 +54,13 @@ func ReadNativeMessages(ctx context.Context) {
 	// Validate the request that started this process
 	extension, err := validateNativeMessagingRequest(ctx)
 	if err != nil {
-		slogger.Logger.Log(context.TODO(), slog.LevelError,
+		slogger.Log(context.TODO(), slog.LevelError,
 			"invalid native messaging request",
 			"err", err,
 		)
 	}
 
-	slogger.Logger.Log(context.TODO(), slog.LevelInfo,
+	slogger.Log(context.TODO(), slog.LevelInfo,
 		"native messaging app opened",
 		"extension", extension,
 	)
@@ -71,7 +71,7 @@ func ReadNativeMessages(ctx context.Context) {
 	for {
 		headerBytesRead, err := stdinReader.Read(header)
 		if headerBytesRead == 0 || err != nil {
-			slogger.Logger.Log(context.TODO(), slog.LevelWarn,
+			slogger.Log(context.TODO(), slog.LevelWarn,
 				"could not read next header",
 				"err", err,
 			)
@@ -80,7 +80,7 @@ func ReadNativeMessages(ctx context.Context) {
 
 		msgLength := binary.NativeEndian.Uint32(header)
 
-		slogger.Logger.Log(context.TODO(), slog.LevelInfo,
+		slogger.Log(context.TODO(), slog.LevelInfo,
 			"received message with length",
 			"length", msgLength,
 		)
@@ -95,20 +95,20 @@ func ReadNativeMessages(ctx context.Context) {
 			)
 			break
 		} else if err != nil {
-			slogger.Logger.Log(context.TODO(), slog.LevelWarn,
+			slogger.Log(context.TODO(), slog.LevelWarn,
 				"could not read message",
 				"err", err,
 			)
 			break
 		}
 
-		slogger.Logger.Log(context.TODO(), slog.LevelInfo,
+		slogger.Log(context.TODO(), slog.LevelInfo,
 			"message",
 			"contents", string(msgContent),
 		)
 	}
 
-	slogger.Logger.Log(context.TODO(), slog.LevelInfo,
+	slogger.Log(context.TODO(), slog.LevelInfo,
 		"shutting down",
 	)
 }
