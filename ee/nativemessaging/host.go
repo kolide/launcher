@@ -102,6 +102,7 @@ func ReadNativeMessages(ctx context.Context) {
 			break
 		}
 
+		// In the future, we would forward this request
 		slogger.Log(context.TODO(), slog.LevelInfo,
 			"message",
 			"contents", string(msgContent),
