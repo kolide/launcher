@@ -37,6 +37,11 @@ import (
 //go:embed assets/tuf/root.json
 var rootJson []byte
 
+// RootJSON returns the embedded TUF root.json for client initialization.
+func RootJSON() []byte {
+	return rootJson
+}
+
 // Configuration defaults
 const (
 	tufDirectoryName = "tuf"
@@ -827,11 +832,16 @@ func findReleasePromoteTime(ctx context.Context, binary autoupdatableBinary, tar
 // PlatformArch returns the correct arch for the runtime OS. For now, since osquery doesn't publish an arm64 release,
 // we use the universal binaries for darwin.
 func PlatformArch() string {
-	if runtime.GOOS == "darwin" {
+	return ArchForPlatform(runtime.GOOS, runtime.GOARCH)
+}
+
+// ArchForPlatform returns the TUF arch string for the given platform.
+// Darwin uses "universal"; others use the provided arch.
+func ArchForPlatform(platform, arch string) string {
+	if platform == "darwin" {
 		return "universal"
 	}
-
-	return runtime.GOARCH
+	return arch
 }
 
 // shouldDelayDownload determines whether to delay downloading an update based on our AutoupdateDownloadSplay mechanism.

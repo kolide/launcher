@@ -26,6 +26,7 @@ import (
 	"github.com/kolide/launcher/v2/ee/agent/flags/keys"
 	"github.com/kolide/launcher/v2/ee/agent/knapsack"
 	"github.com/kolide/launcher/v2/ee/agent/listener"
+	"github.com/kolide/launcher/v2/ee/agent/permissions"
 	"github.com/kolide/launcher/v2/ee/agent/startupsettings"
 	"github.com/kolide/launcher/v2/ee/agent/storage"
 	agentbbolt "github.com/kolide/launcher/v2/ee/agent/storage/bbolt"
@@ -198,12 +199,21 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		Timeout:      time.Duration(30) * time.Second,
 		FreelistType: bbolt.FreelistMapType,
 	}
-	db, err := bbolt.Open(agentbbolt.LauncherDbLocation(rootDirectory), 0600, boltOptions)
+	dbLocation := agentbbolt.LauncherDbLocation(rootDirectory)
+	db, err := bbolt.Open(dbLocation, 0600, boltOptions)
 	if err != nil {
 		return fmt.Errorf("open launcher db: %w", err)
 	}
 	defer db.Close()
 	startupSpan.AddEvent("database_opened")
+
+	if err := permissions.RestrictFileAccessToRootOnly(dbLocation); err != nil {
+		slogger.Log(context.TODO(), slog.LevelError,
+			"could not restrict file access for launcher db",
+			"db_location", dbLocation,
+			"err", err,
+		)
+	}
 
 	if err := writePidFile(filepath.Join(rootDirectory, "launcher.pid")); err != nil {
 		return fmt.Errorf("write launcher pid to file: %w", err)

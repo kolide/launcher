@@ -271,15 +271,19 @@ func (lpc *LogPublisherClient) publish(ctx context.Context, payload any, publica
 
 	requestUUID := uuid.NewForRequest()
 	ctx = uuid.NewContext(ctx, requestUUID)
-	resp := &http.Response{}
+	var resp *http.Response
 	var publicationResponse types.OsqueryPublicationResponse
 
 	defer func(begin time.Time) {
+		statusCode := 0
+		if resp != nil {
+			statusCode = resp.StatusCode
+		}
 		lpc.slogger.Log(ctx, levelForError(err), "attempted osquery publication",
 			"request_uuid", requestUUID,
 			"publication_type", publicationPath,
 			"response", publicationResponse,
-			"status_code", resp.StatusCode,
+			"status_code", statusCode,
 			"err", err,
 			"took", time.Since(begin),
 			"batch_metadata", logAttrs,

@@ -1,6 +1,6 @@
 //go:build windows
 
-package listener
+package permissions
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-func setSocketPermissions(socketPath string) error {
+func RestrictFileAccessToRootOnly(filePathToRestrict string) error {
 	adminSid, err := windows.CreateWellKnownSid(windows.WinBuiltinAdministratorsSid)
 	if err != nil {
 		return fmt.Errorf("getting admin SID: %w", err)
@@ -23,7 +23,7 @@ func setSocketPermissions(socketPath string) error {
 	}
 
 	// SYSTEM, admin, and creator/owner have full control; standard users are not granted any permissions.
-	// We do not inherit permissions from the root directory here.
+	// We do not inherit permissions from the parent here.
 	explicitAccessPolicies := []windows.EXPLICIT_ACCESS{
 		{
 			AccessPermissions: windows.GENERIC_ALL,
@@ -65,7 +65,7 @@ func setSocketPermissions(socketPath string) error {
 
 	// Apply new DACL
 	if err := windows.SetNamedSecurityInfo(
-		socketPath,
+		filePathToRestrict,
 		windows.SE_FILE_OBJECT,
 		// PROTECTED_DACL_SECURITY_INFORMATION here ensures we don't re-inherit the parent permissions
 		windows.DACL_SECURITY_INFORMATION|windows.PROTECTED_DACL_SECURITY_INFORMATION,

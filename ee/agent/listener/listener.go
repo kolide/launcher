@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/kolide/launcher/v2/ee/agent/permissions"
 	"github.com/kolide/launcher/v2/ee/agent/storage"
 	"github.com/kolide/launcher/v2/ee/agent/types"
 	"github.com/kolide/launcher/v2/pkg/backoff"
@@ -84,7 +85,7 @@ func initSocket(k types.Knapsack, slogger *slog.Logger, socketPrefix string) (ne
 	}
 
 	// Ensure the permissions are set correctly for the socket -- we require root/admin.
-	if err := setSocketPermissions(socketPath); err != nil {
+	if err := permissions.RestrictFileAccessToRootOnly(socketPath); err != nil {
 		listener.Close()
 		return nil, socketPath, fmt.Errorf("setting appropriate permissions on %s: %w", socketPath, err)
 	}

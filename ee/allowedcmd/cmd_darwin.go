@@ -66,6 +66,8 @@ var SystemProfiler = newAllowedCommand("/usr/sbin/system_profiler")
 
 var Tmutil = newAllowedCommand("/usr/bin/tmutil")
 
+var Xattr = newAllowedCommand("/usr/bin/xattr")
+
 var ZerotierCli = newAllowedCommand("/usr/local/bin/zerotier-cli")
 
 var Zfs = newAllowedCommand("/usr/sbin/zfs")
