@@ -15,8 +15,9 @@ import (
 func Test_registerManifestFileLocation_deregisterManifestFileLocation(t *testing.T) {
 	t.Parallel()
 
+	hostName := nativeMessagingHostName("kolide-test-k2")
 	manifestPath := filepath.Join("some", "test", "dir", "nmh-manifest.json")
-	testRegistryKey := `SOFTWARE\Kolide\Launcher\Test_registerManifestFileLocation\Google\Chrome\NativeMessagingHosts\` + nativeMessagingHostName
+	testRegistryKey := `SOFTWARE\Kolide\Launcher\Test_registerManifestFileLocation\Google\Chrome\NativeMessagingHosts\` + hostName
 
 	// Test registration
 	require.NoError(t, registerManifestFileLocation(manifestPath, testRegistryKey))

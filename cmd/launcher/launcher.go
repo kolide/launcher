@@ -612,7 +612,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		runGroup.Add("localserver", ls.Start, ls.Interrupt)
 
 		// Support native messaging as an alternative to the localserver
-		if err := nativemessaging.WriteNativeMessagingManifest(rootDirectory); err != nil {
+		if err := nativemessaging.WriteNativeMessagingManifest(rootDirectory, k.Identifier()); err != nil {
 			slogger.Log(ctx, slog.LevelError,
 				"could not write native messaging manifest",
 				"err", err,
