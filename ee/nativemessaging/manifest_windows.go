@@ -13,8 +13,8 @@ import (
 // manifestFileRegistrationLocations returns the registry key where we should write the path to the
 // native messaging manifest file.
 // See: https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging#native-messaging-host-location
-func manifestFileRegistrationLocations() []string {
-	return []string{`SOFTWARE\Google\Chrome\NativeMessagingHosts\` + nativeMessagingHostName}
+func manifestFileRegistrationLocations(hostName string) []string {
+	return []string{`SOFTWARE\Google\Chrome\NativeMessagingHosts\` + hostName}
 }
 
 // registerManifestFileLocation writes the manifest file location to the expected registry key

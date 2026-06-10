@@ -20,7 +20,6 @@ type manifest struct {
 }
 
 const (
-	nativeMessagingHostName        = "com.kolide.agent"
 	nativeMessagingHostDescription = "Device Trust Agent"
 	nativeMessagingInterfaceType   = "stdio" // This is the only possible value for "type"
 )
@@ -60,19 +59,27 @@ func AllowlistedDt4aOriginsLookup() map[string]struct{} {
 
 // WriteNativeMessagingManifest is a thin wrapper around writeManifest, providing the paths
 // to write the manifest to, and the registry key path for the manifest file on Windows.
-func WriteNativeMessagingManifest(rootDir string) error {
-	return writeManifest(launcherManifestFilePath(rootDir), manifestFileRegistrationLocations())
+func WriteNativeMessagingManifest(rootDir string, identifier string) error {
+	hostName := nativeMessagingHostName(identifier)
+	return writeManifest(launcherManifestFilePath(rootDir), manifestFileRegistrationLocations(hostName), hostName)
 }
 
 func launcherManifestFilePath(rootDir string) string {
 	return filepath.Join(rootDir, "nmh-manifest.json")
 }
 
+func nativeMessagingHostName(identifier string) string {
+	hostName := fmt.Sprintf("com.%s.agent", identifier)
+	// Identifiers typically contain hyphens, but only lowercase alphanumeric characters, underscores,
+	// and periods are permitted.
+	return strings.ReplaceAll(hostName, "-", "_")
+}
+
 // writeManifest builds a manifest to register launcher as a native messaging host,
 // and writes it to the specified location at `manifestFilePath`, and then registers that location
 // with each location in `registrationLocations`.
-func writeManifest(manifestFilePath string, registrationLocations []string) error {
-	m, err := buildManifest()
+func writeManifest(manifestFilePath string, registrationLocations []string, hostName string) error {
+	m, err := buildManifest(hostName)
 	if err != nil {
 		return fmt.Errorf("building manifest: %w", err)
 	}
@@ -105,7 +112,7 @@ func writeManifest(manifestFilePath string, registrationLocations []string) erro
 	return nil
 }
 
-func buildManifest() (*manifest, error) {
+func buildManifest(hostName string) (*manifest, error) {
 	launcherPath, err := os.Executable()
 	if err != nil {
 		return nil, fmt.Errorf("getting current executable path: %w", err)
@@ -119,7 +126,7 @@ func buildManifest() (*manifest, error) {
 	}
 	slices.Sort(allowedOrigins) // sort to maintain consistent ordering of origins
 	return &manifest{
-		Name:           nativeMessagingHostName,
+		Name:           hostName,
 		Description:    nativeMessagingHostDescription,
 		Path:           launcherPath,
 		Type:           nativeMessagingInterfaceType,
@@ -127,8 +134,9 @@ func buildManifest() (*manifest, error) {
 	}, nil
 }
 
-func RemoveNativeMessagingManifest(rootDir string) error {
-	return removeManifest(launcherManifestFilePath(rootDir), manifestFileRegistrationLocations())
+func RemoveNativeMessagingManifest(rootDir string, identifier string) error {
+	hostName := nativeMessagingHostName(identifier)
+	return removeManifest(launcherManifestFilePath(rootDir), manifestFileRegistrationLocations(hostName))
 }
 
 func removeManifest(manifestFilePath string, registrationLocations []string) error {

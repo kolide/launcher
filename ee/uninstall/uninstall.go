@@ -46,7 +46,7 @@ func Uninstall(ctx context.Context, k types.Knapsack, exitOnCompletion bool) {
 		}
 	}
 
-	if err := nativemessaging.RemoveNativeMessagingManifest(k.RootDirectory()); err != nil {
+	if err := nativemessaging.RemoveNativeMessagingManifest(k.RootDirectory(), k.Identifier()); err != nil {
 		slogger.Log(ctx, slog.LevelError,
 			"removing native messaging manifest",
 			"err", err,
