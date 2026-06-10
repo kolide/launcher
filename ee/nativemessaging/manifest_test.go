@@ -19,23 +19,26 @@ func TestMain(m *testing.M) {
 func Test_writeManifest_removeManifest(t *testing.T) {
 	t.Parallel()
 
+	identifier := "kolide-test-k2"
+	hostName := nativeMessagingHostName(identifier)
+
 	rootDir := t.TempDir()
 	manifestRegistrationPaths := make([]string, 0)
 	switch runtime.GOOS {
 	case "windows":
 		// Only one registry key on Windows
-		manifestRegistrationPaths = append(manifestRegistrationPaths, `SOFTWARE\Kolide\Launcher\Test_writeManifest_removeManifest\Google\Chrome\NativeMessagingHosts\`+nativeMessagingHostName)
+		manifestRegistrationPaths = append(manifestRegistrationPaths, `SOFTWARE\Kolide\Launcher\Test_writeManifest_removeManifest\Google\Chrome\NativeMessagingHosts\`+hostName)
 	default:
 		// Multiple paths on macOS/Linux
 		manifestRegistrationPaths = append(manifestRegistrationPaths,
-			filepath.Join(rootDir, fmt.Sprintf("chrome_%s.json", nativeMessagingHostName)),
-			filepath.Join(rootDir, "some", "deeper", "path", fmt.Sprintf("chrome_for_testing_%s.json", nativeMessagingHostName)), // tests having to make directories on the fly
-			filepath.Join(rootDir, fmt.Sprintf("chromium_%s.json", nativeMessagingHostName)),
+			filepath.Join(rootDir, fmt.Sprintf("chrome_%s.json", hostName)),
+			filepath.Join(rootDir, "some", "deeper", "path", fmt.Sprintf("chrome_for_testing_%s.json", hostName)), // tests having to make directories on the fly
+			filepath.Join(rootDir, fmt.Sprintf("chromium_%s.json", hostName)),
 		)
 	}
 
 	expectedManifestPath := launcherManifestFilePath(rootDir)
-	require.NoError(t, writeManifest(expectedManifestPath, manifestRegistrationPaths))
+	require.NoError(t, writeManifest(expectedManifestPath, manifestRegistrationPaths, hostName))
 
 	// Confirm valid data written to expected path
 	currentExe, err := os.Executable()
@@ -49,7 +52,7 @@ func Test_writeManifest_removeManifest(t *testing.T) {
 	var currentManifest manifest
 	require.NoError(t, json.Unmarshal(fileContents, &currentManifest))
 
-	require.Equal(t, nativeMessagingHostName, currentManifest.Name)
+	require.Equal(t, hostName, currentManifest.Name)
 	require.Equal(t, nativeMessagingHostDescription, currentManifest.Description)
 	require.Equal(t, currentExe, currentManifest.Path)
 	require.Equal(t, nativeMessagingInterfaceType, currentManifest.Type)
@@ -73,7 +76,7 @@ func Test_writeManifest_removeManifest(t *testing.T) {
 	}
 
 	// Confirm no error on re-writing manifest
-	require.NoError(t, writeManifest(expectedManifestPath, manifestRegistrationPaths))
+	require.NoError(t, writeManifest(expectedManifestPath, manifestRegistrationPaths, hostName))
 
 	// Now, remove the manifest
 	require.NoError(t, removeManifest(expectedManifestPath, manifestRegistrationPaths))

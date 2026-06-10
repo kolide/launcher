@@ -49,7 +49,7 @@ func runUninstall(_ *multislogger.MultiSlogger, args []string) error {
 		identifier = strings.TrimSpace(matches[0][1])
 	}
 
-	if err := nativemessaging.RemoveNativeMessagingManifest(opts.RootDirectory); err != nil {
+	if err := nativemessaging.RemoveNativeMessagingManifest(opts.RootDirectory, identifier); err != nil {
 		fmt.Printf("could not remove native messaging manifest: %s\n", err)
 	}
 

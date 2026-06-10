@@ -12,6 +12,7 @@ import (
 	storageci "github.com/kolide/launcher/v2/ee/agent/storage/ci"
 	"github.com/kolide/launcher/v2/ee/agent/types"
 	"github.com/kolide/launcher/v2/ee/agent/types/mocks"
+	"github.com/kolide/launcher/v2/pkg/launcher"
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 	"go.etcd.io/bbolt"
@@ -73,6 +74,7 @@ func TestUninstall(t *testing.T) {
 			testServerProvidedDataStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ServerProvidedDataStore.String())
 			require.NoError(t, err, "could not create test server provided data store")
 			k.On("ServerProvidedDataStore").Return(testServerProvidedDataStore)
+			k.On("Identifier").Return(launcher.DefaultLauncherIdentifier)
 			stores := map[storage.Store]types.KVStore{
 				storage.PersistentHostDataStore: testHostDataStore,
 				storage.ConfigStore:             testConfigStore,
