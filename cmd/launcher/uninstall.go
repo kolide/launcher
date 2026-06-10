@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kolide/launcher/v2/ee/nativemessaging"
 	"github.com/kolide/launcher/v2/pkg/launcher"
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/peterbourgon/ff/v3"
@@ -46,6 +47,10 @@ func runUninstall(_ *multislogger.MultiSlogger, args []string) error {
 	if len(matches) == 1 && len(matches[0]) == 2 {
 		// Capture non-default identifiers if they match the regexp
 		identifier = strings.TrimSpace(matches[0][1])
+	}
+
+	if err := nativemessaging.RemoveNativeMessagingManifest(opts.RootDirectory, identifier); err != nil {
+		fmt.Printf("could not remove native messaging manifest: %s\n", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/kolide/krypto/pkg/echelper"
+	"github.com/kolide/launcher/v2/ee/nativemessaging"
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
@@ -376,7 +377,7 @@ func Test_originIsAllowlisted(t *testing.T) {
 		},
 	}
 
-	for allowlistedOrigin := range allowlistedDt4aOriginsLookup {
+	for allowlistedOrigin := range nativemessaging.AllowlistedDt4aOriginsLookup() {
 		testCases = append(testCases, testCase{
 			testCaseName:      allowlistedOrigin,
 			requestOrigin:     allowlistedOrigin,

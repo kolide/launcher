@@ -47,6 +47,7 @@ import (
 	"github.com/kolide/launcher/v2/ee/filewalker"
 	"github.com/kolide/launcher/v2/ee/gowrapper"
 	"github.com/kolide/launcher/v2/ee/localserver"
+	"github.com/kolide/launcher/v2/ee/nativemessaging"
 	"github.com/kolide/launcher/v2/ee/observability"
 	"github.com/kolide/launcher/v2/ee/observability/exporter"
 	"github.com/kolide/launcher/v2/ee/osquerypublisher"
@@ -609,6 +610,14 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 
 		ls.SetQuerier(osqueryRunner)
 		runGroup.Add("localserver", ls.Start, ls.Interrupt)
+
+		// Support native messaging as an alternative to the localserver
+		if err := nativemessaging.WriteNativeMessagingManifest(rootDirectory, k.Identifier()); err != nil {
+			slogger.Log(ctx, slog.LevelError,
+				"could not write native messaging manifest",
+				"err", err,
+			)
+		}
 	}
 
 	// If autoupdating is enabled, run the autoupdater

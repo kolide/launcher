@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/kolide/krypto/pkg/echelper"
+	"github.com/kolide/launcher/v2/ee/nativemessaging"
 	"github.com/kolide/launcher/v2/ee/observability"
 )
 
@@ -24,27 +25,6 @@ const (
 )
 
 var (
-	// allowlistedDt4aOriginsLookup contains the complete list of origins that are permitted to access the /dt4a endpoint.
-	allowlistedDt4aOriginsLookup = map[string]struct{}{
-		// Release extension
-		"chrome-extension://gejiddohjgogedgjnonbofjigllpkmbf":  {},
-		"chrome-extension://khgocmkkpikpnmmkgmdnfckapcdkgfaf":  {},
-		"chrome-extension://aeblfdkhhhdcdjpifhhbdiojplfjncoa":  {},
-		"chrome-extension://dppgmdbiimibapkepcbdbmkaabgiofem":  {},
-		"moz-extension://dfbae458-fb6f-4614-856e-094108a80852": {},
-		"moz-extension://25fc87fa-4d31-4fee-b5c1-c32a7844c063": {},
-		"moz-extension://d634138d-c276-4fc8-924b-40a0ea21d284": {},
-		// Development and internal builds
-		"chrome-extension://hjlinigoblmkhjejkmbegnoaljkphmgo":  {},
-		"moz-extension://0a75d802-9aed-41e7-8daa-24c067386e82": {},
-		"chrome-extension://hiajhnnfoihkhlmfejoljaokdpgboiea":  {},
-		"chrome-extension://kioanpobaefjdloichnjebbdafiloboa":  {},
-		"chrome-extension://bkpbhnjcbehoklfkljkkbbmipaphipgl":  {},
-		// Development web app
-		"https://my.b5local.com:4000":           {},
-		"https://dev.sites.gitlab.1password.io": {},
-	}
-
 	allowlisted1POriginRegex = regexp.MustCompile(`https:\/\/.+\.1password\.(com|ca|eu)$`)
 )
 
@@ -72,7 +52,7 @@ func originIsAllowlisted(requestOrigin string) bool {
 	}
 
 	// Allow origins in the allowlist
-	if _, ok := allowlistedDt4aOriginsLookup[requestOrigin]; ok {
+	if _, ok := nativemessaging.AllowlistedDt4aOriginsLookup()[requestOrigin]; ok {
 		return true
 	}
 
