@@ -33,7 +33,7 @@ func validateBrowser(ctx context.Context, proc *process.Process) error {
 	}
 	teamIdentifier, found := allowlistedBrowsers[browserProcessName]
 	if !found {
-		return fmt.Errorf("name %s for browser process not in allowlisted chrome paths", browserProcessName)
+		return fmt.Errorf("name %s for browser process not in allowlisted browser names", browserProcessName)
 	}
 
 	pathToVerify, err := proc.ExeWithContext(ctx)
@@ -41,18 +41,6 @@ func validateBrowser(ctx context.Context, proc *process.Process) error {
 		return fmt.Errorf("getting executable for browser process: %w", err)
 	}
 
-	// Verify the codesigning for the app bundle, and that it is associated with
-	// the expected team identifier
-	if err := validateCodesigning(ctx, pathToVerify, teamIdentifier); err != nil {
-		return fmt.Errorf("validating codesigning: %w", err)
-	}
-
-	return nil
-}
-
-// validateCodesigning runs codesign --verify against the given path to confirm
-// whether it has a valid signature.
-func validateCodesigning(ctx context.Context, pathToVerify string, teamIdentifier string) error {
 	// Build our identity assertion:
 	// 1. "anchor apple generic" guarantees the signing chain roots are in Apple's CA
 	// 2. "certificate leaf[subject.OU] = <teamIdentifier>" guarantees the team ID matches what we expect
