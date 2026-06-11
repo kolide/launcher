@@ -5,7 +5,6 @@ package nativemessaging
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/kolide/launcher/v2/ee/allowedcmd"
 	"github.com/shirou/gopsutil/v4/process"
@@ -42,14 +41,10 @@ func validateBrowser(ctx context.Context, proc *process.Process) error {
 		return fmt.Errorf("getting executable for browser process: %w", err)
 	}
 
-	// Verify the codesigning for the app bundle
-	if err := validateCodesigning(ctx, pathToVerify); err != nil {
+	// Verify the codesigning for the app bundle, and that it is associated with
+	// the expected team identifier
+	if err := validateCodesigning(ctx, pathToVerify, teamIdentifier); err != nil {
 		return fmt.Errorf("validating codesigning: %w", err)
-	}
-
-	// Validate that the codesigning is associated with an expected team identifier
-	if err := validateTeamIdentifier(ctx, pathToVerify, teamIdentifier); err != nil {
-		return fmt.Errorf("validating team identifier: %w", err)
 	}
 
 	return nil
@@ -57,8 +52,12 @@ func validateBrowser(ctx context.Context, proc *process.Process) error {
 
 // validateCodesigning runs codesign --verify against the given path to confirm
 // whether it has a valid signature.
-func validateCodesigning(ctx context.Context, pathToVerify string) error {
-	verifyCmd, err := allowedcmd.Codesign.Cmd(ctx, "--verify", "--verbose", "--deep", pathToVerify)
+func validateCodesigning(ctx context.Context, pathToVerify string, teamIdentifier string) error {
+	// Build our identity assertion:
+	// 1. "anchor apple generic" guarantees the signing chain roots are in Apple's CA
+	// 2. "certificate leaf[subject.OU] = <teamIdentifier>" guarantees the team ID matches what we expect
+	identityAssertion := fmt.Sprintf(`anchor apple generic and certificate leaf[subject.OU] = "%s"`, teamIdentifier)
+	verifyCmd, err := allowedcmd.Codesign.Cmd(ctx, "--verify", "--deep", "--verbose", "-R", "="+identityAssertion, pathToVerify)
 	if err != nil {
 		return fmt.Errorf("creating codesign --verify cmd: %w", err)
 	}
@@ -68,35 +67,4 @@ func validateCodesigning(ctx context.Context, pathToVerify string) error {
 	}
 
 	return nil
-}
-
-// validateTeamIdentifier runs codesign --display against the given path, parses the output
-// to extract the team identifier, and confirms it matches the expected identifier.
-func validateTeamIdentifier(ctx context.Context, pathToVerify string, teamIdentifier string) error {
-	displayCmd, err := allowedcmd.Codesign.Cmd(ctx, "--display", "--verbose", "--deep", pathToVerify)
-	if err != nil {
-		return fmt.Errorf("creating codesign --display cmd: %w", err)
-	}
-	displayOutput, err := displayCmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("running codesign --display against %s: output: `%s`: %w", pathToVerify, string(displayOutput), err)
-	}
-
-	displayOutputStr := strings.ReplaceAll(string(displayOutput), "\r\n", "\n")
-	for line := range strings.SplitSeq(displayOutputStr, "\n") {
-		key, val, found := strings.Cut(line, "=")
-		if !found {
-			continue
-		}
-		if key != "TeamIdentifier" {
-			continue
-		}
-		foundTeamIdentifier := strings.TrimSpace(val)
-		if foundTeamIdentifier != teamIdentifier {
-			return fmt.Errorf("team identifier mismatch: expected %s, got %s", teamIdentifier, foundTeamIdentifier)
-		}
-		return nil
-	}
-
-	return fmt.Errorf("codesign --display output does not contain TeamIdentifier: %s", displayOutputStr)
 }
