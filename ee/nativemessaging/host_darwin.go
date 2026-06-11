@@ -91,8 +91,9 @@ func validateTeamIdentifier(ctx context.Context, pathToVerify string, teamIdenti
 		if key != "TeamIdentifier" {
 			continue
 		}
-		if strings.TrimSpace(val) != teamIdentifier {
-			return fmt.Errorf("team identifier mismatch: expected %s, got %s", teamIdentifier, val)
+		foundTeamIdentifier := strings.TrimSpace(val)
+		if foundTeamIdentifier != teamIdentifier {
+			return fmt.Errorf("team identifier mismatch: expected %s, got %s", teamIdentifier, foundTeamIdentifier)
 		}
 		return nil
 	}

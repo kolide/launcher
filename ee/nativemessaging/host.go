@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -43,7 +44,7 @@ func ReadNativeMessages(ctx context.Context) {
 	var logWriter io.WriteCloser
 	var err error
 	logFile := filepath.Join(determineRootDirectory(), fmt.Sprintf("desktop_%d", os.Getuid()), "nativemessaging.log")
-	logWriter, err = os.OpenFile(logFile, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
+	logWriter, err = os.OpenFile(logFile, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0644)
 	if err != nil {
 		logWriter = newNopCloser(io.Discard)
 	}
@@ -54,25 +55,32 @@ func ReadNativeMessages(ctx context.Context) {
 	// Validate the request that started this process
 	extension, err := validateNativeMessagingRequest(ctx)
 	if err != nil {
-		slogger.Log(context.TODO(), slog.LevelError,
+		slogger.Log(ctx, slog.LevelError,
 			"invalid native messaging request",
 			"err", err,
 			"extension", extension,
 		)
+		return
 	}
 
-	slogger.Log(context.TODO(), slog.LevelInfo,
+	slogger.Log(ctx, slog.LevelInfo,
 		"native messaging app opened",
 		"extension", extension,
 	)
 
 	// Handle input until the connection is closed
-	stdinReader := bufio.NewReaderSize(bufio.NewReader(os.Stdin), msgBufferSize)
+	stdinReader := bufio.NewReaderSize(os.Stdin, msgBufferSize)
 	header := make([]byte, 4)
 	for {
-		headerBytesRead, err := stdinReader.Read(header)
-		if headerBytesRead == 0 || err != nil {
-			slogger.Log(context.TODO(), slog.LevelWarn,
+		headerBytesRead, err := io.ReadFull(stdinReader, header)
+		if err != nil && (errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF)) {
+			slogger.Log(ctx, slog.LevelInfo,
+				"stream closed",
+			)
+			break
+		}
+		if headerBytesRead != 4 || err != nil {
+			slogger.Log(ctx, slog.LevelWarn,
 				"could not read next header",
 				"err", err,
 			)
@@ -81,22 +89,31 @@ func ReadNativeMessages(ctx context.Context) {
 
 		msgLength := binary.NativeEndian.Uint32(header)
 
-		slogger.Log(context.TODO(), slog.LevelInfo,
+		if msgLength > msgBufferSize {
+			slogger.Log(ctx, slog.LevelInfo,
+				"received message with length exceeding max, terminating processing",
+				"length", msgLength,
+				"max_length", msgBufferSize,
+			)
+			break
+		}
+
+		slogger.Log(ctx, slog.LevelInfo,
 			"received message with length",
 			"length", msgLength,
 		)
 
 		msgContent := make([]byte, int(msgLength))
-		msgBytesRead, err := stdinReader.Read(msgContent)
+		msgBytesRead, err := io.ReadFull(stdinReader, msgContent)
 		if msgBytesRead < int(msgLength) {
-			slogger.Log(context.TODO(), slog.LevelWarn,
+			slogger.Log(ctx, slog.LevelWarn,
 				"could not read all bytes in message",
 				"length", msgLength,
 				"bytes_read", msgBytesRead,
 			)
 			break
 		} else if err != nil {
-			slogger.Log(context.TODO(), slog.LevelWarn,
+			slogger.Log(ctx, slog.LevelWarn,
 				"could not read message",
 				"err", err,
 			)
@@ -104,13 +121,13 @@ func ReadNativeMessages(ctx context.Context) {
 		}
 
 		// In the future, we would forward this request
-		slogger.Log(context.TODO(), slog.LevelInfo,
+		slogger.Log(ctx, slog.LevelInfo,
 			"message",
 			"contents", string(msgContent),
 		)
 	}
 
-	slogger.Log(context.TODO(), slog.LevelInfo,
+	slogger.Log(ctx, slog.LevelInfo,
 		"shutting down",
 	)
 }
