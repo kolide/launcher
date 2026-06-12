@@ -21,9 +21,12 @@ import (
 
 	"github.com/Masterminds/semver"
 	"github.com/kolide/launcher/v2/ee/agent/flags/keys"
+	"github.com/kolide/launcher/v2/ee/agent/storage/inmemory"
+	"github.com/kolide/launcher/v2/ee/agent/types"
 	typesmocks "github.com/kolide/launcher/v2/ee/agent/types/mocks"
 	tufci "github.com/kolide/launcher/v2/ee/tuf/ci"
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/v2/pkg/threadsafebuffer"
 	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -327,19 +330,21 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 	mockKnapsack.AssertExpectations(t)
 }
 
-func TestExecute_downgrade(t *testing.T) {
+func TestExecute_downgrade_osquery(t *testing.T) {
 	t.Parallel()
 
 	testRootDir := t.TempDir()
-	testReleaseVersion := "3.22.9"
+	testReleaseVersion := tufci.OlderBinaryVersion // 5.17.0
+	currentRunningOsqueryVersion := "5.18.0"
 	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
 
-	// Set up osquery binary
+	// Make sure the binary is available on disk so that this is a true rollback
+	// (i.e. no TUF download required)
 	osqBinaryPath := filepath.Join(t.TempDir(), "osqueryd")
 	if runtime.GOOS == "windows" {
 		osqBinaryPath += ".exe"
 	}
-	tufci.CopyBinary(t, osqBinaryPath)
+	tufci.CopyOlderBinary(t, osqBinaryPath)
 
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("RootDirectory").Return(testRootDir)
@@ -353,19 +358,38 @@ func TestExecute_downgrade(t *testing.T) {
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 	mockKnapsack.On("InModernStandby").Return(false)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay, keys.AutoupdateInterval, keys.AutoupdateInitialDelay).Return()
-	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(osqBinaryPath)
+	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(osqBinaryPath).Maybe()
 
 	// Set logger so that we can capture output
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 	slogger := multislogger.New(slog.NewJSONHandler(&logBytes, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	mockKnapsack.On("Slogger").Return(slogger.Logger)
 
+	// Track whether the osqueryd restart func is ever invoked
+	var osquerydRestartCount atomic.Int64
+
+	// Set up osquery instance history with currentRunningOsqueryVersion
+	osqHistory, err := history.InitHistory(inmemory.NewStore())
+	require.NoError(t, err)
+	require.NoError(t, osqHistory.NewInstance(types.DefaultEnrollmentID, "test-run-id"))
+	runningQuerier := typesmocks.NewQuerier(t)
+	runningQuerier.On("Query", mock.Anything).Return([]map[string]string{
+		{"instance_id": "test-instance-id", "version": currentRunningOsqueryVersion},
+	}, nil)
+	require.NoError(t, osqHistory.SetConnected("test-run-id", runningQuerier))
+
 	// Set up autoupdater
 	client := &http.Client{}
 	t.Cleanup(func() {
 		client.CloseIdleConnections()
 	})
-	autoupdater, err := NewTufAutoupdater(t.Context(), mockKnapsack, client, client, WithOsqueryRestart(func(context.Context) error { return nil }))
+	autoupdater, err := NewTufAutoupdater(t.Context(), mockKnapsack, client, client,
+		WithOsqueryRestart(func(context.Context) error {
+			osquerydRestartCount.Add(1)
+			return nil
+		}),
+		WithOsqueryHistory(osqHistory),
+	)
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Update the metadata client with our test root JSON
@@ -380,45 +404,32 @@ func TestExecute_downgrade(t *testing.T) {
 	autoupdater.libraryManager = mockLibraryManager
 	mockLibraryManager.On("TidyLibrary", binaryOsqueryd, mock.Anything).Return().Once()
 
-	// Expect that we do not attempt to update the library (i.e. the osquery update was previously downloaded)
-	mockLibraryManager.On("Available", binaryOsqueryd, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion)).Return(true)
+	// The rollback target is already present in the library, so no download is needed -- the
+	// autoupdater should detect the already-available rollback version and restart osqueryd onto it.
+	mockLibraryManager.On("Available", binaryOsqueryd, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion)).Return(true).Maybe()
 	mockLibraryManager.On("Available", binaryLauncher, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion)).Return(true)
 
 	// Let the autoupdater run for a bit
 	go autoupdater.Execute()
+	time.Sleep(3 * time.Second)
 
-	// Wait up to 5 seconds to confirm we see log lines `restarted binary after update`, indicating that
-	// the autoupdater restarted osqueryd even though it did not perform a download
-	shutdownDeadline := time.Now().Add(5 * time.Second).Unix()
-	for {
-		if time.Now().Unix() > shutdownDeadline {
-			t.Error("autoupdater did not restart osquery within 5 seconds -- logs: ", logBytes.String())
-			t.FailNow()
-		}
+	// Stop the autoupdater
+	autoupdater.Interrupt(errors.New("test error"))
+	time.Sleep(100 * time.Millisecond)
 
-		// Wait for Execute to do its thing
-		time.Sleep(100 * time.Millisecond)
+	// osqueryd should be restarted in order to load the rollback version
+	require.GreaterOrEqual(t, osquerydRestartCount.Load(), int64(1), "expected osqueryd to be restarted on rollback -- logs: %s", logBytes.String())
 
-		logLines := strings.Split(strings.TrimSpace(logBytes.String()), "\n")
-		osquerydRestarted := false
-		for _, line := range logLines {
-			if strings.Contains(line, "restarted binary after update") {
-				osquerydRestarted = true
-				break
-			}
-		}
-
-		if osquerydRestarted {
+	logLines := strings.Split(strings.TrimSpace(logBytes.String()), "\n")
+	restartFound := false
+	for _, line := range logLines {
+		if strings.Contains(line, "restarted binary after update") {
+			restartFound = true
 			break
 		}
 	}
-
-	// Assert expectation that we checked to see if version was available in library
-	mockLibraryManager.AssertExpectations(t)
-
-	// The autoupdater won't stop after an osqueryd download, so interrupt it and let it shut down
-	autoupdater.Interrupt(errors.New("test error"))
-	time.Sleep(100 * time.Millisecond)
+	require.True(t, restartFound,
+		"expected osqueryd to be restarted on rollback -- logs: %s", logBytes.String())
 
 	// Confirm we pulled all config items as expected
 	mockKnapsack.AssertExpectations(t)

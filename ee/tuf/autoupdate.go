@@ -110,7 +110,8 @@ type TufAutoupdater struct {
 	signalRestart        chan error
 	slogger              *slog.Logger
 	restartFuncs         map[autoupdatableBinary]func(context.Context) error
-	calculatedSplayDelay *atomic.Int64 // the randomly selected delay within the download splay window
+	calculatedSplayDelay *atomic.Int64          // the randomly selected delay within the download splay window
+	osqueryHistory       types.OsqueryHistorian // used to determine the version of the currently-running osquery process
 }
 
 type TufAutoupdaterOption func(*TufAutoupdater)
@@ -121,6 +122,14 @@ func WithOsqueryRestart(restart func(context.Context) error) TufAutoupdaterOptio
 			ta.restartFuncs = make(map[autoupdatableBinary]func(context.Context) error)
 		}
 		ta.restartFuncs[binaryOsqueryd] = restart
+	}
+}
+
+// WithOsqueryHistory provides the autoupdater with osquery instance history, so that it can
+// determine the version of the currently-running osquery process.
+func WithOsqueryHistory(osqueryHistory types.OsqueryHistorian) TufAutoupdaterOption {
+	return func(ta *TufAutoupdater) {
+		ta.osqueryHistory = osqueryHistory
 	}
 }
 
@@ -521,7 +530,24 @@ func (ta *TufAutoupdater) currentRunningVersion(binary autoupdatableBinary) (str
 		}
 		return launcherVersion, nil
 	case binaryOsqueryd:
-		// Query via runsimple instead of client to avoid any socket contention
+		// If possible, we pull the currently-running osquery version from the osquery history,
+		// recorded by our current osquery instance after startup. We prefer this over `LatestOsquerydPath`
+		// because that path is resolved against the TUF metadata we just refreshed, so during
+		// a rollback it points to the rollback target that already exists in the update library --
+		// leading the autoupdater to incorrectly conclude that it's already running the appropriate version
+		// and not perform the osquery restart. This leaves us running the stale version until launcher
+		// or osquery restarts independently.
+		if ta.osqueryHistory != nil {
+			if stats, err := ta.osqueryHistory.LatestInstanceStats(types.DefaultEnrollmentID); err == nil {
+				if runningVersion, ok := stats["version"]; ok && runningVersion != "" {
+					return runningVersion, nil
+				}
+			}
+		}
+
+		// Fall back to querying the binary directly -- for example, if there's no history
+		// because osquery hasn't started up yet on a fresh install.
+		// Query via runsimple, instead of osquery client, to avoid any socket contention.
 		ctx, cancel := context.WithTimeout(context.Background(), ta.osqueryTimeout)
 		defer cancel()
 
