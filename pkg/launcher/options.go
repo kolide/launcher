@@ -232,7 +232,7 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		flAutoupdate              = flagset.Bool("autoupdate", DefaultAutoupdate, "Whether or not the osquery autoupdater is enabled (default: false)")
 		flTufServerURL            = flagset.String("tuf_url", DefaultTufServer, "TUF update server (default: https://tuf.kolide.com)")
 		flMirrorURL               = flagset.String("mirror_url", DefaultMirror, "The mirror server for autoupdates (default: https://dl.kolide.co)")
-		flAutoupdateInterval      = flagset.Duration("autoupdate_interval", 1*time.Hour, "The interval to check for updates (default: once every hour)")
+		flAutoupdateInterval      = flagset.Duration("autoupdate_interval", 15*time.Minute, "The interval to check for updates (default: every 15 minutes)")
 		flUpdateChannel           = flagset.String("update_channel", "stable", "The channel to pull updates from (options: stable, beta, nightly)")
 		flAutoupdateInitialDelay  = flagset.Duration("autoupdater_initial_delay", 1*time.Hour, "Initial autoupdater subprocess delay")
 		flUpdateDirectory         = flagset.String("update_directory", "", "Local directory to hold updates for osqueryd and launcher")
