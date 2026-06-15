@@ -21,6 +21,8 @@ var allowlistedBrowsers = map[string]string{
 	`Google Chrome Canary`: "Google LLC",
 }
 
+// validateBrowser confirms that the calling process is a known browser
+// signed by a publisher in our allowlist.
 func validateBrowser(ctx context.Context, proc *process.Process) error {
 	browserProcessName, err := proc.NameWithContext(ctx)
 	if err != nil {
