@@ -634,6 +634,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			metadataClient,
 			mirrorClient,
 			tuf.WithOsqueryRestart(osqueryRunner.Restart),
+			tuf.WithOsqueryHistory(k.OsqueryHistory()),
 		)
 		if err != nil {
 			return fmt.Errorf("creating TUF autoupdater updater: %w", err)
