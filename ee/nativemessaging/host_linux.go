@@ -43,13 +43,13 @@ func validateBrowser(ctx context.Context, proc *process.Process) error {
 	}
 	fileStats, ok := fi.Sys().(*syscall.Stat_t)
 	if !ok {
-		return fmt.Errorf("getting stat_t for %s: %w", pathToVerify, err)
+		return fmt.Errorf("getting stat_t for %s", pathToVerify)
 	}
 	if fileStats.Uid != 0 {
 		return fmt.Errorf("browser %s is not root-owned -- owned by %d", pathToVerify, fileStats.Uid)
 	}
 	if fi.Mode()&022 != 0 {
-		return fmt.Errorf("%s is group- or world-writable: %s", fi, fi.Mode().String())
+		return fmt.Errorf("%s is group- or world-writable: %s", pathToVerify, fi.Mode().String())
 	}
 
 	return nil

@@ -31,11 +31,11 @@ func validateBrowser(ctx context.Context, proc *process.Process) error {
 	// Some older versions of Chrome launch via cmd.exe, so we have to go up
 	// one more level.
 	if browserProcessName == "cmd.exe" {
-		ppid, err := proc.Ppid()
+		ppid, err := proc.PpidWithContext(ctx)
 		if err != nil {
 			return fmt.Errorf("getting cmd.exe parent process: %w", err)
 		}
-		proc, err = process.NewProcessWithContext(ctx, int32(ppid))
+		proc, err = process.NewProcessWithContext(ctx, ppid)
 		if err != nil {
 			return fmt.Errorf("getting cmd.exe parent process (%d): %w", ppid, err)
 		}
