@@ -221,9 +221,24 @@ func validateNativeMessagingRequest(ctx context.Context) (string, error) {
 	if err != nil {
 		return potentialExtension, fmt.Errorf("getting parent process (%d) for request from %s: %w", ppid, potentialExtension, err)
 	}
+	parentProcessCreateTime, err := parentProcess.CreateTimeWithContext(ctx)
+	if err != nil {
+		return potentialExtension, fmt.Errorf("getting parent process create time for request from %s: %w", potentialExtension, err)
+	}
 
+	// Perform per-OS validation
 	if err := validateBrowser(ctx, parentProcess); err != nil {
 		return potentialExtension, fmt.Errorf("validating browser process with ppid %d: %w", ppid, err)
+	}
+
+	// Check that the create time is still the same, so that we know the process hasn't died
+	// and had its PID reused by some other process.
+	parentProcessCreateTimeAfterValidation, err := parentProcess.CreateTimeWithContext(ctx)
+	if err != nil {
+		return potentialExtension, fmt.Errorf("getting parent process create time after performing validation: %w", err)
+	}
+	if parentProcessCreateTime != parentProcessCreateTimeAfterValidation {
+		return potentialExtension, fmt.Errorf("PID reuse: parent process originally created at %d, now %d has create time at %d", parentProcessCreateTime, ppid, parentProcessCreateTimeAfterValidation)
 	}
 
 	return potentialExtension, nil
