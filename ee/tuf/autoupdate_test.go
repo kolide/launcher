@@ -1390,6 +1390,8 @@ func TestFlagsChanged_DuringInitialDelay(t *testing.T) {
 	t.Parallel()
 
 	testRootDir := t.TempDir()
+	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, "1.2.3")
+
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("RootDirectory").Return(testRootDir)
 	mockKnapsack.On("UpdateChannel").Return("nightly")
@@ -1398,16 +1400,17 @@ func TestFlagsChanged_DuringInitialDelay(t *testing.T) {
 	mockKnapsack.On("AutoupdateInterval").Return(interval).Maybe()
 	initialDelay := 1 * time.Second
 	mockKnapsack.On("AutoupdateInitialDelay").Return(initialDelay)
-	mockKnapsack.On("TufServerURL").Return("https://example.com")
+	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay, keys.AutoupdateInterval, keys.AutoupdateInitialDelay).Return()
-	// The autoupdater now checks for updates during the initial delay, so its loop may interact with
-	// these dependencies. The metadata update fails against example.com, so no download/restart occurs.
+	// tidyLibrary queries osqueryd version at startup; return an empty path so version lookup fails
+	// immediately without spawning a subprocess.
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return("").Maybe()
-	mockKnapsack.On("InModernStandby").Return(false).Maybe()
-	mockKnapsack.On("AutoupdateDownloadSplay").Return(0 * time.Second).Maybe()
+	// Skip the update check loop so Execute reaches its select quickly and can be interrupted
+	// without performing library operations.
+	mockKnapsack.On("InModernStandby").Return(true).Maybe()
 
 	// Start out with a pinned version, then unset the pinned version
 	pinnedLauncherVersion := "1.7.3"
@@ -1421,19 +1424,34 @@ func TestFlagsChanged_DuringInitialDelay(t *testing.T) {
 	})
 	autoupdater, err := NewTufAutoupdater(t.Context(), mockKnapsack, client, client, WithOsqueryRestart(func(context.Context) error { return nil }))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
+	require.NoError(t, autoupdater.metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
 	require.Equal(t, pinnedLauncherVersion, autoupdater.pinnedVersions[binaryLauncher])
 
-	// Start the autoupdater, then notify flag change right away, during the initial delay
-	go autoupdater.Execute()
+	mockLibraryManager := NewMocklibrarian(t)
+	autoupdater.libraryManager = mockLibraryManager
+
+	executeDone := make(chan error, 1)
+	go func() {
+		executeDone <- autoupdater.Execute()
+	}()
+
+	// Wait for Execute to reach its select loop before sending flag changes / interrupt.
 	time.Sleep(100 * time.Millisecond)
 	autoupdater.FlagsChanged(t.Context(), keys.PinnedLauncherVersion)
 
-	// Stop the autoupdater
+	// Stop the autoupdater and wait for Execute to exit so we don't leak its goroutine.
 	autoupdater.Interrupt(errors.New("test error"))
+	select {
+	case err := <-executeDone:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("Execute did not exit after interrupt")
+	}
 
 	// Confirm we unset the pinned launcher version
 	require.Equal(t, "", autoupdater.pinnedVersions[binaryLauncher])
 
+	mockLibraryManager.AssertExpectations(t)
 	// Confirm we pulled all config items as expected
 	mockKnapsack.AssertExpectations(t)
 }
