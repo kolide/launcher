@@ -2,6 +2,7 @@ package nativemessaging
 
 import (
 	"os"
+	"path/filepath"
 	"runtime"
 	"testing"
 
@@ -167,17 +168,122 @@ func Test_validateBrowserPath(t *testing.T) {
 			shouldPass:   false, // inadequate codesigning
 		},
 		{
-			testCaseName: "windows + chrome",
+			testCaseName: "windows + chrome - Program Files",
 			platform:     "windows",
 			browserPath:  `C:\Program Files\Google\Chrome\Application\chrome.exe`,
 			browserName:  "chrome.exe",
 			shouldPass:   true,
 		},
 		{
+			testCaseName: "windows + chrome - Program Files (x86)",
+			platform:     "windows",
+			browserPath:  `C:\Program Files (x86)\Google\Chrome\Application\chrome.exe`,
+			browserName:  "chrome.exe",
+			shouldPass:   true,
+		},
+		{
+			testCaseName: "windows + chrome - per-user",
+			platform:     "windows",
+			browserPath:  filepath.Join(os.Getenv("LOCALAPPDATA"), "Google", "Chrome", "Application", "chrome.exe"),
+			browserName:  "chrome.exe",
+			shouldPass:   true,
+		},
+		{
+			testCaseName: "windows + chrome beta - Program Files",
+			platform:     "windows",
+			browserPath:  `C:\Program Files\Google\Chrome Beta\Application\chrome.exe`,
+			browserName:  "chrome.exe",
+			shouldPass:   true,
+		},
+		{
+			testCaseName: "windows + chrome beta - Program Files (x86)",
+			platform:     "windows",
+			browserPath:  `C:\Program Files (x86)\Google\Chrome Beta\Application\chrome.exe`,
+			browserName:  "chrome.exe",
+			shouldPass:   true,
+		},
+		{
+			testCaseName: "windows + chrome beta - per-user",
+			platform:     "windows",
+			browserPath:  filepath.Join(os.Getenv("LOCALAPPDATA"), "Google", "Chrome Beta", "Application", "chrome.exe"),
+			browserName:  "chrome.exe",
+			shouldPass:   true,
+		},
+		{
+			testCaseName: "windows + chrome dev - Program Files",
+			platform:     "windows",
+			browserPath:  `C:\Program Files\Google\Chrome Dev\Application\chrome.exe`,
+			browserName:  "chrome.exe",
+			shouldPass:   true,
+		},
+		{
+			testCaseName: "windows + chrome dev - Program Files (x86)",
+			platform:     "windows",
+			browserPath:  `C:\Program Files (x86)\Google\Chrome Dev\Application\chrome.exe`,
+			browserName:  "chrome.exe",
+			shouldPass:   true,
+		},
+		{
+			testCaseName: "windows + chrome dev - per-user",
+			platform:     "windows",
+			browserPath:  filepath.Join(os.Getenv("LOCALAPPDATA"), "Google", "Chrome Dev", "Application", "chrome.exe"),
+			browserName:  "chrome.exe",
+			shouldPass:   true,
+		},
+		{
+			testCaseName: "windows + chrome canary - per-user",
+			platform:     "windows",
+			browserPath:  filepath.Join(os.Getenv("LOCALAPPDATA"), "Google", "Chrome SxS", "Application", "chrome.exe"),
+			browserName:  "chrome.exe",
+			shouldPass:   true,
+		},
+		{
+			testCaseName: "windows + chromium - Program Files",
+			platform:     "windows",
+			browserPath:  `C:\Program Files\Chromium\Application\chrome.exe`,
+			browserName:  "chrome.exe",
+			shouldPass:   false, // not signed by Google LLC
+		},
+		{
+			testCaseName: "windows + chromium - per-user",
+			platform:     "windows",
+			browserPath:  filepath.Join(os.Getenv("LOCALAPPDATA"), "Chromium", "Application", "chrome.exe"),
+			browserName:  "chrome.exe",
+			shouldPass:   false, // not signed by Google LLC
+		},
+		{
 			testCaseName: "linux + chrome",
 			platform:     "linux",
 			browserPath:  "/opt/google/chrome/chrome",
 			browserName:  "chrome",
+			shouldPass:   true,
+		},
+		{
+			testCaseName: "linux + chrome beta",
+			platform:     "linux",
+			browserPath:  "/opt/google/chrome-beta/chrome",
+			browserName:  "chrome",
+			shouldPass:   true,
+		},
+		{
+			testCaseName: "linux + chrome dev",
+			platform:     "linux",
+			browserPath:  "/opt/google/chrome-unstable/chrome",
+			browserName:  "chrome",
+			shouldPass:   true,
+		},
+		{
+			testCaseName: "linux + chromium - snap",
+			platform:     "linux",
+			browserPath:  "/snap/chromium/current/usr/lib/chromium-browser/chrome",
+			browserName:  "chrome",
+			shouldPass:   true,
+		},
+		{
+			testCaseName: "linux + chromium - deb",
+			platform:     "linux",
+			browserPath:  "/usr/lib/chromium-browser/chromium-browser",
+			browserName:  "chromium-browser",
 			shouldPass:   true,
 		},
 	} {
