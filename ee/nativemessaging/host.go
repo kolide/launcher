@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -19,9 +20,12 @@ import (
 	"github.com/shirou/gopsutil/v4/process"
 )
 
-// msgBufferSize is the maximum message size we expect. Technically the extension is allowed to send a message
-// with size up to 64 MiB, but we restrict further.
-const msgBufferSize = 8192
+const (
+	// msgBufferSize is the maximum message size we expect. Technically the extension is allowed to send a message
+	// with size up to 64 MiB, but we restrict further.
+	msgBufferSize      = 8192
+	maxSendMessageSize = 1000000 // 1MB
+)
 
 // nopCloser wraps a Writer with a no-op Close function; we use it
 // to wrap io.Discard so it can be an io.WriteCloser
@@ -126,6 +130,17 @@ func ReadNativeMessages(ctx context.Context) {
 			"message",
 			"contents", string(msgContent),
 		)
+
+		// Write a test message
+		if err := sendMessage(map[string]any{
+			"msg":     "received message",
+			"msg_len": msgLength,
+		}); err != nil {
+			slogger.Log(ctx, slog.LevelError,
+				"sending message",
+				"err", err,
+			)
+		}
 	}
 
 	slogger.Log(ctx, slog.LevelInfo,
@@ -243,4 +258,29 @@ func validateNativeMessagingRequest(ctx context.Context) (string, error) {
 	}
 
 	return potentialExtension, nil
+}
+
+// sendMessage formats the given body by marshalling it to JSON,
+// adding the expected header, and writing it to stdout.
+// See: https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging#native-messaging-host-protocol
+func sendMessage(msgBody any) error {
+	bodyRaw, err := json.Marshal(msgBody)
+	if err != nil {
+		return fmt.Errorf("marshalling msg body to JSON: %w", err)
+	}
+	bodyLen := len(bodyRaw)
+	totalMsgLen := bodyLen + 4
+	if totalMsgLen > maxSendMessageSize {
+		return fmt.Errorf("message with size %d bytes exceeds max of 1 MB", totalMsgLen)
+	}
+
+	header := make([]byte, 4)
+	binary.NativeEndian.PutUint32(header, uint32(bodyLen))
+
+	written, err := os.Stdout.Write(append(header, bodyRaw...))
+	if written != totalMsgLen || err != nil {
+		return fmt.Errorf("sending message: wrote %d of %d expected bytes: %w", written, totalMsgLen, err)
+	}
+
+	return nil
 }
