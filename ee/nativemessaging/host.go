@@ -3,8 +3,6 @@ package nativemessaging
 import (
 	"bufio"
 	"context"
-	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -18,13 +16,6 @@ import (
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/peterbourgon/ff/v3"
 	"github.com/shirou/gopsutil/v4/process"
-)
-
-const (
-	// msgBufferSize is the maximum message size we expect. Technically the extension is allowed to send a message
-	// with size up to 64 MiB, but we restrict further.
-	msgBufferSize      = 8192
-	maxSendMessageSize = 1000000 // 1MB
 )
 
 // nopCloser wraps a Writer with a no-op Close function; we use it
@@ -75,57 +66,25 @@ func ReadNativeMessages(ctx context.Context) {
 
 	// Handle input until the connection is closed
 	stdinReader := bufio.NewReaderSize(os.Stdin, msgBufferSize)
-	header := make([]byte, 4)
 	for {
-		headerBytesRead, err := io.ReadFull(stdinReader, header)
-		if err != nil && (errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF)) {
-			slogger.Log(ctx, slog.LevelInfo,
-				"stream closed",
-			)
-			break
-		}
-		if headerBytesRead != 4 || err != nil {
-			slogger.Log(ctx, slog.LevelWarn,
-				"could not read next header",
-				"err", err,
-			)
-			break
-		}
+		msgContent, err := readMessage(stdinReader)
+		if err != nil {
+			// May be a genuine error, or may just be the stream closing
+			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+				slogger.Log(ctx, slog.LevelInfo,
+					"stream closed",
+				)
+			} else {
+				slogger.Log(ctx, slog.LevelError,
+					"terminating processing after error",
+					"err", err,
+				)
+			}
 
-		msgLength := binary.NativeEndian.Uint32(header)
-
-		if msgLength > msgBufferSize {
-			slogger.Log(ctx, slog.LevelInfo,
-				"received message with length exceeding max, terminating processing",
-				"length", msgLength,
-				"max_length", msgBufferSize,
-			)
 			break
 		}
 
-		slogger.Log(ctx, slog.LevelInfo,
-			"received message with length",
-			"length", msgLength,
-		)
-
-		msgContent := make([]byte, int(msgLength))
-		msgBytesRead, err := io.ReadFull(stdinReader, msgContent)
-		if msgBytesRead < int(msgLength) {
-			slogger.Log(ctx, slog.LevelWarn,
-				"could not read all bytes in message",
-				"length", msgLength,
-				"bytes_read", msgBytesRead,
-			)
-			break
-		} else if err != nil {
-			slogger.Log(ctx, slog.LevelWarn,
-				"could not read message",
-				"err", err,
-			)
-			break
-		}
-
-		// In the future, we would forward this request
+		// In the future, we would JSON unmarshal this request and then forward it
 		slogger.Log(ctx, slog.LevelInfo,
 			"message",
 			"contents", string(msgContent),
@@ -134,7 +93,7 @@ func ReadNativeMessages(ctx context.Context) {
 		// Write a test message
 		if err := sendMessage(map[string]any{
 			"msg":     "received message",
-			"msg_len": msgLength,
+			"msg_len": len(msgContent),
 		}); err != nil {
 			slogger.Log(ctx, slog.LevelError,
 				"sending message",
@@ -295,29 +254,4 @@ func getBrowserProcess(ctx context.Context) (*process.Process, int32, string, er
 	}
 
 	return parentProcess, ppid, processName, nil
-}
-
-// sendMessage formats the given body by marshalling it to JSON,
-// adding the expected header, and writing it to stdout.
-// See: https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging#native-messaging-host-protocol
-func sendMessage(msgBody any) error {
-	bodyRaw, err := json.Marshal(msgBody)
-	if err != nil {
-		return fmt.Errorf("marshalling msg body to JSON: %w", err)
-	}
-	bodyLen := len(bodyRaw)
-	totalMsgLen := bodyLen + 4
-	if totalMsgLen > maxSendMessageSize {
-		return fmt.Errorf("message with size %d bytes exceeds max of 1 MB", totalMsgLen)
-	}
-
-	header := make([]byte, 4)
-	binary.NativeEndian.PutUint32(header, uint32(bodyLen))
-
-	written, err := os.Stdout.Write(append(header, bodyRaw...))
-	if written != totalMsgLen || err != nil {
-		return fmt.Errorf("sending message: wrote %d of %d expected bytes: %w", written, totalMsgLen, err)
-	}
-
-	return nil
 }
