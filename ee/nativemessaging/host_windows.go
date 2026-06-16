@@ -15,10 +15,7 @@ import (
 // In case of variable install locations, we allowlist the executable name rather than
 // the full path.
 var allowlistedBrowsers = map[string]string{
-	`Google Chrome`:        "Google LLC",
-	`Google Chrome Beta`:   "Google LLC",
-	`Google Chrome Dev`:    "Google LLC",
-	`Google Chrome Canary`: "Google LLC",
+	"chrome.exe": "Google LLC", // Covers stable, beta, dev, and canary
 }
 
 // validateBrowser confirms that the calling process is a known browser
