@@ -1,6 +1,7 @@
 package nativemessaging
 
 import (
+	"os"
 	"runtime"
 	"testing"
 
@@ -116,6 +117,87 @@ func Test_extractIdentifierFromExecutable(t *testing.T) {
 			}
 
 			require.Equal(t, tt.expectedIdentifier, extractIdentifierFromExecutable(tt.executablePath))
+		})
+	}
+}
+
+func Test_validateBrowserPath(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		testCaseName string
+		platform     string
+		browserPath  string
+		browserName  string
+		shouldPass   bool
+	}{
+		{
+			testCaseName: "darwin + chrome",
+			platform:     "darwin",
+			browserPath:  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+			browserName:  "Google Chrome",
+			shouldPass:   true,
+		},
+		{
+			testCaseName: "darwin + chrome beta",
+			platform:     "darwin",
+			browserPath:  "/Applications/Google Chrome Beta.app/Contents/MacOS/Google Chrome Beta",
+			browserName:  "Google Chrome Beta",
+			shouldPass:   true,
+		},
+		{
+			testCaseName: "darwin + chrome dev",
+			platform:     "darwin",
+			browserPath:  "/Applications/Google Chrome Dev.app/Contents/MacOS/Google Chrome Dev",
+			browserName:  "Google Chrome Dev",
+			shouldPass:   true,
+		},
+		{
+			testCaseName: "darwin + chrome canary",
+			platform:     "darwin",
+			browserPath:  "/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary",
+			browserName:  "Google Chrome Canary",
+			shouldPass:   true,
+		},
+		{
+			testCaseName: "darwin + chromium",
+			platform:     "darwin",
+			browserPath:  "/Applications/Chromium.app/Contents/MacOS/Chromium",
+			browserName:  "Chromium",
+			shouldPass:   false, // inadequate codesigning
+		},
+		{
+			testCaseName: "windows + chrome",
+			platform:     "windows",
+			browserPath:  `C:\Program Files\Google\Chrome\Application\chrome.exe`,
+			browserName:  "chrome.exe",
+			shouldPass:   true,
+		},
+		{
+			testCaseName: "linux + chrome",
+			platform:     "linux",
+			browserPath:  "/opt/google/chrome/chrome",
+			browserName:  "chrome",
+			shouldPass:   true,
+		},
+	} {
+		t.Run(tt.testCaseName, func(t *testing.T) {
+			t.Parallel()
+
+			if tt.platform != runtime.GOOS {
+				return
+			}
+			// Check whether browser is actually installed -- in CI, almost certainly not
+			if _, err := os.Stat(tt.browserPath); err != nil {
+				return
+			}
+
+			validationErr := validateBrowser(t.Context(), tt.browserPath, tt.browserName)
+			if tt.shouldPass {
+				require.NoError(t, validationErr)
+			} else {
+				require.Error(t, validationErr)
+			}
 		})
 	}
 }
