@@ -34,12 +34,8 @@ func readMessage(msgReader io.Reader) ([]byte, error) {
 	}
 
 	msgContentRaw := make([]byte, int(msgLength))
-	msgBytesRead, err := io.ReadFull(msgReader, msgContentRaw)
-	if err != nil {
+	if _, err := io.ReadFull(msgReader, msgContentRaw); err != nil {
 		return nil, fmt.Errorf("reading message of length %d: %w", msgLength, err)
-	}
-	if msgBytesRead < int(msgLength) {
-		return nil, fmt.Errorf("could only read %d of %d bytes in message", msgBytesRead, msgLength)
 	}
 
 	return msgContentRaw, nil
