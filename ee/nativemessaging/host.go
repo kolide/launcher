@@ -249,7 +249,11 @@ func validateNativeMessagingRequest(ctx context.Context) (string, error) {
 
 	// Check that the create time is still the same, so that we know the process hasn't died
 	// and had its PID reused by some other process.
-	parentProcessCreateTimeAfterValidation, err := parentProcess.CreateTimeWithContext(ctx)
+	parentProcessAfterValidation, err := process.NewProcessWithContext(ctx, int32(ppid))
+	if err != nil {
+		return potentialExtension, fmt.Errorf("getting parent process after performing validation: %w", err)
+	}
+	parentProcessCreateTimeAfterValidation, err := parentProcessAfterValidation.CreateTimeWithContext(ctx)
 	if err != nil {
 		return potentialExtension, fmt.Errorf("getting parent process create time after performing validation: %w", err)
 	}
