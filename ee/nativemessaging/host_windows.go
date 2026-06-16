@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/kolide/launcher/v2/ee/allowedcmd"
-	"github.com/shirou/gopsutil/v4/process"
 )
 
 const (
@@ -29,17 +28,12 @@ var allowlistedBrowsers = map[string]string{
 	"chrome.exe": "Google LLC", // Covers stable, beta, dev, and canary
 }
 
-// validateBrowser confirms that the calling process is a known browser
+// validateBrowser confirms that the given path is a known browser
 // signed by a publisher in our allowlist.
-func validateBrowser(ctx context.Context, proc *process.Process, browserProcessName string) error {
+func validateBrowser(ctx context.Context, browserPath string, browserProcessName string) error {
 	publisher, found := allowlistedBrowsers[browserProcessName]
 	if !found {
 		return fmt.Errorf("name %s for browser process not in allowlisted browser names", browserProcessName)
-	}
-
-	pathToVerify, err := proc.ExeWithContext(ctx)
-	if err != nil {
-		return fmt.Errorf("getting executable for browser process: %w", err)
 	}
 
 	// Run Get-AuthenticodeSignature to confirm the codesigning is valid,
@@ -49,10 +43,10 @@ func validateBrowser(ctx context.Context, proc *process.Process, browserProcessN
 	if err != nil {
 		return fmt.Errorf("creating powershell Get-AuthenticodeSignature cmd: %w", err)
 	}
-	authenticodeCmd.Env = append(os.Environ(), authenticodePathEnvVar+"="+pathToVerify)
+	authenticodeCmd.Env = append(os.Environ(), authenticodePathEnvVar+"="+browserPath)
 	authenticodeOutput, err := authenticodeCmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("running powershell Get-AuthenticodeSignature against %s: output: `%s`: %w", pathToVerify, string(authenticodeOutput), err)
+		return fmt.Errorf("running powershell Get-AuthenticodeSignature against %s: output: `%s`: %w", browserPath, string(authenticodeOutput), err)
 	}
 	gotSubject := string(authenticodeOutput)
 	if !strings.Contains(gotSubject, fmt.Sprintf("O=%s", publisher)) {

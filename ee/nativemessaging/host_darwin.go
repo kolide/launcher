@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/kolide/launcher/v2/ee/allowedcmd"
-	"github.com/shirou/gopsutil/v4/process"
 )
 
 // allowlistedBrowsers maps allowlisted browsers to their expected team identifiers.
@@ -23,31 +22,26 @@ var allowlistedBrowsers = map[string]string{
 	`Google Chrome Canary`: "EQHXZ8M8AV",
 }
 
-// validateBrowser confirms that the calling process is a known browser on our allowlist
+// validateBrowser confirms that the given path is a known browser on our allowlist
 // that has a valid code signature belonging to a known team identifier.
-func validateBrowser(ctx context.Context, proc *process.Process, browserProcessName string) error {
-	// The calling process must be in our allowlist
+func validateBrowser(ctx context.Context, browserPath string, browserProcessName string) error {
+	// The path must be in our allowlist
 	teamIdentifier, found := allowlistedBrowsers[browserProcessName]
 	if !found {
 		return fmt.Errorf("name %s for browser process not in allowlisted browser names", browserProcessName)
-	}
-
-	pathToVerify, err := proc.ExeWithContext(ctx)
-	if err != nil {
-		return fmt.Errorf("getting executable for browser process: %w", err)
 	}
 
 	// Build our identity assertion:
 	// 1. "anchor apple generic" guarantees the signing chain roots are in Apple's CA
 	// 2. "certificate leaf[subject.OU] = <teamIdentifier>" guarantees the team ID matches what we expect
 	identityAssertion := fmt.Sprintf(`anchor apple generic and certificate leaf[subject.OU] = "%s"`, teamIdentifier)
-	verifyCmd, err := allowedcmd.Codesign.Cmd(ctx, "--verify", "--deep", "--verbose", "-R", "="+identityAssertion, pathToVerify)
+	verifyCmd, err := allowedcmd.Codesign.Cmd(ctx, "--verify", "--deep", "--verbose", "-R", "="+identityAssertion, browserPath)
 	if err != nil {
 		return fmt.Errorf("creating codesign --verify cmd: %w", err)
 	}
 	verifyOutput, err := verifyCmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("running codesign --verify against %s: output: `%s`: %w", pathToVerify, string(verifyOutput), err)
+		return fmt.Errorf("running codesign --verify against %s: output: `%s`: %w", browserPath, string(verifyOutput), err)
 	}
 
 	return nil

@@ -199,9 +199,13 @@ func validateNativeMessagingRequest(ctx context.Context) (string, error) {
 	if err != nil {
 		return potentialExtension, fmt.Errorf("getting browser process create time for request from %s: %w", potentialExtension, err)
 	}
+	browserPath, err := browserProcess.ExeWithContext(ctx)
+	if err != nil {
+		return potentialExtension, fmt.Errorf("getting executable for browser process: %w", err)
+	}
 
 	// Perform per-OS validation
-	if err := validateBrowser(ctx, browserProcess, browserProcessName); err != nil {
+	if err := validateBrowser(ctx, browserPath, browserProcessName); err != nil {
 		return potentialExtension, fmt.Errorf("validating browser process %s: %w", browserProcessName, err)
 	}
 
