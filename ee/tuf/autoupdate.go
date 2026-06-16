@@ -28,6 +28,7 @@ import (
 	"github.com/kolide/launcher/v2/ee/agent/flags/keys"
 	"github.com/kolide/launcher/v2/ee/agent/types"
 	"github.com/kolide/launcher/v2/ee/observability"
+	kolideatomic "github.com/kolide/launcher/v2/pkg/atomic"
 	"github.com/kolide/launcher/v2/pkg/osquery/runsimple"
 	client "github.com/theupdateframework/go-tuf/client"
 	filejsonstore "github.com/theupdateframework/go-tuf/client/filejsonstore"
@@ -103,6 +104,7 @@ type TufAutoupdater struct {
 	pinnedVersionGetters map[autoupdatableBinary]func() string // maps the binaries to the knapsack function to retrieve updated pinned versions
 	initialDelayStart    time.Time                             // when the autoupdater was created
 	initialDelayEnd      atomic.Value                          // stores time.Time for thread-safe access
+	initialDelayTimer    *time.Timer                           // fires when the initial delay ends so deferred restarts can run
 	updateLock           *sync.Mutex
 	checkTicker          *time.Ticker
 	interrupt            chan struct{}
@@ -112,6 +114,10 @@ type TufAutoupdater struct {
 	restartFuncs         map[autoupdatableBinary]func(context.Context) error
 	calculatedSplayDelay *atomic.Int64          // the randomly selected delay within the download splay window
 	osqueryHistory       types.OsqueryHistorian // used to determine the version of the currently-running osquery process
+	// Restarts are gated by the initial delay: during the delay we still check for and download
+	// updates, but defer the restart until the delay ends, recording the pending restart here.
+	pendingRestartLauncherVersion *kolideatomic.String // launcher version awaiting restart (empty if none)
+	pendingRestartOsquerydVersion *kolideatomic.String // osqueryd version awaiting restart (empty if none)
 }
 
 type TufAutoupdaterOption func(*TufAutoupdater)
@@ -153,11 +159,13 @@ func NewTufAutoupdater(ctx context.Context, k types.Knapsack, metadataHttpClient
 			binaryLauncher: func() string { return k.PinnedLauncherVersion() },
 			binaryOsqueryd: func() string { return k.PinnedOsquerydVersion() },
 		},
-		updateLock:           &sync.Mutex{},
-		osqueryTimeout:       30 * time.Second,
-		slogger:              k.Slogger().With("component", "tuf_autoupdater"),
-		restartFuncs:         make(map[autoupdatableBinary]func(context.Context) error),
-		calculatedSplayDelay: &atomic.Int64{},
+		updateLock:                    &sync.Mutex{},
+		osqueryTimeout:                30 * time.Second,
+		slogger:                       k.Slogger().With("component", "tuf_autoupdater"),
+		restartFuncs:                  make(map[autoupdatableBinary]func(context.Context) error),
+		calculatedSplayDelay:          &atomic.Int64{},
+		pendingRestartLauncherVersion: kolideatomic.NewString(""),
+		pendingRestartOsquerydVersion: kolideatomic.NewString(""),
 	}
 
 	// Set initial delay end time atomically (calculated from start time)
@@ -242,33 +250,6 @@ func DefaultLibraryDirectory(rootDirectory string) string {
 // has been published; less frequently, it removes old/outdated TUF errors from the bucket
 // we store them in.
 func (ta *TufAutoupdater) Execute() (err error) {
-	// Delay startup, if initial delay is set. We use a ticker-based approach
-	// so that we can respect changes to ta.initialDelayEnd from FlagsChanged.
-	initialDelayTicker := time.NewTicker(100 * time.Millisecond)
-	defer initialDelayTicker.Stop()
-
-	for time.Now().Before(ta.initialDelayEnd.Load().(time.Time)) {
-		select {
-		case <-ta.interrupt:
-			ta.slogger.Log(context.TODO(), slog.LevelDebug,
-				"received external interrupt during initial delay, stopping",
-			)
-			return nil
-		case signalRestartErr := <-ta.signalRestart:
-			ta.slogger.Log(context.TODO(), slog.LevelDebug,
-				"received interrupt to restart launcher after update during initial delay, stopping",
-			)
-			return signalRestartErr
-		case <-initialDelayTicker.C:
-			// Check if we've passed the initial delay period in the next loop iteration
-			continue
-		}
-	}
-
-	ta.slogger.Log(context.TODO(), slog.LevelInfo,
-		"exiting initial delay",
-	)
-
 	// For now, tidy the library on startup. In the future, we will tidy the library
 	// earlier, after version selection.
 	ta.tidyLibrary()
@@ -276,12 +257,18 @@ func (ta *TufAutoupdater) Execute() (err error) {
 	ta.checkTicker = time.NewTicker(ta.knapsack.AutoupdateInterval())
 	defer ta.checkTicker.Stop()
 
+	// We begin checking for and downloading updates immediately, but we defer any restart
+	// until the initial delay has elapsed. This timer fires when the initial delay ends so
+	// that we can perform any restart that was deferred during the delay.
+	ta.initialDelayTimer = time.NewTimer(time.Until(ta.initialDelayEnd.Load().(time.Time)))
+	defer ta.initialDelayTimer.Stop()
+
 	for {
 		ta.slogger.Log(context.TODO(), slog.LevelInfo,
 			"checking for updates",
 		)
 		// always allow our AutoupdateDownloadSplay delay during routine checks for autoupdates
-		if err := ta.checkForUpdate(context.TODO(), binaries, true); err != nil {
+		if err := ta.checkForUpdate(context.TODO(), binaries, true, false); err != nil {
 			observability.AutoupdateFailureCounter.Add(context.TODO(), 1)
 			ta.slogger.Log(context.TODO(), slog.LevelError,
 				"error checking for update",
@@ -304,10 +291,60 @@ func (ta *TufAutoupdater) Execute() (err error) {
 				"received interrupt to restart launcher after update, stopping",
 			)
 			return signalRestartErr
+		case <-ta.initialDelayTimer.C:
+			ta.slogger.Log(context.TODO(), slog.LevelInfo,
+				"exiting initial delay",
+			)
+
+			// The initial delay has ended -- perform any restart that was deferred during the delay.
+			if signalRestartErr := ta.restartIfPending(context.TODO()); signalRestartErr != nil {
+				ta.slogger.Log(context.TODO(), slog.LevelDebug,
+					"restarting launcher after deferred update at end of initial delay",
+				)
+				return signalRestartErr
+			}
+			continue
 		case <-ta.checkTicker.C:
 			continue
 		}
 	}
+}
+
+// restartIfPending performs any restart that was deferred during the initial delay. If a launcher
+// restart is pending, it returns a LauncherReloadNeeded error so that Execute exits and the newly
+// downloaded launcher is loaded. Otherwise, if an osqueryd restart is
+// pending, it invokes the osqueryd restart function.
+func (ta *TufAutoupdater) restartIfPending(ctx context.Context) error {
+	if pendingVersion := ta.pendingRestartLauncherVersion.Load(); pendingVersion != "" {
+		ta.pendingRestartLauncherVersion.Store("")
+		ta.slogger.Log(ctx, slog.LevelInfo,
+			"performing deferred launcher restart after initial delay",
+			"new_binary_version", pendingVersion,
+		)
+		return NewLauncherReloadNeededErr(pendingVersion)
+	}
+
+	if pendingVersion := ta.pendingRestartOsquerydVersion.Load(); pendingVersion != "" {
+		restart, ok := ta.restartFuncs[binaryOsqueryd]
+		if !ok {
+			return nil
+		}
+
+		ta.pendingRestartOsquerydVersion.Store("")
+
+		ta.slogger.Log(ctx, slog.LevelInfo,
+			"performing deferred osqueryd restart after initial delay",
+			"new_binary_version", pendingVersion,
+		)
+		if err := restart(ctx); err != nil {
+			ta.slogger.Log(ctx, slog.LevelWarn,
+				"failed to restart osqueryd after deferred update at end of initial delay",
+				"err", err,
+			)
+		}
+	}
+
+	return nil
 }
 
 func (ta *TufAutoupdater) Interrupt(_ error) {
@@ -342,7 +379,7 @@ func (ta *TufAutoupdater) Do(data io.Reader) error {
 			"initial_delay_end", initialDelayEnd.UTC().Format(time.RFC3339),
 		)
 		// We don't return an error because there's no need for the actionqueue to retry this request --
-		// we're going to perform an autoupdate check as soon as we exit the delay anyway.
+		// we're going to perform an autoupdate check on the next interval anyway.
 		return nil
 	}
 
@@ -371,7 +408,7 @@ func (ta *TufAutoupdater) Do(data io.Reader) error {
 	)
 
 	// do not allow AutoupdateDownloadSplay delay during autoupdate now requests
-	if err := ta.checkForUpdate(ctx, binariesToUpdate, false); err != nil {
+	if err := ta.checkForUpdate(ctx, binariesToUpdate, false, updateRequest.BypassInitialDelay); err != nil {
 		observability.AutoupdateFailureCounter.Add(ctx, 1)
 		ta.slogger.Log(ctx, slog.LevelError,
 			"error checking for update per control server request",
@@ -411,6 +448,10 @@ func (ta *TufAutoupdater) FlagsChanged(ctx context.Context, flagKeys ...keys.Fla
 			// Calculate the new delay end time from the original start time
 			newDelayEnd := ta.initialDelayStart.Add(newDelay)
 			ta.initialDelayEnd.Store(newDelayEnd)
+			// Keep the timer that triggers deferred restarts in sync with the new delay end.
+			if ta.initialDelayTimer != nil {
+				ta.initialDelayTimer.Reset(time.Until(newDelayEnd))
+			}
 			ta.slogger.Log(ctx, slog.LevelInfo,
 				"autoupdate initial delay changed while in delay period",
 				"old_delay_end", currentDelayEnd,
@@ -480,7 +521,7 @@ func (ta *TufAutoupdater) FlagsChanged(ctx context.Context, flagKeys ...keys.Fla
 
 	// At least one binary requires a recheck or the interval changed -- perform that now
 	// do not allow AutoupdateDownloadSplay delay when responding to flag changes
-	if err := ta.checkForUpdate(ctx, binariesToCheckForUpdate, false); err != nil {
+	if err := ta.checkForUpdate(ctx, binariesToCheckForUpdate, false, false); err != nil {
 		observability.AutoupdateFailureCounter.Add(ctx, 1)
 		ta.slogger.Log(ctx, slog.LevelError,
 			"error checking for update after autoupdate setting changed",
@@ -580,7 +621,9 @@ func (ta *TufAutoupdater) currentRunningVersion(binary autoupdatableBinary) (str
 // a new release that we should download. If so, it will add the release to our updates library.
 // If allowDelay is set to false, our knapsack.AutoupdateDownloadSplay will be ignored and the update
 // will be downloaded immediately, regardless of promotion time.
-func (ta *TufAutoupdater) checkForUpdate(ctx context.Context, binariesToCheck []autoupdatableBinary, allowDelay bool) error {
+// If bypassInitialDelay is false and we are still within the initial delay, any required restart is
+// deferred (recorded as pending) rather than performed immediately.
+func (ta *TufAutoupdater) checkForUpdate(ctx context.Context, binariesToCheck []autoupdatableBinary, allowSplayDelay bool, bypassInitialDelay bool) error {
 	ctx, span := observability.StartSpan(ctx, "binaries", fmt.Sprintf("%+v", binariesToCheck))
 	defer span.End()
 
@@ -624,7 +667,7 @@ func (ta *TufAutoupdater) checkForUpdate(ctx context.Context, binariesToCheck []
 	updatesDownloaded := make(map[autoupdatableBinary]string)
 	updateErrors := make([]error, 0)
 	for _, binary := range binariesToCheck {
-		downloadedUpdateVersion, err := ta.downloadUpdate(binary, targets, allowDelay)
+		downloadedUpdateVersion, err := ta.downloadUpdate(binary, targets, allowSplayDelay)
 		if err != nil {
 			updateErrors = append(updateErrors, fmt.Errorf("could not download update for %s: %w", binary, err))
 		}
@@ -645,10 +688,28 @@ func (ta *TufAutoupdater) checkForUpdate(ctx context.Context, binariesToCheck []
 		return fmt.Errorf("could not download updates: %+v", updateErrors)
 	}
 
+	// Determine whether we should defer any restart because we're still within the initial delay.
+	// During the initial delay we still download updates, but we hold off on restarting so that we
+	// don't restart immediately after installation. The deferred restart is performed once the delay ends.
+	inInitialDelay := !bypassInitialDelay && time.Now().Before(ta.initialDelayEnd.Load().(time.Time))
+
 	// If launcher was updated, we want to exit and reload
 	if updatedVersion, ok := updatesDownloaded[binaryLauncher]; ok {
 		// Only reload if we're not using a localdev path
 		if ta.knapsack.LocalDevelopmentPath() == "" {
+			if inInitialDelay {
+				ta.pendingRestartLauncherVersion.Store(updatedVersion)
+				ta.slogger.Log(ctx, slog.LevelInfo,
+					"launcher updated during initial delay -- deferring restart until delay ends",
+					"new_binary_version", updatedVersion,
+				)
+
+				// it is okay to return early here- even if there was also an osquery update at the exact same time
+				// we would pick it up when we leave the initial delay and restart launcher, it is cleaner to
+				// get the latest versions of both binaries that way anyway
+				return nil
+			}
+
 			ta.slogger.Log(ctx, slog.LevelInfo,
 				"launcher updated -- exiting to load new version",
 				"new_binary_version", updatedVersion,
@@ -661,6 +722,16 @@ func (ta *TufAutoupdater) checkForUpdate(ctx context.Context, binariesToCheck []
 	// For non-launcher binaries (i.e. osqueryd), call any reload functions we have saved
 	for binary, newBinaryVersion := range updatesDownloaded {
 		if binary == binaryLauncher {
+			continue
+		}
+
+		if inInitialDelay {
+			ta.pendingRestartOsquerydVersion.Store(newBinaryVersion)
+			ta.slogger.Log(ctx, slog.LevelInfo,
+				"binary updated during initial delay -- deferring restart until delay ends",
+				"binary", binary,
+				"new_binary_version", newBinaryVersion,
+			)
 			continue
 		}
 
