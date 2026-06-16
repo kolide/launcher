@@ -24,7 +24,7 @@ var allowlistedBrowsers = map[string]struct{}{
 
 // validateBrowser checks that the process is a known browser where the executable
 // is owned by root with appropriate permissions.
-func validateBrowser(ctx context.Context, proc *process.Process) error {
+func validateBrowser(ctx context.Context, proc *process.Process, _ string) error {
 	pathToVerify, err := proc.ExeWithContext(ctx)
 	if err != nil {
 		return fmt.Errorf("getting executable for browser process: %w", err)

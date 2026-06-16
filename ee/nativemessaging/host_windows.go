@@ -31,29 +31,7 @@ var allowlistedBrowsers = map[string]string{
 
 // validateBrowser confirms that the calling process is a known browser
 // signed by a publisher in our allowlist.
-func validateBrowser(ctx context.Context, proc *process.Process) error {
-	browserProcessName, err := proc.NameWithContext(ctx)
-	if err != nil {
-		return fmt.Errorf("getting name for browser process: %w", err)
-	}
-	// Some older versions of Chrome launch via cmd.exe, so we have to go up
-	// one more level.
-	if browserProcessName == "cmd.exe" {
-		ppid, err := proc.PpidWithContext(ctx)
-		if err != nil {
-			return fmt.Errorf("getting cmd.exe parent process: %w", err)
-		}
-		proc, err = process.NewProcessWithContext(ctx, ppid)
-		if err != nil {
-			return fmt.Errorf("getting cmd.exe parent process (%d): %w", ppid, err)
-		}
-
-		browserProcessName, err = proc.NameWithContext(ctx)
-		if err != nil {
-			return fmt.Errorf("getting name for browser process: %w", err)
-		}
-	}
-
+func validateBrowser(ctx context.Context, proc *process.Process, browserProcessName string) error {
 	publisher, found := allowlistedBrowsers[browserProcessName]
 	if !found {
 		return fmt.Errorf("name %s for browser process not in allowlisted browser names", browserProcessName)

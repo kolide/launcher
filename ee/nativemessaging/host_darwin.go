@@ -25,12 +25,8 @@ var allowlistedBrowsers = map[string]string{
 
 // validateBrowser confirms that the calling process is a known browser on our allowlist
 // that has a valid code signature belonging to a known team identifier.
-func validateBrowser(ctx context.Context, proc *process.Process) error {
+func validateBrowser(ctx context.Context, proc *process.Process, browserProcessName string) error {
 	// The calling process must be in our allowlist
-	browserProcessName, err := proc.NameWithContext(ctx)
-	if err != nil {
-		return fmt.Errorf("getting name for browser process: %w", err)
-	}
 	teamIdentifier, found := allowlistedBrowsers[browserProcessName]
 	if !found {
 		return fmt.Errorf("name %s for browser process not in allowlisted browser names", browserProcessName)

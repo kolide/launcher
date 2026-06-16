@@ -232,36 +232,69 @@ func validateNativeMessagingRequest(ctx context.Context) (string, error) {
 	}
 
 	// Get the calling process so we can validate it
-	ppid := os.Getppid()
-	parentProcess, err := process.NewProcessWithContext(ctx, int32(ppid))
+	browserProcess, browserPid, browserProcessName, err := getBrowserProcess(ctx)
 	if err != nil {
-		return potentialExtension, fmt.Errorf("getting parent process (%d) for request from %s: %w", ppid, potentialExtension, err)
+		return potentialExtension, fmt.Errorf("getting browser process: %w", err)
 	}
-	parentProcessCreateTime, err := parentProcess.CreateTimeWithContext(ctx)
+	browserProcessCreateTime, err := browserProcess.CreateTimeWithContext(ctx)
 	if err != nil {
-		return potentialExtension, fmt.Errorf("getting parent process create time for request from %s: %w", potentialExtension, err)
+		return potentialExtension, fmt.Errorf("getting browser process create time for request from %s: %w", potentialExtension, err)
 	}
 
 	// Perform per-OS validation
-	if err := validateBrowser(ctx, parentProcess); err != nil {
-		return potentialExtension, fmt.Errorf("validating browser process with ppid %d: %w", ppid, err)
+	if err := validateBrowser(ctx, browserProcess, browserProcessName); err != nil {
+		return potentialExtension, fmt.Errorf("validating browser process %s: %w", browserProcessName, err)
 	}
 
 	// Check that the create time is still the same, so that we know the process hasn't died
 	// and had its PID reused by some other process.
-	parentProcessAfterValidation, err := process.NewProcessWithContext(ctx, int32(ppid))
+	browserProcessAfterValidation, err := process.NewProcessWithContext(ctx, browserPid)
 	if err != nil {
-		return potentialExtension, fmt.Errorf("getting parent process after performing validation: %w", err)
+		return potentialExtension, fmt.Errorf("getting browser process after performing validation: %w", err)
 	}
-	parentProcessCreateTimeAfterValidation, err := parentProcessAfterValidation.CreateTimeWithContext(ctx)
+	browserProcessCreateTimeAfterValidation, err := browserProcessAfterValidation.CreateTimeWithContext(ctx)
 	if err != nil {
-		return potentialExtension, fmt.Errorf("getting parent process create time after performing validation: %w", err)
+		return potentialExtension, fmt.Errorf("getting browser process create time after performing validation: %w", err)
 	}
-	if parentProcessCreateTime != parentProcessCreateTimeAfterValidation {
-		return potentialExtension, fmt.Errorf("PID reuse: parent process originally created at %d, now %d has create time at %d", parentProcessCreateTime, ppid, parentProcessCreateTimeAfterValidation)
+	if browserProcessCreateTime != browserProcessCreateTimeAfterValidation {
+		return potentialExtension, fmt.Errorf("PID reuse: browser process originally created at %d, now %d has create time at %d", browserProcessCreateTime, browserPid, browserProcessCreateTimeAfterValidation)
 	}
 
 	return potentialExtension, nil
+}
+
+// getBrowserProcess returns the process that ultimately created this process. Usually
+// this is the parent process, but on Windows it can be one level above the parent.
+func getBrowserProcess(ctx context.Context) (*process.Process, int32, string, error) {
+	ppid := int32(os.Getppid())
+	parentProcess, err := process.NewProcessWithContext(ctx, ppid)
+	if err != nil {
+		return nil, ppid, "", fmt.Errorf("getting parent process (%d): %w", ppid, err)
+	}
+	processName, err := parentProcess.NameWithContext(ctx)
+	if err != nil {
+		return nil, ppid, "", fmt.Errorf("getting name for parent process: %w", err)
+	}
+
+	// Some older versions of Chrome on Windows launch via cmd.exe, so we have to go up
+	// one more level.
+	if processName == "cmd.exe" {
+		ppid, err = parentProcess.PpidWithContext(ctx)
+		if err != nil {
+			return nil, ppid, "", fmt.Errorf("getting cmd.exe parent process: %w", err)
+		}
+		parentProcess, err = process.NewProcessWithContext(ctx, ppid)
+		if err != nil {
+			return nil, ppid, "", fmt.Errorf("getting cmd.exe parent process (%d): %w", ppid, err)
+		}
+
+		processName, err = parentProcess.NameWithContext(ctx)
+		if err != nil {
+			return nil, ppid, "", fmt.Errorf("getting name for browser process: %w", err)
+		}
+	}
+
+	return parentProcess, ppid, processName, nil
 }
 
 // sendMessage formats the given body by marshalling it to JSON,
