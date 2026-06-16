@@ -298,7 +298,7 @@ func (ta *TufAutoupdater) Execute() (err error) {
 
 			// The initial delay has ended -- perform any restart that was deferred during the delay.
 			if signalRestartErr := ta.restartIfPending(context.TODO()); signalRestartErr != nil {
-				ta.slogger.Log(context.TODO(), slog.LevelDebug,
+				ta.slogger.Log(context.TODO(), slog.LevelInfo,
 					"restarting launcher after deferred update at end of initial delay",
 				)
 				return signalRestartErr
