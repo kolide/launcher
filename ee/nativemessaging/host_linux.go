@@ -19,7 +19,7 @@ var allowlistedBrowsers = map[string]struct{}{
 	"chrome":                   {},
 	"chromium":                 {},
 	"chromium-browser":         {},
-	"chromium-browser-privacy": {},
+	"chromium-browser-privacy": {}, // RPM
 }
 
 // validateBrowser checks that the process is a known browser where the executable

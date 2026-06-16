@@ -40,7 +40,8 @@ func ReadNativeMessages(ctx context.Context) {
 	// We can't write to kv.sqlite (as the watchdog does) because this process
 	// won't have sufficient permissions. For now, we write to a file in the desktop
 	// directory. If that's not possible (i.e. on Windows there is no desktop directory),
-	// we write logs to io.Discard instead.
+	// we write logs to io.Discard instead. In the future, root launcher will create
+	// an appropriate directory for logs when it calls WriteNativeMessagingManifest.
 	var logWriter io.WriteCloser
 	var err error
 	logFile := filepath.Join(determineRootDirectory(), fmt.Sprintf("desktop_%d", os.Getuid()), "nativemessaging.log")
