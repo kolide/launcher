@@ -85,6 +85,27 @@ jobs:
         run: make github-launcherapp
         if: ${{ contains(matrix.os, 'macos') }}
 
+      # Generate this platform's table schema from the freshly-built binary.
+      # Tables are selected at compile time per GOOS, so each runner emits only
+      # its own platform's tables; they're combined in the combine_schema job.
+      # Guarded to the main build so the reproducible twin doesn't collide on
+      # the artifact name.
+      - name: Generate table schema
+        if: env.CACHE_KEY_PREFIX == ''
+        shell: bash
+        run: |
+          launcher_bin=build/launcher
+          if [ "$RUNNER_OS" = "Windows" ]; then launcher_bin=build/launcher.exe; fi
+          "$launcher_bin" specs --output "launcher-specs-${RUNNER_OS}.json"
+
+      - name: Upload table schema
+        if: env.CACHE_KEY_PREFIX == ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: schema-${{ runner.os }}
+          path: launcher-specs-${{ runner.os }}.json
+          if-no-files-found: error
+
       - name: Cache build output
         uses: actions/cache@v5
         with:
@@ -173,6 +194,20 @@ jobs:
       - name: Build
         if: github.ref_type == 'tag'
         run: make -j2 github-build
+
+      # See the note in the non-container build: emit this platform's schema
+      # for the combine_schema job, guarded to the main (non-reproducible) build.
+      - name: Generate table schema
+        if: env.CACHE_KEY_PREFIX == ''
+        run: ./build/launcher specs --output "launcher-specs-${RUNNER_OS}.json"
+
+      - name: Upload table schema
+        if: env.CACHE_KEY_PREFIX == ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: schema-${{ runner.os }}
+          path: launcher-specs-${{ runner.os }}.json
+          if-no-files-found: error
 
       - name: Cache build output
         uses: actions/cache@v5
@@ -651,6 +686,76 @@ jobs:
           path: build/
           if-no-files-found: error
 
+  # Fan-in: combine the per-platform schemas emitted by the build jobs into a
+  # single cross-platform launcher-schema.json (JSON array, platforms unioned).
+  # Gated on store_artifacts so we only publish a schema for a fully-passing
+  # build. The combined artifact is what endpoint-releaser / the release-attach
+  # workflow uploads to the GitHub release for k2 to ingest.
+  combine_schema:
+    permissions:
+      contents: read
+    name: Combine table schema
+    runs-on: ubuntu-22.04
+    needs:
+      - store_artifacts
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # need a full checkout for `git describe`
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: "./go.mod"
+          check-latest: true
+          cache: false
+
+      - id: go-cache-paths
+        shell: bash
+        run: |
+          echo "go-build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+          echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+
+      - name: cache restore - GOCACHE
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ steps.go-cache-paths.outputs.go-build }}
+          key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
+          enableCrossOsArchive: true
+
+      - name: cache restore - GOMODCACHE
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ steps.go-cache-paths.outputs.go-mod }}
+          key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
+          enableCrossOsArchive: true
+
+      - name: Get dependencies
+        run: make deps
+
+      - name: Download platform schemas
+        uses: actions/download-artifact@v4
+        with:
+          pattern: schema-*
+          path: schemas
+          merge-multiple: true
+
+      - name: Combine schemas
+        run: |
+          go run ./cmd/launcher specs --merge \
+            --output launcher-schema.json \
+            schemas/launcher-specs-macOS.json \
+            schemas/launcher-specs-Linux.json \
+            schemas/launcher-specs-Windows.json
+
+      - name: Upload combined schema
+        uses: actions/upload-artifact@v4
+        with:
+          name: launcher-schema
+          path: launcher-schema.json
+          if-no-files-found: error
+
   package_builder_test:
     permissions:
       contents: read
@@ -732,3 +837,4 @@ jobs:
       - package_builder_test
       - exec_testing
       - container_exec_testing
+      - combine_schema

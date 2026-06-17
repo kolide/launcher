@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -12,6 +13,7 @@ import (
 	"os"
 	"runtime"
 	"slices"
+	"strings"
 
 	"github.com/kolide/launcher/v2/ee/agent/flags"
 	"github.com/kolide/launcher/v2/ee/agent/knapsack"
@@ -53,11 +55,21 @@ func runSpecs(systemMultiSlogger *multislogger.MultiSlogger, args []string) erro
 	flQuiet := flagset.Bool("quiet", false, "don't print specs. Used in testing")
 	flOutput := flagset.String("output", "", "write specs to file (default: stdout)")
 	flMissingOk := flagset.Bool("missing-ok", false, "do not exit with error when required fields are missing or blank")
+	flMerge := flagset.Bool("merge", false, "merge mode: combine the NDJSON spec files given as arguments into a single, platform-unioned JSON array")
 	var flRequired requiredFields
 	flagset.Var(&flRequired, "required", "field name that must be present in the spec (repeatable); warns if missing")
 
 	if err := ff.Parse(flagset, args, ff.WithEnvVarNoPrefix()); err != nil {
 		return fmt.Errorf("parsing flags: %w", err)
+	}
+
+	// In merge mode we don't generate specs from the running binary; instead we
+	// combine the per-platform NDJSON spec files produced by each platform's
+	// `launcher specs` run into a single JSON array, unioning the platforms for
+	// any table that appears in more than one file. This is how CI combines the
+	// platform-specific schemas into one cross-platform launcher-schema.json.
+	if *flMerge {
+		return runMergeSpecs(flagset.Args(), *flOutput)
 	}
 
 	// Reject unknown -required field names so the user gets a clear error.
@@ -154,4 +166,111 @@ func runSpecs(systemMultiSlogger *multislogger.MultiSlogger, args []string) erro
 		return errors.New("one or more required fields were missing or blank")
 	}
 	return nil
+}
+
+// runMergeSpecs combines the per-platform NDJSON spec files in inputPaths into a
+// single JSON array, deduplicating tables by name and unioning their platforms.
+// Each input is expected to be the NDJSON output of `launcher specs` from one
+// platform (one OsqueryTableSpec per line). The combined output is sorted by
+// table name and written to outputPath (or stdout when empty) as a JSON array,
+// which is the shape k2 ingests for its table docs.
+func runMergeSpecs(inputPaths []string, outputPath string) error {
+	if len(inputPaths) == 0 {
+		return errors.New("merge mode requires one or more spec files as arguments")
+	}
+
+	merged := make(map[string]osquerytable.OsqueryTableSpec)
+	for _, inputPath := range inputPaths {
+		if err := mergeSpecFile(inputPath, merged); err != nil {
+			return fmt.Errorf("merging %s: %w", inputPath, err)
+		}
+	}
+
+	combined := slices.Collect(maps.Values(merged))
+	slices.SortFunc(combined, func(a, b osquerytable.OsqueryTableSpec) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+
+	combinedBytes, err := json.MarshalIndent(combined, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshalling combined specs: %w", err)
+	}
+
+	out := io.Writer(os.Stdout)
+	if outputPath != "" {
+		f, err := os.Create(outputPath)
+		if err != nil {
+			return fmt.Errorf("creating output file: %w", err)
+		}
+		defer f.Close()
+		out = f
+	}
+
+	if _, err := fmt.Fprintln(out, string(combinedBytes)); err != nil {
+		return fmt.Errorf("writing combined specs: %w", err)
+	}
+
+	return nil
+}
+
+// mergeSpecFile reads a single NDJSON spec file and folds its tables into merged,
+// unioning the platforms of any table already present from another file.
+func mergeSpecFile(inputPath string, merged map[string]osquerytable.OsqueryTableSpec) error {
+	f, err := os.Open(inputPath)
+	if err != nil {
+		return fmt.Errorf("opening file: %w", err)
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	// Specs can include lengthy descriptions/examples, so allow large lines.
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+
+		var spec osquerytable.OsqueryTableSpec
+		if err := json.Unmarshal([]byte(line), &spec); err != nil {
+			return fmt.Errorf("unmarshalling spec line %q: %w", line, err)
+		}
+
+		existing, ok := merged[spec.Name]
+		if !ok {
+			merged[spec.Name] = spec
+			continue
+		}
+
+		// Same table from another platform: union the platforms onto the
+		// already-seen spec so the combined entry lists every platform it
+		// is available on.
+		existing.Platforms = unionPlatforms(existing.Platforms, spec.Platforms)
+		merged[spec.Name] = existing
+	}
+
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("reading file: %w", err)
+	}
+
+	return nil
+}
+
+// unionPlatforms returns the de-duplicated union of two platform slices,
+// preserving the order in which platforms are first seen (existing platforms
+// first, then any new ones). It is generic over the unexported platformName
+// type used by OsqueryTableSpec.Platforms.
+func unionPlatforms[T ~string](existing, additional []T) []T {
+	seen := make(map[T]struct{}, len(existing)+len(additional))
+	union := make([]T, 0, len(existing)+len(additional))
+	for _, platforms := range [][]T{existing, additional} {
+		for _, platform := range platforms {
+			if _, ok := seen[platform]; ok {
+				continue
+			}
+			seen[platform] = struct{}{}
+			union = append(union, platform)
+		}
+	}
+	return union
 }

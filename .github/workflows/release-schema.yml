@@ -1,0 +1,80 @@
+name: Attach table schema to release
+
+# When a release is published, attach the combined launcher-schema.json (produced
+# by the `ci` workflow's combine_schema job for this tag) as a release asset. k2
+# ingests this asset from the GitHub "Latest" release to power Live Query table
+# docs, autocomplete, SQL validation, and NLQ query generation.
+#
+# Note on immutability: this uploads after publish, which works for mutable
+# releases. If/when releases are made immutable, this should move to attaching
+# the asset at release-creation time (e.g. `gh release create --draft ... && gh
+# release edit --draft=false`) or be folded into an atomic
+# tag -> build -> sign -> release step. The producing artifact (launcher-schema)
+# does not change -- only where it is attached.
+on:
+  release:
+    types: [published]
+  # Allow manual re-attach for a given tag if a release was created before this
+  # workflow existed, or if the asset needs to be regenerated.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to attach the schema to (e.g. 1.23.4)"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  attach_schema:
+    name: Attach schema
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write # required to upload the release asset
+    steps:
+      - name: Resolve tag
+        id: tag
+        env:
+          EVENT_TAG: ${{ github.event.release.tag_name }}
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+        run: |
+          tag="${EVENT_TAG:-$INPUT_TAG}"
+          if [ -z "$tag" ]; then
+            echo "could not determine release tag" >&2
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Find ci run for tag
+        id: cirun
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run_id=$(gh run list \
+            --repo "${{ github.repository }}" \
+            --workflow ci \
+            --branch "${{ steps.tag.outputs.tag }}" \
+            --json databaseId,status,conclusion \
+            --jq 'first(.[] | select(.conclusion == "success" and .status == "completed")) | .databaseId')
+          if [ -z "$run_id" ]; then
+            echo "no successful ci run found for tag ${{ steps.tag.outputs.tag }}" >&2
+            exit 1
+          fi
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+
+      - name: Download combined schema
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "${{ steps.cirun.outputs.run_id }}" \
+            --repo "${{ github.repository }}" \
+            --name launcher-schema \
+            --dir .
+
+      - name: Attach schema to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ steps.tag.outputs.tag }}" launcher-schema.json \
+            --repo "${{ github.repository }}" \
+            --clobber
