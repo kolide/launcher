@@ -125,6 +125,8 @@ func Test_extractIdentifierFromExecutable(t *testing.T) {
 func Test_validateBrowserPath(t *testing.T) {
 	t.Parallel()
 
+	isCi := os.Getenv("CI") == "true"
+
 	for _, tt := range []struct {
 		testCaseName string
 		platform     string
@@ -172,7 +174,7 @@ func Test_validateBrowserPath(t *testing.T) {
 			platform:     "windows",
 			browserPath:  `C:\Program Files\Google\Chrome\Application\chrome.exe`,
 			browserName:  "chrome.exe",
-			shouldPass:   true,
+			shouldPass:   !isCi, // This does exist on CI, but we can't run Get-AuthenticodeSignature there, so validation fails
 		},
 		{
 			testCaseName: "windows + chrome - Program Files (x86)",
@@ -256,7 +258,7 @@ func Test_validateBrowserPath(t *testing.T) {
 			platform:     "linux",
 			browserPath:  "/opt/google/chrome/chrome",
 			browserName:  "chrome",
-			shouldPass:   true,
+			shouldPass:   !isCi, // This does exist on CI machines, and has permissions `-rwxrwxrwx` there -- which should fail validation
 		},
 		{
 			testCaseName: "linux + chrome beta",
