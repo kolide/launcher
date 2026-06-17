@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"log/slog"
+	"net"
 
 	"github.com/kolide/launcher/v2/ee/agent/types"
 )
@@ -15,6 +16,14 @@ import (
 func makeTLSConfig(k types.Knapsack, rootPool *x509.CertPool) *tls.Config {
 
 	hostname := k.KolideServerURL()
+
+	// ServerName must be host-only: certificate SANs (DNS or IP) never encode a
+	// port, and Go matches ServerName against the SANs literally. SplitHostPort
+	// correctly handles bracketed IPv6 literals; it errors when no port is
+	// present, in which case we leave hostname untouched.
+	if host, _, err := net.SplitHostPort(hostname); err == nil {
+		hostname = host
+	}
 
 	conf := &tls.Config{
 		ServerName:         hostname,
