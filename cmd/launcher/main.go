@@ -39,7 +39,9 @@ func main() {
 // or running `runLauncher`. We wrap it so that all our deferred calls will execute before we call
 // `os.Exit` in `main()`.
 func runMain() int {
-	// Check to see if this is a native messaging host invocation. We have to check this first,
+	// Check to see if this is a native messaging host invocation, which looks like:
+	// `some-path-to/launcher chrome-extension://hjlinigoblmkhjejkmbegnoaljkphmgo/`
+	// We have to check and handle the native messaging host invocation case first,
 	// before even initializing logging, because we should not write logs to os.Stdout when following
 	// the native messaging protocol.
 	if len(os.Args) == 2 {
