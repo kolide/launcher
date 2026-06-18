@@ -27,13 +27,14 @@ plus `PlatformTables` (see `pkg/osquery/table/table.go`). It deliberately does
 ```mermaid
 flowchart TD
     subgraph ci [launcher CI - go.yml]
-        bd["build: macOS, Windows"] -->|"launcher specs --output"| sd["schema-* artifacts (one NDJSON file per platform)"]
-        bl["build_linux"] -->|"launcher specs --output"| sd
+        bd["build: macOS, Windows"] --> gs["generate_schema (matrix: runs cached binary per platform)"]
+        bl["build_linux"] --> gs
+        gs -->|"launcher specs --output"| sd["schema-* artifacts (one NDJSON file per platform)"]
         sd --> cj["combine_schema job"]
         cj -->|"launcher specs --merge"| lsj["launcher-schema artifact (single JSON array)"]
     end
-    lsj -->|"release published"| rw["release-schema.yml"]
-    rw -->|"gh release upload"| ghr["launcher-schema.json on the GitHub release"]
+    cj -->|"on tag: gh release upload"| ghr["launcher-schema.json on the GitHub release"]
+    rw["release-schema.yml (manual backfill)"] -.->|"gh release upload"| ghr
     ghr -->|"rails launcher_schemas:sync"| k2data["k2: lib/kolide/launcher/schemas/data/VERSION.json"]
     k2data --> merge["Kolide::Osquery::Schemas.load_schema merges launcher tables in"]
     merge --> docs["Live Query docs sidebar"]
@@ -104,32 +105,45 @@ Implementation: `runSpecs`, `runMergeSpecs`, `mergeSpecFile`, `readSpecs`,
 
 In `.github/workflows/go.yml`:
 
-1. **Generate (per platform).** The `build` (macOS, Windows) and `build_linux`
-   jobs run the freshly-built binary as `launcher specs --output
-   launcher-specs-<RUNNER_OS>.json` and upload it as a `schema-<os>` artifact.
-   These steps are gated on `env.CACHE_KEY_PREFIX == ''` so the reproducible
-   build twin does not race the main build on the artifact name.
-2. **Combine (fan-in).** The `combine_schema` job (`needs: store_artifacts`)
+1. **Generate (per platform).** The `generate_schema` job runs on a matrix of
+   `[ubuntu-24.04, macos-26, windows-2025]` and `needs: [build, build_linux]`.
+   It restores the cached `build/` output (it runs the already-built binary, so
+   it needs no checkout or Go toolchain) and runs `launcher specs --output
+   launcher-specs-<RUNNER_OS>.json`, uploading each as a `schema-<os>` artifact.
+   Running each platform's binary on its own runner is required because the
+   schema is platform-specific. Keeping this in its own job (rather than as steps
+   inside `build`/`build_linux`) avoids duplicating the step across two jobs and
+   avoids the reproducible build twins racing on the artifact name — they don't
+   feed `generate_schema`, so they produce no schema artifact at all.
+2. **Combine (fan-in).** The `combine_schema` job (`needs: generate_schema`)
    downloads all `schema-*` artifacts and runs
    `go run ./cmd/launcher specs --merge --output launcher-schema.json ...`,
    then uploads the result as the `launcher-schema` artifact. It is part of the
    `ci_mergeable` gate.
-
-Then in `.github/workflows/release-schema.yml`:
-
-3. **Attach to the release.** On `release: published` (or via `workflow_dispatch`
-   with a `tag` input), the workflow finds the successful `ci` run for the tag,
-   downloads the `launcher-schema` artifact, and runs
+3. **Attach to the release (tag builds).** On a tag build
+   (`if: github.ref_type == 'tag'`), `combine_schema` has a final step that runs
    `gh release upload <tag> launcher-schema.json --clobber` (the job has
-   `contents: write`). The asset name is always `launcher-schema.json`; the
+   `contents: write`). Doing this inside the tag's own `ci` run — where the
+   freshly combined artifact is already in hand — avoids racing a separate
+   release-triggered workflow against `ci`: a release published against a new tag
+   fires `release: published` almost immediately, before this `ci` run finishes,
+   so a `release`-triggered upload would not yet find a successful run. If no
+   release exists for the tag yet, the step emits a notice and skips rather than
+   failing the build. The asset name is always `launcher-schema.json`; the
    release tag carries the version.
 
-> Note on immutability: attaching after publish works for mutable releases. If
-> releases are made immutable, this step should attach the asset at
-> release-creation time (e.g. `gh release create --draft ... && gh release edit
-> --draft=false`) or be folded into an atomic tag → build → sign → release step.
-> The artifact that produces the schema does not change — only where it is
-> attached.
+`.github/workflows/release-schema.yml` is a **manual backfill** (`workflow_dispatch`
+with a `tag` input) for the cases the in-`ci` attach can't cover: a tag pushed
+before its release existed (so the ci-time upload was skipped), a release cut
+from a tag built before schema support landed, or a needed re-attach. It finds
+the successful `ci` run for the tag, downloads the `launcher-schema` artifact,
+and runs `gh release upload <tag> launcher-schema.json --clobber`.
+
+> Note on immutability: both paths upload to an existing (mutable) release. If
+> releases are made immutable, asset attachment must happen at release-creation
+> time (e.g. `gh release create --draft ... && gh release edit --draft=false`)
+> or be folded into an atomic tag → build → sign → release step. The artifact
+> that produces the schema does not change — only where it is attached.
 
 
 ## Local testing

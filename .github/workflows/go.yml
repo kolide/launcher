@@ -85,27 +85,6 @@ jobs:
         run: make github-launcherapp
         if: ${{ contains(matrix.os, 'macos') }}
 
-      # Generate this platform's table schema from the freshly-built binary.
-      # Tables are selected at compile time per GOOS, so each runner emits only
-      # its own platform's tables; they're combined in the combine_schema job.
-      # Guarded to the main build so the reproducible twin doesn't collide on
-      # the artifact name.
-      - name: Generate table schema
-        if: env.CACHE_KEY_PREFIX == ''
-        shell: bash
-        run: |
-          launcher_bin=build/launcher
-          if [ "$RUNNER_OS" = "Windows" ]; then launcher_bin=build/launcher.exe; fi
-          "$launcher_bin" specs --output "launcher-specs-${RUNNER_OS}.json"
-
-      - name: Upload table schema
-        if: env.CACHE_KEY_PREFIX == ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: schema-${{ runner.os }}
-          path: launcher-specs-${{ runner.os }}.json
-          if-no-files-found: error
-
       - name: Cache build output
         uses: actions/cache@v5
         with:
@@ -194,20 +173,6 @@ jobs:
       - name: Build
         if: github.ref_type == 'tag'
         run: make -j2 github-build
-
-      # See the note in the non-container build: emit this platform's schema
-      # for the combine_schema job, guarded to the main (non-reproducible) build.
-      - name: Generate table schema
-        if: env.CACHE_KEY_PREFIX == ''
-        run: ./build/launcher specs --output "launcher-specs-${RUNNER_OS}.json"
-
-      - name: Upload table schema
-        if: env.CACHE_KEY_PREFIX == ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: schema-${{ runner.os }}
-          path: launcher-specs-${{ runner.os }}.json
-          if-no-files-found: error
 
       - name: Cache build output
         uses: actions/cache@v5
@@ -686,18 +651,65 @@ jobs:
           path: build/
           if-no-files-found: error
 
-  # Fan-in: combine the per-platform schemas emitted by the build jobs into a
-  # single cross-platform launcher-schema.json (JSON array, platforms unioned).
-  # Gated on store_artifacts so we only publish a schema for a fully-passing
-  # build. The combined artifact is what endpoint-releaser / the release-attach
-  # workflow uploads to the GitHub release for k2 to ingest.
-  combine_schema:
+  # Generate each platform's table schema from its built binary. Tables are
+  # selected at compile time per GOOS, so each runner emits only its own
+  # platform's tables; they're combined in the combine_schema job. This runs the
+  # cached binary (no build needed) on a regular runner matrix, which avoids
+  # both duplicating the step across build/build_linux and colliding with the
+  # reproducible build twins (those produce no schema artifact).
+  generate_schema:
     permissions:
       contents: read
+    name: Generate table schema
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-24.04
+          - macos-26
+          - windows-2025
+    needs:
+      - build
+      - build_linux
+    steps:
+      - name: cache restore build output
+        uses: actions/cache/restore@v5
+        with:
+          path: ./build
+          key: ${{ runner.os }}-${{ github.run_id }}
+          fail-on-cache-miss: true # need the launcher binary to run it below
+          enableCrossOsArchive: true
+
+      - name: Generate table schema
+        shell: bash
+        run: |
+          launcher_bin=build/launcher
+          if [ "$RUNNER_OS" = "Windows" ]; then launcher_bin=build/launcher.exe; fi
+          "$launcher_bin" specs --output "launcher-specs-${RUNNER_OS}.json"
+
+      - name: Upload table schema
+        uses: actions/upload-artifact@v4
+        with:
+          name: schema-${{ runner.os }}
+          path: launcher-specs-${{ runner.os }}.json
+          if-no-files-found: error
+
+  # Fan-in: combine the per-platform schemas emitted by generate_schema into a
+  # single cross-platform launcher-schema.json (JSON array, platforms unioned),
+  # which k2 ingests for its table docs. On tag builds this job also attaches the
+  # combined schema to the tag's GitHub release directly -- we're already inside
+  # the tag's ci run with the artifact in hand, so this avoids racing a separate
+  # release-triggered workflow against ci (a freshly published release fires
+  # `release: published` before this ci run finishes) and avoids re-downloading
+  # the artifact.
+  combine_schema:
+    permissions:
+      contents: write # required to attach the schema to the release on tag builds
     name: Combine table schema
     runs-on: ubuntu-22.04
     needs:
-      - store_artifacts
+      - generate_schema
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -755,6 +767,24 @@ jobs:
           name: launcher-schema
           path: launcher-schema.json
           if-no-files-found: error
+
+      # On tag builds, attach the freshly-combined schema to the tag's GitHub
+      # release so k2 can ingest it. If no release exists yet for the tag (e.g.
+      # the tag was pushed without a release), we skip rather than fail the build
+      # -- use the manual `release-schema.yml` workflow to attach it once the
+      # release exists.
+      - name: Attach schema to release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" launcher-schema.json --repo "$GITHUB_REPOSITORY" --clobber
+            echo "Attached launcher-schema.json to release $TAG"
+          else
+            echo "::notice::No GitHub release found for tag $TAG; skipping schema upload. Use the 'Attach table schema to release' workflow to attach it once the release exists."
+          fi
 
   package_builder_test:
     permissions:

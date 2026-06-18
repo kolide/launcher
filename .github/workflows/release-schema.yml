@@ -1,21 +1,23 @@
 name: Attach table schema to release
 
-# When a release is published, attach the combined launcher-schema.json (produced
-# by the `ci` workflow's combine_schema job for this tag) as a release asset. k2
-# ingests this asset from the GitHub "Latest" release to power Live Query table
-# docs, autocomplete, SQL validation, and NLQ query generation.
+# Manual backfill: attach the combined launcher-schema.json (produced by the
+# `ci` workflow's combine_schema job for a given tag) to that tag's GitHub
+# release. k2 ingests this asset from the GitHub "Latest" release to power Live
+# Query table docs, autocomplete, SQL validation, and NLQ query generation.
 #
-# Note on immutability: this uploads after publish, which works for mutable
-# releases. If/when releases are made immutable, this should move to attaching
-# the asset at release-creation time (e.g. `gh release create --draft ... && gh
-# release edit --draft=false`) or be folded into an atomic
-# tag -> build -> sign -> release step. The producing artifact (launcher-schema)
-# does not change -- only where it is attached.
+# The common path is automatic: combine_schema in the `ci` workflow attaches the
+# schema during the tag's build (see .github/workflows/go.yml). This workflow
+# exists for the cases that path can't cover -- e.g. the tag was pushed before
+# the release existed (so the ci-time upload was skipped), the release was cut
+# from a tag built before schema support landed, or the asset needs to be
+# regenerated/re-attached.
+#
+# Note on immutability: this uploads to an existing (mutable) release. If/when
+# releases are made immutable, asset attachment must happen at release-creation
+# time (e.g. `gh release create --draft ... && gh release edit --draft=false`)
+# or be folded into an atomic tag -> build -> sign -> release step. The producing
+# artifact (launcher-schema) does not change -- only where it is attached.
 on:
-  release:
-    types: [published]
-  # Allow manual re-attach for a given tag if a release was created before this
-  # workflow existed, or if the asset needs to be regenerated.
   workflow_dispatch:
     inputs:
       tag:
@@ -35,15 +37,13 @@ jobs:
       - name: Resolve tag
         id: tag
         env:
-          EVENT_TAG: ${{ github.event.release.tag_name }}
           INPUT_TAG: ${{ github.event.inputs.tag }}
         run: |
-          tag="${EVENT_TAG:-$INPUT_TAG}"
-          if [ -z "$tag" ]; then
+          if [ -z "$INPUT_TAG" ]; then
             echo "could not determine release tag" >&2
             exit 1
           fi
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "tag=$INPUT_TAG" >> "$GITHUB_OUTPUT"
 
       - name: Find ci run for tag
         id: cirun
