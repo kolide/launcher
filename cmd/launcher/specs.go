@@ -241,6 +241,8 @@ func mergeSpecFile(inputPath string, merged map[string]osquerytable.OsqueryTable
 		}
 
 		conflicts = append(conflicts, schemaConflicts(existing, spec)...)
+		// Only platforms are merged; description/url/notes/examples keep the
+		// first-seen file's values, so divergence there is resolved by input order.
 		existing.Platforms = unionPlatforms(existing.Platforms, spec.Platforms)
 		merged[spec.Name] = existing
 	}
