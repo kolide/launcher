@@ -110,62 +110,8 @@ Then in `.github/workflows/release-schema.yml`:
 > The artifact that produces the schema does not change — only where it is
 > attached.
 
-## k2 behavior
-
-### Sync (`rails launcher_schemas:sync`)
-
-`lib/tasks/launcher_schemas.rake` fetches
-`https://api.github.com/repos/kolide/launcher/releases/latest`. That endpoint
-returns **only the release GitHub has marked "Latest"**, which by definition
-excludes drafts and prereleases — so nightly/alpha/beta launcher builds are
-never ingested and k2 always tracks the current stable launcher schema. The task
-finds the `launcher-schema.json` asset, strips a leading `v` from the tag (tags
-look like `v2.3.2`), and writes `lib/kolide/launcher/schemas/data/<version>.json`.
-The file is then committed in a PR (the data dir is listed in `.ignore` for
-search tooling, but the JSON is committed, same as the osquery schema files).
-
-> Coupling requirement: because k2 reads only the "Latest" release, the schema
-> asset must ride the stable release that becomes Latest. Nightly/alpha builds
-> must be created as prereleases (or not as GitHub releases at all) so they never
-> become Latest.
-
-### Loader and merge
-
-`Kolide::Launcher::Schemas` (`lib/kolide/launcher/schemas.rb`) loads the synced
-JSON, reusing `Kolide::Osquery::Schemas::Table` since the launcher schema has the
-same shape as the osquery schema. `Kolide::Launcher::Schemas.latest` returns an
-empty hash when no schema file is present yet, so k2 degrades gracefully to
-osquery-only until the first sync.
-
-The single integration point is `Kolide::Osquery::Schemas.load_schema`
-(`lib/kolide/osquery/schemas.rb`), which now merges the launcher tables into the
-osquery table map:
-
-```ruby
-SCHEMAS[version] = Kolide::Launcher::Schemas.latest.merge(osquery_tables)
-```
-
-Because every consumer reads that same map (directly or through
-`Kolide::Osquery::Schemas::Schema`), the launcher tables automatically appear in:
-
-- **Live Query docs sidebar** — `app/views/live_query/campaigns/_docs.html.erb`
-  (the "View on GitHub" link is shown only when a table has a `url`, since many
-  launcher tables have none; the fragment cache key includes the launcher schema
-  version so it busts when the schema updates).
-- **SQL editor autocomplete** — `app/views/api/internal/editor/auto_complete/osquery.json.jbuilder`.
-- **SQL validation** — `Schema#valid_query`, used by
-  `app/validators/osquery_sql_validator.rb`; launcher tables stop being flagged
-  "not found".
-- **NLQ / LLM query generation** — `Kolide::Osquery::Schemas::LlmFormatter` and
-  the `list_osquery_tables` / `get_osquery_table_schema` LLM tools.
-
-The launcher schema is independent of the osquery version, so the latest launcher
-tables are merged regardless of which osquery schema version is loaded. On the
-(unlikely) event of a name collision, the osquery definition wins.
 
 ## Local testing
-
-### Launcher
 
 Generate the current platform's schema (NDJSON) without installing anything:
 
@@ -193,41 +139,3 @@ the table should collapse to one entry with the platforms unioned. This is what
 go test ./cmd/launcher/ -run 'Test_runSpecs|Test_runMergeSpecs'
 ```
 
-### k2
-
-Since a published release with the asset may not exist yet, drop a schema file in
-manually using a locally-generated one, then confirm the surfaces pick it up:
-
-```sh
-# Produce a combined schema from your local launcher and place it where k2 loads from.
-cd ~/repos/launcher
-go run ./cmd/launcher specs --output /tmp/launcher-specs.json
-go run ./cmd/launcher specs --merge --output \
-  ~/repos/k2/lib/kolide/launcher/schemas/data/0.0.0-local.json /tmp/launcher-specs.json
-```
-
-```sh
-cd ~/repos/k2
-
-# Loader sees the file:
-bundle exec rails runner 'pp Kolide::Launcher::Schemas.latest_version; pp Kolide::Launcher::Schemas.latest.keys.first(5)'
-
-# Launcher tables are merged into the shared schema map:
-bundle exec rails runner 'pp Kolide::Osquery::Schemas::Schema.new.find_table_by_name("kolide_launcher_info")&.name'
-
-# Validation now accepts a launcher table (no "not found" error):
-bundle exec rails runner 'pp Kolide::Osquery::Schemas::Schema.new.valid_query("select * from kolide_launcher_info").errors'
-```
-
-Then load a Live Query page and confirm the launcher tables appear in the docs
-sidebar and in editor autocomplete. Remove the temporary
-`0.0.0-local.json` when you are done so it is not committed.
-
-To test the real sync path against a launcher release that already carries the
-asset (set `GITHUB_TOKEN` to avoid unauthenticated rate limits):
-
-```sh
-cd ~/repos/k2
-GITHUB_TOKEN=<token> bundle exec rails launcher_schemas:sync
-git status lib/kolide/launcher/schemas/data/   # new <version>.json to commit
-```
