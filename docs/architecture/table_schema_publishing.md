@@ -76,8 +76,22 @@ table available on several platforms ends up with a single entry like
 `"platforms":["darwin","linux","windows"]`. The combined list is sorted by table
 name. Output goes to stdout or `--output <file>`.
 
-Implementation: `runSpecs`, `runMergeSpecs`, `mergeSpecFile`, and
-`unionPlatforms` in `cmd/launcher/specs.go`; tests in `cmd/launcher/specs_test.go`.
+A table that appears on more than one platform is expected to expose the **same
+column schema** everywhere. Before writing output, the merge compares the columns
+(by name and type) of each duplicate against the already-merged entry and
+**fails with a non-zero exit** if they diverge — e.g. a column present on one
+platform but not another, or the same column with a different type. This prevents
+a unioned entry from advertising columns for a platform that does not actually
+have them (which would corrupt k2 autocomplete/validation/docs for that
+platform). A failure here means a table's definition has drifted across its
+platform-specific, build-tagged files and should be reconciled at the source.
+Platform lists themselves are not compared (unioning them is the point), and
+documentation-only fields such as `description`/`notes` are not treated as part
+of the schema.
+
+Implementation: `runSpecs`, `runMergeSpecs`, `mergeSpecFile`, `schemaConflicts`,
+and `unionPlatforms` in `cmd/launcher/specs.go`; tests in
+`cmd/launcher/specs_test.go`.
 
 ### CI: generate, combine, publish
 

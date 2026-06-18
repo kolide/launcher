@@ -130,6 +130,109 @@ func Test_runMergeSpecs_noInputs(t *testing.T) {
 	require.Error(t, err)
 }
 
+func Test_runMergeSpecs_schemaMismatch_columnPresence(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	// table_shared has an extra "b" column on darwin that linux does not have.
+	darwin := filepath.Join(dir, "darwin.json")
+	require.NoError(t, os.WriteFile(darwin, []byte(
+		`{"name":"table_shared","description":"shared","platforms":["darwin"],"columns":[{"name":"a","type":"text"},{"name":"b","type":"text"}]}`+"\n"), 0644))
+
+	linux := filepath.Join(dir, "linux.json")
+	require.NoError(t, os.WriteFile(linux, []byte(
+		`{"name":"table_shared","description":"shared","platforms":["linux"],"columns":[{"name":"a","type":"text"}]}`+"\n"), 0644))
+
+	outPath := filepath.Join(dir, "launcher-schema.json")
+	err := runMergeSpecs([]string{darwin, linux}, outPath)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "schema mismatch")
+	require.Contains(t, err.Error(), "table_shared")
+	require.Contains(t, err.Error(), `"b"`)
+
+	// The conflicting schema must not be written out.
+	_, statErr := os.Stat(outPath)
+	require.True(t, os.IsNotExist(statErr), "no output file should be written when a schema conflict is detected")
+}
+
+func Test_runMergeSpecs_schemaMismatch_columnType(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	// table_shared.c is text on darwin but integer on windows.
+	darwin := filepath.Join(dir, "darwin.json")
+	require.NoError(t, os.WriteFile(darwin, []byte(
+		`{"name":"table_shared","description":"shared","platforms":["darwin"],"columns":[{"name":"c","type":"text"}]}`+"\n"), 0644))
+
+	windows := filepath.Join(dir, "windows.json")
+	require.NoError(t, os.WriteFile(windows, []byte(
+		`{"name":"table_shared","description":"shared","platforms":["windows"],"columns":[{"name":"c","type":"integer"}]}`+"\n"), 0644))
+
+	err := runMergeSpecs([]string{darwin, windows}, "")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "schema mismatch")
+	require.Contains(t, err.Error(), "table_shared")
+	require.Contains(t, err.Error(), `"c"`)
+}
+
+func Test_schemaConflicts(t *testing.T) {
+	t.Parallel()
+
+	col := func(name, ctype string) osquerytable.ColumnDefinition {
+		return osquerytable.ColumnDefinition{Name: name, Type: osquerytable.ColumnType(ctype)}
+	}
+
+	tests := []struct {
+		name     string
+		a        []osquerytable.ColumnDefinition
+		b        []osquerytable.ColumnDefinition
+		wantSame bool
+	}{
+		{
+			name:     "identical columns",
+			a:        []osquerytable.ColumnDefinition{col("a", "text"), col("b", "integer")},
+			b:        []osquerytable.ColumnDefinition{col("a", "text"), col("b", "integer")},
+			wantSame: true,
+		},
+		{
+			name:     "reordered columns still match",
+			a:        []osquerytable.ColumnDefinition{col("a", "text"), col("b", "integer")},
+			b:        []osquerytable.ColumnDefinition{col("b", "integer"), col("a", "text")},
+			wantSame: true,
+		},
+		{
+			name:     "column missing on one side",
+			a:        []osquerytable.ColumnDefinition{col("a", "text"), col("b", "integer")},
+			b:        []osquerytable.ColumnDefinition{col("a", "text")},
+			wantSame: false,
+		},
+		{
+			name:     "differing column type",
+			a:        []osquerytable.ColumnDefinition{col("a", "text")},
+			b:        []osquerytable.ColumnDefinition{col("a", "integer")},
+			wantSame: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			conflicts := schemaConflicts(
+				osquerytable.OsqueryTableSpec{Name: "t", Columns: tt.a},
+				osquerytable.OsqueryTableSpec{Name: "t", Columns: tt.b},
+			)
+			if tt.wantSame {
+				require.Empty(t, conflicts)
+			} else {
+				require.NotEmpty(t, conflicts)
+			}
+		})
+	}
+}
+
 func platformStrings[T ~string](platforms []T) []string {
 	out := make([]string, 0, len(platforms))
 	for _, p := range platforms {

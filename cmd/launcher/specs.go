@@ -180,10 +180,24 @@ func runMergeSpecs(inputPaths []string, outputPath string) error {
 	}
 
 	merged := make(map[string]osquerytable.OsqueryTableSpec)
+	var conflicts []string
 	for _, inputPath := range inputPaths {
-		if err := mergeSpecFile(inputPath, merged); err != nil {
+		fileConflicts, err := mergeSpecFile(inputPath, merged)
+		if err != nil {
 			return fmt.Errorf("merging %s: %w", inputPath, err)
 		}
+		conflicts = append(conflicts, fileConflicts...)
+	}
+
+	// A table that appears on more than one platform is expected to expose the
+	// same column schema everywhere. If it does not, the unioned entry would
+	// advertise columns for a platform that does not actually have them, which
+	// would break k2's autocomplete, validation, and docs for that platform.
+	// Fail loudly so the divergence is reconciled at the source rather than
+	// silently shipping a schema that is wrong for some platforms.
+	if len(conflicts) > 0 {
+		slices.Sort(conflicts)
+		return fmt.Errorf("cross-platform table schema mismatch:\n\t%s", strings.Join(conflicts, "\n\t"))
 	}
 
 	combined := slices.Collect(maps.Values(merged))
@@ -214,14 +228,17 @@ func runMergeSpecs(inputPaths []string, outputPath string) error {
 }
 
 // mergeSpecFile reads a single NDJSON spec file and folds its tables into merged,
-// unioning the platforms of any table already present from another file.
-func mergeSpecFile(inputPath string, merged map[string]osquerytable.OsqueryTableSpec) error {
+// unioning the platforms of any table already present from another file. It
+// returns descriptions of any column-schema conflicts found between a table in
+// this file and the already-merged entry of the same name (see schemaConflicts).
+func mergeSpecFile(inputPath string, merged map[string]osquerytable.OsqueryTableSpec) ([]string, error) {
 	f, err := os.Open(inputPath)
 	if err != nil {
-		return fmt.Errorf("opening file: %w", err)
+		return nil, fmt.Errorf("opening file: %w", err)
 	}
 	defer f.Close()
 
+	var conflicts []string
 	scanner := bufio.NewScanner(f)
 	// Specs can include lengthy descriptions/examples, so allow large lines.
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -233,7 +250,7 @@ func mergeSpecFile(inputPath string, merged map[string]osquerytable.OsqueryTable
 
 		var spec osquerytable.OsqueryTableSpec
 		if err := json.Unmarshal([]byte(line), &spec); err != nil {
-			return fmt.Errorf("unmarshalling spec line %q: %w", line, err)
+			return nil, fmt.Errorf("unmarshalling spec line %q: %w", line, err)
 		}
 
 		existing, ok := merged[spec.Name]
@@ -242,18 +259,71 @@ func mergeSpecFile(inputPath string, merged map[string]osquerytable.OsqueryTable
 			continue
 		}
 
-		// Same table from another platform: union the platforms onto the
-		// already-seen spec so the combined entry lists every platform it
-		// is available on.
+		// Same table from another platform. The platforms are unioned below, but
+		// the column schema is expected to be identical regardless of which
+		// platform's binary emitted the spec, so record any divergence.
+		conflicts = append(conflicts, schemaConflicts(existing, spec)...)
+
+		// Union the platforms onto the already-seen spec so the combined entry
+		// lists every platform the table is available on.
 		existing.Platforms = unionPlatforms(existing.Platforms, spec.Platforms)
 		merged[spec.Name] = existing
 	}
 
 	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("reading file: %w", err)
+		return nil, fmt.Errorf("reading file: %w", err)
 	}
 
-	return nil
+	return conflicts, nil
+}
+
+// schemaConflicts compares the column schemas of two specs for the same table
+// (each seen on different platforms) and returns human-readable descriptions of
+// any differences. Platform lists are intentionally ignored, since unioning them
+// is the whole point of the merge; the columns, however, are expected to be
+// identical no matter which platform's binary emitted the spec. A conflict
+// almost always means a table whose definition diverged across its
+// platform-specific, build-tagged files and should be reconciled at the source.
+//
+// Columns are matched by name (order-insensitive). Conflicts are reported when a
+// column is present for one platform set but not the other, or when a shared
+// column has a different type. Description/notes and other documentation fields
+// are not considered part of the schema and are not compared here.
+func schemaConflicts(a, b osquerytable.OsqueryTableSpec) []string {
+	aCols := columnsByName(a.Columns)
+	bCols := columnsByName(b.Columns)
+
+	var conflicts []string
+	for name := range aCols {
+		if _, ok := bCols[name]; !ok {
+			conflicts = append(conflicts, fmt.Sprintf("table %q: column %q present on %v but not %v", a.Name, name, a.Platforms, b.Platforms))
+		}
+	}
+	for name := range bCols {
+		if _, ok := aCols[name]; !ok {
+			conflicts = append(conflicts, fmt.Sprintf("table %q: column %q present on %v but not %v", a.Name, name, b.Platforms, a.Platforms))
+		}
+	}
+	for name, aCol := range aCols {
+		bCol, ok := bCols[name]
+		if !ok {
+			continue
+		}
+		if aCol.Type != bCol.Type {
+			conflicts = append(conflicts, fmt.Sprintf("table %q: column %q is type %q on %v but %q on %v", a.Name, name, aCol.Type, a.Platforms, bCol.Type, b.Platforms))
+		}
+	}
+
+	return conflicts
+}
+
+// columnsByName indexes a column slice by column name for easy lookup.
+func columnsByName(cols []osquerytable.ColumnDefinition) map[string]osquerytable.ColumnDefinition {
+	byName := make(map[string]osquerytable.ColumnDefinition, len(cols))
+	for _, col := range cols {
+		byName[col.Name] = col
+	}
+	return byName
 }
 
 // unionPlatforms returns the de-duplicated union of two platform slices,
