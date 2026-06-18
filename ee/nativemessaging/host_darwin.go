@@ -39,6 +39,8 @@ func validateBrowser(ctx context.Context, browserPath string, browserProcessName
 	if err != nil {
 		return fmt.Errorf("creating codesign --verify cmd: %w", err)
 	}
+	// The command will return an error if codesigning doesn't pass -- we don't need
+	// to parse verifyOutput to confirm. We capture it only to include in the error string.
 	verifyOutput, err := verifyCmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("running codesign --verify against %s: output: `%s`: %w", browserPath, string(verifyOutput), err)
