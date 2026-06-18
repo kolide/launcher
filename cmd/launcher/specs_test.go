@@ -177,6 +177,110 @@ func Test_runMergeSpecs_schemaMismatch_columnType(t *testing.T) {
 	require.Contains(t, err.Error(), `"c"`)
 }
 
+func Test_readSpecs(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		input     string
+		wantNames []string
+	}{
+		{
+			name:      "ndjson",
+			input:     `{"name":"a","columns":[]}` + "\n" + `{"name":"b","columns":[]}` + "\n",
+			wantNames: []string{"a", "b"},
+		},
+		{
+			name:      "ndjson with blank lines",
+			input:     `{"name":"a","columns":[]}` + "\n\n" + `{"name":"b","columns":[]}` + "\n",
+			wantNames: []string{"a", "b"},
+		},
+		{
+			name:      "compact json array",
+			input:     `[{"name":"a","columns":[]},{"name":"b","columns":[]}]`,
+			wantNames: []string{"a", "b"},
+		},
+		{
+			name: "pretty printed json array",
+			input: `[
+  {
+    "name": "a",
+    "columns": []
+  },
+  {
+    "name": "b",
+    "columns": []
+  }
+]
+`,
+			wantNames: []string{"a", "b"},
+		},
+		{
+			name:      "empty input",
+			input:     "   \n\t ",
+			wantNames: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			specs, err := readSpecs(strings.NewReader(tt.input))
+			require.NoError(t, err)
+
+			var names []string
+			for _, s := range specs {
+				names = append(names, s.Name)
+			}
+			require.Equal(t, tt.wantNames, names)
+		})
+	}
+}
+
+// A pretty-printed JSON array is exactly what `launcher specs --merge` emits, so
+// re-feeding that output into the merge must work, not fail like it would if the
+// reader assumed one complete spec per line.
+func Test_runMergeSpecs_acceptsPrettyPrintedArray(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	arrayInput := filepath.Join(dir, "array.json")
+	require.NoError(t, os.WriteFile(arrayInput, []byte(`[
+  {
+    "name": "table_a",
+    "description": "a",
+    "platforms": ["darwin"],
+    "columns": [
+      { "name": "c", "type": "text" }
+    ]
+  },
+  {
+    "name": "table_b",
+    "description": "b",
+    "platforms": ["linux"],
+    "columns": []
+  }
+]
+`), 0644))
+
+	outPath := filepath.Join(dir, "out.json")
+	require.NoError(t, runMergeSpecs([]string{arrayInput}, outPath))
+
+	data, err := os.ReadFile(outPath)
+	require.NoError(t, err)
+
+	var combined []osquerytable.OsqueryTableSpec
+	require.NoError(t, json.Unmarshal(data, &combined))
+
+	names := make([]string, 0, len(combined))
+	for _, s := range combined {
+		names = append(names, s.Name)
+	}
+	require.ElementsMatch(t, []string{"table_a", "table_b"}, names)
+}
+
 func Test_schemaConflicts(t *testing.T) {
 	t.Parallel()
 

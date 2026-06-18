@@ -1,7 +1,7 @@
 package main
 
 import (
-	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -227,10 +227,14 @@ func runMergeSpecs(inputPaths []string, outputPath string) error {
 	return nil
 }
 
-// mergeSpecFile reads a single NDJSON spec file and folds its tables into merged,
+// mergeSpecFile reads a single spec file and folds its tables into merged,
 // unioning the platforms of any table already present from another file. It
 // returns descriptions of any column-schema conflicts found between a table in
 // this file and the already-merged entry of the same name (see schemaConflicts).
+//
+// The file may be NDJSON (one spec per line, as emitted by `launcher specs`) or
+// a single JSON array (as emitted by `launcher specs --merge`); both compact and
+// pretty-printed forms are accepted. See readSpecs.
 func mergeSpecFile(inputPath string, merged map[string]osquerytable.OsqueryTableSpec) ([]string, error) {
 	f, err := os.Open(inputPath)
 	if err != nil {
@@ -238,21 +242,13 @@ func mergeSpecFile(inputPath string, merged map[string]osquerytable.OsqueryTable
 	}
 	defer f.Close()
 
+	specs, err := readSpecs(f)
+	if err != nil {
+		return nil, fmt.Errorf("reading specs: %w", err)
+	}
+
 	var conflicts []string
-	scanner := bufio.NewScanner(f)
-	// Specs can include lengthy descriptions/examples, so allow large lines.
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
-		}
-
-		var spec osquerytable.OsqueryTableSpec
-		if err := json.Unmarshal([]byte(line), &spec); err != nil {
-			return nil, fmt.Errorf("unmarshalling spec line %q: %w", line, err)
-		}
-
+	for _, spec := range specs {
 		existing, ok := merged[spec.Name]
 		if !ok {
 			merged[spec.Name] = spec
@@ -270,11 +266,58 @@ func mergeSpecFile(inputPath string, merged map[string]osquerytable.OsqueryTable
 		merged[spec.Name] = existing
 	}
 
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("reading file: %w", err)
+	return conflicts, nil
+}
+
+// readSpecs decodes osquery table specs from r, accepting either of the two
+// shapes used in this flow, in both compact and pretty-printed forms:
+//
+//   - A stream of JSON objects (NDJSON), as emitted by `launcher specs` — one
+//     OsqueryTableSpec per line, though any whitespace separation works.
+//   - A single JSON array of specs, as emitted by `launcher specs --merge`.
+//
+// The shape is detected from the first non-whitespace byte: '[' is decoded as a
+// JSON array, anything else as a stream of objects. Using encoding/json (rather
+// than scanning lines) means newlines/indentation inside a spec do not matter
+// and there is no per-line size limit to overflow.
+func readSpecs(r io.Reader) ([]osquerytable.OsqueryTableSpec, error) {
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return nil, fmt.Errorf("reading input: %w", err)
 	}
 
-	return conflicts, nil
+	data = bytes.TrimSpace(data)
+	if len(data) == 0 {
+		return nil, nil
+	}
+
+	// A leading '[' is the JSON-array shape (the --merge output, possibly
+	// pretty-printed); decode it in one shot.
+	if data[0] == '[' {
+		var specs []osquerytable.OsqueryTableSpec
+		if err := json.Unmarshal(data, &specs); err != nil {
+			return nil, fmt.Errorf("decoding JSON array of specs: %w", err)
+		}
+		return specs, nil
+	}
+
+	// Otherwise treat the input as a stream of JSON objects. The decoder skips
+	// whitespace between values, so this transparently handles NDJSON as well as
+	// pretty-printed, multi-line objects.
+	dec := json.NewDecoder(bytes.NewReader(data))
+	var specs []osquerytable.OsqueryTableSpec
+	for {
+		var spec osquerytable.OsqueryTableSpec
+		if err := dec.Decode(&spec); err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return nil, fmt.Errorf("decoding spec near byte offset %d: %w", dec.InputOffset(), err)
+		}
+		specs = append(specs, spec)
+	}
+
+	return specs, nil
 }
 
 // schemaConflicts compares the column schemas of two specs for the same table

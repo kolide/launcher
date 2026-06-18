@@ -70,11 +70,18 @@ Useful flags:
 ### `launcher specs --merge`
 
 `launcher specs --merge <file>...` is the combine step. It reads one or more
-per-platform NDJSON spec files and writes a single **JSON array** (the shape k2
+per-platform spec files and writes a single **JSON array** (the shape k2
 ingests), deduplicating tables by name and **unioning their platforms** so a
 table available on several platforms ends up with a single entry like
 `"platforms":["darwin","linux","windows"]`. The combined list is sorted by table
 name. Output goes to stdout or `--output <file>`.
+
+Each input file may be either NDJSON (one spec per line, the `launcher specs`
+output) or a single JSON array (the `launcher specs --merge` output); both
+compact and pretty-printed forms are accepted, so a previously merged
+`launcher-schema.json` can be fed straight back in. Parsing uses `encoding/json`
+rather than line scanning, so indentation/newlines inside a spec are irrelevant
+and there is no per-line size limit.
 
 A table that appears on more than one platform is expected to expose the **same
 column schema** everywhere. Before writing output, the merge compares the columns
@@ -89,8 +96,8 @@ Platform lists themselves are not compared (unioning them is the point), and
 documentation-only fields such as `description`/`notes` are not treated as part
 of the schema.
 
-Implementation: `runSpecs`, `runMergeSpecs`, `mergeSpecFile`, `schemaConflicts`,
-and `unionPlatforms` in `cmd/launcher/specs.go`; tests in
+Implementation: `runSpecs`, `runMergeSpecs`, `mergeSpecFile`, `readSpecs`,
+`schemaConflicts`, and `unionPlatforms` in `cmd/launcher/specs.go`; tests in
 `cmd/launcher/specs_test.go`.
 
 ### CI: generate, combine, publish
