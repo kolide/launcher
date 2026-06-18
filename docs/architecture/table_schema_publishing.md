@@ -35,13 +35,11 @@ flowchart TD
     end
     cj -->|"on tag: gh release upload"| ghr["launcher-schema.json on the GitHub release"]
     rw["release-schema.yml (manual backfill)"] -.->|"gh release upload"| ghr
-    ghr -->|"rails launcher_schemas:sync"| k2data["k2: lib/kolide/launcher/schemas/data/VERSION.json"]
-    k2data --> merge["Kolide::Osquery::Schemas.load_schema merges launcher tables in"]
-    merge --> docs["Live Query docs sidebar"]
-    merge --> ac["SQL editor autocomplete"]
-    merge --> val["SQL validation"]
-    merge --> nlq["NLQ / LLM query generation"]
+    ghr -.->|"ingested downstream by k2"| k2["k2: Live Query docs, autocomplete, validation, NLQ"]
 ```
+
+The launcher side of this flow ends at the schema asset attached to the GitHub
+release; how k2 ingests and serves it is owned by k2 and out of scope here.
 
 ## Launcher behavior
 
@@ -95,7 +93,11 @@ platform). A failure here means a table's definition has drifted across its
 platform-specific, build-tagged files and should be reconciled at the source.
 Platform lists themselves are not compared (unioning them is the point), and
 documentation-only fields such as `description`/`notes` are not treated as part
-of the schema.
+of the schema. Because those fields are not compared, a multi-platform table
+keeps the values from the **first input file in which it appears** (in CI the
+per-platform files are merged in alphabetical order). Divergence there is
+resolved silently rather than flagged, so keep cross-platform tables'
+descriptions/notes in sync at the source if it matters.
 
 Implementation: `runSpecs`, `runMergeSpecs`, `mergeSpecFile`, `readSpecs`,
 `schemaConflicts`, and `unionPlatforms` in `cmd/launcher/specs.go`; tests in

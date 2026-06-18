@@ -701,40 +701,16 @@ jobs:
     needs:
       - generate_schema
     steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # need a full checkout for `git describe`
-
-      - name: Setup Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: "./go.mod"
-          check-latest: true
-          cache: false
-
-      - id: go-cache-paths
-        shell: bash
-        run: |
-          echo "go-build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
-          echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
-
-      - name: cache restore - GOCACHE
+      # Reuse the Linux launcher binary built by build_linux rather than
+      # rebuilding from source -- the merge logic is platform-independent, so the
+      # cached binary does the combine without a checkout, Go toolchain, or deps.
+      - name: cache restore build output
         uses: actions/cache/restore@v5
         with:
-          path: ${{ steps.go-cache-paths.outputs.go-build }}
-          key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
+          path: ./build
+          key: ${{ runner.os }}-${{ github.run_id }}
+          fail-on-cache-miss: true # need the launcher binary to run it below
           enableCrossOsArchive: true
-
-      - name: cache restore - GOMODCACHE
-        uses: actions/cache/restore@v5
-        with:
-          path: ${{ steps.go-cache-paths.outputs.go-mod }}
-          key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
-          enableCrossOsArchive: true
-
-      - name: Get dependencies
-        run: make deps
 
       - name: Download platform schemas
         uses: actions/download-artifact@v4
@@ -754,7 +730,7 @@ jobs:
             echo "no per-platform schema files found in schemas/" >&2
             exit 1
           fi
-          go run ./cmd/launcher specs --merge \
+          build/launcher specs --merge \
             --output launcher-schema.json \
             "${schema_files[@]}"
 
