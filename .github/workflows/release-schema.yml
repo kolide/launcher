@@ -1,22 +1,9 @@
 name: Attach table schema to release
 
-# Manual backfill: attach the combined launcher-schema.json (produced by the
-# `ci` workflow's combine_schema job for a given tag) to that tag's GitHub
-# release. k2 ingests this asset from the GitHub "Latest" release to power Live
-# Query table docs, autocomplete, SQL validation, and NLQ query generation.
-#
-# The common path is automatic: combine_schema in the `ci` workflow attaches the
-# schema during the tag's build (see .github/workflows/go.yml). This workflow
-# exists for the cases that path can't cover -- e.g. the tag was pushed before
-# the release existed (so the ci-time upload was skipped), the release was cut
-# from a tag built before schema support landed, or the asset needs to be
-# regenerated/re-attached.
-#
-# Note on immutability: this uploads to an existing (mutable) release. If/when
-# releases are made immutable, asset attachment must happen at release-creation
-# time (e.g. `gh release create --draft ... && gh release edit --draft=false`)
-# or be folded into an atomic tag -> build -> sign -> release step. The producing
-# artifact (launcher-schema) does not change -- only where it is attached.
+# Manual backfill for attaching launcher-schema.json to a tag's GitHub release.
+# The common path is automatic (combine_schema in the `ci` workflow); this covers
+# the cases it can't -- e.g. the tag was pushed before its release existed, or the
+# asset needs re-attaching.
 on:
   workflow_dispatch:
     inputs:

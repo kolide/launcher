@@ -63,11 +63,6 @@ func runSpecs(systemMultiSlogger *multislogger.MultiSlogger, args []string) erro
 		return fmt.Errorf("parsing flags: %w", err)
 	}
 
-	// In merge mode we don't generate specs from the running binary; instead we
-	// combine the per-platform NDJSON spec files produced by each platform's
-	// `launcher specs` run into a single JSON array, unioning the platforms for
-	// any table that appears in more than one file. This is how CI combines the
-	// platform-specific schemas into one cross-platform launcher-schema.json.
 	if *flMerge {
 		return runMergeSpecs(flagset.Args(), *flOutput)
 	}
@@ -76,7 +71,7 @@ func runSpecs(systemMultiSlogger *multislogger.MultiSlogger, args []string) erro
 	requiredFieldValidators := make(map[string]requiredFieldValidator)
 	for _, field := range flRequired {
 		if validator, ok := specRequiredFieldValidators[field]; !ok {
-			return fmt.Errorf("unknown field to equire: %s. Must be %v", field, slices.Collect(maps.Keys(specRequiredFieldValidators)))
+			return fmt.Errorf("unknown field to require: %s. Must be %v", field, slices.Collect(maps.Keys(specRequiredFieldValidators)))
 		} else {
 			requiredFieldValidators[field] = validator
 		}
@@ -168,12 +163,10 @@ func runSpecs(systemMultiSlogger *multislogger.MultiSlogger, args []string) erro
 	return nil
 }
 
-// runMergeSpecs combines the per-platform NDJSON spec files in inputPaths into a
-// single JSON array, deduplicating tables by name and unioning their platforms.
-// Each input is expected to be the NDJSON output of `launcher specs` from one
-// platform (one OsqueryTableSpec per line). The combined output is sorted by
-// table name and written to outputPath (or stdout when empty) as a JSON array,
-// which is the shape k2 ingests for its table docs.
+// runMergeSpecs combines the per-platform spec files in inputPaths into a single
+// JSON array (the shape k2 ingests), deduplicating tables by name and unioning
+// their platforms. Output is sorted by name and written to outputPath, or stdout
+// when empty.
 func runMergeSpecs(inputPaths []string, outputPath string) error {
 	if len(inputPaths) == 0 {
 		return errors.New("merge mode requires one or more spec files as arguments")
@@ -189,12 +182,9 @@ func runMergeSpecs(inputPaths []string, outputPath string) error {
 		conflicts = append(conflicts, fileConflicts...)
 	}
 
-	// A table that appears on more than one platform is expected to expose the
-	// same column schema everywhere. If it does not, the unioned entry would
-	// advertise columns for a platform that does not actually have them, which
-	// would break k2's autocomplete, validation, and docs for that platform.
-	// Fail loudly so the divergence is reconciled at the source rather than
-	// silently shipping a schema that is wrong for some platforms.
+	// A table seen on multiple platforms must expose the same columns everywhere;
+	// otherwise the unioned entry would advertise columns a platform lacks. Fail
+	// so the divergence is fixed at the source rather than shipped to k2.
 	if len(conflicts) > 0 {
 		slices.Sort(conflicts)
 		return fmt.Errorf("cross-platform table schema mismatch:\n\t%s", strings.Join(conflicts, "\n\t"))
@@ -227,14 +217,9 @@ func runMergeSpecs(inputPaths []string, outputPath string) error {
 	return nil
 }
 
-// mergeSpecFile reads a single spec file and folds its tables into merged,
-// unioning the platforms of any table already present from another file. It
-// returns descriptions of any column-schema conflicts found between a table in
-// this file and the already-merged entry of the same name (see schemaConflicts).
-//
-// The file may be NDJSON (one spec per line, as emitted by `launcher specs`) or
-// a single JSON array (as emitted by `launcher specs --merge`); both compact and
-// pretty-printed forms are accepted. See readSpecs.
+// mergeSpecFile folds the tables from one spec file into merged, unioning
+// platforms for tables already seen and returning any column-schema conflicts
+// (see schemaConflicts). The file may be NDJSON or a JSON array (see readSpecs).
 func mergeSpecFile(inputPath string, merged map[string]osquerytable.OsqueryTableSpec) ([]string, error) {
 	f, err := os.Open(inputPath)
 	if err != nil {
@@ -255,13 +240,7 @@ func mergeSpecFile(inputPath string, merged map[string]osquerytable.OsqueryTable
 			continue
 		}
 
-		// Same table from another platform. The platforms are unioned below, but
-		// the column schema is expected to be identical regardless of which
-		// platform's binary emitted the spec, so record any divergence.
 		conflicts = append(conflicts, schemaConflicts(existing, spec)...)
-
-		// Union the platforms onto the already-seen spec so the combined entry
-		// lists every platform the table is available on.
 		existing.Platforms = unionPlatforms(existing.Platforms, spec.Platforms)
 		merged[spec.Name] = existing
 	}
@@ -269,17 +248,10 @@ func mergeSpecFile(inputPath string, merged map[string]osquerytable.OsqueryTable
 	return conflicts, nil
 }
 
-// readSpecs decodes osquery table specs from r, accepting either of the two
-// shapes used in this flow, in both compact and pretty-printed forms:
-//
-//   - A stream of JSON objects (NDJSON), as emitted by `launcher specs` — one
-//     OsqueryTableSpec per line, though any whitespace separation works.
-//   - A single JSON array of specs, as emitted by `launcher specs --merge`.
-//
-// The shape is detected from the first non-whitespace byte: '[' is decoded as a
-// JSON array, anything else as a stream of objects. Using encoding/json (rather
-// than scanning lines) means newlines/indentation inside a spec do not matter
-// and there is no per-line size limit to overflow.
+// readSpecs decodes table specs from r, accepting either NDJSON (one spec per
+// line, from `launcher specs`) or a single JSON array (from `launcher specs
+// --merge`), in compact or pretty-printed form. The shape is detected from the
+// first non-whitespace byte.
 func readSpecs(r io.Reader) ([]osquerytable.OsqueryTableSpec, error) {
 	data, err := io.ReadAll(r)
 	if err != nil {
@@ -291,8 +263,6 @@ func readSpecs(r io.Reader) ([]osquerytable.OsqueryTableSpec, error) {
 		return nil, nil
 	}
 
-	// A leading '[' is the JSON-array shape (the --merge output, possibly
-	// pretty-printed); decode it in one shot.
 	if data[0] == '[' {
 		var specs []osquerytable.OsqueryTableSpec
 		if err := json.Unmarshal(data, &specs); err != nil {
@@ -301,9 +271,6 @@ func readSpecs(r io.Reader) ([]osquerytable.OsqueryTableSpec, error) {
 		return specs, nil
 	}
 
-	// Otherwise treat the input as a stream of JSON objects. The decoder skips
-	// whitespace between values, so this transparently handles NDJSON as well as
-	// pretty-printed, multi-line objects.
 	dec := json.NewDecoder(bytes.NewReader(data))
 	var specs []osquerytable.OsqueryTableSpec
 	for {
@@ -320,18 +287,10 @@ func readSpecs(r io.Reader) ([]osquerytable.OsqueryTableSpec, error) {
 	return specs, nil
 }
 
-// schemaConflicts compares the column schemas of two specs for the same table
-// (each seen on different platforms) and returns human-readable descriptions of
-// any differences. Platform lists are intentionally ignored, since unioning them
-// is the whole point of the merge; the columns, however, are expected to be
-// identical no matter which platform's binary emitted the spec. A conflict
-// almost always means a table whose definition diverged across its
-// platform-specific, build-tagged files and should be reconciled at the source.
-//
-// Columns are matched by name (order-insensitive). Conflicts are reported when a
-// column is present for one platform set but not the other, or when a shared
-// column has a different type. Description/notes and other documentation fields
-// are not considered part of the schema and are not compared here.
+// schemaConflicts returns descriptions of any column differences between two
+// specs for the same table seen on different platforms. Columns are matched by
+// name; a conflict is a column on one side but not the other, or a type
+// mismatch. Platform lists and doc fields (description/notes) are not compared.
 func schemaConflicts(a, b osquerytable.OsqueryTableSpec) []string {
 	aCols := columnsByName(a.Columns)
 	bCols := columnsByName(b.Columns)
@@ -360,7 +319,6 @@ func schemaConflicts(a, b osquerytable.OsqueryTableSpec) []string {
 	return conflicts
 }
 
-// columnsByName indexes a column slice by column name for easy lookup.
 func columnsByName(cols []osquerytable.ColumnDefinition) map[string]osquerytable.ColumnDefinition {
 	byName := make(map[string]osquerytable.ColumnDefinition, len(cols))
 	for _, col := range cols {
@@ -370,9 +328,7 @@ func columnsByName(cols []osquerytable.ColumnDefinition) map[string]osquerytable
 }
 
 // unionPlatforms returns the de-duplicated union of two platform slices,
-// preserving the order in which platforms are first seen (existing platforms
-// first, then any new ones). It is generic over the unexported platformName
-// type used by OsqueryTableSpec.Platforms.
+// preserving first-seen order. Generic over the unexported platformName type.
 func unionPlatforms[T ~string](existing, additional []T) []T {
 	seen := make(map[T]struct{}, len(existing)+len(additional))
 	union := make([]T, 0, len(existing)+len(additional))

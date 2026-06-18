@@ -651,12 +651,10 @@ jobs:
           path: build/
           if-no-files-found: error
 
-  # Generate each platform's table schema from its built binary. Tables are
-  # selected at compile time per GOOS, so each runner emits only its own
-  # platform's tables; they're combined in the combine_schema job. This runs the
-  # cached binary (no build needed) on a regular runner matrix, which avoids
-  # both duplicating the step across build/build_linux and colliding with the
-  # reproducible build twins (those produce no schema artifact).
+  # Generate each platform's table schema by running its cached binary (tables
+  # are compile-time per GOOS, so each runner emits only its own). A separate
+  # matrix job, rather than steps in build/build_linux, avoids duplicating the
+  # step and avoids colliding with the reproducible build twins.
   generate_schema:
     permissions:
       contents: read
@@ -695,14 +693,6 @@ jobs:
           path: launcher-specs-${{ runner.os }}.json
           if-no-files-found: error
 
-  # Fan-in: combine the per-platform schemas emitted by generate_schema into a
-  # single cross-platform launcher-schema.json (JSON array, platforms unioned),
-  # which k2 ingests for its table docs. On tag builds this job also attaches the
-  # combined schema to the tag's GitHub release directly -- we're already inside
-  # the tag's ci run with the artifact in hand, so this avoids racing a separate
-  # release-triggered workflow against ci (a freshly published release fires
-  # `release: published` before this ci run finishes) and avoids re-downloading
-  # the artifact.
   combine_schema:
     permissions:
       contents: write # required to attach the schema to the release on tag builds
@@ -754,12 +744,19 @@ jobs:
           merge-multiple: true
 
       - name: Combine schemas
+        shell: bash
         run: |
+          # Glob the downloaded schemas rather than naming each file, so this is
+          # robust to $RUNNER_OS casing or the platform set changing.
+          shopt -s nullglob
+          schema_files=(schemas/launcher-specs-*.json)
+          if [ ${#schema_files[@]} -eq 0 ]; then
+            echo "no per-platform schema files found in schemas/" >&2
+            exit 1
+          fi
           go run ./cmd/launcher specs --merge \
             --output launcher-schema.json \
-            schemas/launcher-specs-macOS.json \
-            schemas/launcher-specs-Linux.json \
-            schemas/launcher-specs-Windows.json
+            "${schema_files[@]}"
 
       - name: Upload combined schema
         uses: actions/upload-artifact@v4
@@ -775,15 +772,21 @@ jobs:
       # release exists.
       - name: Attach schema to release
         if: github.ref_type == 'tag'
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
-          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+          # A missing release is expected and non-fatal (the manual
+          # release-schema.yml backfill handles it); any other error must fail.
+          if err=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" 2>&1 >/dev/null); then
             gh release upload "$TAG" launcher-schema.json --repo "$GITHUB_REPOSITORY" --clobber
             echo "Attached launcher-schema.json to release $TAG"
-          else
+          elif printf '%s' "$err" | grep -qi 'release not found'; then
             echo "::notice::No GitHub release found for tag $TAG; skipping schema upload. Use the 'Attach table schema to release' workflow to attach it once the release exists."
+          else
+            echo "failed to look up release $TAG: $err" >&2
+            exit 1
           fi
 
   package_builder_test:
