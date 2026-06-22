@@ -575,6 +575,31 @@ MC4CAQAwBQYDK2VwBCIEIALEbo1EFnWFqBK/wC+hhypG/8hXEerwdNetAoFoFVdv
 -----END PRIVATE KEY-----`,
 			expectedFinding: true,
 		},
+		{
+			testCaseName:    "1Password recovery key (true positive)",
+			rawData:         `recovery_key = "1PRK-25QX-VSEX-BGMD-7CEN-6YJN-JAVA-DRQ3-DH2B-OIC4-ST4F-CLUA-BUFS-VRNA"`,
+			expectedFinding: true,
+		},
+		{
+			testCaseName:    "1Password recovery key, bare token (true positive)",
+			rawData:         `1PRK-36V7-JAX6-K5F7-BQTQ-Z6LY-S5DJ-IOZU-J6B7-CTWV-2ZPL-ISPD-5DKW-QA4A`,
+			expectedFinding: true,
+		},
+		{
+			testCaseName:    "1Password recovery key placeholder (false positive, entropy too low)",
+			rawData:         `1PRK-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX`,
+			expectedFinding: false,
+		},
+		{
+			testCaseName:    "1Password recovery key, too few groups",
+			rawData:         `1PRK-25QX-VSEX-BGMD`,
+			expectedFinding: false,
+		},
+		{
+			testCaseName:    "1Password recovery key, lowercase is not a match",
+			rawData:         `1prk-25qx-vsex-bgmd-7cen-6yjn-java-drq3-dh2b-oic4-st4f-clua-bufs-vrna`,
+			expectedFinding: false,
+		},
 	} {
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
