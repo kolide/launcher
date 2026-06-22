@@ -5,7 +5,6 @@ import (
 
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
-	"github.com/kolide/launcher/v2/pkg/windows/oleconv"
 )
 
 // IUpdateSession represents a session in which the caller can perform
@@ -25,6 +24,8 @@ func NewUpdateSession() (*IUpdateSession, error) {
 	if err != nil {
 		return nil, fmt.Errorf("creating Microsoft.Update.Session: %w", err)
 	}
+	defer unknown.Release()
+
 	disp, err := unknown.QueryInterface(ole.IID_IDispatch)
 	if err != nil {
 		return nil, fmt.Errorf("querying IID_IDispatch: %w", err)
@@ -39,23 +40,24 @@ func toIUpdateSession(updateSessionDisp *ole.IDispatch) (*IUpdateSession, error)
 		disp: updateSessionDisp,
 	}
 
-	if iUpdateSession.ClientApplicationID, err = oleconv.ToStringErr(oleutil.GetProperty(updateSessionDisp, "ClientApplicationID")); err != nil {
-		return nil, fmt.Errorf("getting property ClientApplicationID as string: %w", err)
+	if iUpdateSession.ClientApplicationID, err = getPropertyString(updateSessionDisp, "ClientApplicationID"); err != nil {
+		return nil, fmt.Errorf("ClientApplicationID: %w", err)
 	}
 
-	if iUpdateSession.ReadOnly, err = oleconv.ToBoolErr(oleutil.GetProperty(updateSessionDisp, "ReadOnly")); err != nil {
-		return nil, fmt.Errorf("getting property ReadOnly as bool: %w", err)
+	if iUpdateSession.ReadOnly, err = getPropertyBool(updateSessionDisp, "ReadOnly"); err != nil {
+		return nil, fmt.Errorf("ReadOnly: %w", err)
 	}
 
 	return iUpdateSession, nil
 }
 
 func (iUpdateSession *IUpdateSession) GetLocal() (uint32, error) {
-	return oleconv.ToUint32Err(oleutil.GetProperty(iUpdateSession.disp, "UserLocale"))
+	return getPropertyUint32(iUpdateSession.disp, "UserLocale")
 }
 
 func (iUpdateSession *IUpdateSession) SetLocal(locale uint32) error {
-	if _, err := oleconv.ToUint32Err(oleutil.PutProperty(iUpdateSession.disp, "UserLocale", locale)); err != nil {
+	_, err := oleutil.PutProperty(iUpdateSession.disp, "UserLocale", locale)
+	if err != nil {
 		return fmt.Errorf("putproperty userlocale: %w", err)
 	}
 	return nil
@@ -64,10 +66,18 @@ func (iUpdateSession *IUpdateSession) SetLocal(locale uint32) error {
 // CreateUpdateSearcher returns an IUpdateSearcher interface for this session.
 // https://docs.microsoft.com/en-us/windows/win32/api/wuapi/nf-wuapi-iupdatesession-createupdatesearcher
 func (iUpdateSession *IUpdateSession) CreateUpdateSearcher() (*IUpdateSearcher, error) {
-	updateSearcherDisp, err := oleconv.ToIDispatchErr(oleutil.CallMethod(iUpdateSession.disp, "CreateUpdateSearcher"))
+	updateSearcherDisp, err := callMethodDispatch(iUpdateSession.disp, "CreateUpdateSearcher")
 	if err != nil {
-		return nil, fmt.Errorf("calling CreateUpdateSearcher: %w", err)
+		return nil, fmt.Errorf("CreateUpdateSearcher: %w", err)
 	}
 
 	return toIUpdateSearcher(updateSearcherDisp)
+}
+
+// Release frees the underlying COM object.
+func (iUpdateSession *IUpdateSession) Release() {
+	if iUpdateSession.disp != nil {
+		iUpdateSession.disp.Release()
+		iUpdateSession.disp = nil
+	}
 }
