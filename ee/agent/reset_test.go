@@ -328,8 +328,6 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			mockKnapsack.On("ResetOnHardwareChangeEnabled").Return(tt.resetOnHardwareChangeEnabled).Maybe()
 			mockKnapsack.On("EnrollmentIDs").Return([]string{"default"}).Maybe()
 
-			// Hardcode serial and hardware uuid to avoid osquery call in test
-
 			// Set up dependencies: ensure that retrieved hardware data matches expectations
 			var actualSerial, actualHardwareUUID string
 			var fetchFunc serialAndHardwareUUIDFunc
