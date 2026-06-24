@@ -43,6 +43,8 @@ func readMessage(msgReader io.Reader) ([]byte, error) {
 
 // sendMessage formats the given message body appropropriately
 // and then writes it to stdout.
+// The native messaging documentation states that I/O mode must be explicitly set to O_BINARY
+// on Windows -- however, this appears to already be handled appropriately for Golang.
 func sendMessage(msgBody any) error {
 	msg, err := formatMessage(msgBody)
 	if err != nil {
