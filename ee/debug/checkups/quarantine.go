@@ -145,7 +145,11 @@ func (q *quarantine) Run(ctx context.Context, extraFh io.Writer) error {
 
 	totalQuarantinedFiles := 0
 
+	quarantineDirs := make([]string, 0)
 	for path, fileNames := range q.quarantineDirPathFilenames {
+		if len(fileNames) > 0 {
+			quarantineDirs = append(quarantineDirs, path)
+		}
 		fmt.Fprintf(extraFh, "%s: %d files\n", path, len(fileNames))
 		totalQuarantinedFiles += len(fileNames)
 
@@ -161,7 +165,7 @@ func (q *quarantine) Run(ctx context.Context, extraFh io.Writer) error {
 	}
 
 	q.status = Warning
-	q.summary = fmt.Sprintf("found %d quarantined files and %d files with quarantine attr set", totalQuarantinedFiles, len(bundlesWithQuarantineAttrSet))
+	q.summary = fmt.Sprintf("found %d quarantined files (in %s) and %d files with quarantine attr set", totalQuarantinedFiles, strings.Join(quarantineDirs, ","), len(bundlesWithQuarantineAttrSet))
 
 	return nil
 }
