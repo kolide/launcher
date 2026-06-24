@@ -52,24 +52,30 @@ func (use UninitializedStorageError) Error() string {
 	return "storage is uninitialized in knapsack"
 }
 
+// serialAndHardwareUUIDFunc is a wrapper around `currentSerialAndHardwareUUID`; it exists
+// so we can avoid the osquery call in tests.
+type serialAndHardwareUUIDFunc func(ctx context.Context, k types.Knapsack) (string, string, error)
+
 type hardwareChangeDetector struct {
-	slogger     *slog.Logger
-	k           types.Knapsack
-	interrupt   chan struct{}
-	interrupted *atomic.Bool
+	slogger                  *slog.Logger
+	k                        types.Knapsack
+	getSerialAndHardwareUUID serialAndHardwareUUIDFunc
+	interrupt                chan struct{}
+	interrupted              *atomic.Bool
 }
 
 func NewHardwareChangeDetector(k types.Knapsack, slogger *slog.Logger) *hardwareChangeDetector {
 	return &hardwareChangeDetector{
-		slogger:     slogger.With("component", "hardware_change_detector"),
-		k:           k,
-		interrupt:   make(chan struct{}),
-		interrupted: &atomic.Bool{},
+		slogger:                  slogger.With("component", "hardware_change_detector"),
+		k:                        k,
+		getSerialAndHardwareUUID: currentSerialAndHardwareUUID,
+		interrupt:                make(chan struct{}),
+		interrupted:              &atomic.Bool{},
 	}
 }
 
 func (h *hardwareChangeDetector) Execute() error {
-	if remediationOccurred := detectAndRemediateHardwareChange(context.TODO(), h.k, h.slogger); remediationOccurred {
+	if remediationOccurred := detectAndRemediateHardwareChange(context.TODO(), h.k, h.slogger, h.getSerialAndHardwareUUID); remediationOccurred {
 		h.slogger.Log(context.TODO(), slog.LevelInfo,
 			"hardware change detected and database wiped, sending shutdown request to launcher",
 		)
@@ -95,7 +101,7 @@ func (h *hardwareChangeDetector) Interrupt(_ error) {
 // HostDataStore. If the hardware-identifying information has changed, it logs the change; if the
 // ResetOnHardwareChangeEnabled feature flag is enabled, then it will reset the database. Returns
 // a bool of whether remediation occurred.
-func detectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack, slogger *slog.Logger) bool {
+func detectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack, slogger *slog.Logger, getSerialAndHardwareUUID serialAndHardwareUUIDFunc) bool {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -113,7 +119,7 @@ func detectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack, slo
 		)
 	}()
 
-	currentSerial, currentHardwareUUID, err := currentSerialAndHardwareUUID(ctx, k)
+	currentSerial, currentHardwareUUID, err := getSerialAndHardwareUUID(ctx, k)
 	if err != nil {
 		slogger.Log(ctx, slog.LevelWarn, "could not get current serial and hardware UUID", "err", err)
 	} else {

@@ -40,3 +40,18 @@ id = "private-key"
 description = "Ignore Cosign encrypted private keys (https://github.com/gitleaks/gitleaks/issues/1034)"
 condition = "AND"
 stopwords = ["BEGIN ENCRYPTED COSIGN PRIVATE KEY", "BEGIN ENCRYPTED SIGSTORE PRIVATE KEY"]
+
+# Custom Kolide detection rules (these add new rules not present in the default
+# gitleaks config, as opposed to the allowlists above which tune existing rules).
+
+[[rules]]
+id = "1password-recovery-key"
+description = "Uncovered a possible 1Password recovery key, potentially compromising account recovery and access to secrets in vaults."
+# Recovery keys are the literal prefix "1PRK" followed by 13 hyphen-separated
+# groups of 4 uppercase-alphanumeric characters, e.g.
+# 1PRK-25QX-VSEX-BGMD-7CEN-6YJN-JAVA-DRQ3-DH2B-OIC4-ST4F-CLUA-BUFS-VRNA
+regex = '''\b1PRK-(?:[A-Z0-9]{4}-){12}[A-Z0-9]{4}\b'''
+# Genuine keys carry ~4.5 bits/char of entropy; this floor drops doc placeholders
+# such as 1PRK-XXXX-XXXX-... while leaving wide margin for real keys.
+entropy = 3.5
+keywords = ["1prk"]

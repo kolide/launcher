@@ -1,27 +1,25 @@
 package agent
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
-	"path/filepath"
 	"runtime"
-	"sync"
 	"testing"
 	"time"
 
+	"github.com/kolide/kit/ulid"
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/v2/ee/agent/storage"
 	storageci "github.com/kolide/launcher/v2/ee/agent/storage/ci"
 	"github.com/kolide/launcher/v2/ee/agent/types"
 	typesmocks "github.com/kolide/launcher/v2/ee/agent/types/mocks"
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
-	"github.com/kolide/launcher/v2/pkg/osquery/testutil"
 	"github.com/kolide/launcher/v2/pkg/threadsafebuffer"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 )
@@ -30,28 +28,8 @@ func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m)
 }
 
-var testOsqueryBinary string
-var osqueryBinaryDownloadErr error
-
-// downloadOnceFunc downloads a real osquery binary for use in tests. This function
-// can be called multiple times but will only execute once -- the osquery binary is
-// stored at path `testOsqueryBinary` and can be reused by all subsequent tests.
-var downloadOnceFunc = sync.OnceFunc(func() {
-	testOsqueryBinary, _, osqueryBinaryDownloadErr = testutil.DownloadOsquery("nightly")
-})
-
 func TestDetectAndRemediateHardwareChange(t *testing.T) {
 	t.Parallel()
-	downloadOnceFunc()
-	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
-
-	// Pre-compute hardware serial and UUID once rather than in each parallel subtest.
-	// All subtests query the same hardware and get the same result, so running 16+
-	// simultaneous osquery processes just overwhelms slow CI runners.
-	setupKnapsack := typesmocks.NewKnapsack(t)
-	setupKnapsack.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
-	cachedSerial, cachedHardwareUUID, err := currentSerialAndHardwareUUID(t.Context(), setupKnapsack)
-	require.NoError(t, err, "expected no error querying osquery for hardware data at ", testOsqueryBinary)
 
 	testCases := []struct {
 		name                         string
@@ -325,8 +303,10 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 		},
 	}
 
-	for _, tt := range testCases { //nolint:paralleltest
+	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			slogger := multislogger.NewNopLogger()
 
 			// Set up dependencies: data store for hardware-identifying data
@@ -350,14 +330,19 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 
 			// Set up dependencies: ensure that retrieved hardware data matches expectations
 			var actualSerial, actualHardwareUUID string
+			var fetchFunc serialAndHardwareUUIDFunc
 			if tt.osquerySuccess {
-				mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
-				actualSerial = cachedSerial
-				actualHardwareUUID = cachedHardwareUUID
+				actualSerial = ulid.New()
+				actualHardwareUUID = ulid.New()
+				fetchFunc = func(_ context.Context, _ types.Knapsack) (string, string, error) {
+					return actualSerial, actualHardwareUUID, nil
+				}
 			} else {
-				mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(filepath.Join("not", "a", "real", "osqueryd", "binary"))
 				actualSerial = "test-serial"
 				actualHardwareUUID = "test-hardware-uuid"
+				fetchFunc = func(_ context.Context, _ types.Knapsack) (string, string, error) {
+					return "", "", errors.New("test error")
+				}
 			}
 
 			actualMachineGUID, err := currentMachineGuid(t.Context(), mockKnapsack)
@@ -432,7 +417,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			require.NoError(t, testConfigStore.Set([]byte("localEccKey"), testLocalEccKeyRaw))
 
 			// Make test call
-			remediationOccurred := detectAndRemediateHardwareChange(t.Context(), mockKnapsack, slogger)
+			remediationOccurred := detectAndRemediateHardwareChange(t.Context(), mockKnapsack, slogger, fetchFunc)
 			require.Equal(t, tt.expectDatabaseWipe, remediationOccurred, "expected remediation to occur when database should be wiped")
 
 			// Confirm backup occurred, if database got wiped
@@ -507,8 +492,6 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 
 func TestDetectAndRemediateHardwareChange_SavesDataOverMultipleResets(t *testing.T) {
 	t.Parallel()
-	downloadOnceFunc()
-	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 
 	slogger := multislogger.NewNopLogger()
 
@@ -528,7 +511,6 @@ func TestDetectAndRemediateHardwareChange_SavesDataOverMultipleResets(t *testing
 		storage.ConfigStore:             testConfigStore,
 		storage.ServerProvidedDataStore: testServerProvidedDataStore,
 	})
-	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	mockKnapsack.On("ResetOnHardwareChangeEnabled").Return(true)
 	mockKnapsack.On("Enrollments").Return([]types.Enrollment{
 		{
@@ -559,8 +541,15 @@ func TestDetectAndRemediateHardwareChange_SavesDataOverMultipleResets(t *testing
 	require.NoError(t, err, "marshalling test key")
 	require.NoError(t, testConfigStore.Set([]byte("localEccKey"), testLocalEccKeyRaw))
 
+	// Hardcode serial and hardware uuid to avoid osquery call in test
+	cachedSerial := ulid.New()
+	cachedHardwareUUID := ulid.New()
+	serialHardwareFetchFunc := func(_ context.Context, _ types.Knapsack) (string, string, error) {
+		return cachedSerial, cachedHardwareUUID, nil
+	}
+
 	// Make first test call
-	require.True(t, detectAndRemediateHardwareChange(t.Context(), mockKnapsack, slogger))
+	require.True(t, detectAndRemediateHardwareChange(t.Context(), mockKnapsack, slogger, serialHardwareFetchFunc))
 
 	// Confirm the old_host_data key exists in the data store
 	dataRaw, err := testHostDataStore.Get(hostDataKeyResetRecords)
@@ -585,7 +574,7 @@ func TestDetectAndRemediateHardwareChange_SavesDataOverMultipleResets(t *testing
 	require.NoError(t, testConfigStore.Set([]byte("localEccKey"), testLocalEccKeyRaw))
 
 	// Make second test call
-	require.True(t, detectAndRemediateHardwareChange(t.Context(), mockKnapsack, slogger))
+	require.True(t, detectAndRemediateHardwareChange(t.Context(), mockKnapsack, slogger, serialHardwareFetchFunc))
 
 	// Confirm the old_host_data key exists in the data store
 	newDataRaw, err := testHostDataStore.Get(hostDataKeyResetRecords)
@@ -605,8 +594,6 @@ func TestDetectAndRemediateHardwareChange_SavesDataOverMultipleResets(t *testing
 
 func TestExecute(t *testing.T) {
 	t.Parallel()
-	downloadOnceFunc()
-	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
@@ -629,7 +616,6 @@ func TestExecute(t *testing.T) {
 		storage.ConfigStore:             testConfigStore,
 		storage.ServerProvidedDataStore: testServerProvidedDataStore,
 	})
-	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	mockKnapsack.On("ResetOnHardwareChangeEnabled").Return(true)
 	mockKnapsack.On("Enrollments").Return([]types.Enrollment{
 		{
@@ -645,6 +631,9 @@ func TestExecute(t *testing.T) {
 	require.NoError(t, testHostDataStore.Set(hostDataKeyMachineGuid, []byte("not-the-correct-machine-guid")), "could not set machine guid in test store")
 
 	detector := NewHardwareChangeDetector(mockKnapsack, slogger)
+	detector.getSerialAndHardwareUUID = func(_ context.Context, _ types.Knapsack) (string, string, error) {
+		return ulid.New(), ulid.New(), nil
+	}
 
 	executeErrs := make(chan error)
 	go func() {
@@ -662,15 +651,12 @@ func TestExecute(t *testing.T) {
 
 func TestInterrupt_Multiple(t *testing.T) {
 	t.Parallel()
-	downloadOnceFunc()
-	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
 
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 	}))
 	mockKnapsack := typesmocks.NewKnapsack(t)
-	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	testHostDataStore, err := storageci.NewStore(t, slogger, storage.PersistentHostDataStore.String())
 	require.NoError(t, err, "could not create test host data store")
 	mockKnapsack.On("PersistentHostDataStore").Return(testHostDataStore)
@@ -682,6 +668,9 @@ func TestInterrupt_Multiple(t *testing.T) {
 	}, nil)
 
 	detector := NewHardwareChangeDetector(mockKnapsack, slogger)
+	detector.getSerialAndHardwareUUID = func(_ context.Context, _ types.Knapsack) (string, string, error) {
+		return ulid.New(), ulid.New(), nil
+	}
 
 	// Start and then interrupt
 	go detector.Execute()
