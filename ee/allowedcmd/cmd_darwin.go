@@ -10,6 +10,8 @@ var Bputil = newAllowedCommand("/usr/bin/bputil")
 
 var Brew = newAllowedCommand("/opt/homebrew/bin/brew", "/usr/local/bin/brew").WithEnv("HOMEBREW_NO_AUTO_UPDATE=1")
 
+var Codesign = newAllowedCommand("/usr/bin/codesign")
+
 var Diskutil = newAllowedCommand("/usr/sbin/diskutil")
 
 var Echo = newAllowedCommand("/bin/echo")
