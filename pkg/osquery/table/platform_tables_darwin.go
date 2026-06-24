@@ -12,7 +12,6 @@ import (
 	"github.com/kolide/launcher/v2/ee/tables/apple_silicon_security_policy"
 	"github.com/kolide/launcher/v2/ee/tables/dataflattentable"
 	json "github.com/kolide/launcher/v2/ee/tables/execparsers/json"
-	"github.com/kolide/launcher/v2/ee/tables/execparsers/mapxml"
 	"github.com/kolide/launcher/v2/ee/tables/execparsers/plist"
 	"github.com/kolide/launcher/v2/ee/tables/execparsers/remotectl"
 	"github.com/kolide/launcher/v2/ee/tables/execparsers/repcli"
@@ -28,6 +27,7 @@ import (
 	"github.com/kolide/launcher/v2/ee/tables/macos_software_update"
 	"github.com/kolide/launcher/v2/ee/tables/mdmclient"
 	"github.com/kolide/launcher/v2/ee/tables/munki"
+	nix_env_upgradeable "github.com/kolide/launcher/v2/ee/tables/nix_env/upgradeable"
 	"github.com/kolide/launcher/v2/ee/tables/osquery_user_exec_table"
 	"github.com/kolide/launcher/v2/ee/tables/profiles"
 	"github.com/kolide/launcher/v2/ee/tables/pwpolicy"
@@ -126,7 +126,7 @@ func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsque
 		systemprofiler.TablePlugin(k, slogger),
 		munki.ManagedInstalls(k, slogger),
 		munki.MunkiReport(k, slogger),
-		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_nix_upgradeable", mapxml.Parser, allowedcmd.NixEnv, []string{"--query", "--installed", "-c", "--xml"}),
+		nix_env_upgradeable.TablePlugin(k, slogger),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_remotectl", remotectl.Parser, allowedcmd.Remotectl, []string{`dumpstate`}),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_socketfilterfw", socketfilterfw.Parser, allowedcmd.Socketfilterfw, []string{"--getglobalstate", "--getblockall", "--getallowsigned", "--getstealthmode"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_socketfilterfw_apps", socketfilterfw.Parser, allowedcmd.Socketfilterfw, []string{"--listapps"}, dataflattentable.WithIncludeStderr()),

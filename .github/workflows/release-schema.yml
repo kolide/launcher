@@ -1,0 +1,67 @@
+name: Attach table schema to release
+
+# Manual backfill for attaching launcher-schema.json to a tag's GitHub release.
+# The common path is automatic (combine_schema in the `ci` workflow); this covers
+# the cases it can't -- e.g. the tag was pushed before its release existed, or the
+# asset needs re-attaching.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to attach the schema to (e.g. 1.23.4)"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  attach_schema:
+    name: Attach schema
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write # required to upload the release asset
+    steps:
+      - name: Resolve tag
+        id: tag
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+        run: |
+          if [ -z "$INPUT_TAG" ]; then
+            echo "could not determine release tag" >&2
+            exit 1
+          fi
+          echo "tag=$INPUT_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Find ci run for tag
+        id: cirun
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run_id=$(gh run list \
+            --repo "${{ github.repository }}" \
+            --workflow ci \
+            --branch "${{ steps.tag.outputs.tag }}" \
+            --json databaseId,status,conclusion \
+            --jq 'first(.[] | select(.conclusion == "success" and .status == "completed")) | .databaseId')
+          if [ -z "$run_id" ]; then
+            echo "no successful ci run found for tag ${{ steps.tag.outputs.tag }}" >&2
+            exit 1
+          fi
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+
+      - name: Download combined schema
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "${{ steps.cirun.outputs.run_id }}" \
+            --repo "${{ github.repository }}" \
+            --name launcher-schema \
+            --dir .
+
+      - name: Attach schema to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ steps.tag.outputs.tag }}" launcher-schema.json \
+            --repo "${{ github.repository }}" \
+            --clobber
