@@ -183,11 +183,7 @@ func ValidateNativeMessagingArgs(osArgs []string) (string, error) {
 	if len(osArgs) != 2 && len(osArgs) != 3 {
 		return "", fmt.Errorf("unexpected number of args: expected 2 or 3, got %d", len(osArgs))
 	}
-	if len(osArgs) == 3 {
-		if osArgs[2] != "--parent-window=0" {
-			return "", fmt.Errorf("unexpected third arg %s, expected --parent-window=0", osArgs[2])
-		}
-	}
+
 	// The extension should be one that we know about. It will have an extra / at the end, which we remove
 	// before performing the lookup against our known origins.
 	potentialExtension := strings.TrimSuffix(osArgs[1], "/")
