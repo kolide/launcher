@@ -176,18 +176,34 @@ func extractIdentifierFromExecutable(executablePath string) string {
 	return identifier
 }
 
-// validateNativeMessagingRequest validates that launcher has been launched by the expected process --
-// Chrome, on behalf of a known extension.
-func validateNativeMessagingRequest(ctx context.Context) (string, error) {
-	// launcher should be called with exactly 1 argument, which is the extension.
-	if len(os.Args) != 2 {
-		return "", fmt.Errorf("unexpected number of args: expected 2, got %d", len(os.Args))
+func ValidateNativeMessagingArgs(osArgs []string) (string, error) {
+	// launcher should be called with exactly 1 argument, which is the extension,
+	// or with one additional argument on Windows:
+	// `some-path-to/launcher chrome-extension://hjlinigoblmkhjejkmbegnoaljkphmgo/ --parent-window=0`.
+	if len(osArgs) != 2 && len(osArgs) != 3 {
+		return "", fmt.Errorf("unexpected number of args: expected 2 or 3, got %d", len(osArgs))
+	}
+	if len(osArgs) == 3 {
+		if osArgs[2] != "--parent-window=0" {
+			return "", fmt.Errorf("unexpected third arg %s, expected --parent-window=0", osArgs[2])
+		}
 	}
 	// The extension should be one that we know about. It will have an extra / at the end, which we remove
 	// before performing the lookup against our known origins.
-	potentialExtension := strings.TrimSuffix(os.Args[1], "/")
+	potentialExtension := strings.TrimSuffix(osArgs[1], "/")
 	if _, ok := allowlistedDt4aOriginsLookup[potentialExtension]; !ok {
 		return "", fmt.Errorf("native messaging called from unexpected extension %s", potentialExtension)
+	}
+
+	return potentialExtension, nil
+}
+
+// validateNativeMessagingRequest validates that launcher has been launched by the expected process --
+// Chrome, on behalf of a known extension.
+func validateNativeMessagingRequest(ctx context.Context) (string, error) {
+	potentialExtension, err := ValidateNativeMessagingArgs(os.Args)
+	if err != nil {
+		return "", fmt.Errorf("unexpected args for native messaging request: %w", err)
 	}
 
 	// Get the calling process so we can validate it

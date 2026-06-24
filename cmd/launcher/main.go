@@ -39,17 +39,14 @@ func main() {
 // or running `runLauncher`. We wrap it so that all our deferred calls will execute before we call
 // `os.Exit` in `main()`.
 func runMain() int {
-	// Check to see if this is a native messaging host invocation, which looks like:
-	// `some-path-to/launcher chrome-extension://hjlinigoblmkhjejkmbegnoaljkphmgo/`
+	// Check to see if this is a native messaging host invocation.
 	// We have to check and handle the native messaging host invocation case first,
 	// before even initializing logging, because we should not write logs to os.Stdout when following
 	// the native messaging protocol.
-	if len(os.Args) == 2 {
-		if _, ok := nativemessaging.AllowlistedDt4aOriginsLookup()[strings.TrimSuffix(os.Args[1], "/")]; ok {
-			// Native messaging host invocation -- continues reading until closed
-			nativemessaging.ReadNativeMessages(context.Background())
-			return 0
-		}
+	if _, err := nativemessaging.ValidateNativeMessagingArgs(os.Args); err == nil {
+		// Native messaging host invocation -- continues reading until closed
+		nativemessaging.ReadNativeMessages(context.Background())
+		return 0
 	}
 
 	systemSlogger, logCloser, err := multislogger.SystemSlogger()

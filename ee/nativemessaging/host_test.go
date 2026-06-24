@@ -10,6 +10,59 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestValidateNativeMessagingArgs(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		testCaseName      string
+		osArgs            []string
+		expectedExtension string
+		expectedValid     bool
+	}{
+		{
+			testCaseName:      "too few args",
+			osArgs:            []string{"launcher"},
+			expectedExtension: "",
+			expectedValid:     false,
+		},
+		{
+			testCaseName:      "too many args",
+			osArgs:            []string{"launcher", "chrome-extension://bkpbhnjcbehoklfkljkkbbmipaphipgl/", "--parent-window=0", "another", "arg"},
+			expectedExtension: "",
+			expectedValid:     false,
+		},
+		{
+			testCaseName:      "macOS invocation",
+			osArgs:            []string{"launcher", "chrome-extension://bkpbhnjcbehoklfkljkkbbmipaphipgl/"},
+			expectedExtension: "chrome-extension://bkpbhnjcbehoklfkljkkbbmipaphipgl",
+			expectedValid:     true,
+		},
+		{
+			testCaseName:      "Windows invocation",
+			osArgs:            []string{"launcher", "chrome-extension://bkpbhnjcbehoklfkljkkbbmipaphipgl/", "--parent-window=0"},
+			expectedExtension: "chrome-extension://bkpbhnjcbehoklfkljkkbbmipaphipgl",
+			expectedValid:     true,
+		},
+		{
+			testCaseName:      "invalid extension",
+			osArgs:            []string{"launcher", "chrome-extension://abcdabcdabcdabcd/"},
+			expectedExtension: "",
+			expectedValid:     false,
+		},
+	} {
+		t.Run(tt.testCaseName, func(t *testing.T) {
+			t.Parallel()
+
+			extension, err := ValidateNativeMessagingArgs(tt.osArgs)
+			if tt.expectedValid {
+				require.NoError(t, err)
+				require.Equal(t, tt.expectedExtension, extension)
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
+}
+
 func Test_extractIdentifierFromExecutable(t *testing.T) {
 	t.Parallel()
 
