@@ -9,15 +9,27 @@ import (
 	"strings"
 )
 
-// manifest represents a native messaging host config.
-// See https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging#native-messaging-host
-type manifest struct {
-	Name           string   `json:"name"`
-	Description    string   `json:"description"`
-	Path           string   `json:"path"`
-	Type           string   `json:"type"`
-	AllowedOrigins []string `json:"allowed_origins"`
-}
+type (
+	// See https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging#native-messaging-host
+	chromeManifest struct {
+		manifest
+		AllowedOrigins []string `json:"allowed_origins"` // Chrome-only
+	}
+	// See https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Native_manifests
+	firefoxManifest struct {
+		manifest
+		AllowedExtensions []string `json:"allowed_extensions"` // Firefox-only
+	}
+	// manifest represents a native messaging host config -- configs between browsers largely have overlap,
+	// but Firefox will not load a config that has `allowed_origins` in it, so we have to keep
+	// chromeManifest and firefoxManifest separate.
+	manifest struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		Path        string `json:"path"`
+		Type        string `json:"type"`
+	}
+)
 
 const (
 	nativeMessagingHostDescription = "Device Trust Agent"
@@ -61,11 +73,15 @@ func AllowlistedDt4aOriginsLookup() map[string]struct{} {
 // to write the manifest to, and the registry key path for the manifest file on Windows.
 func WriteNativeMessagingManifest(rootDir string, identifier string) error {
 	hostName := nativeMessagingHostName(identifier)
-	return writeManifest(launcherManifestFilePath(rootDir), manifestFileRegistrationLocations(hostName), hostName)
+	chromeManifest, _, err := buildManifests(hostName)
+	if err != nil {
+		return fmt.Errorf("building manifests: %w", err)
+	}
+	return writeManifest(chromeManifest, launcherChromeManifestFilePath(rootDir), chromeManifestFileRegistrationLocations(hostName))
 }
 
-func launcherManifestFilePath(rootDir string) string {
-	return filepath.Join(rootDir, "nmh-manifest.json")
+func launcherChromeManifestFilePath(rootDir string) string {
+	return filepath.Join(rootDir, "chrome-nmh-manifest.json")
 }
 
 func nativeMessagingHostName(identifier string) string {
@@ -78,13 +94,8 @@ func nativeMessagingHostName(identifier string) string {
 // writeManifest builds a manifest to register launcher as a native messaging host,
 // and writes it to the specified location at `manifestFilePath`, and then registers that location
 // with each location in `registrationLocations`.
-func writeManifest(manifestFilePath string, registrationLocations []string, hostName string) error {
-	m, err := buildManifest(hostName)
-	if err != nil {
-		return fmt.Errorf("building manifest: %w", err)
-	}
-
-	rawManifest, err := json.Marshal(m)
+func writeManifest(manifestToWrite any, manifestFilePath string, registrationLocations []string) error {
+	rawManifest, err := json.Marshal(manifestToWrite)
 	if err != nil {
 		return fmt.Errorf("marshalling manifest: %w", err)
 	}
@@ -112,11 +123,19 @@ func writeManifest(manifestFilePath string, registrationLocations []string, host
 	return nil
 }
 
-func buildManifest(hostName string) (*manifest, error) {
+func buildManifests(hostName string) (*chromeManifest, *firefoxManifest, error) {
 	launcherPath, err := os.Executable()
 	if err != nil {
-		return nil, fmt.Errorf("getting current executable path: %w", err)
+		return nil, nil, fmt.Errorf("getting current executable path: %w", err)
 	}
+	sharedManifest := manifest{
+		Name:        hostName,
+		Description: nativeMessagingHostDescription,
+		Path:        launcherPath,
+		Type:        nativeMessagingInterfaceType,
+	}
+
+	// Allowed origins (Chrome-only)
 	allowedOrigins := make([]string, 0)
 	for allowedOrigin := range allowlistedDt4aOriginsLookup {
 		if !strings.HasPrefix(allowedOrigin, "chrome-extension://") {
@@ -125,18 +144,19 @@ func buildManifest(hostName string) (*manifest, error) {
 		allowedOrigins = append(allowedOrigins, allowedOrigin+"/")
 	}
 	slices.Sort(allowedOrigins) // sort to maintain consistent ordering of origins
-	return &manifest{
-		Name:           hostName,
-		Description:    nativeMessagingHostDescription,
-		Path:           launcherPath,
-		Type:           nativeMessagingInterfaceType,
-		AllowedOrigins: allowedOrigins,
-	}, nil
+
+	return &chromeManifest{
+			manifest:       sharedManifest,
+			AllowedOrigins: allowedOrigins,
+		}, &firefoxManifest{
+			manifest:          sharedManifest,
+			AllowedExtensions: []string{},
+		}, nil
 }
 
 func RemoveNativeMessagingManifest(rootDir string, identifier string) error {
 	hostName := nativeMessagingHostName(identifier)
-	return removeManifest(launcherManifestFilePath(rootDir), manifestFileRegistrationLocations(hostName))
+	return removeManifest(launcherChromeManifestFilePath(rootDir), chromeManifestFileRegistrationLocations(hostName))
 }
 
 func removeManifest(manifestFilePath string, registrationLocations []string) error {

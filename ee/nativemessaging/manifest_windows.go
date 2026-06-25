@@ -10,10 +10,10 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
-// manifestFileRegistrationLocations returns the registry key where we should write the path to the
+// chromeManifestFileRegistrationLocations returns the registry key where we should write the path to the
 // native messaging manifest file.
 // See: https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging#native-messaging-host-location
-func manifestFileRegistrationLocations(hostName string) []string {
+func chromeManifestFileRegistrationLocations(hostName string) []string {
 	return []string{`SOFTWARE\Google\Chrome\NativeMessagingHosts\` + hostName}
 }
 

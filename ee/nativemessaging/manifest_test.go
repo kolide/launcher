@@ -37,8 +37,10 @@ func Test_writeManifest_removeManifest(t *testing.T) {
 		)
 	}
 
-	expectedManifestPath := launcherManifestFilePath(rootDir)
-	require.NoError(t, writeManifest(expectedManifestPath, manifestRegistrationPaths, hostName))
+	expectedManifestPath := launcherChromeManifestFilePath(rootDir)
+	m, _, err := buildManifests(hostName)
+	require.NoError(t, err)
+	require.NoError(t, writeManifest(m, expectedManifestPath, manifestRegistrationPaths))
 
 	// Confirm valid data written to expected path
 	currentExe, err := os.Executable()
@@ -49,14 +51,14 @@ func Test_writeManifest_removeManifest(t *testing.T) {
 	fileContents, err := os.ReadFile(expectedManifestPath)
 	require.NoError(t, err)
 
-	var currentManifest manifest
-	require.NoError(t, json.Unmarshal(fileContents, &currentManifest))
+	var currentChromeManifest chromeManifest
+	require.NoError(t, json.Unmarshal(fileContents, &currentChromeManifest))
 
-	require.Equal(t, hostName, currentManifest.Name)
-	require.Equal(t, nativeMessagingHostDescription, currentManifest.Description)
-	require.Equal(t, currentExe, currentManifest.Path)
-	require.Equal(t, nativeMessagingInterfaceType, currentManifest.Type)
-	require.Less(t, 0, len(currentManifest.AllowedOrigins))
+	require.Equal(t, hostName, currentChromeManifest.Name)
+	require.Equal(t, nativeMessagingHostDescription, currentChromeManifest.Description)
+	require.Equal(t, currentExe, currentChromeManifest.Path)
+	require.Equal(t, nativeMessagingInterfaceType, currentChromeManifest.Type)
+	require.Less(t, 0, len(currentChromeManifest.AllowedOrigins))
 
 	// Check existence of symlinks on macOS/Linux (registry key for Windows tested separately in Test_registerManifestFileLocation)
 	if runtime.GOOS != "windows" {
@@ -76,7 +78,7 @@ func Test_writeManifest_removeManifest(t *testing.T) {
 	}
 
 	// Confirm no error on re-writing manifest
-	require.NoError(t, writeManifest(expectedManifestPath, manifestRegistrationPaths, hostName))
+	require.NoError(t, writeManifest(m, expectedManifestPath, manifestRegistrationPaths))
 
 	// Now, remove the manifest
 	require.NoError(t, removeManifest(expectedManifestPath, manifestRegistrationPaths))
