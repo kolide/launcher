@@ -25,7 +25,8 @@ const (
 // In case of variable install locations, we allowlist the executable name rather than
 // the full path.
 var allowlistedBrowsers = map[string]string{
-	"chrome.exe": "Google LLC", // Covers stable, beta, dev, and canary
+	"chrome.exe":  "Google LLC", // Covers stable, beta, dev, and canary
+	"firefox.exe": "Mozilla Corporation",
 }
 
 // validateBrowser confirms that the given path is a known browser
