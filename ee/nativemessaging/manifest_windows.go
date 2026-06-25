@@ -17,6 +17,13 @@ func chromeManifestFileRegistrationLocations(hostName string) []string {
 	return []string{`SOFTWARE\Google\Chrome\NativeMessagingHosts\` + hostName}
 }
 
+// firefoxManifestFileRegistrationLocations returns the registry key where we should write the path to the
+// native messaging manifest file.
+// See: https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Native_manifests#manifest_location
+func firefoxManifestFileRegistrationLocations(hostName string) []string {
+	return []string{`SOFTWARE\Mozilla\NativeMessagingHosts\` + hostName}
+}
+
 // registerManifestFileLocation writes the manifest file location to the expected registry key
 // at `registrationPath` so that Chrome knows where to find it.
 // See: https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging#native-messaging-host-location

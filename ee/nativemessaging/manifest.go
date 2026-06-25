@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 )
 
@@ -73,15 +72,25 @@ func AllowlistedDt4aOriginsLookup() map[string]struct{} {
 // to write the manifest to, and the registry key path for the manifest file on Windows.
 func WriteNativeMessagingManifest(rootDir string, identifier string) error {
 	hostName := nativeMessagingHostName(identifier)
-	chromeManifest, _, err := buildManifests(hostName)
+	chromeManifest, firefoxManifest, err := buildManifests(hostName)
 	if err != nil {
 		return fmt.Errorf("building manifests: %w", err)
 	}
-	return writeManifest(chromeManifest, launcherChromeManifestFilePath(rootDir), chromeManifestFileRegistrationLocations(hostName))
+
+	chromeWriteErr := writeManifest(chromeManifest, launcherChromeManifestFilePath(rootDir), chromeManifestFileRegistrationLocations(hostName))
+	firefoxWriteErr := writeManifest(firefoxManifest, launcherFirefoxManifestFilePath(rootDir), firefoxManifestFileRegistrationLocations(hostName))
+	if chromeWriteErr != nil || firefoxWriteErr != nil {
+		return fmt.Errorf("writing manifest files: chrome: %v; firefox: %v", chromeWriteErr, firefoxWriteErr)
+	}
+	return nil
 }
 
 func launcherChromeManifestFilePath(rootDir string) string {
 	return filepath.Join(rootDir, "chrome-nmh-manifest.json")
+}
+
+func launcherFirefoxManifestFilePath(rootDir string) string {
+	return filepath.Join(rootDir, "firefox-nmh-manifest.json")
 }
 
 func nativeMessagingHostName(identifier string) string {
@@ -135,22 +144,25 @@ func buildManifests(hostName string) (*chromeManifest, *firefoxManifest, error) 
 		Type:        nativeMessagingInterfaceType,
 	}
 
-	// Allowed origins (Chrome-only)
-	allowedOrigins := make([]string, 0)
+	allowedChromeOrigins := make([]string, 0)
+	allowedFirefoxExtensions := make([]string, 0)
 	for allowedOrigin := range allowlistedDt4aOriginsLookup {
-		if !strings.HasPrefix(allowedOrigin, "chrome-extension://") {
+		if strings.HasPrefix(allowedOrigin, "chrome-extension://") {
+			allowedChromeOrigins = append(allowedChromeOrigins, allowedOrigin+"/")
 			continue
 		}
-		allowedOrigins = append(allowedOrigins, allowedOrigin+"/")
+		if originWithPrefixTrimmed, ok := strings.CutPrefix(allowedOrigin, "moz-extension://"); ok {
+			allowedFirefoxExtensions = append(allowedFirefoxExtensions, fmt.Sprintf("{%s}", originWithPrefixTrimmed))
+			continue
+		}
 	}
-	slices.Sort(allowedOrigins) // sort to maintain consistent ordering of origins
 
 	return &chromeManifest{
 			manifest:       sharedManifest,
-			AllowedOrigins: allowedOrigins,
+			AllowedOrigins: allowedChromeOrigins,
 		}, &firefoxManifest{
 			manifest:          sharedManifest,
-			AllowedExtensions: []string{},
+			AllowedExtensions: allowedFirefoxExtensions,
 		}, nil
 }
 
