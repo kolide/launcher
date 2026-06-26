@@ -198,7 +198,7 @@ func ValidateNativeMessagingArgs(osArgs []string) (string, error) {
 	// is the extension ID. We require at least Firefox 55 here so that we can validate
 	// the extension ID.
 	if len(osArgs) != 3 {
-		return "", fmt.Errorf("extension does not match for Chrome, and wrong number of args for Firefox: %s", strings.Join(os.Args, ","))
+		return "", fmt.Errorf("extension does not match for Chrome, and wrong number of args for Firefox: %s", strings.Join(osArgs, ","))
 	}
 	// The extension ID in the args will be formatted like {0a75d802-9aed-41e7-8daa-24c067386e82};
 	// update its format to moz-extension://0a75d802-9aed-41e7-8daa-24c067386e82 for the lookup.
@@ -207,7 +207,7 @@ func ValidateNativeMessagingArgs(osArgs []string) (string, error) {
 		return potentialExtension, nil
 	}
 
-	return "", fmt.Errorf("native messaging called with unexpected args: %s", strings.Join(os.Args, ","))
+	return "", fmt.Errorf("native messaging called with unexpected args: %s", strings.Join(osArgs, ","))
 }
 
 // validateNativeMessagingRequest validates that launcher has been launched by the expected process --
