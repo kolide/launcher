@@ -168,7 +168,12 @@ func buildManifests(hostName string) (*chromeManifest, *firefoxManifest, error) 
 
 func RemoveNativeMessagingManifest(rootDir string, identifier string) error {
 	hostName := nativeMessagingHostName(identifier)
-	return removeManifest(launcherChromeManifestFilePath(rootDir), chromeManifestFileRegistrationLocations(hostName))
+	chromeRemoveErr := removeManifest(launcherChromeManifestFilePath(rootDir), chromeManifestFileRegistrationLocations(hostName))
+	firefoxRemoveErr := removeManifest(launcherFirefoxManifestFilePath(rootDir), firefoxManifestFileRegistrationLocations(hostName))
+	if chromeRemoveErr != nil || firefoxRemoveErr != nil {
+		return fmt.Errorf("removing manifest files: chrome: %v; firefox: %v", chromeRemoveErr, firefoxRemoveErr)
+	}
+	return nil
 }
 
 func removeManifest(manifestFilePath string, registrationLocations []string) error {
