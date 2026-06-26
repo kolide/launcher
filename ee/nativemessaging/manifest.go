@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -156,6 +157,9 @@ func buildManifests(hostName string) (*chromeManifest, *firefoxManifest, error) 
 			continue
 		}
 	}
+	// Maintain consistent ordering of origins
+	slices.Sort(allowedChromeOrigins)
+	slices.Sort(allowedFirefoxExtensions)
 
 	return &chromeManifest{
 			manifest:       sharedManifest,
