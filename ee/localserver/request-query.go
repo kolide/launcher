@@ -101,17 +101,28 @@ func (ls *localServer) requestScheduledQueryHandlerFunc(w http.ResponseWriter, r
 	results := make([]distributed.Result, len(scheduledQueriesQueryResults))
 
 	for i, scheduledQuery := range scheduledQueriesQueryResults {
-		results[i] = distributed.Result{
-			QueryName: scheduledQuery["name"],
+		name, nameOk := scheduledQuery["name"]
+		query, queryOk := scheduledQuery["query"]
+		if !nameOk || name == "" || !queryOk || query == "" {
+			ls.slogger.Log(r.Context(), slog.LevelError,
+				"scheduled query result missing name or query field",
+				"query_name", name,
+			)
+			results[i].Status = 1
+			continue
 		}
 
-		scheduledQueryResult, err := queryWithRetries(ls.querier, scheduledQuery["query"])
+		results[i] = distributed.Result{
+			QueryName: name,
+		}
+
+		scheduledQueryResult, err := queryWithRetries(ls.querier, query)
 		if err != nil {
 			ls.slogger.Log(r.Context(), slog.LevelError,
 				"running scheduled query on demand",
 				"err", err,
-				"query", scheduledQuery["query"],
-				"query_name", scheduledQuery["name"],
+				"query", query,
+				"query_name", name,
 			)
 
 			results[i].Status = 1
