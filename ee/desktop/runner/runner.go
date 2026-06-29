@@ -592,18 +592,21 @@ func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
 }
 
 // Ping handles notifications from the control service that a subscribed
-// subsystem (e.g. localizations) has been updated. The runner re-writes the
-// shared localization file so desktop child processes pick up the new
-// translations on their next read, and refreshes the menu so any localized
-// menu strings reflect the new locale as well.
+// subsystem (e.g. localizations) has been updated. Refreshing the menu
+// re-writes the shared localization file so desktop child processes pick up
+// the new translations on their next read, and refreshes any localized menu
+// strings so they reflect the new locale as well.
+//
+// We deliberately do not restart the desktop process here. Most localized
+// strings (menu items, and notification labels on Windows/Linux) are read
+// fresh and update live via the menu refresh. The one exception is the macOS
+// notification "Learn More" label, which is baked into the registered
+// notification category at listener startup and so only picks up a new locale
+// after the desktop process restarts. Since that label changes very rarely and
+// restarting is disruptive (drops the menu bar item, notification listener, and
+// presence sessions), we leave it to update on the next natural desktop
+// process restart rather than forcing one on every update.
 func (r *DesktopUsersProcessesRunner) Ping() {
-	if err := r.writeLocalizationFile(); err != nil {
-		r.slogger.Log(context.TODO(), slog.LevelWarn,
-			"failed to write localization file after subsystem update",
-			"err", err,
-		)
-	}
-
 	r.refreshMenu()
 }
 
