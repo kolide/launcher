@@ -69,7 +69,7 @@ func (w *windowsNotifier) SendNotification(n Notification) error {
 			{
 				Type:      "protocol",
 				Label:     learnMoreLabel(w.localizationPath),
-				Arguments: n.ActionUri,
+				Arguments: actionUri,
 			},
 		}
 	}
