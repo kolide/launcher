@@ -232,6 +232,13 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	gomaxprocsObs := newGomaxprocsObserver(slogger, k)
 	flagController.RegisterChangeObserver(gomaxprocsObs, keys.LauncherGoMaxProcs)
 
+	// Generates and stores a new run ID
+	newRunID := k.GetRunID()
+
+	// Update the local context logger and surface the knapsack-configured slogger
+	logger = log.With(logger, "run_id", newRunID)
+	slogger = k.Slogger()
+
 	// Apply GOMAXPROCS limit from control flag
 	gomaxprocsLimiter(ctx, slogger, k.LauncherGoMaxProcs())
 
@@ -241,13 +248,6 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	flagController.RegisterChangeObserver(multiSlogger, keys.DuplicateLogWindow)
 	// Set initial dedup window from current flag value
 	multiSlogger.UpdateDuplicateLogWindow(flagController.DuplicateLogWindow())
-
-	// Generate a new run ID
-	newRunID := k.GetRunID()
-
-	// Apply the run ID to both logger and slogger
-	logger = log.With(logger, "run_id", newRunID)
-	slogger = slogger.With("run_id", newRunID)
 
 	// set start time, first runtime, first version
 	initLauncherHistory(k)
