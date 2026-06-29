@@ -24,15 +24,17 @@
 
 NotificationDelegate *notificationDelegate;
 
-void runNotificationListenerApp(void) {
+void runNotificationListenerApp(char *cLearnMoreLabel) {
     @autoreleasepool {
         [NSApplication sharedApplication];
 
         UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
 
+        NSString *learnMoreTitle = [NSString stringWithUTF8String:cLearnMoreLabel];
+
         // Define our custom notification category with actions we will want to use on notifications later
         UNNotificationAction *learnMoreAction = [UNNotificationAction actionWithIdentifier:@"LearnMoreAction"
-            title:@"Learn More" options:UNNotificationActionOptionNone];
+            title:learnMoreTitle options:UNNotificationActionOptionNone];
 
         UNNotificationCategory *category = [UNNotificationCategory categoryWithIdentifier:@"KolideNotificationWithButtonCategory"
             actions:@[learnMoreAction] intentIdentifiers:@[]

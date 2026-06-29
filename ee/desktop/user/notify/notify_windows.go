@@ -13,17 +13,19 @@ import (
 )
 
 type windowsNotifier struct {
-	slogger      *slog.Logger
-	iconFilepath string
-	interrupt    chan struct{}
-	interrupted  atomic.Bool
+	slogger          *slog.Logger
+	iconFilepath     string
+	localizationPath string
+	interrupt        chan struct{}
+	interrupted      atomic.Bool
 }
 
-func NewDesktopNotifier(slogger *slog.Logger, iconFilepath string) *windowsNotifier {
+func NewDesktopNotifier(slogger *slog.Logger, iconFilepath string, localizationPath string) *windowsNotifier {
 	return &windowsNotifier{
-		slogger:      slogger.With("component", "desktop_notifier"),
-		iconFilepath: iconFilepath,
-		interrupt:    make(chan struct{}),
+		slogger:          slogger.With("component", "desktop_notifier"),
+		iconFilepath:     iconFilepath,
+		localizationPath: localizationPath,
+		interrupt:        make(chan struct{}),
 	}
 }
 
@@ -66,7 +68,7 @@ func (w *windowsNotifier) SendNotification(n Notification) error {
 		notification.Actions = []toast.Action{
 			{
 				Type:      "protocol",
-				Label:     "Learn More",
+				Label:     learnMoreLabel(w.localizationPath),
 				Arguments: actionUri,
 			},
 		}

@@ -852,3 +852,39 @@ func createTestEnrollSecret(t *testing.T, munemo string) string {
 
 	return signedTokenStr
 }
+
+// Retrieving a RunID should fetch a consistent ID. It also shouldn't replace the pointers
+// to our internal loggers which are exposed via APIs.
+func TestGetRunID(t *testing.T) { //nolint:paralleltest
+	newKnapsack := func() *knapsack {
+		enrollmentDetailsStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.EnrollmentDetailsStore.String())
+		require.NoError(t, err)
+		return New(map[storage.Store]types.KVStore{
+			storage.EnrollmentDetailsStore: enrollmentDetailsStore,
+		}, nil, nil, multislogger.New(), multislogger.New())
+	}
+
+	t.Run("generates and returns same ID", func(t *testing.T) { //nolint:paralleltest
+		runID = "" // reset global, otherwise test is a no-op
+		testKnapsack := newKnapsack()
+		runId := testKnapsack.GetRunID()
+		require.NotEmpty(t, runId)
+		require.Equal(t, runId, testKnapsack.GetRunID())
+	})
+
+	// Regression: GetRunID historically orphaned existing loggers
+	// by replacing the Logger pointers in knapsack.
+	t.Run("does not orphan existing sloggers", func(t *testing.T) { //nolint:paralleltest
+		runID = "" // reset global, otherwise test is a no-op
+		testKnapsack := newKnapsack()
+		slogger := testKnapsack.Slogger()
+		systemSlogger := testKnapsack.SystemSlogger()
+		require.NotNil(t, slogger)
+		require.NotNil(t, systemSlogger)
+
+		testKnapsack.GetRunID()
+
+		require.Equal(t, slogger, testKnapsack.Slogger())
+		require.Equal(t, systemSlogger, testKnapsack.SystemSlogger())
+	})
+}

@@ -56,6 +56,11 @@
         "future": "in %{time}",
         "past": "%{time} ago"
       }
+    },
+    "notifications": {
+      "actions": {
+        "learn_more": "Learn More"
+      }
     }
   }
 }

@@ -16,7 +16,16 @@ type LocalizationData struct {
 }
 
 type Translations struct {
-	Datetime Datetime `json:"datetime"`
+	Datetime      Datetime      `json:"datetime"`
+	Notifications Notifications `json:"notifications,omitempty"`
+}
+
+// Notifications holds translations for desktop notification UI strings
+// rendered by the launcher itself (not server-controlled title/body).
+type Notifications struct {
+	Actions struct {
+		LearnMore string `json:"learn_more,omitempty"`
+	} `json:"actions,omitempty"`
 }
 
 // PluralForms holds translations for all CLDR plural categories.

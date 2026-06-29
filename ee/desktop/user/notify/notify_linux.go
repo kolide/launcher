@@ -16,6 +16,7 @@ import (
 
 type dbusNotifier struct {
 	iconFilepath        string
+	localizationPath    string
 	slogger             *slog.Logger
 	conn                *dbus.Conn
 	signal              chan *dbus.Signal
@@ -35,7 +36,7 @@ const (
 // the correct default browser.
 var browserLaunchers = []allowedcmd.AllowedCommand{allowedcmd.XdgOpen, allowedcmd.XWwwBrowser}
 
-func NewDesktopNotifier(slogger *slog.Logger, iconFilepath string) *dbusNotifier {
+func NewDesktopNotifier(slogger *slog.Logger, iconFilepath string, localizationPath string) *dbusNotifier {
 	conn, err := dbus.ConnectSessionBus()
 	if err != nil {
 		slogger.Log(context.TODO(), slog.LevelWarn,
@@ -46,6 +47,7 @@ func NewDesktopNotifier(slogger *slog.Logger, iconFilepath string) *dbusNotifier
 
 	return &dbusNotifier{
 		iconFilepath:        iconFilepath,
+		localizationPath:    localizationPath,
 		slogger:             slogger.With("component", "desktop_notifier"),
 		conn:                conn,
 		signal:              make(chan *dbus.Signal),
@@ -166,7 +168,7 @@ func (d *dbusNotifier) sendNotificationViaDbus(n Notification) error {
 
 	actions := []string{}
 	if n.ActionUri != "" {
-		actions = append(actions, n.ActionUri, "Learn More")
+		actions = append(actions, n.ActionUri, learnMoreLabel(d.localizationPath))
 	}
 
 	notificationsService := conn.Object(notificationServiceInterface, notificationServiceObj)
@@ -210,7 +212,7 @@ func (d *dbusNotifier) sendNotificationViaNotifySend(n Notification) error {
 	// notify-send doesn't support actions, but URLs in notifications are clickable in at least
 	// some desktop environments.
 	if n.ActionUri != "" {
-		n.Body += " Learn More: " + n.ActionUri
+		n.Body += " " + learnMoreLabel(d.localizationPath) + ": " + n.ActionUri
 	}
 
 	args := []string{n.Title, n.Body}
