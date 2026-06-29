@@ -81,8 +81,8 @@ func New(stores map[storage.Store]types.KVStore, flags types.Flags, db *bbolt.DB
 func (k *knapsack) GetRunID() string {
 	if runID == "" {
 		runID = ulid.New()
-		k.slogger.Logger = k.slogger.With("run_id", runID)
-		k.systemSlogger.Logger = k.systemSlogger.With("run_id", runID)
+		*k.slogger.Logger = *k.slogger.With("run_id", runID)
+		*k.systemSlogger.Logger = *k.systemSlogger.With("run_id", runID)
 	}
 	return runID
 }
