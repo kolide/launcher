@@ -41,7 +41,7 @@ func (a *authedHttpSender) Send(r io.Reader) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 300 {
-		bodyData, err := io.ReadAll(resp.Request.Body)
+		bodyData, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return fmt.Errorf("received non 200 http status code: %d, error reading body response body %w", resp.StatusCode, err)
 		}
