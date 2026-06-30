@@ -2,6 +2,7 @@ package sendbuffer
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -94,7 +95,7 @@ func TestSendBuffer(t *testing.T) {
 			}
 
 			for i := 0; i < len(tt.expectedReceives); i++ {
-				require.NoError(t, sb.sendAndPurge())
+				require.NoError(t, sb.sendAndPurge(context.Background()))
 
 				for {
 					// wait for the send to finish
@@ -138,7 +139,7 @@ func TestSendAndPurgeHandlesLogBufferFullPurge(t *testing.T) {
 	go func() {
 		for !testCompleted.Load() {
 			time.Sleep(50 * time.Millisecond)
-			sb.sendAndPurge()
+			sb.sendAndPurge(context.Background())
 		}
 	}()
 
@@ -504,7 +505,7 @@ type testSender struct {
 	allReceived  [][]byte
 }
 
-func (s *testSender) Send(r io.Reader) error {
+func (s *testSender) Send(_ context.Context, r io.Reader) error {
 	s.lastReceived.Reset()
 	data, err := io.ReadAll(r)
 	require.NoError(s.t, err)

@@ -13,7 +13,7 @@ import (
 )
 
 type sender interface {
-	Send(r io.Reader) error
+	Send(ctx context.Context, r io.Reader) error
 }
 
 var (
@@ -148,7 +148,7 @@ func (sb *SendBuffer) Run(ctx context.Context) error {
 	}()
 
 	for {
-		if err := sb.sendAndPurge(); err != nil {
+		if err := sb.sendAndPurge(ctx); err != nil {
 			sb.logger.Log("msg", "failed to send and purge", "err", err)
 		}
 
@@ -266,7 +266,7 @@ func (sb *SendBuffer) DeleteAllData() {
 	sb.size = 0
 }
 
-func (sb *SendBuffer) sendAndPurge() error {
+func (sb *SendBuffer) sendAndPurge(ctx context.Context) error {
 	if !sb.sendMutex.TryLock() {
 		sb.logger.Log("msg", "could not get lock on send mutex, will retry")
 		return nil
@@ -283,7 +283,7 @@ func (sb *SendBuffer) sendAndPurge() error {
 		return nil
 	}
 
-	if err := sb.sender.Send(toSendBuff); err != nil {
+	if err := sb.sender.Send(ctx, toSendBuff); err != nil {
 		sb.logger.Log("msg", "failed to send, will retry", "err", err)
 		return nil
 	}

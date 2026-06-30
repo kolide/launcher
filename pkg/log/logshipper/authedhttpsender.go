@@ -15,6 +15,7 @@ type authedHttpSender struct {
 	client    *http.Client
 }
 
+// Creates a generic HTTP client with an overall 30s timeout.
 func newAuthHttpSender() *authedHttpSender {
 	return &authedHttpSender{
 		client: &http.Client{
@@ -23,10 +24,7 @@ func newAuthHttpSender() *authedHttpSender {
 	}
 }
 
-func (a *authedHttpSender) Send(r io.Reader) error {
-	ctx, cancel := context.WithTimeout(context.Background(), a.client.Timeout)
-	defer cancel()
-
+func (a *authedHttpSender) Send(ctx context.Context, r io.Reader) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, a.endpoint, r)
 	if err != nil {
 		return err
