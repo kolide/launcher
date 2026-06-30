@@ -299,7 +299,7 @@ func (ls *LogShipper) updateSenderAuthToken() error {
 		return errors.New("no token found")
 	}
 
-	ls.sender.authtoken = string(token)
+	ls.sender.authtoken.Store(string(token))
 	return nil
 }
 
@@ -311,11 +311,11 @@ func (ls *LogShipper) updateLogIngestURL() error {
 	}
 
 	if parsedUrl == nil || parsedUrl.String() == "" {
-		ls.sender.endpoint = ""
+		ls.sender.endpoint.Store("")
 		return errors.New("log ingest url is empty")
 	}
 
-	ls.sender.endpoint = parsedUrl.String()
+	ls.sender.endpoint.Store(parsedUrl.String())
 	return nil
 }
 

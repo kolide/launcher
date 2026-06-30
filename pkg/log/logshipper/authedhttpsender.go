@@ -7,11 +7,13 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/kolide/launcher/v2/pkg/atomic"
 )
 
 type authedHttpSender struct {
-	endpoint  string
-	authtoken string
+	endpoint  atomic.String
+	authtoken atomic.String
 	client    *http.Client
 }
 
@@ -25,12 +27,12 @@ func newAuthHttpSender() *authedHttpSender {
 }
 
 func (a *authedHttpSender) Send(ctx context.Context, r io.Reader) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, a.endpoint, r)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, a.endpoint.Load(), r)
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/octet-stream")
-	req.Header.Set("authorization", a.authtoken)
+	req.Header.Set("authorization", a.authtoken.Load())
 
 	resp, err := a.client.Do(req)
 	if err != nil {
