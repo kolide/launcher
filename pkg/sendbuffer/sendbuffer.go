@@ -290,7 +290,7 @@ func (sb *SendBuffer) sendAndPurge(ctx context.Context) error {
 
 	if err := sb.sender.Send(ctx, toSendBuff); err != nil {
 		sb.logger.Log("msg", "failed to send, will retry", "err", err)
-		return nil
+		return err
 	}
 
 	// testing on a new enrollment in debug mode, log size hit 130K bytes
