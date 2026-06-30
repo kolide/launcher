@@ -17,8 +17,14 @@ type sender interface {
 }
 
 var (
-	defaultMaxSizeBytes  = 512 * 1024
-	defaultSendSizeBytes = 8 * 1024
+	// default bytes buffered before dropping incoming data
+	defaultMaxSizeBytes = 1024 * 1024
+	// default bytes sent at one time per send tick
+	defaultSendSizeBytes = 512 * 1024
+	// default interval at which to send
+	defaultSendInterval = 1 * time.Minute
+	// discards a write which exceeds this amount
+	maxWriteBytes = 8 * 1024
 )
 
 type SendBuffer struct {
@@ -67,7 +73,7 @@ func New(sender sender, opts ...option) *SendBuffer {
 		maxStorageSizeBytes: defaultMaxSizeBytes,
 		maxSendSizeBytes:    defaultSendSizeBytes,
 		sender:              sender,
-		sendTicker:          time.NewTicker(1 * time.Minute),
+		sendTicker:          time.NewTicker(defaultSendInterval),
 		logger:              log.NewNopLogger(),
 		isSending:           false,
 	}
@@ -94,13 +100,13 @@ func (sb *SendBuffer) Write(in []byte) (int, error) {
 		return len(in), nil
 	}
 
-	// if the single data piece is larger than the max send size, drop it and log
-	if len(in) > sb.maxSendSizeBytes {
+	// if the single data piece is excessively large, drop it and log
+	if len(in) > maxWriteBytes {
 		sb.logger.Log(
-			"msg", "dropped data because element greater than max send size",
+			"msg", "dropped data that exceeds maximum write bytes",
 			"method", "Write",
 			"size_of_data_bytes", len(in),
-			"max_send_size_bytes", sb.maxSendSizeBytes,
+			"max_write_size", maxWriteBytes,
 			"head", string(in)[0:minInt(len(in), 100)],
 		)
 		return len(in), nil
@@ -128,7 +134,7 @@ func (sb *SendBuffer) Write(in []byte) (int, error) {
 	}
 
 	// If we don't make a copy of the data, we get data loss in the logs array.
-	// It seems the input gets concurrenlty overridden somewhere under the hood.
+	// It seems the input gets concurrently overridden somewhere under the hood.
 	data := make([]byte, len(in))
 	copy(data, in)
 
