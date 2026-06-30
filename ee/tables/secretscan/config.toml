@@ -37,7 +37,7 @@ stopwords = ["RSA_1024", "RSA_2048", "RSA_3072", "RSA_4096", "EC_prime256v1", "E
 description = "Ignore base64-encoded SHA256 hashes of APK signing certificates"
 condition = "AND"
 regexTarget = "line"
-regexes = ['''.*android:apk-key-hash:.*''']
+regexes = ['''android:apk-key-hash:''']
 
 [[rules]]
 id = "private-key"
