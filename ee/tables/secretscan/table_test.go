@@ -600,6 +600,16 @@ MC4CAQAwBQYDK2VwBCIEIALEbo1EFnWFqBK/wC+hhypG/8hXEerwdNetAoFoFVdv
 			rawData:         `1prk-25qx-vsex-bgmd-7cen-6yjn-java-drq3-dh2b-oic4-st4f-clua-bufs-vrna`,
 			expectedFinding: false,
 		},
+		{
+			testCaseName:    "APK key hash",
+			rawData:         `android:apk-key-hash:H9aaJx3lOZCaxVnsZU5__AZkVjXJALA11rtegEE0Ldc`,
+			expectedFinding: false,
+		},
+		{
+			testCaseName:    "APK key hash, middle of string",
+			rawData:         `TEST=android:apk-key-hash:H9aaJx3lOZCaxVnsZU5__AZkVjXJALA11rtegEE0Ldc`,
+			expectedFinding: false,
+		},
 	} {
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
