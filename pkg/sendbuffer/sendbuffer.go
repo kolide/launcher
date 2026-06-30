@@ -156,12 +156,6 @@ func (sb *SendBuffer) Run(ctx context.Context) error {
 		case <-sb.sendTicker.C:
 			continue
 		case <-ctx.Done():
-			// Send one final batch, if possible, so that we can get logs related to shutdowns.
-			// Sleep for one second first to allow any shutdown-related logs to be written.
-			time.Sleep(1 * time.Second)
-			if err := sb.sendAndPurge(); err != nil {
-				sb.logger.Log("msg", "failed to send final batch of logs on shutdown", "err", err)
-			}
 			return nil
 		}
 	}
@@ -264,6 +258,11 @@ func (sb *SendBuffer) DeleteAllData() {
 	defer sb.writeMutex.Unlock()
 	sb.logs = nil
 	sb.size = 0
+}
+
+// Attempts to drain the send buffer.
+func (sb *SendBuffer) Drain(ctx context.Context) error {
+	return sb.sendAndPurge(ctx)
 }
 
 func (sb *SendBuffer) sendAndPurge(ctx context.Context) error {

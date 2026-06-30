@@ -30,6 +30,7 @@ const (
 	truncatedFormatString = "%s[TRUNCATED]"
 	defaultSendInterval   = 1 * time.Minute
 	debugSendInterval     = 5 * time.Second
+	maxDrainTimeout       = 5 * time.Second
 )
 
 type LogShipper struct {
@@ -152,6 +153,18 @@ func (ls *LogShipper) Stop(_ error) {
 
 	if ls.stopFunc != nil {
 		ls.stopFunc()
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), maxDrainTimeout)
+	defer cancel()
+
+	// Try to send any buffered logs without blocking process exit for too long.
+	if err := ls.sendBuffer.Drain(ctx); err != nil {
+		ls.knapsack.Slogger().Log(context.Background(), slog.LevelError,
+			"draining buffered logs errored",
+			"err",
+			err,
+		)
 	}
 }
 
