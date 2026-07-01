@@ -18,6 +18,7 @@ var allowlistedBrowsers = map[string]struct{}{
 	"chromium":                 {},
 	"chromium-browser":         {},
 	"chromium-browser-privacy": {}, // RPM
+	"xdg-desktop-portal":       {}, // Firefox distributed via Snap or Flatpak
 }
 
 // validateBrowser checks that the given path is a known browser where the executable

@@ -177,21 +177,37 @@ func extractIdentifierFromExecutable(executablePath string) string {
 }
 
 func ValidateNativeMessagingArgs(osArgs []string) (string, error) {
-	// launcher should be called with exactly 1 argument, which is the extension,
-	// or with one additional argument on Windows:
-	// `some-path-to/launcher chrome-extension://hjlinigoblmkhjejkmbegnoaljkphmgo/ --parent-window=0`.
+	// We always expect launcher to be called with 1 or 2 arguments, for both Firefox and Chrome
+	// across all OSes.
 	if len(osArgs) != 2 && len(osArgs) != 3 {
 		return "", fmt.Errorf("unexpected number of args: expected 2 or 3, got %d", len(osArgs))
 	}
 
-	// The extension should be one that we know about. It will have an extra / at the end, which we remove
-	// before performing the lookup against our known origins.
+	// For Chrome, launcher should be called with exactly 1 argument, which is the extension,
+	// or with one additional argument on Windows:
+	// `some-path-to/launcher chrome-extension://hjlinigoblmkhjejkmbegnoaljkphmgo/ --parent-window=0`.
+	// We check for this case first, evaluating the first arg against our lookup map. We strip
+	// the / suffix before performing the lookup against our known origins.
 	potentialExtension := strings.TrimSuffix(osArgs[1], "/")
-	if _, ok := allowlistedDt4aOriginsLookup[potentialExtension]; !ok {
-		return "", fmt.Errorf("native messaging called from unexpected extension %s", potentialExtension)
+	if _, ok := allowlistedDt4aOriginsLookup[potentialExtension]; ok {
+		return potentialExtension, nil
 	}
 
-	return potentialExtension, nil
+	// For Firefox, launcher should be called with 1 or 2 arguments: the first argument
+	// is the path to the app manifest, and the second argument (starting in Firefox 55)
+	// is the extension ID. We explicitly do not support Firefox versions older than 55;
+	// we want to be able to validate the extension ID.
+	if len(osArgs) != 3 {
+		return "", fmt.Errorf("extension does not match for Chrome, and wrong number of args for Firefox: %s", strings.Join(osArgs, ","))
+	}
+	// The extension ID in the args will be formatted like {0a75d802-9aed-41e7-8daa-24c067386e82};
+	// update its format to moz-extension://0a75d802-9aed-41e7-8daa-24c067386e82 for the lookup.
+	potentialExtension = fmt.Sprintf("moz-extension://%s", strings.TrimPrefix(strings.TrimSuffix(osArgs[2], "}"), "{"))
+	if _, ok := allowlistedDt4aOriginsLookup[potentialExtension]; ok {
+		return potentialExtension, nil
+	}
+
+	return "", fmt.Errorf("native messaging called with unexpected args: %s", strings.Join(osArgs, ","))
 }
 
 // validateNativeMessagingRequest validates that launcher has been launched by the expected process --

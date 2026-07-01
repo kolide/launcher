@@ -31,15 +31,21 @@ func TestValidateNativeMessagingArgs(t *testing.T) {
 			expectedValid:     false,
 		},
 		{
-			testCaseName:      "macOS invocation",
+			testCaseName:      "Chrome macOS invocation",
 			osArgs:            []string{"launcher", "chrome-extension://bkpbhnjcbehoklfkljkkbbmipaphipgl/"},
 			expectedExtension: "chrome-extension://bkpbhnjcbehoklfkljkkbbmipaphipgl",
 			expectedValid:     true,
 		},
 		{
-			testCaseName:      "Windows invocation",
+			testCaseName:      "Chrome Windows invocation",
 			osArgs:            []string{"launcher", "chrome-extension://bkpbhnjcbehoklfkljkkbbmipaphipgl/", "--parent-window=0"},
 			expectedExtension: "chrome-extension://bkpbhnjcbehoklfkljkkbbmipaphipgl",
+			expectedValid:     true,
+		},
+		{
+			testCaseName:      "Firefox invocation",
+			osArgs:            []string{"launcher", "some/path/to/manifest", "{0a75d802-9aed-41e7-8daa-24c067386e82}"},
+			expectedExtension: "moz-extension://0a75d802-9aed-41e7-8daa-24c067386e82",
 			expectedValid:     true,
 		},
 		{

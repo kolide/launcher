@@ -20,6 +20,7 @@ var allowlistedBrowsers = map[string]string{
 	`Google Chrome Beta`:   "EQHXZ8M8AV",
 	`Google Chrome Dev`:    "EQHXZ8M8AV",
 	`Google Chrome Canary`: "EQHXZ8M8AV",
+	`firefox`:              "43AQ936H96",
 }
 
 // validateBrowser confirms that the given path is a known browser on our allowlist
