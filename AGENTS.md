@@ -29,10 +29,10 @@ Guidance for AI coding agents working in this repository (`github.com/kolide/lau
 - **platform-specific code organization**
   - **Do** use separate files with build constraints for platform-specific implementations.
   - **Never** use `runtime.GOOS` checks for code that won't compile on all platforms.
-  - Split into `_unix.go` and `_windows.go` files when using platform-specific packages.
+  - Split into  `_posix.go` (for macOS + Linux), and otherwise `_linux.go`, `_windows.go`, `_darwin.go` files when using platform-specific packages.
 
 - **temporary file lifecycle management**
-  - **Do** use `os.CreateTemp()` for temporary files with appropriate prefixes.
+  - **Do** use `agent.MkdirTemp()` for temporary files with appropriate prefixes.
   - **Do** defer cleanup with error logging if cleanup fails.
   - **Never** leave temporary files without explicit cleanup.
 
