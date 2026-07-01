@@ -302,17 +302,17 @@ func (sb *SendBuffer) Drain(ctx context.Context) error {
 		defer sb.writeMutex.Unlock()
 		return len(sb.logs)
 	}
-	initialLines, i := storedLines(), 0
+	linesRemaining, i := storedLines(), 0
 
-	for i = 0; i < sb.maxDrainSends && initialLines > 0 && storedLines() > 0; i += 1 {
+	for i = 0; i < sb.maxDrainSends && linesRemaining > 0 && storedLines() > 0; i += 1 {
 		cnt, err := sb.sendAndPurge(ctx)
-		initialLines -= cnt
+		linesRemaining -= cnt
 		switch {
 		case err != nil:
 			return fmt.Errorf("draining sendbuffer failed on send and purge: %w", err)
 		case cnt == 0:
 			return nil
-		case initialLines <= 0:
+		case linesRemaining <= 0:
 			return nil
 		}
 
@@ -324,7 +324,7 @@ func (sb *SendBuffer) Drain(ctx context.Context) error {
 	}
 
 	if i >= sb.maxDrainSends {
-		return fmt.Errorf("failed to drain sendbuffer after the maximum of %d sends with %d lines remaining", sb.maxDrainSends, initialLines)
+		return fmt.Errorf("failed to drain sendbuffer after the maximum of %d sends with %d lines remaining", sb.maxDrainSends, linesRemaining)
 	}
 	return nil
 }
