@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"sync"
 	"time"
@@ -13,36 +14,50 @@ import (
 )
 
 type sender interface {
-	Send(r io.Reader) error
+	Send(ctx context.Context, r io.Reader) error
 }
 
 var (
-	defaultMaxSizeBytes  = 512 * 1024
-	defaultSendSizeBytes = 8 * 1024
+	// default bytes buffered before dropping incoming data
+	defaultMaxSizeBytes = 1024 * 1024
+	// default bytes sent at one time per send tick
+	defaultSendSizeBytes = 512 * 1024
+	// default interval at which to send
+	defaultSendInterval = 1 * time.Minute
+	// discards a write which exceeds this amount
+	maxWriteBytes = 8 * 1024
+	// maximum number of times to send during draining
+	defaultMaxDrainSends = 5
+	// drain wait duration between multiple sends
+	defaultDrainSendWait = 300 * time.Millisecond
 )
 
 type SendBuffer struct {
-	logs                                        [][]byte
-	size, maxStorageSizeBytes, maxSendSizeBytes int
-	sendMutex                                   sync.Mutex
-	writeMutex                                  sync.RWMutex
-	logger                                      log.Logger
-	sender                                      sender
-	sendTicker                                  *time.Ticker
-	isSending                                   bool
-
+	logs       [][]byte
+	sendMutex  sync.Mutex
+	writeMutex sync.RWMutex
+	sender     sender
+	sendTicker *time.Ticker
+	isSending  bool
 	// logsJustPurged is used to prevent attempting to delete logs that were just purged
 	logsJustPurged bool
+
+	// configurables
+	logger                                                     log.Logger
+	size, maxStorageSizeBytes, maxSendSizeBytes, maxDrainSends int
+	drainSendWait                                              time.Duration
 }
 
 type option func(*SendBuffer)
 
+// The maximum amount of data to buffer in bytes.
 func WithMaxStorageSizeBytes(maxSize int) option {
 	return func(sb *SendBuffer) {
 		sb.maxStorageSizeBytes = maxSize
 	}
 }
 
+// The maximum size of a single Read call to the provided sender.
 func WithMaxSendSizeBytes(sendSize int) option {
 	return func(sb *SendBuffer) {
 		sb.maxSendSizeBytes = sendSize
@@ -55,6 +70,21 @@ func WithLogger(logger log.Logger) option {
 	}
 }
 
+// When draining, stops early with an error if more than the provided sends are
+// necessary.
+func WithMaxDrainSends(cnt int) option {
+	return func(sb *SendBuffer) {
+		sb.maxDrainSends = cnt
+	}
+}
+
+// When draining, wait the provided duration between sends if multiple are required.
+func WithDrainSendWait(wait time.Duration) option {
+	return func(sb *SendBuffer) {
+		sb.drainSendWait = wait
+	}
+}
+
 // WithSendInterval sets the interval at which the buffer will send data.
 func WithSendInterval(sendInterval time.Duration) option {
 	return func(sb *SendBuffer) {
@@ -64,12 +94,15 @@ func WithSendInterval(sendInterval time.Duration) option {
 
 func New(sender sender, opts ...option) *SendBuffer {
 	sb := &SendBuffer{
+		sender:     sender,
+		sendTicker: time.NewTicker(defaultSendInterval),
+		isSending:  false,
+
 		maxStorageSizeBytes: defaultMaxSizeBytes,
 		maxSendSizeBytes:    defaultSendSizeBytes,
-		sender:              sender,
-		sendTicker:          time.NewTicker(1 * time.Minute),
+		maxDrainSends:       defaultMaxDrainSends,
+		drainSendWait:       defaultDrainSendWait,
 		logger:              log.NewNopLogger(),
-		isSending:           false,
 	}
 
 	for _, opt := range opts {
@@ -94,13 +127,13 @@ func (sb *SendBuffer) Write(in []byte) (int, error) {
 		return len(in), nil
 	}
 
-	// if the single data piece is larger than the max send size, drop it and log
-	if len(in) > sb.maxSendSizeBytes {
+	// if the single data piece is excessively large, drop it and log
+	if len(in) > maxWriteBytes {
 		sb.logger.Log(
-			"msg", "dropped data because element greater than max send size",
+			"msg", "dropped data that exceeds maximum write bytes",
 			"method", "Write",
 			"size_of_data_bytes", len(in),
-			"max_send_size_bytes", sb.maxSendSizeBytes,
+			"max_write_size", maxWriteBytes,
 			"head", string(in)[0:minInt(len(in), 100)],
 		)
 		return len(in), nil
@@ -128,7 +161,7 @@ func (sb *SendBuffer) Write(in []byte) (int, error) {
 	}
 
 	// If we don't make a copy of the data, we get data loss in the logs array.
-	// It seems the input gets concurrenlty overridden somewhere under the hood.
+	// It seems the input gets concurrently overridden somewhere under the hood.
 	data := make([]byte, len(in))
 	copy(data, in)
 
@@ -148,7 +181,7 @@ func (sb *SendBuffer) Run(ctx context.Context) error {
 	}()
 
 	for {
-		if err := sb.sendAndPurge(); err != nil {
+		if _, err := sb.sendAndPurge(ctx); err != nil {
 			sb.logger.Log("msg", "failed to send and purge", "err", err)
 		}
 
@@ -156,12 +189,6 @@ func (sb *SendBuffer) Run(ctx context.Context) error {
 		case <-sb.sendTicker.C:
 			continue
 		case <-ctx.Done():
-			// Send one final batch, if possible, so that we can get logs related to shutdowns.
-			// Sleep for one second first to allow any shutdown-related logs to be written.
-			time.Sleep(1 * time.Second)
-			if err := sb.sendAndPurge(); err != nil {
-				sb.logger.Log("msg", "failed to send final batch of logs on shutdown", "err", err)
-			}
 			return nil
 		}
 	}
@@ -266,26 +293,64 @@ func (sb *SendBuffer) DeleteAllData() {
 	sb.size = 0
 }
 
-func (sb *SendBuffer) sendAndPurge() error {
+// Attempts to drain the send buffer, sending everything present through its configured
+// sender until empty, ctx is done, or it drains at least the number of logs originally
+// present at call.
+func (sb *SendBuffer) Drain(ctx context.Context) error {
+	storedLines := func() int {
+		sb.writeMutex.Lock()
+		defer sb.writeMutex.Unlock()
+		return len(sb.logs)
+	}
+	linesRemaining, i := storedLines(), 0
+
+	for i = 0; i < sb.maxDrainSends && linesRemaining > 0 && storedLines() > 0; i += 1 {
+		cnt, err := sb.sendAndPurge(ctx)
+		linesRemaining -= cnt
+		switch {
+		case err != nil:
+			return fmt.Errorf("draining sendbuffer failed on send and purge: %w", err)
+		case cnt == 0:
+			return nil
+		case linesRemaining <= 0:
+			return nil
+		}
+
+		select {
+		case <-time.After(sb.drainSendWait):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+
+	if i >= sb.maxDrainSends {
+		return fmt.Errorf("failed to drain sendbuffer after the maximum of %d sends with %d lines remaining", sb.maxDrainSends, linesRemaining)
+	}
+	return nil
+}
+
+// Sends from the buffer if anything is present, returning the number of entries sent
+// or an error.
+func (sb *SendBuffer) sendAndPurge(ctx context.Context) (int, error) {
 	if !sb.sendMutex.TryLock() {
 		sb.logger.Log("msg", "could not get lock on send mutex, will retry")
-		return nil
+		return 0, nil
 	}
 	defer sb.sendMutex.Unlock()
 
 	toSendBuff := &bytes.Buffer{}
 	lastKey, err := sb.copyLogs(toSendBuff, sb.maxSendSizeBytes)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	if toSendBuff.Len() == 0 {
-		return nil
+		return 0, nil
 	}
 
-	if err := sb.sender.Send(toSendBuff); err != nil {
+	if err := sb.sender.Send(ctx, toSendBuff); err != nil {
 		sb.logger.Log("msg", "failed to send, will retry", "err", err)
-		return nil
+		return 0, err
 	}
 
 	// testing on a new enrollment in debug mode, log size hit 130K bytes
@@ -299,12 +364,12 @@ func (sb *SendBuffer) sendAndPurge() error {
 	// to send the logs. To live with this, we just verify that the logs didn't just get purged.
 	if sb.logsJustPurged {
 		sb.logsJustPurged = false
-		return nil
+		return 0, nil
 	}
 
 	sb.deleteLogs(lastKey)
 
-	return nil
+	return lastKey, nil
 }
 
 // copyLogs writes to the provided writer, peeking at the size of each log

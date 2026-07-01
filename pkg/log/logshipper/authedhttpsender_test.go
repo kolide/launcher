@@ -2,6 +2,7 @@ package logshipper
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -38,9 +39,9 @@ func Test_authedHttpSender_Send(t *testing.T) {
 			defer ts.Close()
 
 			authedSender := newAuthHttpSender()
-			authedSender.endpoint = ts.URL
-			authedSender.authtoken = token
-			authedSender.Send(bytes.NewBuffer(dataToSend))
+			authedSender.endpoint.Store(ts.URL)
+			authedSender.authtoken.Store(token)
+			authedSender.Send(context.Background(), bytes.NewBuffer(dataToSend))
 
 			wg.Wait()
 		})

@@ -7,14 +7,17 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/kolide/launcher/v2/pkg/atomic"
 )
 
 type authedHttpSender struct {
-	endpoint  string
-	authtoken string
+	endpoint  atomic.String
+	authtoken atomic.String
 	client    *http.Client
 }
 
+// Creates a generic HTTP client with an overall 30s timeout.
 func newAuthHttpSender() *authedHttpSender {
 	return &authedHttpSender{
 		client: &http.Client{
@@ -23,16 +26,13 @@ func newAuthHttpSender() *authedHttpSender {
 	}
 }
 
-func (a *authedHttpSender) Send(r io.Reader) error {
-	ctx, cancel := context.WithTimeout(context.Background(), a.client.Timeout)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, a.endpoint, r)
+func (a *authedHttpSender) Send(ctx context.Context, r io.Reader) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, a.endpoint.Load(), r)
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/octet-stream")
-	req.Header.Set("authorization", a.authtoken)
+	req.Header.Set("authorization", a.authtoken.Load())
 
 	resp, err := a.client.Do(req)
 	if err != nil {
@@ -41,7 +41,7 @@ func (a *authedHttpSender) Send(r io.Reader) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 300 {
-		bodyData, err := io.ReadAll(resp.Request.Body)
+		bodyData, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return fmt.Errorf("received non 200 http status code: %d, error reading body response body %w", resp.StatusCode, err)
 		}

@@ -30,6 +30,7 @@ const (
 	truncatedFormatString = "%s[TRUNCATED]"
 	defaultSendInterval   = 1 * time.Minute
 	debugSendInterval     = 5 * time.Second
+	maxDrainTimeout       = 5 * time.Second
 )
 
 type LogShipper struct {
@@ -152,6 +153,18 @@ func (ls *LogShipper) Stop(_ error) {
 
 	if ls.stopFunc != nil {
 		ls.stopFunc()
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), maxDrainTimeout)
+	defer cancel()
+
+	// Try to send any buffered logs without blocking process exit for too long.
+	if err := ls.sendBuffer.Drain(ctx); err != nil {
+		ls.knapsack.Slogger().Log(context.Background(), slog.LevelError,
+			"draining buffered logs errored",
+			"err",
+			err,
+		)
 	}
 }
 
@@ -286,7 +299,7 @@ func (ls *LogShipper) updateSenderAuthToken() error {
 		return errors.New("no token found")
 	}
 
-	ls.sender.authtoken = string(token)
+	ls.sender.authtoken.Store(string(token))
 	return nil
 }
 
@@ -298,11 +311,11 @@ func (ls *LogShipper) updateLogIngestURL() error {
 	}
 
 	if parsedUrl == nil || parsedUrl.String() == "" {
-		ls.sender.endpoint = ""
+		ls.sender.endpoint.Store("")
 		return errors.New("log ingest url is empty")
 	}
 
-	ls.sender.endpoint = parsedUrl.String()
+	ls.sender.endpoint.Store(parsedUrl.String())
 	return nil
 }
 

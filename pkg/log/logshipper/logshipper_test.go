@@ -60,7 +60,7 @@ func TestLogShipper(t *testing.T) {
 			knapsack.On("LogIngestServerURL").Return("").Once()
 			ls.Ping()
 			require.False(t, ls.isShippingStarted.Load(), "shipping should not have stared since there is no ingest server url")
-			require.Equal(t, authToken, ls.sender.authtoken)
+			require.Equal(t, authToken, ls.sender.authtoken.Load())
 
 			// no device identifying attributes
 			logIngestUrl := "https://example.com"
@@ -68,8 +68,8 @@ func TestLogShipper(t *testing.T) {
 			knapsack.On("ServerProvidedDataStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), "test")).Once()
 			ls.Ping()
 			require.False(t, ls.isShippingStarted.Load(), "shipping should not have stared since there are no device identifying attributes")
-			require.Equal(t, authToken, ls.sender.authtoken)
-			require.Equal(t, logIngestUrl, ls.sender.endpoint)
+			require.Equal(t, authToken, ls.sender.authtoken.Load())
+			require.Equal(t, logIngestUrl, ls.sender.endpoint.Load())
 
 			// happy path
 
@@ -85,8 +85,8 @@ func TestLogShipper(t *testing.T) {
 			})
 			ls.Ping()
 			require.True(t, ls.isShippingStarted.Load(), "shipping should now be enabled")
-			require.Equal(t, authToken, ls.sender.authtoken)
-			require.Equal(t, logIngestUrl, ls.sender.endpoint)
+			require.Equal(t, authToken, ls.sender.authtoken.Load())
+			require.Equal(t, logIngestUrl, ls.sender.endpoint.Load())
 
 			// make sure attributes are added to logs in send buffer
 			ls.sendBuffer.UpdateData(func(in io.Reader, out io.Writer) error {
@@ -109,24 +109,24 @@ func TestLogShipper(t *testing.T) {
 			authToken = ulid.New()
 			tokenStore.Set(storage.ObservabilityIngestAuthTokenKey, []byte(authToken))
 			ls.Ping()
-			require.Equal(t, authToken, ls.sender.authtoken, "auth token should update")
-			require.Equal(t, logIngestUrl, ls.sender.endpoint)
+			require.Equal(t, authToken, ls.sender.authtoken.Load(), "auth token should update")
+			require.Equal(t, logIngestUrl, ls.sender.endpoint.Load())
 
 			// update shipping level
 			knapsack.On("LogShippingLevel").Return("debug")
 			knapsack.On("Slogger").Return(multislogger.NewNopLogger())
 			ls.Ping()
 			require.Equal(t, slog.LevelDebug.Level(), ls.slogLevel.Level(), "log shipper should set to debug")
-			require.Equal(t, authToken, ls.sender.authtoken)
-			require.Equal(t, logIngestUrl, ls.sender.endpoint)
+			require.Equal(t, authToken, ls.sender.authtoken.Load())
+			require.Equal(t, logIngestUrl, ls.sender.endpoint.Load())
 
 			// update log ingest url
 			logIngestUrl = "https://example.com/new"
 			knapsack.On("LogIngestServerURL").Return(logIngestUrl)
 			ls.Ping()
 			require.Equal(t, slog.LevelDebug.Level(), ls.slogLevel.Level(), "log shipper should set to debug")
-			require.Equal(t, authToken, ls.sender.authtoken)
-			require.Equal(t, logIngestUrl, ls.sender.endpoint)
+			require.Equal(t, authToken, ls.sender.authtoken.Load())
+			require.Equal(t, logIngestUrl, ls.sender.endpoint.Load())
 		})
 	}
 }

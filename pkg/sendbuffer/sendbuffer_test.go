@@ -2,6 +2,7 @@ package sendbuffer
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -57,10 +58,10 @@ func TestSendBuffer(t *testing.T) {
 			expectedReceives: nil,
 		},
 		{
-			name:             "does not exceed max send size",
-			maxStorageSize:   1000,
-			maxSendSize:      4,
-			writes:           []string{"hello"},
+			name:             "does not exceed max write size",
+			maxStorageSize:   2 * maxWriteBytes,
+			maxSendSize:      2 * maxWriteBytes,
+			writes:           []string{strings.Repeat("a", maxWriteBytes+1)},
 			expectedReceives: nil,
 		},
 		{
@@ -94,7 +95,8 @@ func TestSendBuffer(t *testing.T) {
 			}
 
 			for i := 0; i < len(tt.expectedReceives); i++ {
-				require.NoError(t, sb.sendAndPurge())
+				_, err := sb.sendAndPurge(context.Background())
+				require.NoError(t, err)
 
 				for {
 					// wait for the send to finish
@@ -138,7 +140,7 @@ func TestSendAndPurgeHandlesLogBufferFullPurge(t *testing.T) {
 	go func() {
 		for !testCompleted.Load() {
 			time.Sleep(50 * time.Millisecond)
-			sb.sendAndPurge()
+			sb.sendAndPurge(context.Background())
 		}
 	}()
 
@@ -504,7 +506,7 @@ type testSender struct {
 	allReceived  [][]byte
 }
 
-func (s *testSender) Send(r io.Reader) error {
+func (s *testSender) Send(_ context.Context, r io.Reader) error {
 	s.lastReceived.Reset()
 	data, err := io.ReadAll(r)
 	require.NoError(s.t, err)
@@ -521,4 +523,175 @@ func (s *testSender) aggregateAllReceived() []byte {
 		aggregated = append(aggregated, data...)
 	}
 	return aggregated
+}
+
+// thread-safe sender for tests that tracks stats/sent bytes
+type drainTestSender struct {
+	mu       sync.Mutex
+	sends    int
+	received []byte
+	err      error
+}
+
+func (s *drainTestSender) Send(_ context.Context, r io.Reader) error {
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.sends++
+	if s.err != nil {
+		return s.err
+	}
+
+	s.received = append(s.received, data...)
+	return nil
+}
+
+func (s *drainTestSender) sendCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.sends
+}
+
+func (s *drainTestSender) receivedData() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return string(s.received)
+}
+
+func TestDrain(t *testing.T) {
+	t.Parallel()
+
+	writeLines := func(t *testing.T, sb *SendBuffer, lines ...string) {
+		t.Helper()
+		for _, line := range lines {
+			_, err := sb.Write([]byte(line))
+			require.NoError(t, err)
+		}
+	}
+
+	t.Run("drains everything in multiple sends", func(t *testing.T) {
+		t.Parallel()
+
+		sender := &drainTestSender{}
+		sb := New(sender,
+			WithMaxSendSizeBytes(1), // one line per send
+			WithMaxDrainSends(5),
+			WithDrainSendWait(time.Nanosecond),
+		)
+		writeLines(t, sb, "0", "1", "2")
+
+		require.NoError(t, sb.Drain(t.Context()))
+
+		require.Equal(t, 3, sender.sendCount())
+		require.Equal(t, "012", sender.receivedData())
+		require.Empty(t, sb.logs)
+		require.Zero(t, sb.size)
+	})
+
+	t.Run("calls sender once when one send suffices", func(t *testing.T) {
+		t.Parallel()
+
+		sender := &drainTestSender{}
+		sb := New(sender,
+			WithMaxSendSizeBytes(1000), // everything fits in a single send
+			WithMaxDrainSends(5),
+			WithDrainSendWait(time.Microsecond),
+		)
+		writeLines(t, sb, "0", "1", "2")
+
+		require.NoError(t, sb.Drain(t.Context()))
+
+		require.Equal(t, 1, sender.sendCount())
+		require.Equal(t, "012", sender.receivedData())
+		require.Empty(t, sb.logs)
+		require.Zero(t, sb.size)
+	})
+
+	t.Run("errors after exceeding max drain sends", func(t *testing.T) {
+		t.Parallel()
+
+		sender := &drainTestSender{}
+		sb := New(sender,
+			WithMaxSendSizeBytes(1), // one line per send, so 5 lines need 5 sends
+			WithMaxDrainSends(2),
+			WithDrainSendWait(time.Microsecond),
+		)
+		writeLines(t, sb, "0", "1", "2", "3", "4")
+
+		err := sb.Drain(t.Context())
+
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "failed to drain sendbuffer after the maximum")
+		require.Equal(t, 2, sender.sendCount())
+		require.Len(t, sb.logs, 3) // only 2 of 5 drained
+	})
+
+	t.Run("aborts and preserves data on send error", func(t *testing.T) {
+		t.Parallel()
+
+		sender := &drainTestSender{err: errors.New("boom")}
+		sb := New(sender,
+			WithMaxSendSizeBytes(1),
+			WithMaxDrainSends(5),
+			WithDrainSendWait(time.Microsecond),
+		)
+		writeLines(t, sb, "0", "1", "2")
+
+		err := sb.Drain(t.Context())
+
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "draining sendbuffer failed on send and purge")
+		require.Equal(t, 1, sender.sendCount())
+		require.Len(t, sb.logs, 3) // nothing deleted on send failure
+		require.Equal(t, 3, sb.size)
+	})
+
+	t.Run("stops and returns when context is cancelled", func(t *testing.T) {
+		t.Parallel()
+
+		sender := &drainTestSender{}
+		sb := New(sender,
+			WithMaxSendSizeBytes(1),
+			WithMaxDrainSends(5),
+			WithDrainSendWait(10*time.Second), // long, so context wins
+		)
+		writeLines(t, sb, "0", "1", "2")
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		err := sb.Drain(ctx)
+
+		require.ErrorIs(t, err, context.Canceled)
+		require.Equal(t, 1, sender.sendCount()) // one send, then bailed on the wait
+		require.Len(t, sb.logs, 2)
+	})
+
+	t.Run("waits drainSendWait between sends", func(t *testing.T) {
+		t.Parallel()
+
+		sender := &drainTestSender{}
+		sb := New(sender,
+			WithMaxSendSizeBytes(1), // one line per send, so a wait is required between them
+			WithMaxDrainSends(5),
+			WithDrainSendWait(2*time.Second),
+		)
+		writeLines(t, sb, "0", "1", "2")
+
+		go sb.Drain(t.Context())
+
+		// the first send happens immediately
+		require.Eventually(t, func() bool {
+			return sender.sendCount() == 1
+		}, 2*time.Second, 5*time.Millisecond)
+
+		// ...but the second is waiting, so nothing follows
+		time.Sleep(50 * time.Millisecond)
+		require.Equal(t, 1, sender.sendCount())
+	})
 }
