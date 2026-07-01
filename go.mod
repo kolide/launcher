@@ -18,7 +18,7 @@ require (
 	github.com/kolide/krypto v0.1.1-0.20251209172506-7738d1f5d7c1
 	github.com/mat/besticon v3.9.0+incompatible
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
-	github.com/osquery/osquery-go v0.0.0-20260226222546-0cc22f415e57
+	github.com/osquery/osquery-go v0.0.0-20260630173615-eb39ad3443df
 	github.com/peterbourgon/ff/v3 v3.1.2
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.11.1
