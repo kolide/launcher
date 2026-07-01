@@ -909,6 +909,10 @@ func (i *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, client
 			i.paths.extensionSocketPath,
 			osquery.ServerTimeout(1*time.Minute),
 			osquery.WithClient(client),
+			// Buffer the extension transport so serializing large table results
+			// batches socket writes instead of issuing one write syscall per
+			// Thrift primitive. See osquery/osquery-go#136.
+			osquery.WithTransportFactory(thrift.NewTBufferedTransportFactory(16*1024)),
 		)
 		return newErr
 	}, socketOpenTimeout, socketOpenInterval); err != nil {

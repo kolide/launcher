@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/v2/ee/agent/startupsettings"
@@ -177,6 +178,10 @@ func loadExtensionsAndStartServer(slogger *slog.Logger, socketPath string, plugi
 		socketPath,
 		osquery.ServerTimeout(10*time.Second),
 		osquery.WithClient(client),
+		// Buffer the extension transport so serializing large table results
+		// batches socket writes instead of issuing one write syscall per
+		// Thrift primitive. See osquery/osquery-go#136.
+		osquery.WithTransportFactory(thrift.NewTBufferedTransportFactory(16*1024)),
 	)
 	if err != nil {
 		return extensionManagerServer, fmt.Errorf("error creating extension manager server: %w", err)
