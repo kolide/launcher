@@ -195,8 +195,8 @@ func ValidateNativeMessagingArgs(osArgs []string) (string, error) {
 
 	// For Firefox, launcher should be called with 1 or 2 arguments: the first argument
 	// is the path to the app manifest, and the second argument (starting in Firefox 55)
-	// is the extension ID. We require at least Firefox 55 here so that we can validate
-	// the extension ID.
+	// is the extension ID. We explicitly do not support Firefox versions older than 55;
+	// we want to be able to validate the extension ID.
 	if len(osArgs) != 3 {
 		return "", fmt.Errorf("extension does not match for Chrome, and wrong number of args for Firefox: %s", strings.Join(osArgs, ","))
 	}
