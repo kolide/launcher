@@ -63,19 +63,19 @@ jobs:
           YEAR=$(date +%Y)
           TIMESTAMP=$(date +%s)
           BRANCH_NAME="update-tuf-root-json-${TIMESTAMP}"
-          BASE_TREE=$(git rev-parse HEAD)
-          ROOT_JSON_SHA=$(git hash-object pkg/packaging/assets/tuf/root.json)
+          BASE_COMMIT=$(git rev-parse HEAD)
           COMMIT_MESSAGE="[Automated] $MONTH $YEAR - Update TUF root.json"
 
           # For the github-actions bot's commits to be signed, we need to use the GH API
-          # to create a tree, a commit, and a reference.
+          # to create a tree, a commit, and a reference. We pass `content` so that GitHub
+          # can create the blob for us server-side.
           # See: https://github.com/orgs/community/discussions/50055
 
           # Create tree
           CREATE_TREE_RESP=$(jq -n \
-            --arg base_tree "$BASE_TREE" \
-            --arg sha "$ROOT_JSON_SHA" \
-            '{base_tree: $base_tree, tree: [{path: "pkg/packaging/assets/tuf/root.json", mode: "100644", type: "blob", sha: $sha}]}' | \
+            --arg base_tree "$BASE_COMMIT" \
+            --rawfile content pkg/packaging/assets/tuf/root.json \
+            '{base_tree: $base_tree, tree: [{path: "pkg/packaging/assets/tuf/root.json", mode: "100644", type: "blob", content: $content}]}' | \
             gh api --method POST -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" \
             /repos/kolide/launcher/git/trees --input -)
           TREE_SHA=$(echo "$CREATE_TREE_RESP" | jq -r '.sha')
@@ -83,7 +83,7 @@ jobs:
           # Create commit
           CREATE_COMMIT_RESP=$(jq -n \
             --arg message "$COMMIT_MESSAGE" \
-            --arg parent "$BASE_TREE" \
+            --arg parent "$BASE_COMMIT" \
             --arg tree "$TREE_SHA" \
             '{message: $message, parents: [$parent], tree: $tree}' | \
             gh api --method POST -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" \
