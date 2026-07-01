@@ -305,6 +305,7 @@ func (t *Table) findingsToRows(ctx context.Context, argon2idSalts []string, find
 type jwtFamilyHeader struct {
 	Alg string `json:"alg,omitempty"`
 	Enc string `json:"enc,omitempty"`
+	Kid string `json:"kid,omitempty"`
 	Cty string `json:"cty,omitempty"`
 }
 
@@ -328,11 +329,12 @@ func isEncryptedJWTFamilyValue(finding report.Finding) bool {
 		return false
 	}
 
-	// Check for JWEs. The presence of the Algorithm and Encryption Algorithm
-	// header params suggest that this is a JWE.
+	// Check for JWEs. The presence of the Encryption Algorithm and
+	// either Algorithm or Key ID header params suggest that this is a JWE.
 	// https://datatracker.ietf.org/doc/html/rfc7516#section-4.1.1
 	// https://datatracker.ietf.org/doc/html/rfc7516#section-4.1.2
-	if len(h.Alg) > 0 && len(h.Enc) > 0 {
+	// https://datatracker.ietf.org/doc/html/rfc7516#section-4.1.6
+	if len(h.Enc) > 0 && (len(h.Kid) > 0 || len(h.Alg) > 0) {
 		return true
 	}
 	// Check for encrypted JWKs.
@@ -348,7 +350,7 @@ func isEncryptedJWTFamilyValue(finding report.Finding) bool {
 // of the discovered secret. Because of the multitude of possible ways people can stash secrets, and the myriad of
 // secret types, this is very hard to get right. So instead, we aim to solve the simple case, and ignore the rest.
 func findingsToKeyNames(findings []report.Finding) []string {
-	// Perticular problems...
+	// Particular problems...
 	//
 	// We can't use f.StartColumn, because in the case of CONFIG_KEY=abc123, it returns the start of CONFIG_KEY, not abc
 	// So instead we remove the secret, from the match block, and then strip out any characters we don't want.
