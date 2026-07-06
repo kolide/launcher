@@ -433,7 +433,7 @@ jobs:
 
       - name: Install benchstat
         if: github.ref != 'refs/heads/main' && github.ref_type != 'tag' && steps.download-benchmark.outcome == 'success'
-        run: go install golang.org/x/perf/cmd/benchstat@latest
+        run: go install golang.org/x/perf/cmd/benchstat@9e4b9ddef5b6a4371594ec978cb4b8088bec845d # untagged, unversioned
 
       - name: Compare performance against main
         if: github.ref != 'refs/heads/main' && github.ref_type != 'tag' && steps.download-benchmark.outcome == 'success'
