@@ -63,22 +63,25 @@ jobs:
         run: go install golang.org/x/vuln/cmd/govulncheck@latest
         shell: bash
 
+      # For false positives, filtering out in jq by `select(.osv != "GO-2024-3166")`
+      # and exiting 0 early allows ignoring specific vulns.
       - id: govulncheck
-        run: govulncheck -C . -format json ./... > govulncheck.json
-
-      # If we need to exclude future go-tuf findings that do not apply to our version of go-tuf prior to v2,
-      # adding a final select to JQ will do the trick: `select(. != "GO-2024-3166")`
-      # TODO: remove exclusion for GO-2026-4923 as soon as a new version of go.etcd.io/bbolt is available.
-      - name: Evaluate govulncheck results
         shell: bash
         run: |
-          findingCount=$(jq -r '.finding | select ( . != null ) | .osv | select(. != "GO-2026-4923")' govulncheck.json | wc -l)
-          findingCount=$((findingCount + 0))
-          if [[ $findingCount -ne 0 ]]; then
-            printf "govulncheck reports %d findings" "$findingCount"
-            jq -r '.finding | select ( . != null )' govulncheck.json
-            exit 1
+          if govulncheck -C . ./...; then
+            echo "govulncheck exited zero"
+            exit 0
           fi
+
+          echo "govulncheck exited non-zero, capturing output"
+          govulncheck -C . -format json ./... > govulncheck.json
+
+          findingCount=$(jq -r '.finding | select ( . != null ) | .osv' govulncheck.json | wc -l)
+          findingCount=$((findingCount + 0))
+          printf "govulncheck reports %d findings" "$findingCount"
+          jq -r '.finding | select ( . != null )' govulncheck.json
+
+          exit 1
 
   table_specs:
     permissions:
