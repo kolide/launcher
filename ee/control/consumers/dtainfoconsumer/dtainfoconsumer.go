@@ -37,11 +37,19 @@ type dtaPayload struct {
 	DTABlob *string `json:"dta_blob"`
 }
 
+// Updates the dta on disk. Discards data which fails to parse to avoid retries which cannot succeed.
+// Only write errors will bubble up a failure.
 func (c *DTAInfoConsumer) Update(data io.Reader) error {
 	c.slogger.Log(context.TODO(), slog.LevelDebug, "received dta update")
 	var payload dtaPayload
 	if err := json.NewDecoder(data).Decode(&payload); err != nil {
-		return fmt.Errorf("failed to read or decode dta payload: %w", err)
+		c.slogger.Log(
+			context.TODO(),
+			slog.LevelDebug,
+			"failed to decode dta in Update",
+			"err", err,
+		)
+		return nil
 	}
 
 	if payload.DTABlob == nil {
@@ -55,11 +63,11 @@ func (c *DTAInfoConsumer) Update(data io.Reader) error {
 		c.slogger.Log(
 			context.TODO(),
 			slog.LevelWarn,
-			"failed to parse dta",
+			"failed to parse dta, will not retry",
 			"err", err,
 			"dta", *payload.DTABlob,
 		)
-		return err
+		return nil
 	}
 
 	path := c.dtaFilePath(munemo)

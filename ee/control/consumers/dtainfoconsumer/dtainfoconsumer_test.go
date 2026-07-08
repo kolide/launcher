@@ -27,7 +27,6 @@ func TestUpdate(t *testing.T) {
 	tests := []struct {
 		name    string
 		payload string
-		err     bool
 		munemo  string // when set, expect this claim
 	}{
 		{
@@ -41,22 +40,18 @@ func TestUpdate(t *testing.T) {
 		{
 			name:    "invalid json",
 			payload: `not json`,
-			err:     true,
 		},
 		{
 			name:    "invalid jwt",
 			payload: `{"dta_blob": "not-a-jwt"}`,
-			err:     true,
 		},
 		{
 			name:    "jwt missing munemo claim",
 			payload: dtaPayloadFor(signTestJWT(t, jwt.MapClaims{"other": "x"})),
-			err:     true,
 		},
 		{
 			name:    "munemo claim not a string",
 			payload: dtaPayloadFor(signTestJWT(t, jwt.MapClaims{"munemo": 42})),
-			err:     true,
 		},
 		{
 			name:    "happy path",
@@ -73,11 +68,7 @@ func TestUpdate(t *testing.T) {
 			consumer := newTestConsumer(t, rootDir)
 
 			err := consumer.Update(strings.NewReader(tt.payload))
-			if tt.err {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-			}
+			require.NoError(t, err) // even failures are discarded to prevent retries of bad data
 
 			if tt.munemo == "" {
 				entries, err := os.ReadDir(rootDir)
