@@ -99,9 +99,23 @@ func TestUpdateReplacesExistingFile(t *testing.T) {
 		require.NoError(t, consumer.Update(strings.NewReader(dtaPayloadFor(blob))))
 	}
 
-	contents, err := os.ReadFile(filepath.Join(rootDir, dtaFilePrefix+testMunemo+dtaFileSuffix))
+	contents, err := os.ReadFile(consumer.dtaFilePath(testMunemo))
 	require.NoError(t, err)
 	require.Equal(t, secondBlob, string(contents))
+}
+
+// A fatal write error is returned from update, with the goal of allowing retries
+// for transient issues.
+func TestUpdateFailsOnBadFile(t *testing.T) {
+	t.Parallel()
+
+	rootDir := t.TempDir()
+	consumer := newTestConsumer(t, rootDir)
+	path := consumer.dtaFilePath("test")
+	require.NoError(t, os.Mkdir(path, 0644))
+
+	blob := signTestJWT(t, jwt.MapClaims{"munemo": "test", "v": 1})
+	require.Error(t, consumer.Update(strings.NewReader(dtaPayloadFor(blob))))
 }
 
 func newTestConsumer(t *testing.T, rootDir string) *DTAInfoConsumer {
