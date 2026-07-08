@@ -63,6 +63,8 @@ jobs:
         run: go install golang.org/x/vuln/cmd/govulncheck@latest
         shell: bash
 
+      # For false positives, filtering out in jq by `select(.osv != "GO-2024-3166")`
+      # and exiting 0 early allows ignoring specific vulns.
       - id: govulncheck
         shell: bash
         run: |
