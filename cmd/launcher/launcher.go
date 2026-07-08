@@ -35,6 +35,7 @@ import (
 	"github.com/kolide/launcher/v2/ee/control"
 	"github.com/kolide/launcher/v2/ee/control/actionqueue"
 	"github.com/kolide/launcher/v2/ee/control/consumers/acceleratecontrolconsumer"
+	"github.com/kolide/launcher/v2/ee/control/consumers/dtainfoconsumer"
 	"github.com/kolide/launcher/v2/ee/control/consumers/flareconsumer"
 	"github.com/kolide/launcher/v2/ee/control/consumers/keyvalueconsumer"
 	"github.com/kolide/launcher/v2/ee/control/consumers/localizationconsumer"
@@ -469,6 +470,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		controlService.RegisterSubscriber(katcSubsystemName, osqueryRunner)
 		controlService.RegisterSubscriber(katcSubsystemName, startupSettingsWriter)
 		controlService.RegisterConsumer(serverReleaseTrackerDataSubsystemName, keyvalueconsumer.NewConfigConsumer(k.ServerReleaseTrackerDataStore()))
+		controlService.RegisterConsumer("dta", dtainfoconsumer.New(k))
 
 		// Manage filewalkers and handle updates to filewalk configs
 		filewalkManager := filewalker.New(k, slogger)
