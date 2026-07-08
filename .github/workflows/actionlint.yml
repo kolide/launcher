@@ -25,7 +25,7 @@ jobs:
           check-latest: true
           cache: false
       - name: install actionlint
-        run: go install github.com/rhysd/actionlint/cmd/actionlint@latest
+        run: go install github.com/rhysd/actionlint/cmd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca # v1.7.12
       - name: actionlint
         run: |
           echo "::add-matcher::.github/actionlint-matcher.json"
