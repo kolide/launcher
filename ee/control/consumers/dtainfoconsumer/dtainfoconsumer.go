@@ -38,7 +38,7 @@ type dtaPayload struct {
 }
 
 func (c *DTAInfoConsumer) Update(data io.Reader) error {
-	c.slogger.DebugContext(context.TODO(), "received dta update")
+	c.slogger.Log(context.TODO(), slog.LevelDebug, "received dta update")
 	var payload dtaPayload
 	if err := json.NewDecoder(data).Decode(&payload); err != nil {
 		return fmt.Errorf("failed to read or decode dta payload: %w", err)
@@ -46,14 +46,15 @@ func (c *DTAInfoConsumer) Update(data io.Reader) error {
 
 	if payload.DTABlob == nil {
 		// expected when no key is active
-		c.slogger.DebugContext(context.TODO(), "dta blob was absent from payload")
+		c.slogger.Log(context.TODO(), slog.LevelDebug, "dta blob was absent from payload")
 		return nil
 	}
 
 	munemo, err := parseDta(*payload.DTABlob)
 	if err != nil {
-		c.slogger.WarnContext(
+		c.slogger.Log(
 			context.TODO(),
+			slog.LevelWarn,
 			"failed to parse dta",
 			"err", err,
 			"dta", *payload.DTABlob,
@@ -66,7 +67,7 @@ func (c *DTAInfoConsumer) Update(data io.Reader) error {
 		return fmt.Errorf("failed to write dta to %q: %w", path, err)
 	}
 
-	c.slogger.InfoContext(context.TODO(), "successfully wrote dta", "path", path)
+	c.slogger.Log(context.TODO(), slog.LevelInfo, "successfully wrote dta", "path", path)
 	return nil
 }
 
