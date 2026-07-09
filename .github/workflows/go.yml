@@ -342,7 +342,7 @@ jobs:
         run: make test
 
       - name: Upload coverage
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ runner.os }}-coverage.out
           path: ./coverage.out
@@ -465,7 +465,7 @@ jobs:
           echo "::notice::Skipping benchmark comparison - no baseline found on main branch. This is expected for new benchmarks."
 
       - name: Save benchmark results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ runner.os }}-benchmark.txt
           path: ./benchmark.txt
@@ -645,7 +645,7 @@ jobs:
           enableCrossOsArchive: true
 
       - name: Upload Build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifactos }}-build
           path: build/
@@ -687,7 +687,7 @@ jobs:
           "$launcher_bin" specs --output "launcher-specs-${RUNNER_OS}.json"
 
       - name: Upload table schema
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: schema-${{ runner.os }}
           path: launcher-specs-${{ runner.os }}.json
@@ -735,7 +735,7 @@ jobs:
             "${schema_files[@]}"
 
       - name: Upload combined schema
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: launcher-schema
           path: launcher-schema.json
