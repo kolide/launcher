@@ -49,13 +49,13 @@ jobs:
           echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
 
       - name: Go Build Cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ${{ steps.go-cache-paths.outputs.go-build }}
           key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
 
       - name: Go Mod Cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ${{ steps.go-cache-paths.outputs.go-mod }}
           key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
@@ -86,7 +86,7 @@ jobs:
         if: ${{ contains(matrix.os, 'macos') }}
 
       - name: Cache build output
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ./build
           key: ${{ env.CACHE_KEY_PREFIX }}${{ runner.os }}-${{ github.run_id }}
@@ -149,13 +149,13 @@ jobs:
           echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
 
       - name: Go Build Cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ${{ steps.go-cache-paths.outputs.go-build }}
           key: ${{ runner.os }}-go-build-${{ hashFiles('go.sum') }}
 
       - name: Go Mod Cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ${{ steps.go-cache-paths.outputs.go-mod }}
           key: ${{ runner.os }}-go-mod-${{ hashFiles('go.sum') }}
@@ -175,7 +175,7 @@ jobs:
         run: make -j2 github-build
 
       - name: Cache build output
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ./build
           key: ${{ env.CACHE_KEY_PREFIX }}${{ runner.os }}-${{ github.run_id }}
@@ -206,7 +206,7 @@ jobs:
           - Windows
     steps:
       - name: cache restore build 1 output
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: ./build
           key: ${{ matrix.runneros }}-${{ github.run_id }}
@@ -217,7 +217,7 @@ jobs:
         run: mv ./build ./build1
 
       - name: cache restore build 2 output
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: ./build
           key: reproducible-${{ matrix.runneros }}-${{ github.run_id }}
@@ -269,7 +269,7 @@ jobs:
           apt-get -y update
           apt-get -y install zstd
       - name: cache restore build output
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: ./build
           key: ${{ runner.os }}-${{ github.run_id }}
@@ -312,7 +312,7 @@ jobs:
           cache: false
 
       - name: cache restore - build
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: ./build
           key: ${{ runner.os }}-${{ github.run_id }}
@@ -325,14 +325,14 @@ jobs:
           echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
 
       - name: cache restore - GOCACHE
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: ${{ steps.go-cache-paths.outputs.go-build }}
           key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
           enableCrossOsArchive: true
 
       - name: cache restore - GOMODCACHE
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: ${{ steps.go-cache-paths.outputs.go-mod }}
           key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
@@ -378,7 +378,7 @@ jobs:
           cache: false
 
       - name: cache restore - build
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: ./build
           key: ${{ runner.os }}-${{ github.run_id }}
@@ -391,14 +391,14 @@ jobs:
           echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
 
       - name: cache restore - GOCACHE
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: ${{ steps.go-cache-paths.outputs.go-build }}
           key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
           enableCrossOsArchive: true
 
       - name: cache restore - GOMODCACHE
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: ${{ steps.go-cache-paths.outputs.go-mod }}
           key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
@@ -493,7 +493,7 @@ jobs:
       - build # need the other builds too
     steps:
       - name: cache restore build output
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: ./build
           key: ${{ runner.os }}-${{ github.run_id }}
@@ -584,7 +584,7 @@ jobs:
           fi
 
       - name: cache restore build output
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: ./build
           key: ${{ runner.os }}-${{ github.run_id }}
@@ -637,7 +637,7 @@ jobs:
       - container_exec_testing
     steps:
       - name: cache restore build output
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: ./build
           key: ${{ matrix.artifactos }}-${{ github.run_id }}
@@ -672,7 +672,7 @@ jobs:
       - build_linux
     steps:
       - name: cache restore build output
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: ./build
           key: ${{ runner.os }}-${{ github.run_id }}
@@ -705,7 +705,7 @@ jobs:
       # rebuilding from source -- the merge logic is platform-independent, so the
       # cached binary does the combine without a checkout, Go toolchain, or deps.
       - name: cache restore build output
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: ./build
           key: ${{ runner.os }}-${{ github.run_id }}
@@ -796,13 +796,13 @@ jobs:
           echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
 
       - name: Go Build Cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ${{ steps.go-cache-paths.outputs.go-build }}
           key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
 
       - name: Go Mod Cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ${{ steps.go-cache-paths.outputs.go-mod }}
           key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
