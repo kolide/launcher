@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"strings"
@@ -19,8 +20,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-const rootVolume = "/"
-
 type Table struct {
 	slogger *slog.Logger
 }
@@ -28,7 +27,6 @@ type Table struct {
 func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("package_id"),
-		table.TextColumn("volume"),
 	}
 
 	t := &Table{
@@ -36,7 +34,7 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	}
 
 	return tablewrapper.New(flags, slogger, "kolide_pkgutil_packages", columns, t.generate,
-		tablewrapper.WithDescription("macOS Installer packages queried from the receipt database used by Installer for installed packages. Optionally takes a WHERE volume = constraint to specify the volume to check."),
+		tablewrapper.WithDescription("macOS Installer packages and receipts data from `pkgutil --pkgs`. Queries the receipt database used by Installer for installed packages"),
 	)
 }
 
@@ -45,15 +43,15 @@ type pkgutilExecutor struct {
 	slogger *slog.Logger
 }
 
-func (p *pkgutilExecutor) Exec(volume string) ([]byte, error) {
-	return tablehelpers.RunSimple(p.ctx, p.slogger, 10, allowedcmd.Pkgutil, []string{"--volume", volume, "--pkgs"})
+func (p *pkgutilExecutor) Exec() ([]byte, error) {
+	return tablehelpers.RunSimple(p.ctx, p.slogger, 10, allowedcmd.Pkgutil, []string{"--pkgs"})
 }
 
 //mockery:generate: true
 //mockery:filename: executor.go
 //mockery:structname: Executor
 type executor interface {
-	Exec(volume string) ([]byte, error)
+	Exec() ([]byte, error)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
@@ -65,54 +63,36 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		slogger: t.slogger,
 	}
 
-	return generatePkgutilData(ctx, queryContext, pkgutilExecutor, t.slogger)
+	return generatePkgutilData(ctx, pkgutilExecutor, t.slogger)
 }
 
-func generatePkgutilData(ctx context.Context, queryContext table.QueryContext, pkgutilExecutor executor, slogger *slog.Logger) ([]map[string]string, error) {
+func generatePkgutilData(ctx context.Context, pkgutilExecutor executor, slogger *slog.Logger) ([]map[string]string, error) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
+	output, err := pkgutilExecutor.Exec()
+	if err != nil {
+		slogger.Log(ctx, slog.LevelInfo,
+			"pkgutil failed",
+			"err", err,
+		)
+
+		// Don't error out if the binary isn't found
+		if os.IsNotExist(errors.Cause(err)) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("calling pkgutil: %w", err)
+	}
+
 	results := make([]map[string]string, 0)
 
-	volumes := tablehelpers.GetConstraints(queryContext, "volume", tablehelpers.WithDefaults(rootVolume))
-	for _, volume := range volumes {
-		// don't fail this if the directory doesn't exist, there won't be any packages anyway
-		if _, err := os.Stat(volume); os.IsNotExist(err) {
-			continue
-		}
-
-		output, err := pkgutilExecutor.Exec(volume)
-		if err != nil {
-			// pkgutil returns exit status 1 for no results
-			if strings.Contains(err.Error(), "exit status 1") {
-				continue
-			}
-
-			// log that the binary doesn't exist, but don't return an error
-			if os.IsNotExist(errors.Cause(err)) {
-				slogger.Log(ctx, slog.LevelWarn,
-					"pkgutil binary not found",
-					"err", err,
-				)
-				return nil, nil
-			}
-
-			slogger.Log(ctx, slog.LevelError,
-				"pkgutil failed",
-				"volume", volume,
-				"err", err,
-			)
-			return results, nil
-		}
-
-		scanner := bufio.NewScanner(bytes.NewReader(output))
-		for scanner.Scan() {
-			line := scanner.Text()
-			results = append(results, map[string]string{
-				"package_id": line,
-				"volume":     volume,
-			})
-		}
+	scanner := bufio.NewScanner(bytes.NewReader(output))
+	for scanner.Scan() {
+		line := scanner.Text()
+		packageID := strings.TrimSuffix(line, "\n")
+		results = append(results, map[string]string{
+			"package_id": packageID,
+		})
 	}
 
 	return results, nil
