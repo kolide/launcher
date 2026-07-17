@@ -6,7 +6,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"fmt"
 	"log/slog"
 	"os"
 	"strings"
@@ -75,61 +74,35 @@ func generatePkgutilData(ctx context.Context, queryContext table.QueryContext, p
 
 	results := make([]map[string]string, 0)
 
-	volumes := tablehelpers.GetConstraints(queryContext, "volume")
-	// the volume constraint is optional
-	// when absent, query the root volume and return early
-	if len(volumes) < 1 {
-		output, err := pkgutilExecutor.Exec(rootVolume)
-		if err != nil {
-			slogger.Log(ctx, slog.LevelInfo,
-				"pkgutil failed",
-				"err", err,
-			)
-
-			// pkgutil returns exit status 1 for no results
-			if strings.Contains(err.Error(), "exit status 1") {
-				return nil, nil
-			}
-
-			if os.IsNotExist(errors.Cause(err)) {
-				return nil, nil
-			}
-			return nil, fmt.Errorf("calling pkgutil: %w", err)
-		}
-
-		scanner := bufio.NewScanner(bytes.NewReader(output))
-		for scanner.Scan() {
-			line := scanner.Text()
-			results = append(results, map[string]string{
-				"package_id": line,
-				"volume":     rootVolume,
-			})
-		}
-
-		return results, nil
-	}
-
+	volumes := tablehelpers.GetConstraints(queryContext, "volume", tablehelpers.WithDefaults(rootVolume))
 	for _, volume := range volumes {
+		// don't fail this if the directory doesn't exist, there won't be any packages anyway
+		if _, err := os.Stat(volume); os.IsNotExist(err) {
+			continue
+		}
+
 		output, err := pkgutilExecutor.Exec(volume)
 		if err != nil {
-			slogger.Log(ctx, slog.LevelInfo,
-				"pkgutil failed",
-				"err", err,
-			)
-
 			// pkgutil returns exit status 1 for no results
 			if strings.Contains(err.Error(), "exit status 1") {
-				slogger.Log(ctx, slog.LevelInfo,
-					"pkgutil returned no results for volume",
-					"volume", volume,
-				)
 				continue
 			}
 
+			// log that the binary doesn't exist, but don't return an error
 			if os.IsNotExist(errors.Cause(err)) {
+				slogger.Log(ctx, slog.LevelError,
+					"pkgutil binary not found",
+					"err", err,
+				)
 				return nil, nil
 			}
-			return nil, fmt.Errorf("calling pkgutil: %w", err)
+
+			slogger.Log(ctx, slog.LevelError,
+				"pkgutil failed",
+				"volume", volume,
+				"err", err,
+			)
+			return results, nil
 		}
 
 		scanner := bufio.NewScanner(bytes.NewReader(output))

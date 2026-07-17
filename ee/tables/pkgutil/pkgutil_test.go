@@ -15,8 +15,6 @@ import (
 	"go.uber.org/goleak"
 )
 
-const testUserVolume = "/Users/testuser"
-
 func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m)
 }
@@ -72,7 +70,7 @@ func TestGeneratePkgutilData(t *testing.T) {
 				queryContext: table.QueryContext{
 					Constraints: map[string]table.ConstraintList{
 						"package_id": {Affinity: table.ColumnTypeText, Constraints: []table.Constraint{}},
-						"volume":     {Affinity: table.ColumnTypeText, Constraints: []table.Constraint{{Operator: table.OperatorEquals, Expression: testUserVolume}}},
+						"volume":     {Affinity: table.ColumnTypeText, Constraints: []table.Constraint{{Operator: table.OperatorEquals, Expression: "testdata"}}},
 					},
 				},
 			},
@@ -80,7 +78,7 @@ func TestGeneratePkgutilData(t *testing.T) {
 			want: []map[string]string{
 				{
 					"package_id": "com.example.test.receipt",
-					"volume":     testUserVolume,
+					"volume":     "testdata",
 				},
 			},
 			assertion: assert.NoError,
