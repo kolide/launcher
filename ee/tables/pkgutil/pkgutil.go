@@ -90,7 +90,7 @@ func generatePkgutilData(ctx context.Context, queryContext table.QueryContext, p
 
 			// log that the binary doesn't exist, but don't return an error
 			if os.IsNotExist(errors.Cause(err)) {
-				slogger.Log(ctx, slog.LevelError,
+				slogger.Log(ctx, slog.LevelWarn,
 					"pkgutil binary not found",
 					"err", err,
 				)
