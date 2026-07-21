@@ -939,3 +939,24 @@ func Test_sendCallback_handlesRegionURLUpdates(t *testing.T) {
 	// We should have set all URLs
 	k.AssertExpectations(t)
 }
+
+// Regression: historically, sendCallback raced with Close(), sending on a closed channel.
+func Test_sendCallback_close(t *testing.T) {
+	t.Parallel()
+
+	testCallbackServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("{}"))
+	}))
+	t.Cleanup(testCallbackServer.Close)
+
+	k := typesmocks.NewKnapsack(t)
+	k.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
+
+	mw := newKryptoEcMiddleware(multislogger.NewNopLogger(), k, nil, mustGenEcdsaKey(t).PublicKey, nil, "test-munemo")
+	// at runtime, this historically happened with queued, slow callbacks in flight
+	mw.Close()
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, testCallbackServer.URL, nil)
+	require.NoError(t, err)
+	mw.sendCallback(req, &callbackDataStruct{})
+}
