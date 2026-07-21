@@ -85,6 +85,7 @@ type kryptoEcMiddleware struct {
 	presenceDetectionLock sync.Mutex
 	tenantMunemo          *atomic.String
 	callbackQueue         chan *http.Request
+	shutdown              chan struct{}
 	enrollmentTracker     types.EnrollmentTracker
 	knapsack              types.Knapsack
 	flags                 types.Flags
@@ -112,6 +113,7 @@ func newKryptoEcMiddleware(slogger *slog.Logger, knapsack types.Knapsack,
 		presenceDetectionStatusUpdateInterval: 30 * time.Second,
 		tenantMunemo:                          atomicMunemo,
 		callbackQueue:                         callbackQueue,
+		shutdown:                              make(chan struct{}),
 		enrollmentTracker:                     knapsack,
 		knapsack:                              knapsack,
 		flags:                                 knapsack,
@@ -156,15 +158,26 @@ type (
 // this ensures that we don't have multiple callback requests firing simultaneously,
 // to avoid data races during secretless registration.
 func (e *kryptoEcMiddleware) callbackWorker() {
-	client := http.Client{
-		Timeout: 8 * time.Second,
-	}
+	var (
+		client = http.Client{
+			Timeout: 8 * time.Second,
+		}
+		req *http.Request
+	)
 
-	// Worker loop
-	for req := range e.callbackQueue {
+	for {
+		select {
+		case req = <-e.callbackQueue:
+		case <-e.shutdown:
+			e.slogger.Log(context.TODO(), slog.LevelInfo,
+				"callback worker shut down",
+			)
+			return
+		}
+
 		// Anonymous function to avoid piling up defers
 		if err := func() error {
-			ctx, cancel := context.WithTimeout(context.Background(), client.Timeout)
+			ctx, cancel := context.WithTimeout(req.Context(), client.Timeout)
 			defer cancel()
 			ctx, span := observability.StartSpan(ctx)
 			defer span.End()
@@ -279,10 +292,6 @@ func (e *kryptoEcMiddleware) callbackWorker() {
 			)
 		}
 	}
-
-	e.slogger.Log(context.TODO(), slog.LevelInfo,
-		"callback worker shut down",
-	)
 }
 
 // sendCallback is a command to allow launcher to callback to the SaaS side with krypto responses. As the URL it inside
@@ -308,15 +317,28 @@ func (e *kryptoEcMiddleware) sendCallback(req *http.Request, data *callbackDataS
 
 	req.Body = io.NopCloser(bytes.NewReader(b))
 
-	// Check to make sure our queue isn't filling up too rapidly -- drop oldest callback
+	// Queue full. This races with other producers, but we best effort attempt to purge an old item.
 	if len(e.callbackQueue) >= maxDesiredCallbackQueueSize {
 		e.slogger.Log(req.Context(), slog.LevelWarn,
 			"callback queue exceeds desired max callback queue size, dropping oldest callback from queue",
 			"queue_len", len(e.callbackQueue),
 		)
-		<-e.callbackQueue
+		select {
+		case <-req.Context().Done():
+			return
+		case <-e.callbackQueue:
+		default:
+			// purge raced
+		}
 	}
-	e.callbackQueue <- req
+
+	select {
+	case <-req.Context().Done():
+		e.slogger.Log(req.Context(), slog.LevelWarn,
+			"request connection closed before handling callback",
+		)
+	case e.callbackQueue <- req:
+	}
 }
 
 func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
@@ -470,9 +492,9 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 	})
 }
 
-// Close ensures we shut down our callback worker
+// Close cleanly signals our callback worker to shut down.
 func (e *kryptoEcMiddleware) Close() {
-	close(e.callbackQueue)
+	close(e.shutdown)
 }
 
 // extractChallenge finds the challenge in an http request. It prefers the GET parameter, but will fall back to POST data.
