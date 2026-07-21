@@ -1,0 +1,5 @@
+package-id: org.golang.go
+version: 1.22.0
+volume: /
+location: /
+install-time: 1700000000
