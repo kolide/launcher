@@ -324,21 +324,13 @@ func (e *kryptoEcMiddleware) sendCallback(req *http.Request, data *callbackDataS
 			"queue_len", len(e.callbackQueue),
 		)
 		select {
-		case <-req.Context().Done():
-			return
 		case <-e.callbackQueue:
 		default:
-			// purge raced
+			// purge lost a race with other calls
 		}
 	}
 
-	select {
-	case <-req.Context().Done():
-		e.slogger.Log(req.Context(), slog.LevelWarn,
-			"request connection closed before handling callback",
-		)
-	case e.callbackQueue <- req:
-	}
+	e.callbackQueue <- req
 }
 
 func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
