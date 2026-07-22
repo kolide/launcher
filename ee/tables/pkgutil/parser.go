@@ -5,7 +5,6 @@ package pkgutil
 import (
 	"bytes"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/kolide/launcher/v2/ee/tables/execparsers/key_value"
@@ -44,25 +43,6 @@ func parsePkgInfoOutput(output []byte) (map[string]string, error) {
 		valueStr, err := pkgInfoValue(value)
 		if err != nil {
 			return nil, fmt.Errorf("parsing %s: %w", column, err)
-		}
-
-		valueStr = strings.TrimSpace(valueStr)
-		if valueStr == "" {
-			continue
-		}
-
-		if column == "install_time" {
-			installTime, err := strconv.ParseInt(valueStr, 10, 64)
-			if err != nil {
-				return nil, fmt.Errorf("parsing install-time unix timestamp %q: %w", valueStr, err)
-			}
-
-			if installTime < 0 {
-				return nil, fmt.Errorf("invalid install-time unix timestamp %d", installTime)
-			}
-
-			result[column] = strconv.FormatInt(installTime, 10)
-			continue
 		}
 
 		result[column] = valueStr

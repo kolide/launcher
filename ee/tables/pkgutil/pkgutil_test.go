@@ -162,23 +162,6 @@ func TestGeneratePackageInfoData(t *testing.T) {
 			},
 		},
 		{
-			name:           "unix timestamp example",
-			packageID:      "com.example.pkg",
-			execReturnFile: "valid_pkg_info_unix_timestamp.output",
-			want: []map[string]string{
-				{
-					"package_id":   "com.example.pkg",
-					"install_time": "1784553978",
-				},
-			},
-		},
-		{
-			name:           "invalid install time",
-			packageID:      "com.example.pkg",
-			execReturnFile: "invalid_pkg_info_install_time.output",
-			want:           []map[string]string{},
-		},
-		{
 			name:           "duplicate groups",
 			packageID:      "com.example.pkg",
 			execReturnFile: "valid_pkg_info_duplicate_groups.output",
@@ -202,24 +185,7 @@ func TestGeneratePackageInfoData(t *testing.T) {
 			},
 		},
 		{
-			name:           "negative install time",
-			packageID:      "com.example.pkg",
-			execReturnFile: "invalid_pkg_info_negative_install_time.output",
-			want:           []map[string]string{},
-		},
-		{
-			name:           "omits empty install time",
-			packageID:      "com.example.pkg",
-			execReturnFile: "valid_pkg_info_empty_install_time.output",
-			want: []map[string]string{
-				{
-					"package_id": "com.example.pkg",
-					"version":    "1.0.0",
-				},
-			},
-		},
-		{
-			name:           "empty input",
+			name:           "empty output",
 			packageID:      "com.example.pkg",
 			execReturnFile: "valid_pkg_info_empty.output",
 			want:           []map[string]string{},
