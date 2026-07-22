@@ -169,14 +169,12 @@ func (e *kryptoEcMiddleware) callbackWorker() {
 		cancel()
 	}()
 
-	for {
+	// prefer to exit over processing the queue
+	for ctx.Err() == nil {
 		var req *http.Request
 		select {
 		case <-ctx.Done():
-			e.slogger.Log(ctx, slog.LevelInfo,
-				"callback worker shut down",
-			)
-			return
+			break
 		case req = <-e.callbackQueue:
 		}
 
@@ -297,6 +295,10 @@ func (e *kryptoEcMiddleware) callbackWorker() {
 			)
 		}
 	}
+
+	e.slogger.Log(ctx, slog.LevelInfo,
+		"callback worker shut down",
+	)
 }
 
 // sendCallback is a command to allow launcher to callback to the SaaS side with krypto responses. As the URL it inside
