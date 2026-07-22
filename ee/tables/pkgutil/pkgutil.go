@@ -20,7 +20,11 @@ import (
 	"github.com/pkg/errors"
 )
 
-const rootVolume = "/"
+const (
+	packageInfoTableName = "kolide_pkgutil_package_info"
+	packagesTableName    = "kolide_pkgutil_packages"
+	rootVolume           = "/"
+)
 
 type Pkgutil struct {
 	slogger *slog.Logger
@@ -33,10 +37,10 @@ func PkgutilPackages(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	}
 
 	pkgutilTable := &Pkgutil{
-		slogger: slogger.With("table", "kolide_pkgutil_packages"),
+		slogger: slogger.With("table", packagesTableName),
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_pkgutil_packages", columns, pkgutilTable.generatePackages,
+	return tablewrapper.New(flags, slogger, packagesTableName, columns, pkgutilTable.generatePackages,
 		tablewrapper.WithDescription("macOS Installer packages queried from the receipt database used by Installer for installed packages. Optionally takes a WHERE volume = constraint to specify the volume to check."),
 	)
 }
@@ -63,7 +67,7 @@ type executor interface {
 }
 
 func (t *Pkgutil) generatePackages(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, span := observability.StartSpan(ctx, "table_name", "kolide_pkgutil_packages")
+	ctx, span := observability.StartSpan(ctx, "table_name", packagesTableName)
 	defer span.End()
 
 	pkgutilExec := &pkgutilExecutor{
@@ -135,16 +139,16 @@ func PkgutilPackageInfo(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	}
 
 	pkgutilTable := &Pkgutil{
-		slogger: slogger.With("table", "kolide_pkgutil_package_info"),
+		slogger: slogger.With("table", packageInfoTableName),
 	}
 
-	return tablewrapper.New(flags, slogger, "kolide_pkgutil_package_info", columns, pkgutilTable.generatePackageInfo,
+	return tablewrapper.New(flags, slogger, packageInfoTableName, columns, pkgutilTable.generatePackageInfo,
 		tablewrapper.WithDescription("macOS Installer package extended information queried from the receipt database used by Installer for installed packages. Requires a WHERE package_id = constraint to specify the package."),
 	)
 }
 
 func (t *Pkgutil) generatePackageInfo(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, span := observability.StartSpan(ctx, "table_name", "kolide_pkgutil_package_info")
+	ctx, span := observability.StartSpan(ctx, "table_name", packageInfoTableName)
 	defer span.End()
 
 	pkgutilExec := &pkgutilExecutor{
@@ -163,10 +167,10 @@ func generatePackageInfoData(ctx context.Context, queryContext table.QueryContex
 
 	packageIDs := tablehelpers.GetConstraints(queryContext, "package_id")
 	if len(packageIDs) == 0 {
-		slogger.Log(ctx, slog.LevelInfo,
+		slogger.Log(ctx, slog.LevelError,
 			"no package_id provided",
 		)
-		return results, nil
+		return nil, fmt.Errorf("The %s table requires that you specify a constraint for WHERE package_id.", packageInfoTableName)
 	}
 
 	for _, packageID := range packageIDs {
