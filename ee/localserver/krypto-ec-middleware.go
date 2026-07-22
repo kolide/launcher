@@ -158,26 +158,31 @@ type (
 // this ensures that we don't have multiple callback requests firing simultaneously,
 // to avoid data races during secretless registration.
 func (e *kryptoEcMiddleware) callbackWorker() {
-	var (
-		client = http.Client{
-			Timeout: 8 * time.Second,
-		}
-		req *http.Request
-	)
+	client := http.Client{
+		Timeout: 8 * time.Second,
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		<-e.shutdown
+		cancel()
+	}()
 
 	for {
+		var req *http.Request
 		select {
-		case req = <-e.callbackQueue:
-		case <-e.shutdown:
-			e.slogger.Log(context.TODO(), slog.LevelInfo,
+		case <-ctx.Done():
+			e.slogger.Log(ctx, slog.LevelInfo,
 				"callback worker shut down",
 			)
 			return
+		case req = <-e.callbackQueue:
 		}
 
 		// Anonymous function to avoid piling up defers
 		if err := func() error {
-			ctx, cancel := context.WithTimeout(req.Context(), client.Timeout)
+			ctx, cancel := context.WithTimeout(ctx, client.Timeout)
 			defer cancel()
 			ctx, span := observability.StartSpan(ctx)
 			defer span.End()
