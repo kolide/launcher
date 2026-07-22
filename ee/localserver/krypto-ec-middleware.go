@@ -174,7 +174,10 @@ func (e *kryptoEcMiddleware) callbackWorker() {
 		var req *http.Request
 		select {
 		case <-ctx.Done():
-			break
+			e.slogger.Log(ctx, slog.LevelInfo,
+				"callback worker shut down",
+			)
+			return
 		case req = <-e.callbackQueue:
 		}
 
