@@ -135,6 +135,12 @@ func TestFlatten_Jsonl_Complex(t *testing.T) {
 		{Path: []string{"2", "users", "0", "id"}, Value: "1"},
 	}
 
+	mustPrefilter := func(expr string) *Prefilter {
+		p, err := NewPrefilter(expr)
+		require.NoError(t, err, "compiling prefilter")
+		return p
+	}
+
 	var tests = []flattenTestCase{
 		{
 			out: []Row{
@@ -169,9 +175,24 @@ func TestFlatten_Jsonl_Complex(t *testing.T) {
 			},
 		},
 		{
+			comment: "query metadata (prefilter)",
+			options: []FlattenOpts{WithPrefilter(mustPrefilter(
+				`type(this) == map && has(this.metadata) ? {"metadata": this.metadata} : {}`))},
+			out: []Row{
+				{Path: []string{"0", "metadata", "testing"}, Value: "true"},
+				{Path: []string{"0", "metadata", "version"}, Value: "1.0.1"},
+			},
+		},
+		{
 			comment: "array by #",
 			options: []FlattenOpts{WithQuery([]string{"*", "users", "0"})},
 			out:     testdataUser0,
+		},
+		{
+			comment: "array by # (prefilter)",
+			options: []FlattenOpts{WithPrefilter(mustPrefilter(
+				`type(this) == map && has(this.users) ? {"users": [this.users[0]]} : {}`))},
+			out: testdataUser0,
 		},
 		{
 			comment: "array by id value",
@@ -179,9 +200,21 @@ func TestFlatten_Jsonl_Complex(t *testing.T) {
 			out:     testdataUser0,
 		},
 		{
+			comment: "array by id value (prefilter)",
+			options: []FlattenOpts{WithPrefilter(mustPrefilter(
+				`type(this) == map && has(this.users) ? {"users": this.users.filter(u, u.id == 1)} : {}`))},
+			out: testdataUser0,
+		},
+		{
 			comment: "array by uuid",
 			options: []FlattenOpts{WithQuery([]string{"*", "users", "uuid=>abc123"})},
 			out:     testdataUser0,
+		},
+		{
+			comment: "array by uuid (prefilter)",
+			options: []FlattenOpts{WithPrefilter(mustPrefilter(
+				`type(this) == map && has(this.users) ? {"users": this.users.filter(u, u.uuid == "abc123")} : {}`))},
+			out: testdataUser0,
 		},
 		{
 			comment: "array by name with suffix wildcard",
@@ -189,9 +222,21 @@ func TestFlatten_Jsonl_Complex(t *testing.T) {
 			out:     testdataUser0,
 		},
 		{
+			comment: "array by name with suffix wildcard (prefilter)",
+			options: []FlattenOpts{WithPrefilter(mustPrefilter(
+				`type(this) == map && has(this.users) ? {"users": this.users.filter(u, u.name.startsWith("Al"))} : {}`))},
+			out: testdataUser0,
+		},
+		{
 			comment: "array by name with prefix wildcard",
 			options: []FlattenOpts{WithQuery([]string{"*", "users", "name=>*Aardvark"})},
 			out:     testdataUser0,
+		},
+		{
+			comment: "array by name with prefix wildcard (prefilter)",
+			options: []FlattenOpts{WithPrefilter(mustPrefilter(
+				`type(this) == map && has(this.users) ? {"users": this.users.filter(u, u.name.endsWith("Aardvark"))} : {}`))},
+			out: testdataUser0,
 		},
 		{
 			comment: "array by name with suffix and prefix",
@@ -199,10 +244,24 @@ func TestFlatten_Jsonl_Complex(t *testing.T) {
 			out:     testdataUser0,
 		},
 		{
+			comment: "array by name with suffix and prefix (prefilter)",
+			options: []FlattenOpts{WithPrefilter(mustPrefilter(
+				`type(this) == map && has(this.users) ? {"users": this.users.filter(u, u.name.contains("Aardv"))} : {}`))},
+			out: testdataUser0,
+		},
+		{
 			comment: "who likes ants, array re-written",
 			options: []FlattenOpts{WithQuery([]string{"*", "users", "#name", "favorites", "ants"})},
 			out: []Row{
 				{Path: []string{"2", "users", "Alex Aardvark", "favorites", "0"}, Value: "ants"},
+			},
+		},
+		{
+			comment: "who likes ants (prefilter)",
+			options: []FlattenOpts{WithPrefilter(mustPrefilter(
+				`type(this) == map && has(this.users) ? {"users": this.users.filter(u, "ants" in u.favorites).map(u, {"favorites": u.favorites.filter(f, f == "ants")})} : {}`))},
+			out: []Row{
+				{Path: []string{"2", "users", "0", "favorites", "0"}, Value: "ants"},
 			},
 		},
 		{
@@ -213,9 +272,23 @@ func TestFlatten_Jsonl_Complex(t *testing.T) {
 			},
 		},
 		{
+			comment: "rewritten and filtered (prefilter)",
+			options: []FlattenOpts{WithPrefilter(mustPrefilter(
+				`type(this) == map && has(this.users) ? {"users": this.users.filter(u, u.name.startsWith("Al")).map(u, {"id": u.id})} : {}`))},
+			out: []Row{
+				{Path: []string{"2", "users", "0", "id"}, Value: "1"},
+			},
+		},
+		{
 			comment: "bad key name",
 			options: []FlattenOpts{WithQuery([]string{"*", "users", "#nokey"})},
 			out:     []Row{},
+		},
+		{
+			comment: "bad key name (prefilter)",
+			options: []FlattenOpts{WithPrefilter(mustPrefilter(
+				`type(this) == map && has(this.users) ? {"users": this.users.filter(u, has(u.nokey))} : {}`))},
+			out: []Row{},
 		},
 		{
 			comment: "rewrite array to map",
@@ -224,6 +297,16 @@ func TestFlatten_Jsonl_Complex(t *testing.T) {
 				{Path: []string{"2", "users", "Alex Aardvark", "id"}, Value: "1"},
 				{Path: []string{"2", "users", "Bailey Bobcat", "id"}, Value: "2"},
 				{Path: []string{"2", "users", "Cam Chipmunk", "id"}, Value: "3"},
+			},
+		},
+		{
+			comment: "rewrite array to map (prefilter)",
+			options: []FlattenOpts{WithPrefilter(mustPrefilter(
+				`type(this) == map && has(this.users) ? {"users": this.users.map(u, {"id": u.id})} : {}`))},
+			out: []Row{
+				{Path: []string{"2", "users", "0", "id"}, Value: "1"},
+				{Path: []string{"2", "users", "1", "id"}, Value: "2"},
+				{Path: []string{"2", "users", "2", "id"}, Value: "3"},
 			},
 		},
 	}

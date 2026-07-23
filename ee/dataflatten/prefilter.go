@@ -21,7 +21,7 @@ type Prefilter struct{ prg cel.Program }
 
 func NewPrefilter(prefilter string) (*Prefilter, error) {
 	env, err := cel.NewEnv(
-		cel.Variable(celTopLevelVariable, cel.MapType(cel.StringType, cel.DynType)),
+		cel.Variable(celTopLevelVariable, cel.DynType),
 		cel.OptionalTypes(),
 	)
 	if err != nil {
@@ -50,16 +50,35 @@ func (p *Prefilter) Apply(obj any) (any, error) {
 		return nil, nil
 	}
 
-	// Convert back to Go type so that dataflatten can handle it later
-	native, err := out.ConvertToNative(reflect.TypeFor[map[string]any]())
+	native, err := out.ConvertToNative(reflect.TypeFor[any]())
 	if err != nil {
 		return nil, fmt.Errorf("converting prefilter result: %w", err)
 	}
 
-	m, ok := native.(map[string]any)
-	if !ok {
-		return nil, fmt.Errorf("prefilter result was not a map, got %T", native)
-	}
+	return normalizeStringKeys(native), nil
+}
 
-	return m, nil
+// normalizeStringKeys recursively rewrites map[any]any (as produced by CEL's
+// ConvertToNative) to map[string]any so dataflatten can descend into it.
+func normalizeStringKeys(v any) any {
+	switch t := v.(type) {
+	case map[string]any:
+		for k, val := range t {
+			t[k] = normalizeStringKeys(val)
+		}
+		return t
+	case map[any]any:
+		converted := make(map[string]any, len(t))
+		for k, val := range t {
+			converted[fmt.Sprintf("%v", k)] = normalizeStringKeys(val)
+		}
+		return converted
+	case []any:
+		for i, val := range t {
+			t[i] = normalizeStringKeys(val)
+		}
+		return t
+	default:
+		return v
+	}
 }
