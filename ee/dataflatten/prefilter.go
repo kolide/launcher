@@ -27,9 +27,9 @@ func NewPrefilter(prefilter string) (*Prefilter, error) {
 	if err != nil {
 		return nil, fmt.Errorf("initializing CEL env: %w", err)
 	}
-	ast, iss := env.Parse(prefilter)
+	ast, iss := env.Compile(prefilter)
 	if iss.Err() != nil {
-		return nil, fmt.Errorf("parsing CEL prefilter: %w", iss.Err())
+		return nil, fmt.Errorf("compiling CEL prefilter: %w", iss.Err())
 	}
 	prg, err := env.Program(ast)
 	if err != nil {
