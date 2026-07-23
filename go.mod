@@ -34,7 +34,7 @@ require (
 	golang.org/x/sys v0.46.0
 	golang.org/x/text v0.39.0
 	golang.org/x/time v0.8.0
-	google.golang.org/grpc v1.79.3
+	google.golang.org/grpc v1.82.1
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	howett.net/plist v0.0.0-20181124034731-591f970eefbb
 	software.sslmate.com/src/go-pkcs12 v0.0.0-20210415151418-c5206de65a78
@@ -144,8 +144,8 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
 	golang.org/x/term v0.44.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20251202230838-ff82c1b0f217 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20251202230838-ff82c1b0f217 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20260414002931-afd174a4e478 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260414002931-afd174a4e478 // indirect
 	modernc.org/libc v1.65.7 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
