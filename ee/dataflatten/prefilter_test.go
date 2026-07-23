@@ -60,3 +60,63 @@ func TestNewPrefilter(t *testing.T) {
 		})
 	}
 }
+
+func TestApply(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		testCaseName   string
+		prefilterExpr  string
+		dataToFilter   any
+		expectedResult any
+	}{
+		{
+			testCaseName: "prefilter matches, strips unnecessary fields",
+			prefilterExpr: `has(this.type) && this.type == "user" ? {
+  ?"timestamp": this.?timestamp
+} : {}`,
+			dataToFilter: map[string]any{
+				"type":       "user",
+				"some-field": "abc",
+				"timestamp":  "12345", // string just to avoid annoying integer type comparisons
+			},
+			expectedResult: map[string]any{
+				"timestamp": "12345",
+			},
+		},
+		{
+			testCaseName: "prefilter does not match",
+			prefilterExpr: `has(this.type) && this.type == "user" ? {
+  ?"timestamp": this.?timestamp
+} : {}`,
+			dataToFilter: map[string]any{
+				"type":       "admin",
+				"some-field": "abc",
+				"timestamp":  "12345",
+			},
+			expectedResult: nil,
+		},
+		{
+			testCaseName: "prefilter field is missing, handled gracefully",
+			prefilterExpr: `has(this.type) && this.type == "user" ? {
+  ?"timestamp": this.?timestamp
+} : {}`,
+			dataToFilter: map[string]any{
+				"some-field": "abc",
+				"timestamp":  "12345",
+			},
+			expectedResult: nil,
+		},
+	} {
+		t.Run(tt.testCaseName, func(t *testing.T) {
+			t.Parallel()
+
+			p, err := NewPrefilter(tt.prefilterExpr)
+			require.NoError(t, err)
+
+			result, err := p.Apply(tt.dataToFilter)
+			require.NoError(t, err)
+			require.Equal(t, tt.expectedResult, result)
+		})
+	}
+}
