@@ -85,6 +85,7 @@ type kryptoEcMiddleware struct {
 	presenceDetectionLock sync.Mutex
 	tenantMunemo          *atomic.String
 	callbackQueue         chan *http.Request
+	shutdown              chan struct{}
 	enrollmentTracker     types.EnrollmentTracker
 	knapsack              types.Knapsack
 	flags                 types.Flags
@@ -112,6 +113,7 @@ func newKryptoEcMiddleware(slogger *slog.Logger, knapsack types.Knapsack,
 		presenceDetectionStatusUpdateInterval: 30 * time.Second,
 		tenantMunemo:                          atomicMunemo,
 		callbackQueue:                         callbackQueue,
+		shutdown:                              make(chan struct{}),
 		enrollmentTracker:                     knapsack,
 		knapsack:                              knapsack,
 		flags:                                 knapsack,
@@ -160,11 +162,28 @@ func (e *kryptoEcMiddleware) callbackWorker() {
 		Timeout: 8 * time.Second,
 	}
 
-	// Worker loop
-	for req := range e.callbackQueue {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		<-e.shutdown
+		cancel()
+	}()
+
+	// prefer to exit over processing the queue
+	for ctx.Err() == nil {
+		var req *http.Request
+		select {
+		case <-ctx.Done():
+			e.slogger.Log(ctx, slog.LevelInfo,
+				"callback worker shut down",
+			)
+			return
+		case req = <-e.callbackQueue:
+		}
+
 		// Anonymous function to avoid piling up defers
 		if err := func() error {
-			ctx, cancel := context.WithTimeout(context.Background(), client.Timeout)
+			ctx, cancel := context.WithTimeout(ctx, client.Timeout)
 			defer cancel()
 			ctx, span := observability.StartSpan(ctx)
 			defer span.End()
@@ -280,7 +299,7 @@ func (e *kryptoEcMiddleware) callbackWorker() {
 		}
 	}
 
-	e.slogger.Log(context.TODO(), slog.LevelInfo,
+	e.slogger.Log(ctx, slog.LevelInfo,
 		"callback worker shut down",
 	)
 }
@@ -308,14 +327,19 @@ func (e *kryptoEcMiddleware) sendCallback(req *http.Request, data *callbackDataS
 
 	req.Body = io.NopCloser(bytes.NewReader(b))
 
-	// Check to make sure our queue isn't filling up too rapidly -- drop oldest callback
+	// Queue full. This races with other producers, but we best effort attempt to purge an old item.
 	if len(e.callbackQueue) >= maxDesiredCallbackQueueSize {
 		e.slogger.Log(req.Context(), slog.LevelWarn,
 			"callback queue exceeds desired max callback queue size, dropping oldest callback from queue",
 			"queue_len", len(e.callbackQueue),
 		)
-		<-e.callbackQueue
+		select {
+		case <-e.callbackQueue:
+		default:
+			// purge lost a race with other calls
+		}
 	}
+
 	e.callbackQueue <- req
 }
 
@@ -470,9 +494,9 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 	})
 }
 
-// Close ensures we shut down our callback worker
+// Close cleanly signals our callback worker to shut down.
 func (e *kryptoEcMiddleware) Close() {
-	close(e.callbackQueue)
+	close(e.shutdown)
 }
 
 // extractChallenge finds the challenge in an http request. It prefers the GET parameter, but will fall back to POST data.
