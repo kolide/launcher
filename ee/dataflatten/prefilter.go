@@ -10,7 +10,11 @@ import (
 )
 
 const (
-	celTopLevelVariable = "record"
+	// celTopLevelVariable is our fixed CEL variable name; we bind each object to this variable name
+	// when evaluating the prefilter. CEL requires every variable to be declared before parsing;
+	// it is simpler for us to require the variable name to be `this` than to attempt to parse the variable
+	// name out of the prefilter provided in the query.
+	celTopLevelVariable = "this"
 )
 
 type Prefilter struct{ prg cel.Program }
