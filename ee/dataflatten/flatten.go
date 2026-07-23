@@ -162,6 +162,8 @@ func FlattenEach(next iter.Seq2[any, error], opts ...FlattenOpts) ([]Row, error)
 		if err != nil {
 			return nil, fmt.Errorf("iterating: %w", err)
 		}
+		// Since we are producing an array of objects, that top-level array is depth 0.
+		// So, all flattened objects start with a depth of 1.
 		if err := fl.flattenObject([]string{strconv.Itoa(i)}, obj, 1); err != nil {
 			return nil, fmt.Errorf("flattening object %d: %w", i, err)
 		}

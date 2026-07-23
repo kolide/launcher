@@ -184,6 +184,36 @@ func TestFlatten_Jsonl_Complex(t *testing.T) {
 			},
 		},
 		{
+			comment: "top-level scalar key",
+			options: []FlattenOpts{WithQuery([]string{"*", "system"})},
+			out: []Row{
+				{Path: []string{"1", "system"}, Value: "users demo"},
+			},
+		},
+		{
+			comment: "top-level scalar key (prefilter)",
+			options: []FlattenOpts{WithPrefilter(mustPrefilter(
+				`type(this) == map && has(this.system) ? {"system": this.system} : {}`))},
+			out: []Row{
+				{Path: []string{"1", "system"}, Value: "users demo"},
+			},
+		},
+		{
+			comment: "deep pure-key path to scalar",
+			options: []FlattenOpts{WithQuery([]string{"*", "metadata", "version"})},
+			out: []Row{
+				{Path: []string{"0", "metadata", "version"}, Value: "1.0.1"},
+			},
+		},
+		{
+			comment: "deep pure-key path to scalar (prefilter)",
+			options: []FlattenOpts{WithPrefilter(mustPrefilter(
+				`type(this) == map && has(this.metadata) && has(this.metadata.version) ? {"metadata": {"version": this.metadata.version}} : {}`))},
+			out: []Row{
+				{Path: []string{"0", "metadata", "version"}, Value: "1.0.1"},
+			},
+		},
+		{
 			comment: "array by #",
 			options: []FlattenOpts{WithQuery([]string{"*", "users", "0"})},
 			out:     testdataUser0,
@@ -258,10 +288,13 @@ func TestFlatten_Jsonl_Complex(t *testing.T) {
 		},
 		{
 			comment: "who likes ants (prefilter)",
-			options: []FlattenOpts{WithPrefilter(mustPrefilter(
-				`type(this) == map && has(this.users) ? {"users": this.users.filter(u, "ants" in u.favorites).map(u, {"favorites": u.favorites.filter(f, f == "ants")})} : {}`))},
+			options: []FlattenOpts{
+				WithPrefilter(mustPrefilter(
+					`type(this) == map && has(this.users) ? {"users": this.users.filter(u, "ants" in u.favorites)} : {}`)),
+				WithQuery([]string{"*", "users", "#name", "favorites", "ants"}),
+			},
 			out: []Row{
-				{Path: []string{"2", "users", "0", "favorites", "0"}, Value: "ants"},
+				{Path: []string{"2", "users", "Alex Aardvark", "favorites", "0"}, Value: "ants"},
 			},
 		},
 		{
@@ -273,10 +306,13 @@ func TestFlatten_Jsonl_Complex(t *testing.T) {
 		},
 		{
 			comment: "rewritten and filtered (prefilter)",
-			options: []FlattenOpts{WithPrefilter(mustPrefilter(
-				`type(this) == map && has(this.users) ? {"users": this.users.filter(u, u.name.startsWith("Al")).map(u, {"id": u.id})} : {}`))},
+			options: []FlattenOpts{
+				WithPrefilter(mustPrefilter(
+					`type(this) == map && has(this.users) ? {"users": this.users.filter(u, u.name.startsWith("Al"))} : {}`)),
+				WithQuery([]string{"*", "users", "#name=>Al*", "id"}),
+			},
 			out: []Row{
-				{Path: []string{"2", "users", "0", "id"}, Value: "1"},
+				{Path: []string{"2", "users", "Alex Aardvark", "id"}, Value: "1"},
 			},
 		},
 		{
@@ -286,8 +322,11 @@ func TestFlatten_Jsonl_Complex(t *testing.T) {
 		},
 		{
 			comment: "bad key name (prefilter)",
-			options: []FlattenOpts{WithPrefilter(mustPrefilter(
-				`type(this) == map && has(this.users) ? {"users": this.users.filter(u, has(u.nokey))} : {}`))},
+			options: []FlattenOpts{
+				WithPrefilter(mustPrefilter(
+					`type(this) == map && has(this.users) ? {"users": this.users} : {}`)),
+				WithQuery([]string{"*", "users", "#nokey"}),
+			},
 			out: []Row{},
 		},
 		{
@@ -301,12 +340,15 @@ func TestFlatten_Jsonl_Complex(t *testing.T) {
 		},
 		{
 			comment: "rewrite array to map (prefilter)",
-			options: []FlattenOpts{WithPrefilter(mustPrefilter(
-				`type(this) == map && has(this.users) ? {"users": this.users.map(u, {"id": u.id})} : {}`))},
+			options: []FlattenOpts{
+				WithPrefilter(mustPrefilter(
+					`type(this) == map && has(this.users) ? {"users": this.users.map(u, {"name": u.name, "id": u.id})} : {}`)),
+				WithQuery([]string{"*", "users", "#name", "id"}),
+			},
 			out: []Row{
-				{Path: []string{"2", "users", "0", "id"}, Value: "1"},
-				{Path: []string{"2", "users", "1", "id"}, Value: "2"},
-				{Path: []string{"2", "users", "2", "id"}, Value: "3"},
+				{Path: []string{"2", "users", "Alex Aardvark", "id"}, Value: "1"},
+				{Path: []string{"2", "users", "Bailey Bobcat", "id"}, Value: "2"},
+				{Path: []string{"2", "users", "Cam Chipmunk", "id"}, Value: "3"},
 			},
 		},
 	}
@@ -442,6 +484,12 @@ func TestFlatten_Complex(t *testing.T) {
 func TestFlatten_ArrayMaps(t *testing.T) {
 	t.Parallel()
 
+	mustPrefilter := func(expr string) *Prefilter {
+		p, err := NewPrefilter(expr)
+		require.NoError(t, err, "compiling prefilter")
+		return p
+	}
+
 	var tests = []flattenTestCase{
 		{
 			in: `{"data": [{"v":1,"id":"a"},{"v":2,"id":"b"},{"v":3,"id":"c"}]}`,
@@ -471,6 +519,61 @@ func TestFlatten_ArrayMaps(t *testing.T) {
 			},
 			options: []FlattenOpts{WithQuery([]string{"data", "#id"})},
 			comment: "nested array as map",
+		},
+		{
+			in: `{"data": [{"v":1,"id":"a"},{"v":2,"id":"b"},{"v":3,"id":"c"}]}`,
+			out: []Row{
+				{Path: []string{"data", "a", "id"}, Value: "a"},
+				{Path: []string{"data", "a", "v"}, Value: "1"},
+
+				{Path: []string{"data", "b", "id"}, Value: "b"},
+				{Path: []string{"data", "b", "v"}, Value: "2"},
+
+				{Path: []string{"data", "c", "id"}, Value: "c"},
+				{Path: []string{"data", "c", "v"}, Value: "3"},
+			},
+			options: []FlattenOpts{
+				WithPrefilter(mustPrefilter(
+					`type(this) == map && has(this.data) ? {"data": this.data} : {}`)),
+				WithQuery([]string{"data", "#id"}),
+			},
+			comment: "nested array as map (prefilter)",
+		},
+		{
+			in: `{"accounts": [` +
+				`{"services": [{"Name":"MAIL","Enabled":true},{"Name":"CONTACTS","Enabled":false}]},` +
+				`{"services": [{"Name":"CALENDAR","Enabled":true}]}` +
+				`]}`,
+			out: []Row{
+				{Path: []string{"accounts", "0", "services", "MAIL", "Name"}, Value: "MAIL"},
+				{Path: []string{"accounts", "0", "services", "MAIL", "Enabled"}, Value: "true"},
+				{Path: []string{"accounts", "0", "services", "CONTACTS", "Name"}, Value: "CONTACTS"},
+				{Path: []string{"accounts", "0", "services", "CONTACTS", "Enabled"}, Value: "false"},
+				{Path: []string{"accounts", "1", "services", "CALENDAR", "Name"}, Value: "CALENDAR"},
+				{Path: []string{"accounts", "1", "services", "CALENDAR", "Enabled"}, Value: "true"},
+			},
+			options: []FlattenOpts{WithQuery([]string{"accounts", "*", "services", "#Name"})},
+			comment: "wildcard descent with terminal array rewrite",
+		},
+		{
+			in: `{"accounts": [` +
+				`{"services": [{"Name":"MAIL","Enabled":true},{"Name":"CONTACTS","Enabled":false}]},` +
+				`{"services": [{"Name":"CALENDAR","Enabled":true}]}` +
+				`]}`,
+			out: []Row{
+				{Path: []string{"accounts", "0", "services", "MAIL", "Name"}, Value: "MAIL"},
+				{Path: []string{"accounts", "0", "services", "MAIL", "Enabled"}, Value: "true"},
+				{Path: []string{"accounts", "0", "services", "CONTACTS", "Name"}, Value: "CONTACTS"},
+				{Path: []string{"accounts", "0", "services", "CONTACTS", "Enabled"}, Value: "false"},
+				{Path: []string{"accounts", "1", "services", "CALENDAR", "Name"}, Value: "CALENDAR"},
+				{Path: []string{"accounts", "1", "services", "CALENDAR", "Enabled"}, Value: "true"},
+			},
+			options: []FlattenOpts{
+				WithPrefilter(mustPrefilter(
+					`type(this) == map && has(this.accounts) ? {"accounts": this.accounts.map(a, {"services": a.services})} : {}`)),
+				WithQuery([]string{"accounts", "*", "services", "#Name"}),
+			},
+			comment: "wildcard descent with terminal array rewrite (prefilter)",
 		},
 	}
 

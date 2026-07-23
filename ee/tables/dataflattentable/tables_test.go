@@ -134,6 +134,7 @@ func TestDataFlattenTablePrefilter_Animals(t *testing.T) {
 
 	var tests = []struct {
 		prefilter string
+		query     []string
 		expected  []map[string]string
 	}{
 		{
@@ -144,10 +145,12 @@ func TestDataFlattenTablePrefilter_Animals(t *testing.T) {
 			},
 		},
 		{
-			prefilter: `type(this) == map && has(this.users) ? {"users": this.users.filter(u, u.name.endsWith("Aardvark") || u.name.endsWith("Chipmunk")).map(u, {"id": u.id})} : {}`,
+			// prefilter handles the filtering; query handles the terminal array rewrite
+			prefilter: `type(this) == map && has(this.users) ? {"users": this.users.filter(u, u.name.endsWith("Aardvark") || u.name.endsWith("Chipmunk")).map(u, {"name": u.name, "id": u.id})} : {}`,
+			query:     []string{"users/#name/id"},
 			expected: []map[string]string{
-				{"fullkey": "users/0/id", "key": "id", "parent": "users/0", "value": "1"},
-				{"fullkey": "users/1/id", "key": "id", "parent": "users/1", "value": "3"},
+				{"fullkey": "users/Alex Aardvark/id", "key": "id", "parent": "users/Alex Aardvark", "value": "1"},
+				{"fullkey": "users/Cam Chipmunk/id", "key": "id", "parent": "users/Cam Chipmunk", "value": "3"},
 			},
 		},
 	}
@@ -160,6 +163,7 @@ func TestDataFlattenTablePrefilter_Animals(t *testing.T) {
 			mockPathQC := tablehelpers.MockQueryContext(map[string][]string{
 				"path":      {testFile},
 				"prefilter": {tt.prefilter},
+				"query":     tt.query,
 			})
 
 			rows, err := tableFunc.generate(t.Context(), mockPathQC)
@@ -185,6 +189,7 @@ func TestDataFlattenTablePrefilter_Animals(t *testing.T) {
 			mockBytesQC := tablehelpers.MockQueryContext(map[string][]string{
 				"raw_data":  {string(raw_data)},
 				"prefilter": {tt.prefilter},
+				"query":     tt.query,
 			})
 
 			rows, err = tableFunc.generate(t.Context(), mockBytesQC)
