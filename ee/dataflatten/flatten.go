@@ -42,6 +42,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"iter"
 	"log/slog"
 	"strconv"
 	"strings"
@@ -73,6 +74,7 @@ type Flattener struct {
 	query             []string
 	queryKeyDenoter   string
 	queryWildcard     string
+	prefilter         *Prefilter
 	rows              []Row
 }
 
@@ -117,8 +119,11 @@ func WithQuery(q []string) FlattenOpts {
 	}
 }
 
-// Flatten is the entry point to the Flattener functionality.
-func Flatten(data any, opts ...FlattenOpts) ([]Row, error) {
+func WithPrefilter(p *Prefilter) FlattenOpts {
+	return func(fl *Flattener) { fl.prefilter = p }
+}
+
+func newFlattener(opts ...FlattenOpts) *Flattener {
 	fl := &Flattener{
 		rows:            []Row{},
 		slogger:         multislogger.NewNopLogger(),
@@ -130,14 +135,54 @@ func Flatten(data any, opts ...FlattenOpts) ([]Row, error) {
 		opt(fl)
 	}
 
-	if err := fl.descend([]string{}, data, 0); err != nil {
+	return fl
+}
+
+func Flatten(data any, opts ...FlattenOpts) ([]Row, error) {
+	fl := newFlattener(opts...)
+
+	if err := fl.flattenObject([]string{}, data, 0); err != nil {
 		return nil, err
 	}
 
 	return fl.rows, nil
 }
 
-// descend recurses through a given data structure flattening along the way.
+// FlattenEach handles flattening objects as they are yielded -- it allows us
+// to prefilter objects e.g. as they are being decoded from a reader, so that
+// we don't have to store objects in memory that will be prefiltered out during
+// `flattenObject` anyway
+func FlattenEach(next iter.Seq2[any, error], opts ...FlattenOpts) ([]Row, error) {
+	fl := newFlattener(opts...)
+	i := 0
+	for obj, err := range next {
+		if err != nil {
+			return nil, fmt.Errorf("iterating: %w", err)
+		}
+		if err := fl.flattenObject([]string{strconv.Itoa(i)}, obj, 1); err != nil {
+			return nil, fmt.Errorf("flattening object %d: %w", i, err)
+		}
+		i++
+	}
+	return fl.rows, nil
+}
+
+// flattenObject runs the prefilter, if set, and then descends to perform flattening.
+func (fl *Flattener) flattenObject(path []string, obj any, depth int) error {
+	if fl.prefilter != nil {
+		filtered, err := fl.prefilter.Apply(obj)
+		if err != nil {
+			return fmt.Errorf("prefiltering: %w", err)
+		}
+		if filtered == nil {
+			return nil
+		}
+		obj = filtered
+	}
+	return fl.descend(path, obj, depth)
+}
+
+// descend recurses through a given data structure, flattening along the way.
 func (fl *Flattener) descend(path []string, data any, depth int) error {
 	queryTerm, isQueryMatched := fl.queryAtDepth(depth)
 

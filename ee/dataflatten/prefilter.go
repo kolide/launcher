@@ -10,18 +10,12 @@ import (
 )
 
 const (
-	// hardcodedCELPrefilter is hardcoded for ease of iteration, but would be passed in with other FlattenOpts,
-	// ultimately coming from the query context.
-	hardcodedCELPrefilter = `record.type == "user" ? {
-  ?"sourceToolAssistantUUID": record.?sourceToolAssistantUUID,
-  ?"entrypoint":             record.?entrypoint,
-  ?"timestamp":              record.?timestamp,
-  ?"cwd":                    record.?cwd
-} : {}`
 	celTopLevelVariable = "record"
 )
 
-func NewCELPrefilter(prefilter string) (cel.Program, error) {
+type Prefilter struct{ prg cel.Program }
+
+func NewPrefilter(prefilter string) (*Prefilter, error) {
 	env, err := cel.NewEnv(
 		cel.Variable(celTopLevelVariable, cel.MapType(cel.StringType, cel.DynType)),
 		cel.OptionalTypes(),
@@ -38,15 +32,16 @@ func NewCELPrefilter(prefilter string) (cel.Program, error) {
 		return nil, fmt.Errorf("constructing program: %w", err)
 	}
 
-	return prg, nil
+	return &Prefilter{prg: prg}, nil
 }
 
-func RunCELPrefilter(prg cel.Program, data any) (any, error) {
-	out, _, err := prg.Eval(map[string]any{celTopLevelVariable: data})
+func (p *Prefilter) Apply(obj any) (any, error) {
+	out, _, err := p.prg.Eval(map[string]any{celTopLevelVariable: obj})
 	if err != nil {
 		return nil, fmt.Errorf("running prefilter: %w", err)
 	}
-	// Check for and discard empty (i.e. filtered) records now
+
+	// If the output is empty, this object does not match the prefilter
 	if sz, ok := out.(traits.Sizer); ok && sz.Size() == types.IntZero {
 		return nil, nil
 	}
