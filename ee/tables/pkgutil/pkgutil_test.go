@@ -106,8 +106,6 @@ func TestGeneratePkgutilData(t *testing.T) {
 			execReturn, err := os.ReadFile(filepath.Join("testdata", tt.execReturnFile))
 			require.NoError(t, err, "read exec return file")
 
-			executor := &mocks.Executor{}
-
 			volumeEqualsExpression := rootVolume
 			if volumeConstraints, ok := tt.args.queryContext.Constraints["volume"]; ok {
 				if len(volumeConstraints.Constraints) > 0 {
@@ -115,10 +113,104 @@ func TestGeneratePkgutilData(t *testing.T) {
 				}
 			}
 
-			executor.On("Exec", volumeEqualsExpression).Return(execReturn, nil).Once()
+			executor := mocks.NewExecutor(t)
+			executor.On("ExecPackages", volumeEqualsExpression).Return(execReturn, nil).Once()
 
-			got, err := generatePkgutilData(t.Context(), tt.args.queryContext, executor, multislogger.NewNopLogger())
+			got, err := generatePackagesData(t.Context(), tt.args.queryContext, executor, multislogger.NewNopLogger())
 			tt.assertion(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestGeneratePackageInfoData(t *testing.T) {
+	t.Parallel()
+
+	var tests = []struct {
+		name           string
+		packageID      string
+		execReturnFile string
+		want           []map[string]string
+	}{
+		{
+			name:           "with groups",
+			packageID:      "com.apple.pkg.XProtectPlistConfigData_10_15.16U4437",
+			execReturnFile: "valid_pkg_info.output",
+			want: []map[string]string{
+				{
+					"package_id":   "com.apple.pkg.XProtectPlistConfigData_10_15.16U4437",
+					"version":      "5351.1783908380",
+					"volume":       "/",
+					"location":     "/",
+					"install_time": "1784293286",
+					"groups":       "com.apple.FindSystemFiles.pkg-group",
+				},
+			},
+		},
+		{
+			name:           "without groups",
+			packageID:      "org.golang.go",
+			execReturnFile: "valid_pkg_info_no_groups.output",
+			want: []map[string]string{
+				{
+					"package_id":   "org.golang.go",
+					"version":      "1.22.0",
+					"volume":       "/",
+					"location":     "/",
+					"install_time": "1700000000",
+				},
+			},
+		},
+		{
+			name:           "duplicate groups",
+			packageID:      "com.example.pkg",
+			execReturnFile: "valid_pkg_info_duplicate_groups.output",
+			want: []map[string]string{
+				{
+					"package_id":   "com.example.pkg",
+					"groups":       "group.one,group.two",
+					"install_time": "1700000000",
+				},
+			},
+		},
+		{
+			name:           "ignores unmapped keys",
+			packageID:      "com.example.pkg",
+			execReturnFile: "valid_pkg_info_ignores_extras.output",
+			want: []map[string]string{
+				{
+					"package_id":   "com.example.pkg",
+					"install_time": "1700000000",
+				},
+			},
+		},
+		{
+			name:           "empty output",
+			packageID:      "com.example.pkg",
+			execReturnFile: "valid_pkg_info_empty.output",
+			want:           []map[string]string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			execReturn, err := os.ReadFile(filepath.Join("testdata", tt.execReturnFile))
+			require.NoError(t, err, "read exec return file")
+
+			executor := mocks.NewExecutor(t)
+			executor.On("ExecPackageInfo", rootVolume, tt.packageID).Return(execReturn, nil).Once()
+
+			queryContext := table.QueryContext{
+				Constraints: map[string]table.ConstraintList{
+					"package_id": {Affinity: table.ColumnTypeText, Constraints: []table.Constraint{{Operator: table.OperatorEquals, Expression: tt.packageID}}},
+					"volume":     {Affinity: table.ColumnTypeText, Constraints: []table.Constraint{}},
+				},
+			}
+
+			got, err := generatePackageInfoData(t.Context(), queryContext, executor, multislogger.NewNopLogger())
+			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
 		})
 	}
