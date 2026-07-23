@@ -15,6 +15,9 @@ const (
 	// it is simpler for us to require the variable name to be `this` than to attempt to parse the variable
 	// name out of the prefilter provided in the query.
 	celTopLevelVariable = "this"
+	// celCostLimit is our threshold for maximum CPU usage for a single evaluation of a prefilter expression.
+	// The unit is the number of operations performed during evaluation; 10 million should be a comfortably high number.
+	celCostLimit = 10000000
 )
 
 type Prefilter struct{ prg cel.Program }
@@ -31,7 +34,7 @@ func NewPrefilter(prefilter string) (*Prefilter, error) {
 	if iss.Err() != nil {
 		return nil, fmt.Errorf("compiling CEL prefilter: %w", iss.Err())
 	}
-	prg, err := env.Program(ast)
+	prg, err := env.Program(ast, cel.CostLimit(celCostLimit))
 	if err != nil {
 		return nil, fmt.Errorf("constructing program: %w", err)
 	}
@@ -39,6 +42,9 @@ func NewPrefilter(prefilter string) (*Prefilter, error) {
 	return &Prefilter{prg: prg}, nil
 }
 
+// Apply runs the prefilter on the given object. It will return nil if the
+// object does not match the filter; otherwise, it will return a transformed
+// object with only the selected fields.
 func (p *Prefilter) Apply(obj any) (any, error) {
 	out, _, err := p.prg.Eval(map[string]any{celTopLevelVariable: obj})
 	if err != nil {

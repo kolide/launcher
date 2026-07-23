@@ -151,6 +151,10 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		prefilterExpr = dataPrefilter[0]
 		p, err := dataflatten.NewPrefilter(prefilterExpr)
 		if err != nil {
+			t.slogger.Log(ctx, slog.LevelWarn,
+				"could not initialize prefilter",
+				"err", err,
+			)
 			return results, fmt.Errorf("compiling prefilter: %w", err)
 		}
 		flattenOpts = append(flattenOpts, dataflatten.WithPrefilter(p))

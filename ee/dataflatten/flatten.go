@@ -119,6 +119,9 @@ func WithQuery(q []string) FlattenOpts {
 	}
 }
 
+// WithPrefilter specifies a CEL prefilter to apply prior to flattening.
+// It can be used as an alterative to `query` in order to further reduce
+// memory impact of a query.
 func WithPrefilter(p *Prefilter) FlattenOpts {
 	return func(fl *Flattener) { fl.prefilter = p }
 }

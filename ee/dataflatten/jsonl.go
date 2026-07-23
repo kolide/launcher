@@ -12,7 +12,7 @@ import (
 func JsonlFile(file string, opts ...FlattenOpts) ([]Row, error) {
 	f, err := os.Open(file)
 	if err != nil {
-		return nil, fmt.Errorf("unable to open JSON file: %w", err)
+		return nil, fmt.Errorf("unable to open JSONL file: %w", err)
 	}
 	defer f.Close()
 
