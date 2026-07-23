@@ -29,6 +29,7 @@ import (
 	"github.com/kolide/launcher/v2/ee/tables/munki"
 	nix_env_upgradeable "github.com/kolide/launcher/v2/ee/tables/nix_env/upgradeable"
 	"github.com/kolide/launcher/v2/ee/tables/osquery_user_exec_table"
+	"github.com/kolide/launcher/v2/ee/tables/pkgutil"
 	"github.com/kolide/launcher/v2/ee/tables/profiles"
 	"github.com/kolide/launcher/v2/ee/tables/pwpolicy"
 	"github.com/kolide/launcher/v2/ee/tables/security"
@@ -121,6 +122,7 @@ func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsque
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_apfs_users", plist.Parser, allowedcmd.Diskutil, []string{"apfs", "listUsers", "/", "-plist"}),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_tmutil_destinationinfo", plist.Parser, allowedcmd.Tmutil, []string{"destinationinfo", "-X"}),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_powermetrics", plist.Parser, allowedcmd.Powermetrics, []string{"-n", "1", "-f", "plist"}),
+		pkgutil.TablePlugin(k, slogger),
 		screenlockTable,
 		pwpolicy.TablePlugin(k, slogger),
 		systemprofiler.TablePlugin(k, slogger),

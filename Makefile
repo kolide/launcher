@@ -249,7 +249,7 @@ test-bench-tables: generate
 ##
 
 lint:
-	# Requires golangci-lint installed, see https://golangci-lint.run/usage/install#local-installation
+	# Requires golangci-lint installed, see https://golangci-lint.run/docs/welcome/install/local/
 	golangci-lint -j3 run
 
 ##
