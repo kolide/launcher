@@ -148,6 +148,9 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	var prefilterExpr string
 	if dataPrefilter := tablehelpers.GetConstraints(queryContext, "prefilter"); len(dataPrefilter) > 0 {
+		if len(dataPrefilter) > 1 {
+			return results, fmt.Errorf("The %s table allows for a maximum of 1 prefilter constraint", t.tableName)
+		}
 		prefilterExpr = dataPrefilter[0]
 		p, err := dataflatten.NewPrefilter(prefilterExpr)
 		if err != nil {
