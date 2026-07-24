@@ -40,6 +40,7 @@ func Columns(additional ...table.ColumnDefinition) []table.ColumnDefinition {
 		table.TextColumn("key"),
 		table.TextColumn("value"),
 		table.TextColumn("query"),
+		table.TextColumn("prefilter"),
 	}
 
 	return append(columns, additional...)
