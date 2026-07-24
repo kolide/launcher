@@ -167,6 +167,13 @@ func TestFlatten_Jsonl_Complex(t *testing.T) {
 			comment: "all together",
 		},
 		{
+			comment: "select single jsonl line by index",
+			options: []FlattenOpts{WithQuery([]string{"1"})},
+			out: []Row{
+				{Path: []string{"1", "system"}, Value: "users demo"},
+			},
+		},
+		{
 			comment: "query metadata",
 			options: []FlattenOpts{WithQuery([]string{"*", "metadata"})},
 			out: []Row{
