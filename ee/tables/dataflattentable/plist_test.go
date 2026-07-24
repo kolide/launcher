@@ -63,10 +63,11 @@ func TestPlist(t *testing.T) {
 		}
 		require.NoError(t, err)
 
-		// delete the path and query keys, so we don't need to enumerate them in the test case
+		// delete the path, query, and prefilter keys, so we don't need to enumerate them in the test case
 		for _, row := range rows {
 			delete(row, "path")
 			delete(row, "query")
+			delete(row, "prefilter")
 		}
 
 		// Despite being an array. data is returned unordered. Sort it.

@@ -42,6 +42,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"iter"
 	"log/slog"
 	"strconv"
 	"strings"
@@ -73,6 +74,7 @@ type Flattener struct {
 	query             []string
 	queryKeyDenoter   string
 	queryWildcard     string
+	prefilter         *Prefilter
 	rows              []Row
 }
 
@@ -117,8 +119,13 @@ func WithQuery(q []string) FlattenOpts {
 	}
 }
 
-// Flatten is the entry point to the Flattener functionality.
-func Flatten(data any, opts ...FlattenOpts) ([]Row, error) {
+// WithPrefilter specifies a CEL prefilter to apply prior to flattening.
+// It can be used in order to reduce the memory impact of a query.
+func WithPrefilter(p *Prefilter) FlattenOpts {
+	return func(fl *Flattener) { fl.prefilter = p }
+}
+
+func newFlattener(opts ...FlattenOpts) *Flattener {
 	fl := &Flattener{
 		rows:            []Row{},
 		slogger:         multislogger.NewNopLogger(),
@@ -130,61 +137,79 @@ func Flatten(data any, opts ...FlattenOpts) ([]Row, error) {
 		opt(fl)
 	}
 
-	if err := fl.descend([]string{}, data, 0); err != nil {
+	return fl
+}
+
+func Flatten(data any, opts ...FlattenOpts) ([]Row, error) {
+	fl := newFlattener(opts...)
+
+	filteredData, err := fl.applyPrefilter(data)
+	if err != nil {
+		return nil, fmt.Errorf("applying prefilter before flattening: %w", err)
+	}
+
+	if err := fl.descend([]string{}, filteredData, 0); err != nil {
 		return nil, err
 	}
 
 	return fl.rows, nil
 }
 
-// descend recurses through a given data structure flattening along the way.
+// FlattenEach handles flattening objects as they are yielded -- it allows us
+// to prefilter objects e.g. as they are being decoded from a reader, so that
+// we don't have to store objects in memory that will be prefiltered out during
+// `flattenObject` anyway
+func FlattenEach(next iter.Seq2[any, error], opts ...FlattenOpts) ([]Row, error) {
+	fl := newFlattener(opts...)
+
+	i := 0
+	for obj, err := range next {
+		if err != nil {
+			return nil, fmt.Errorf("iterating: %w", err)
+		}
+		filteredObj, err := fl.applyPrefilter(obj)
+		if err != nil {
+			return nil, fmt.Errorf("prefiltering object %d: %w", i, err)
+		}
+		// Since we are producing an array of objects, we use descendArrayElement
+		// to ensure we're handling query filtering appropriately.
+		if err := fl.descendArrayElement([]string{}, i, filteredObj, 0); err != nil {
+			return nil, fmt.Errorf("flattening object %d: %w", i, err)
+		}
+		i++
+	}
+
+	return fl.rows, nil
+}
+
+// applyPrefilter performs filtering on the given object using the prefilter, if one exists.
+// It returns the transformed object. If the filter does not match, it returns nil.
+func (fl *Flattener) applyPrefilter(obj any) (any, error) {
+	if fl.prefilter == nil {
+		return obj, nil
+	}
+
+	filtered, err := fl.prefilter.Apply(obj)
+	if err != nil {
+		return obj, fmt.Errorf("prefiltering: %w", err)
+	}
+
+	if filtered == nil {
+		return nil, nil
+	}
+
+	return filtered, nil
+}
+
+// descend recurses through a given data structure, flattening along the way.
 func (fl *Flattener) descend(path []string, data any, depth int) error {
 	queryTerm, isQueryMatched := fl.queryAtDepth(depth)
 
 	switch v := data.(type) {
 	case []any:
 		for i, e := range v {
-			pathKey := strconv.Itoa(i)
-
-			// If the queryTerm starts with
-			// queryKeyDenoter, then we want to rewrite
-			// the path based on it. Note that this does
-			// no sanity checking. Multiple values will
-			// re-write. If the value isn't there, you get
-			// nothing. Etc.
-			//
-			// keyName == "name"
-			// keyValue == "alex" (need to test this againsty queryTerm
-			// pathKey == What we descend with
-			if after, ok := strings.CutPrefix(queryTerm, fl.queryKeyDenoter); ok {
-				keyQuery := strings.SplitN(after, "=>", 2)
-				keyName := keyQuery[0]
-
-				e, ok := e.(map[string]any)
-				if !ok {
-					continue
-				}
-
-				// Is keyName in this array?
-				val, ok := e[keyName]
-				if !ok {
-					continue
-				}
-
-				pathKey, ok = val.(string)
-				if !ok {
-					continue
-				}
-
-				// Looks good to descend. we're overwritten both e and pathKey. Exit this conditional.
-			}
-
-			if !(isQueryMatched || fl.queryMatchArrayElement(e, i, queryTerm)) {
-				continue
-			}
-
-			if err := fl.descend(append(path, pathKey), e, depth+1); err != nil {
-				return fmt.Errorf("flattening array: %w", err)
+			if err := fl.descendArrayElement(path, i, e, depth); err != nil {
+				return fmt.Errorf("flattening array element at index %d: %w", i, err)
 			}
 		}
 	case map[string]any:
@@ -222,6 +247,44 @@ func (fl *Flattener) descend(path []string, data any, depth int) error {
 		}
 	}
 	return nil
+}
+
+func (fl *Flattener) descendArrayElement(path []string, idx int, data any, depth int) error {
+	queryTerm, isQueryMatched := fl.queryAtDepth(depth)
+	pathKey := strconv.Itoa(idx)
+
+	// If the queryTerm starts with queryKeyDenoter, then we want to rewrite
+	// pathKey to substitute in a different string instead of the current index.
+	// E.g. if the queryTerm is #name, and data is indeed a map, then we want
+	// to update the pathKey from idx to data["name"] -- updating path
+	// from ["users", "1"] to ["users", "alex"].
+	// Note that this does no sanity checking. If a rewrite is requested but the
+	// keyName isn't found, then we don't return any data.
+	if after, ok := strings.CutPrefix(queryTerm, fl.queryKeyDenoter); ok {
+		keyQuery := strings.SplitN(after, "=>", 2)
+		keyName := keyQuery[0]
+
+		dataAsMap, ok := data.(map[string]any)
+		if !ok {
+			return nil
+		}
+
+		val, ok := dataAsMap[keyName]
+		if !ok {
+			return nil
+		}
+
+		pathKey, ok = val.(string)
+		if !ok {
+			return nil
+		}
+	}
+
+	if !(isQueryMatched || fl.queryMatchArrayElement(data, idx, queryTerm)) {
+		return nil
+	}
+
+	return fl.descend(append(path, pathKey), data, depth+1)
 }
 
 // handleStringLike is called when we finally have an object we think

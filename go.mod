@@ -70,6 +70,7 @@ require (
 )
 
 require (
+	cel.dev/expr v0.25.1 // indirect
 	dario.cat/mergo v1.0.1 // indirect
 	github.com/BobuSumisu/aho-corasick v1.0.3 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
@@ -77,6 +78,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.3.0 // indirect
 	github.com/STARRY-S/zip v0.2.3 // indirect
 	github.com/andybalholm/brotli v1.2.0 // indirect
+	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/bodgit/plumbing v1.3.0 // indirect
 	github.com/bodgit/sevenzip v1.6.1 // indirect
@@ -142,6 +144,7 @@ require (
 	go.opentelemetry.io/proto/otlp v1.5.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
+	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
 	golang.org/x/term v0.44.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20251202230838-ff82c1b0f217 // indirect
@@ -157,6 +160,7 @@ require (
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
+	github.com/google/cel-go v0.29.2
 	github.com/google/go-tpm v0.3.3
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect

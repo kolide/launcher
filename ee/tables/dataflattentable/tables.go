@@ -39,37 +39,38 @@ type DataSourceType struct {
 var allTypes = []DataSourceType{
 	{
 		tableName:        "kolide_json",
-		description:      "Parses JSON files or raw JSON data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading any JSON configuration or data file.",
+		description:      "Parses JSON files or raw JSON data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query or prefilter constraint for filtering specific keys. Useful for reading any JSON configuration or data file.",
 		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Json },
 		flattenFileFunc:  func(_ table.QueryContext) dataflatten.DataFileFunc { return dataflatten.JsonFile },
 	},
 	{
 		tableName:        "kolide_jsonc",
-		description:      "Parses JSONC files or raw JSONC data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading any JSONC configuration or data file.",
+		description:      "Parses JSONC files or raw JSONC data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query or prefilter constraint for filtering specific keys. Useful for reading any JSONC configuration or data file.",
 		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Jsonc },
 		flattenFileFunc:  func(_ table.QueryContext) dataflatten.DataFileFunc { return dataflatten.JsoncFile },
 	},
 	{
 		tableName:        "kolide_xml",
-		description:      "Parses XML files or raw XML data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading XML configuration or data files.",
+		description:      "Parses XML files or raw XML data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query or prefilter constraint for filtering specific keys. Useful for reading XML configuration or data files.",
 		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Xml },
 		flattenFileFunc:  func(_ table.QueryContext) dataflatten.DataFileFunc { return dataflatten.XmlFile },
 	},
 	{
 		tableName:        "kolide_ini",
-		description:      "Parses INI files or raw INI data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading INI-style configuration files.",
+		description:      "Parses INI files or raw INI data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query or prefilter constraint for filtering specific keys. Useful for reading INI-style configuration files.",
 		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Ini },
 		flattenFileFunc:  func(_ table.QueryContext) dataflatten.DataFileFunc { return dataflatten.IniFile },
 	},
 	{
 		tableName:        "kolide_plist",
-		description:      "Parses Apple plist files or raw plist data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading macOS preference files, application plists, and system configuration.",
+		description:      "Parses Apple plist files or raw plist data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query or prefilter constraint for filtering specific keys. Useful for reading macOS preference files, application plists, and system configuration.",
 		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Plist },
 	},
 	{
 		tableName:        "kolide_jsonl",
-		description:      "Parses JSONL (JSON Lines) files or raw data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading line-delimited JSON log files.",
+		description:      "Parses JSONL (JSON Lines) files or raw data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query or prefilter constraint for filtering specific keys. Useful for reading line-delimited JSON log files.",
 		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Jsonl },
+		flattenFileFunc:  func(_ table.QueryContext) dataflatten.DataFileFunc { return dataflatten.JsonlFile },
 	},
 	{
 		tableName:        "kolide_protobuf",
@@ -80,11 +81,11 @@ var allTypes = []DataSourceType{
 		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Toml },
 		flattenFileFunc:  func(_ table.QueryContext) dataflatten.DataFileFunc { return dataflatten.TomlFile },
 		tableName:        "kolide_toml",
-		description:      "Parses TOML files or raw TOML data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading TOML configuration files (e.g. Cargo.toml, pyproject.toml).",
+		description:      "Parses TOML files or raw TOML data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query or prefilter constraint for filtering specific keys. Useful for reading TOML configuration files (e.g. Cargo.toml, pyproject.toml).",
 	},
 	{
 		tableName:        "kolide_yaml",
-		description:      "Parses YAML files or raw YAML data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query constraint for filtering specific keys. Useful for reading any YAML configuration or data file.",
+		description:      "Parses YAML files or raw YAML data and returns flattened key-value pairs. Requires a WHERE path = or raw_data = constraint. Supports a query or prefilter constraint for filtering specific keys. Useful for reading any YAML configuration or data file.",
 		flattenBytesFunc: func(_ table.QueryContext) dataflatten.DataFunc { return dataflatten.Yaml },
 		flattenFileFunc:  func(_ table.QueryContext) dataflatten.DataFileFunc { return dataflatten.YamlFile },
 	},
@@ -145,6 +146,23 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		dataflatten.WithNestedPlist(),
 	}
 
+	var prefilterExpr string
+	if dataPrefilter := tablehelpers.GetConstraints(queryContext, "prefilter"); len(dataPrefilter) > 0 {
+		if len(dataPrefilter) > 1 {
+			return results, fmt.Errorf("The %s table allows for a maximum of 1 prefilter constraint", t.tableName)
+		}
+		prefilterExpr = dataPrefilter[0]
+		p, err := dataflatten.NewPrefilter(prefilterExpr)
+		if err != nil {
+			t.slogger.Log(ctx, slog.LevelWarn,
+				"could not initialize prefilter",
+				"err", err,
+			)
+			return results, fmt.Errorf("compiling prefilter: %w", err)
+		}
+		flattenOpts = append(flattenOpts, dataflatten.WithPrefilter(p))
+	}
+
 	for _, requestedPath := range requestedPaths {
 
 		// We take globs in via the sql %, but glob needs *. So convert.
@@ -155,7 +173,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 		for _, filePath := range filePaths {
 			for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
-				subresults, err := t.generatePath(ctx, queryContext, filePath, dataQuery, append(flattenOpts, dataflatten.WithQuery(strings.Split(dataQuery, "/")))...)
+				subresults, err := t.generatePath(ctx, queryContext, filePath, dataQuery, prefilterExpr, append(flattenOpts, dataflatten.WithQuery(strings.Split(dataQuery, "/")))...)
 				if err != nil {
 					t.slogger.Log(ctx, slog.LevelInfo,
 						"failed to get data for path",
@@ -172,7 +190,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	for _, rawdata := range requestedRawDatas {
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
-			subresults, err := t.generateRawData(ctx, queryContext, rawdata, dataQuery, append(flattenOpts, dataflatten.WithQuery(strings.Split(dataQuery, "/")))...)
+			subresults, err := t.generateRawData(ctx, queryContext, rawdata, dataQuery, prefilterExpr, append(flattenOpts, dataflatten.WithQuery(strings.Split(dataQuery, "/")))...)
 			if err != nil {
 				t.slogger.Log(ctx, slog.LevelInfo,
 					"failed to generate for raw_data",
@@ -188,7 +206,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	return results, nil
 }
 
-func (t *Table) generateRawData(ctx context.Context, qc table.QueryContext, rawdata string, dataQuery string, flattenOpts ...dataflatten.FlattenOpts) ([]map[string]string, error) {
+func (t *Table) generateRawData(ctx context.Context, qc table.QueryContext, rawdata string, dataQuery string, prefilter string, flattenOpts ...dataflatten.FlattenOpts) ([]map[string]string, error) {
 	data, err := t.flattenBytesFunc(qc)([]byte(rawdata), flattenOpts...)
 	if err != nil {
 		t.slogger.Log(ctx, slog.LevelInfo,
@@ -199,13 +217,14 @@ func (t *Table) generateRawData(ctx context.Context, qc table.QueryContext, rawd
 	}
 
 	rowData := map[string]string{
-		"raw_data": rawdata,
+		"raw_data":  rawdata,
+		"prefilter": prefilter,
 	}
 
 	return ToMap(data, dataQuery, rowData), nil
 }
 
-func (t *Table) generatePath(ctx context.Context, qc table.QueryContext, filePath string, dataQuery string, flattenOpts ...dataflatten.FlattenOpts) ([]map[string]string, error) {
+func (t *Table) generatePath(ctx context.Context, qc table.QueryContext, filePath string, dataQuery string, prefilter string, flattenOpts ...dataflatten.FlattenOpts) ([]map[string]string, error) {
 	var data []dataflatten.Row
 	var err error
 	if t.flattenFileFunc != nil {
@@ -226,7 +245,8 @@ func (t *Table) generatePath(ctx context.Context, qc table.QueryContext, filePat
 	}
 
 	rowData := map[string]string{
-		"path": filePath,
+		"path":      filePath,
+		"prefilter": prefilter,
 	}
 
 	return ToMap(data, dataQuery, rowData), nil
