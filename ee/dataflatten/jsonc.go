@@ -26,7 +26,7 @@ func JsoncFile(file string, opts ...FlattenOpts) ([]Row, error) {
 
 	if json.Valid(transformedRawdata) {
 		// We call Jsonl rather than Jsonc because we know it's already valid transformed JSON
-		return Jsonl(transformedRawdata)
+		return Jsonl(transformedRawdata, opts...)
 	}
 
 	// We still don't have valid json data -- next try to convert possible utf16 data to utf8.
