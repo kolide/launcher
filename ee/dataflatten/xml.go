@@ -1,6 +1,7 @@
 package dataflatten
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 
@@ -8,11 +9,17 @@ import (
 )
 
 func XmlFile(file string, opts ...FlattenOpts) ([]Row, error) {
-	rdr, err := os.Open(file)
+	f, err := os.Open(file)
 	if err != nil {
 		return nil, err
 	}
-	defer rdr.Close()
+	defer f.Close()
+
+	// Wrap the file in a bufio.Reader before handing it to mxj. mxj wraps any
+	// reader that isn't an io.ByteReader in a helper whose ReadByte issues a
+	// separate one-byte read syscall per byte; using bufio.Reader here avoids these
+	// extra syscalls.
+	rdr := bufio.NewReader(f)
 
 	mv, err := mxj.NewMapXmlReader(rdr)
 	if err != nil {
