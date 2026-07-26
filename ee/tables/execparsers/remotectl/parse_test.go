@@ -86,6 +86,37 @@ func TestParse(t *testing.T) {
 			expectedValueCount:  0,
 			expectedErr:         true,
 		},
+		{
+			name: "property before any array item does not panic",
+			input: []byte("Local device\n\tServices:\n\t\t\tVersion: 1\n"),
+			expectedDeviceCount: 1,
+			expectedValueCount:  0,
+			expectedErr:         false,
+		},
+		{
+			// parseStringArray (used for Heartbeat) exits when it reads a line whose
+			// indentation is <= the starting level, consuming the next device name into
+			// p.lastReadLine. parseDumpstate must reuse that line instead of advancing
+			// the scanner, otherwise the next device's first property is dropped.
+			name:                "device following Heartbeat section captures all properties",
+			input:               []byte("Local device\n\tHeartbeat:\n\t\theartbeat-item\nFound ncm-0 (ncm-device)\n\tState: disconnected\n"),
+			expectedDeviceCount: 2,
+			expectedValueCount:  2,
+			expectedErr:         false,
+		},
+		{
+			name: "Identity block followed immediately by next device does not error",
+			input: []byte(`Local device
+	State: connected
+	Identity:
+		Public key SHA256: abc123
+Found ncm-0 (ncm-device)
+	State: disconnected
+`),
+			expectedDeviceCount: 2,
+			expectedValueCount:  3,
+			expectedErr:         false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -120,6 +151,16 @@ func TestParse(t *testing.T) {
 						for propertyKey, propertyValue := range properties {
 							actualValueCount += 1
 							validateKeyValueInCommandOutput(t, propertyKey, propertyValue.(string), tt.input)
+						}
+
+						continue
+					}
+
+					if topLevelKey == "Identity" {
+						identity := topLevelValue.(map[string]any)
+						for identityKey, identityValue := range identity {
+							actualValueCount += 1
+							validateKeyValueInCommandOutput(t, identityKey, identityValue.(string), tt.input)
 						}
 
 						continue
@@ -175,6 +216,81 @@ func TestParse(t *testing.T) {
 
 			assert.Equal(t, tt.expectedDeviceCount, actualDeviceCount)
 			assert.Equal(t, tt.expectedValueCount, actualValueCount)
+		})
+	}
+}
+
+func TestExtractKeyValue(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		line          string
+		delimiter     string
+		expectedKey   string
+		expectedValue string
+		expectedErr   bool
+	}{
+		{
+			name:          "simple colon pair",
+			line:          "State: connected",
+			delimiter:     ":",
+			expectedKey:   "State",
+			expectedValue: "connected",
+		},
+		{
+			name:          "value contains delimiter (URL)",
+			line:          "Server: https://example.com:8080",
+			delimiter:     ":",
+			expectedKey:   "Server",
+			expectedValue: "https://example.com:8080",
+		},
+		{
+			name:        "no delimiter",
+			line:        "no colon here",
+			delimiter:   ":",
+			expectedErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			k, v, err := extractKeyValue(tt.line, tt.delimiter)
+			if tt.expectedErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.expectedKey, k)
+			require.Equal(t, tt.expectedValue, v)
+		})
+	}
+}
+
+func TestGetCurrentIndentationLevel(t *testing.T) {
+	t.Parallel()
+
+	p := &parser{}
+
+	tests := []struct {
+		name     string
+		line     string
+		expected int
+	}{
+		{"empty line", "", 0},
+		{"no tabs", "Key: value", 0},
+		{"one leading tab", "\tKey: value", 1},
+		{"two leading tabs", "\t\tKey: value", 2},
+		{"tab in value only", "Key: val\there", 0},
+		{"leading tab and tab in value", "\tKey: val\there", 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			p.lastReadLine = tt.line
+			require.Equal(t, tt.expected, p.getCurrentIndentationLevel())
 		})
 	}
 }
