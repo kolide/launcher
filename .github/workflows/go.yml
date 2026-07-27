@@ -16,6 +16,7 @@ jobs:
   build:
     permissions:
       contents: read
+      id-token: write # Required to create an OIDC token for Cloudsmith auth
     name: launcher
     runs-on: ${{ matrix.os }}
     strategy:
@@ -59,6 +60,14 @@ jobs:
         with:
           path: ${{ steps.go-cache-paths.outputs.go-mod }}
           key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
+
+      # Requires `id-token: write` permissions to create an OIDC token for Cloudsmith auth
+      - name: Setup Cloudsmith CLI # Exports CLOUDSMITH_API_KEY
+        uses: step-security/cloudsmith-cli-action@dd1da513017145043c2d29a38b3b85c2b609b5ad # v2.0.3
+        with:
+          oidc-auth-only: 'true' # Just the auth, don't need the CLI installed in CI
+          oidc-namespace: '1password'
+          oidc-service-slug: 'op-github-actions-read'
 
       - name: Get dependencies
         run: make deps
