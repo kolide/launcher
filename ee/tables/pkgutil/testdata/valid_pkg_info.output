@@ -3,4 +3,4 @@ version: 5351.1783908380
 volume: /
 location: /
 install-time: 1784293286
-groups: com.apple.FindSystemFiles.pkg-group
+groups: com.apple.FindSystemFiles.pkg-group com.apple.Another.pkg-group

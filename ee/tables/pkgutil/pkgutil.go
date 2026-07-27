@@ -21,6 +21,7 @@ import (
 )
 
 const (
+	allowedCharacters    = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._"
 	packageInfoTableName = "kolide_pkgutil_package_info"
 	packagesTableName    = "kolide_pkgutil_packages"
 	rootVolume           = "/"
@@ -165,11 +166,8 @@ func generatePackageInfoData(ctx context.Context, queryContext table.QueryContex
 
 	results := make([]map[string]string, 0)
 
-	packageIDs := tablehelpers.GetConstraints(queryContext, "package_id")
+	packageIDs := tablehelpers.GetConstraints(queryContext, "package_id", tablehelpers.WithAllowedCharacters(allowedCharacters))
 	if len(packageIDs) == 0 {
-		slogger.Log(ctx, slog.LevelError,
-			"no package_id provided",
-		)
 		return nil, fmt.Errorf("The %s table requires that you specify a constraint for WHERE package_id.", packageInfoTableName)
 	}
 
@@ -215,7 +213,7 @@ func generatePackageInfoData(ctx context.Context, queryContext table.QueryContex
 				continue
 			}
 
-			if parsed["package_id"] == "" {
+			if id, found := parsed["package_id"]; !found || id == "" {
 				continue
 			}
 

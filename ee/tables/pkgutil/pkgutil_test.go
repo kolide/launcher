@@ -10,7 +10,6 @@ import (
 	"github.com/kolide/launcher/v2/ee/tables/pkgutil/mocks"
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 )
@@ -31,7 +30,6 @@ func TestGeneratePkgutilData(t *testing.T) {
 		args           args
 		execReturnFile string
 		want           []map[string]string
-		assertion      assert.ErrorAssertionFunc
 	}{
 		{
 			name: "valid nonempty results",
@@ -62,7 +60,6 @@ func TestGeneratePkgutilData(t *testing.T) {
 					"volume":     rootVolume,
 				},
 			},
-			assertion: assert.NoError,
 		},
 		{
 			name: "valid nonempty results with volume constraint",
@@ -81,7 +78,6 @@ func TestGeneratePkgutilData(t *testing.T) {
 					"volume":     "testdata",
 				},
 			},
-			assertion: assert.NoError,
 		},
 		{
 			name: "valid empty results",
@@ -95,7 +91,6 @@ func TestGeneratePkgutilData(t *testing.T) {
 			},
 			execReturnFile: "valid_empty.output",
 			want:           []map[string]string{},
-			assertion:      assert.NoError,
 		},
 	}
 
@@ -117,8 +112,8 @@ func TestGeneratePkgutilData(t *testing.T) {
 			executor.On("ExecPackages", volumeEqualsExpression).Return(execReturn, nil).Once()
 
 			got, err := generatePackagesData(t.Context(), tt.args.queryContext, executor, multislogger.NewNopLogger())
-			tt.assertion(t, err)
-			assert.Equal(t, tt.want, got)
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -143,7 +138,7 @@ func TestGeneratePackageInfoData(t *testing.T) {
 					"volume":       "/",
 					"location":     "/",
 					"install_time": "1784293286",
-					"groups":       "com.apple.FindSystemFiles.pkg-group",
+					"groups":       "com.apple.FindSystemFiles.pkg-group com.apple.Another.pkg-group",
 				},
 			},
 		},
@@ -211,7 +206,7 @@ func TestGeneratePackageInfoData(t *testing.T) {
 
 			got, err := generatePackageInfoData(t.Context(), queryContext, executor, multislogger.NewNopLogger())
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, got)
+			require.Equal(t, tt.want, got)
 		})
 	}
 }
