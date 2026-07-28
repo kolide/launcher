@@ -105,6 +105,7 @@ jobs:
     name: launcher -- reproducible
     permissions:
       contents: read
+      id-token: write # Required to create an OIDC token for Cloudsmith auth
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false # Consider changing this sometime
@@ -122,6 +123,7 @@ jobs:
   build_linux:
     permissions:
       contents: read
+      id-token: write # Required to create an OIDC token for Cloudsmith auth
     name: launcher (linux)
     runs-on: ubuntu-22.04
     container: ubuntu:20.04 # Required to support launcher on Ubuntu 20.04
@@ -193,6 +195,7 @@ jobs:
   build_linux_reproducible:
     permissions:
       contents: read
+      id-token: write # Required to create an OIDC token for Cloudsmith auth
     name: launcher (linux) -- reproducible
     runs-on: ubuntu-22.04
     container: ubuntu:20.04 # Required to support launcher on Ubuntu 20.04
