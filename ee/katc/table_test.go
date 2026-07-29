@@ -651,7 +651,7 @@ func TestQueryChromeIndexedDBDataFlatten(t *testing.T) {
 	for _, c := range columns {
 		columnNames[c.Name] = struct{}{}
 	}
-	for _, expected := range []string{pathColumnName, "fullkey", "parent", "key", "value", "query"} {
+	for _, expected := range []string{pathColumnName, "fullkey", "parent", "key", "value", "query", "prefilter"} {
 		require.Contains(t, columnNames, expected, "expected dataflatten column %q", expected)
 	}
 	require.NotContains(t, columnNames, "data", "configured column should be ignored when data_flatten is enabled")
@@ -684,6 +684,7 @@ func TestQueryChromeIndexedDBDataFlatten(t *testing.T) {
 		// With no query constraint supplied, default dataflatten query "*"
 		// should be reflected in every row.
 		require.Equal(t, "*", row["query"], "query column should default to *")
+		require.Contains(t, row, "prefilter")
 
 		if row["fullkey"] == "uuid" {
 			sawUUID = true
@@ -723,6 +724,31 @@ func TestQueryChromeIndexedDBDataFlatten(t *testing.T) {
 	require.NotEmpty(t, filtered, "expected at least one row when filtering query = uuid")
 	for _, row := range filtered {
 		require.Equal(t, "uuid", row["query"], "query column should echo the supplied constraint")
+		require.Equal(t, "uuid", row["fullkey"], "filtering should restrict results to uuid leaves")
+	}
+
+	// With a "prefilter" constraint supplied, dataflatten should restrict results
+	// to matching paths and echo the prefilter back in the "prefilter" column. This
+	// matches the established secedit/jwt/airport pattern.
+	queryContextPrefiltered := table.QueryContext{
+		Constraints: map[string]table.ConstraintList{
+			pathColumnName: {
+				Constraints: []table.Constraint{
+					{Operator: table.OperatorEquals, Expression: indexeddbDest},
+				},
+			},
+			"prefilter": {
+				Constraints: []table.Constraint{
+					{Operator: table.OperatorEquals, Expression: `{?"uuid": this.?uuid}`},
+				},
+			},
+		},
+	}
+	prefiltered, err := testTable.generate(t.Context(), queryContextPrefiltered)
+	require.NoError(t, err)
+	require.NotEmpty(t, prefiltered, "expected at least one row when prefiltering")
+	for _, row := range prefiltered {
+		require.Equal(t, `{?"uuid": this.?uuid}`, row["prefilter"], "query column should echo the supplied constraint")
 		require.Equal(t, "uuid", row["fullkey"], "filtering should restrict results to uuid leaves")
 	}
 }
