@@ -728,8 +728,7 @@ func TestQueryChromeIndexedDBDataFlatten(t *testing.T) {
 	}
 
 	// With a "prefilter" constraint supplied, dataflatten should restrict results
-	// to matching paths and echo the prefilter back in the "prefilter" column. This
-	// matches the established secedit/jwt/airport pattern.
+	// to uuid and echo the prefilter back in the "prefilter" column.
 	queryContextPrefiltered := table.QueryContext{
 		Constraints: map[string]table.ConstraintList{
 			pathColumnName: {
@@ -748,7 +747,7 @@ func TestQueryChromeIndexedDBDataFlatten(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, prefiltered, "expected at least one row when prefiltering")
 	for _, row := range prefiltered {
-		require.Equal(t, `{?"uuid": this.?uuid}`, row["prefilter"], "query column should echo the supplied constraint")
+		require.Equal(t, `{?"uuid": this.?uuid}`, row["prefilter"], "prefilter column should echo the supplied constraint")
 		require.Equal(t, "uuid", row["fullkey"], "filtering should restrict results to uuid leaves")
 	}
 }

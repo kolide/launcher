@@ -3,6 +3,7 @@ package dataflattentable
 import (
 	"fmt"
 	"maps"
+	"strings"
 
 	"github.com/kolide/launcher/v2/ee/dataflatten"
 	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
@@ -61,6 +62,9 @@ func ExtractPrefilterFromQuery(queryContext table.QueryContext) (*dataflatten.Pr
 		return nil, fmt.Errorf("got %d prefilter constraints, expected only 1", len(dataPrefilter))
 	}
 	prefilterExpr := dataPrefilter[0]
+	if strings.TrimSpace(prefilterExpr) == "" {
+		return nil, nil
+	}
 	p, err := dataflatten.NewPrefilter(prefilterExpr)
 	if err != nil {
 		return nil, fmt.Errorf("creating prefilter: %w", err)
