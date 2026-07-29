@@ -35,12 +35,80 @@ func (_m *Executor) EXPECT() *Executor_Expecter {
 	return &Executor_Expecter{mock: &_m.Mock}
 }
 
-// Exec provides a mock function for the type Executor
-func (_mock *Executor) Exec(volume string) ([]byte, error) {
+// ExecPackageInfo provides a mock function for the type Executor
+func (_mock *Executor) ExecPackageInfo(volume string, packageID string) ([]byte, error) {
+	ret := _mock.Called(volume, packageID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ExecPackageInfo")
+	}
+
+	var r0 []byte
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(string, string) ([]byte, error)); ok {
+		return returnFunc(volume, packageID)
+	}
+	if returnFunc, ok := ret.Get(0).(func(string, string) []byte); ok {
+		r0 = returnFunc(volume, packageID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]byte)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(string, string) error); ok {
+		r1 = returnFunc(volume, packageID)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Executor_ExecPackageInfo_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ExecPackageInfo'
+type Executor_ExecPackageInfo_Call struct {
+	*mock.Call
+}
+
+// ExecPackageInfo is a helper method to define mock.On call
+//   - volume string
+//   - packageID string
+func (_e *Executor_Expecter) ExecPackageInfo(volume any, packageID any) *Executor_ExecPackageInfo_Call {
+	return &Executor_ExecPackageInfo_Call{Call: _e.mock.On("ExecPackageInfo", volume, packageID)}
+}
+
+func (_c *Executor_ExecPackageInfo_Call) Run(run func(volume string, packageID string)) *Executor_ExecPackageInfo_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Executor_ExecPackageInfo_Call) Return(bytes []byte, err error) *Executor_ExecPackageInfo_Call {
+	_c.Call.Return(bytes, err)
+	return _c
+}
+
+func (_c *Executor_ExecPackageInfo_Call) RunAndReturn(run func(volume string, packageID string) ([]byte, error)) *Executor_ExecPackageInfo_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ExecPackages provides a mock function for the type Executor
+func (_mock *Executor) ExecPackages(volume string) ([]byte, error) {
 	ret := _mock.Called(volume)
 
 	if len(ret) == 0 {
-		panic("no return value specified for Exec")
+		panic("no return value specified for ExecPackages")
 	}
 
 	var r0 []byte
@@ -63,18 +131,18 @@ func (_mock *Executor) Exec(volume string) ([]byte, error) {
 	return r0, r1
 }
 
-// Executor_Exec_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Exec'
-type Executor_Exec_Call struct {
+// Executor_ExecPackages_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ExecPackages'
+type Executor_ExecPackages_Call struct {
 	*mock.Call
 }
 
-// Exec is a helper method to define mock.On call
+// ExecPackages is a helper method to define mock.On call
 //   - volume string
-func (_e *Executor_Expecter) Exec(volume any) *Executor_Exec_Call {
-	return &Executor_Exec_Call{Call: _e.mock.On("Exec", volume)}
+func (_e *Executor_Expecter) ExecPackages(volume any) *Executor_ExecPackages_Call {
+	return &Executor_ExecPackages_Call{Call: _e.mock.On("ExecPackages", volume)}
 }
 
-func (_c *Executor_Exec_Call) Run(run func(volume string)) *Executor_Exec_Call {
+func (_c *Executor_ExecPackages_Call) Run(run func(volume string)) *Executor_ExecPackages_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 string
 		if args[0] != nil {
@@ -87,12 +155,12 @@ func (_c *Executor_Exec_Call) Run(run func(volume string)) *Executor_Exec_Call {
 	return _c
 }
 
-func (_c *Executor_Exec_Call) Return(bytes []byte, err error) *Executor_Exec_Call {
+func (_c *Executor_ExecPackages_Call) Return(bytes []byte, err error) *Executor_ExecPackages_Call {
 	_c.Call.Return(bytes, err)
 	return _c
 }
 
-func (_c *Executor_Exec_Call) RunAndReturn(run func(volume string) ([]byte, error)) *Executor_Exec_Call {
+func (_c *Executor_ExecPackages_Call) RunAndReturn(run func(volume string) ([]byte, error)) *Executor_ExecPackages_Call {
 	_c.Call.Return(run)
 	return _c
 }

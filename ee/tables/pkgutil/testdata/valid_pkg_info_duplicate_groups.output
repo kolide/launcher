@@ -1,0 +1,4 @@
+package-id: com.example.pkg
+groups: group.one
+groups: group.two
+install-time: 1700000000
