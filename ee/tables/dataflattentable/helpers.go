@@ -1,9 +1,11 @@
 package dataflattentable
 
 import (
+	"fmt"
 	"maps"
 
 	"github.com/kolide/launcher/v2/ee/dataflatten"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -44,4 +46,21 @@ func Columns(additional ...table.ColumnDefinition) []table.ColumnDefinition {
 	}
 
 	return append(columns, additional...)
+}
+
+func ExtractPrefilterFromQuery(queryContext table.QueryContext) (*dataflatten.Prefilter, error) {
+	dataPrefilter := tablehelpers.GetConstraints(queryContext, "prefilter")
+	if len(dataPrefilter) == 0 {
+		return nil, nil
+	}
+	if len(dataPrefilter) > 1 {
+		return nil, fmt.Errorf("got %d prefilter constraints, expected only 1", len(dataPrefilter))
+	}
+	prefilterExpr := dataPrefilter[0]
+	p, err := dataflatten.NewPrefilter(prefilterExpr)
+	if err != nil {
+		return nil, fmt.Errorf("creating prefilter: %w", err)
+	}
+
+	return p, nil
 }
