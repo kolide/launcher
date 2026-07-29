@@ -200,10 +200,19 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	ctx, span := observability.StartSpan(ctx, "table_name", t.name)
 	defer span.End()
 
+	prefilter, err := dataflattentable.ExtractPrefilterFromQuery(queryContext)
+	if err != nil {
+		t.slogger.Log(ctx, slog.LevelWarn,
+			"could not extract prefilter",
+			"err", err,
+		)
+		return nil, fmt.Errorf("extracting prefilter from query context: %w", err)
+	}
+
 	var results []map[string]string
 
 	for _, locale := range tablehelpers.GetConstraints(queryContext, "locale", tablehelpers.WithDefaults("_default")) {
-		result, err := t.searchLocale(ctx, locale, queryContext)
+		result, err := t.searchLocale(ctx, locale, queryContext, prefilter)
 		if err != nil {
 			t.slogger.Log(ctx, slog.LevelInfo,
 				"got error searching",
@@ -221,7 +230,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 }
 
 //nolint:unused
-func (t *Table) searchLocale(ctx context.Context, locale string, queryContext table.QueryContext) ([]map[string]string, error) {
+func (t *Table) searchLocale(ctx context.Context, locale string, queryContext table.QueryContext, prefilter *dataflatten.Prefilter) ([]map[string]string, error) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -230,15 +239,6 @@ func (t *Table) searchLocale(ctx context.Context, locale string, queryContext ta
 		return nil, fmt.Errorf("unable to init comshim: %w", err)
 	}
 	defer comshim.Done()
-
-	prefilter, err := dataflattentable.ExtractPrefilterFromQuery(queryContext)
-	if err != nil {
-		t.slogger.Log(ctx, slog.LevelWarn,
-			"could not extract prefilter",
-			"err", err,
-		)
-		return nil, fmt.Errorf("extracting prefilter from query context: %w", err)
-	}
 
 	var results []map[string]string
 

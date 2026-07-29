@@ -235,7 +235,7 @@ func (tbl *execTableV2) generate(ctx context.Context, queryContext table.QueryCo
 				Path:  []string{"error"},
 				Value: stdErr.String(),
 			},
-		}, "*", "", nil)...)
+		}, "*", prefilter.Expr(), nil)...)
 	}
 
 	return results, nil

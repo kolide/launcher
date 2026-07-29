@@ -68,7 +68,8 @@ func (p *Prefilter) Opts() []FlattenOpts {
 
 // Apply runs the prefilter on the given object. It will return nil if the
 // object does not match the filter; otherwise, it will return a transformed
-// object with only the selected fields. It is nil-safe.
+// object with only the selected fields. If the prefilter is uninitialized,
+// then the object will be returned unchanged.
 func (p *Prefilter) Apply(obj any) (any, error) {
 	if p == nil {
 		return obj, nil
