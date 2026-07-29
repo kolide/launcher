@@ -20,7 +20,10 @@ const (
 	celCostLimit = 10000000
 )
 
-type Prefilter struct{ prg cel.Program }
+type Prefilter struct {
+	prg  cel.Program
+	expr string // stored so it's easy to return in row data
+}
 
 func NewPrefilter(prefilter string) (*Prefilter, error) {
 	env, err := cel.NewEnv(
@@ -39,7 +42,24 @@ func NewPrefilter(prefilter string) (*Prefilter, error) {
 		return nil, fmt.Errorf("constructing program: %w", err)
 	}
 
-	return &Prefilter{prg: prg}, nil
+	return &Prefilter{
+		prg:  prg,
+		expr: prefilter,
+	}, nil
+}
+
+func (p *Prefilter) Expr() string {
+	if p == nil {
+		return ""
+	}
+	return p.expr
+}
+
+func (p *Prefilter) Opts() []FlattenOpts {
+	if p == nil {
+		return nil
+	}
+	return []FlattenOpts{WithPrefilter(p)}
 }
 
 // Apply runs the prefilter on the given object. It will return nil if the
