@@ -11,7 +11,7 @@ import (
 
 // ToMap is a helper function to convert Flatten output directly for
 // consumption by osquery tables.
-func ToMap(rows []dataflatten.Row, query string, rowData map[string]string) []map[string]string {
+func ToMap(rows []dataflatten.Row, query string, prefilter string, rowData map[string]string) []map[string]string {
 	results := make([]map[string]string, len(rows))
 
 	for i, row := range rows {
@@ -25,6 +25,7 @@ func ToMap(rows []dataflatten.Row, query string, rowData map[string]string) []ma
 		res["key"] = k
 		res["value"] = row.Value
 		res["query"] = query
+		res["prefilter"] = prefilter
 
 		results[i] = res
 	}

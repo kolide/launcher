@@ -31,6 +31,11 @@ func generateLauncherDbInfo(db *bbolt.DB) table.GenerateFunc {
 		_, span := observability.StartSpan(ctx, "table_name", "kolide_launcher_db_info")
 		defer span.End()
 
+		prefilter, err := dataflattentable.ExtractPrefilterFromQuery(queryContext)
+		if err != nil {
+			return nil, fmt.Errorf("extracting prefilter from query context: %w", err)
+		}
+
 		stats, err := agent.GetStats(db)
 		if err != nil {
 			return nil, err
@@ -47,6 +52,7 @@ func generateLauncherDbInfo(db *bbolt.DB) table.GenerateFunc {
 			flattenOpts := []dataflatten.FlattenOpts{
 				dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 			}
+			flattenOpts = append(flattenOpts, prefilter.Opts()...) // no-op if the prefilter doesn't exist
 
 			rows, err := dataflatten.Json(statsJson, flattenOpts...)
 
@@ -58,7 +64,7 @@ func generateLauncherDbInfo(db *bbolt.DB) table.GenerateFunc {
 
 			}
 
-			results = append(results, dataflattentable.ToMap(rows, dataQuery, nil)...)
+			results = append(results, dataflattentable.ToMap(rows, dataQuery, prefilter.Expr(), nil)...)
 		}
 
 		return results, nil

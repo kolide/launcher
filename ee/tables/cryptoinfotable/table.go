@@ -46,6 +46,16 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	var results []map[string]string
 
+	// Prefilter applies to all paths, so grab that first
+	prefilter, err := dataflattentable.ExtractPrefilterFromQuery(queryContext)
+	if err != nil {
+		t.slogger.Log(ctx, slog.LevelWarn,
+			"could not extract prefilter",
+			"err", err,
+		)
+		return nil, fmt.Errorf("extracting prefilter from query context: %w", err)
+	}
+
 	requestedPaths := tablehelpers.GetConstraints(queryContext, "path")
 	if len(requestedPaths) == 0 {
 		return results, errors.New("The kolide_cryptoinfo table requires that you specify an equals constraint for path")
@@ -72,6 +82,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 						dataflatten.WithNestedPlist(),
 						dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 					}
+					flattenOpts = append(flattenOpts, prefilter.Opts()...) // no-op if the prefilter doesn't exist
 
 					flatData, err := flattenCryptoInfo(filePath, passphrase, flattenOpts...)
 					if err != nil {
@@ -87,7 +98,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 						"path":       filePath,
 						"passphrase": passphrase,
 					}
-					results = append(results, dataflattentable.ToMap(flatData, dataQuery, rowData)...)
+					results = append(results, dataflattentable.ToMap(flatData, dataQuery, prefilter.Expr(), rowData)...)
 
 				}
 			}

@@ -3,6 +3,7 @@ package dataflattentable
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"strings"
@@ -108,7 +109,7 @@ func NewExecAndParseTable(flags types.Flags, slogger *slog.Logger, tableName str
 	)
 }
 
-const EAVNote = "This is an EAV (Entity-Attribute-Value) table. Rather than a column per field, data is returned as rows with fullkey, key, and value columns. fullkey is the slash-separated path to the value (e.g. network/interfaces/0/name), parent is the path of the containing object, and key is the leaf key name.\n\nFor advanced usage, the query constraint can filter by path -- it supports glob patterns (e.g. WHERE query = 'network/interfaces/*/name')."
+const EAVNote = "This is an EAV (Entity-Attribute-Value) table. Rather than a column per field, data is returned as rows with fullkey, key, and value columns. fullkey is the slash-separated path to the value (e.g. network/interfaces/0/name), parent is the path of the containing object, and key is the leaf key name.\n\nFor advanced usage, the query constraint can filter by path -- it supports glob patterns (e.g. WHERE query = 'network/interfaces/*/name'). The prefilter constraint accepts CEL expressions that use the variable name this to refer to the object being processed; it can be used to reduce the memory impact of a query."
 
 var (
 	defaultDescriptionTmpl = template.Must(template.New("default").Parse(
@@ -172,7 +173,7 @@ func (tbl *execTableV2) generate(ctx context.Context, queryContext table.QueryCo
 						Path:  []string{"error"},
 						Value: "binary is not present on device",
 					},
-				}, "*", nil)...), nil
+				}, "*", "", nil)...), nil
 			}
 
 			return nil, nil
@@ -191,10 +192,19 @@ func (tbl *execTableV2) generate(ctx context.Context, queryContext table.QueryCo
 					Path:  []string{"error"},
 					Value: stdErr.String(),
 				},
-			}, "*", nil)...), nil
+			}, "*", "", nil)...), nil
 		}
 
 		return nil, nil
+	}
+
+	prefilter, err := ExtractPrefilterFromQuery(queryContext)
+	if err != nil {
+		tbl.slogger.Log(ctx, slog.LevelWarn,
+			"could not extract prefilter",
+			"err", err,
+		)
+		return results, fmt.Errorf("extracting prefilter from query context: %w", err)
 	}
 
 	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
@@ -202,6 +212,7 @@ func (tbl *execTableV2) generate(ctx context.Context, queryContext table.QueryCo
 			dataflatten.WithSlogger(tbl.slogger),
 			dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 		}
+		flattenOpts = append(flattenOpts, prefilter.Opts()...) // no-op if the prefilter doesn't exist
 
 		flattened, err := tbl.flattener.FlattenBytes(stdout.Bytes(), flattenOpts...)
 		if err != nil {
@@ -213,7 +224,7 @@ func (tbl *execTableV2) generate(ctx context.Context, queryContext table.QueryCo
 			continue
 		}
 
-		results = append(results, ToMap(flattened, dataQuery, nil)...)
+		results = append(results, ToMap(flattened, dataQuery, prefilter.Expr(), nil)...)
 	}
 
 	// we could have made it through tablehelpers.Run above but still have seen error messaging
@@ -224,7 +235,7 @@ func (tbl *execTableV2) generate(ctx context.Context, queryContext table.QueryCo
 				Path:  []string{"error"},
 				Value: stdErr.String(),
 			},
-		}, "*", nil)...)
+		}, "*", "", nil)...)
 	}
 
 	return results, nil

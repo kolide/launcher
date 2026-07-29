@@ -25,6 +25,7 @@ func Test_generate(t *testing.T) {
 		filePaths               []string
 		expectedResultsFilePath string
 		query                   string
+		prefilter               string
 	}{
 		{
 			name: "no path",
@@ -39,6 +40,12 @@ func Test_generate(t *testing.T) {
 			filePaths:               []string{path.Join("testdata", "prefs.js")},
 			expectedResultsFilePath: "testdata/output.single_path_with_query.json",
 			query:                   "app.normandy.first_run",
+		},
+		{
+			name:                    "single path with prefilter",
+			filePaths:               []string{path.Join("testdata", "prefs.js")},
+			expectedResultsFilePath: "testdata/output.single_path_with_prefilter.json",
+			prefilter:               `"app.normandy.first_run" in this ? {"app.normandy.first_run": this["app.normandy.first_run"]} : {}`,
 		},
 		{
 			name:                    "multiple paths",
@@ -62,6 +69,9 @@ func Test_generate(t *testing.T) {
 			constraints["path"] = tt.filePaths
 			if tt.query != "" {
 				constraints["query"] = append(constraints["query"], tt.query)
+			}
+			if tt.prefilter != "" {
+				constraints["prefilter"] = append(constraints["prefilter"], tt.prefilter)
 			}
 
 			got, _ := table.generate(t.Context(), tablehelpers.MockQueryContext(constraints))

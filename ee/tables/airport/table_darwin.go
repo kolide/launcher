@@ -86,6 +86,12 @@ func generateAirportData(ctx context.Context, queryContext table.QueryContext, a
 		return nil, fmt.Errorf("The %s table requires that you specify a constraint for WHERE option. Valid values for option are (%s).", tableName, strings.Join(allowedOptions, ", "))
 	}
 
+	// Grab the prefilter ahead of time, so we only have to extract it once instead of per-option
+	prefilter, err := dataflattentable.ExtractPrefilterFromQuery(queryContext)
+	if err != nil {
+		return nil, fmt.Errorf("extracting prefilter from query context: %w", err)
+	}
+
 	var results []map[string]string
 	for _, option := range options {
 		airportOutput, err := airportExecutor.Exec(option)
@@ -98,7 +104,7 @@ func generateAirportData(ctx context.Context, queryContext table.QueryContext, a
 			continue
 		}
 
-		optionResult, err := processAirportOutput(bytes.NewReader(airportOutput), option, queryContext, slogger)
+		optionResult, err := processAirportOutput(bytes.NewReader(airportOutput), option, queryContext, prefilter, slogger)
 		if err != nil {
 			slogger.Log(ctx, slog.LevelDebug,
 				"error processing airport output",
@@ -113,7 +119,7 @@ func generateAirportData(ctx context.Context, queryContext table.QueryContext, a
 	return results, nil
 }
 
-func processAirportOutput(airportOutput io.Reader, option string, queryContext table.QueryContext, slogger *slog.Logger) ([]map[string]string, error) {
+func processAirportOutput(airportOutput io.Reader, option string, queryContext table.QueryContext, prefilter *dataflatten.Prefilter, slogger *slog.Logger) ([]map[string]string, error) {
 	var results []map[string]string
 
 	var unmarshalledOutput []map[string]any
@@ -130,12 +136,14 @@ func processAirportOutput(airportOutput io.Reader, option string, queryContext t
 	}
 
 	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
+		flattenOpts := []dataflatten.FlattenOpts{dataflatten.WithSlogger(slogger), dataflatten.WithQuery(strings.Split(dataQuery, "/"))}
+		flattenOpts = append(flattenOpts, prefilter.Opts()...) // no-op if the prefilter doesn't exist
 
-		flattened, err := dataflatten.Flatten(unmarshalledOutput, dataflatten.WithSlogger(slogger), dataflatten.WithQuery(strings.Split(dataQuery, "/")))
+		flattened, err := dataflatten.Flatten(unmarshalledOutput, flattenOpts...)
 		if err != nil {
 			return nil, err
 		}
-		results = append(results, dataflattentable.ToMap(flattened, dataQuery, rowData)...)
+		results = append(results, dataflattentable.ToMap(flattened, dataQuery, prefilter.Expr(), rowData)...)
 	}
 
 	return results, nil

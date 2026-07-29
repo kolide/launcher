@@ -65,6 +65,15 @@ func (c *certTrustSettingsTable) generate(ctx context.Context, queryContext tabl
 		return nil, fmt.Errorf("the %s table requires that you specify a constraint for WHERE domain; valid values for domain are (%s)", tableName, strings.Join(allowedDomains, ", "))
 	}
 
+	prefilter, err := dataflattentable.ExtractPrefilterFromQuery(queryContext)
+	if err != nil {
+		c.slogger.Log(ctx, slog.LevelWarn,
+			"could not extract prefilter",
+			"err", err,
+		)
+		return nil, fmt.Errorf("extracting prefilter from query context: %w", err)
+	}
+
 	results := make([]map[string]string, 0)
 
 	// Since this is a dataflatten table, check for `query` constraints.
@@ -103,10 +112,12 @@ func (c *certTrustSettingsTable) generate(ctx context.Context, queryContext tabl
 			if err != nil {
 				return nil, fmt.Errorf("marshalling trusted certs for dataflattening: %w", err)
 			}
-			flattened, err := dataflatten.Json(rawTrustedCerts, []dataflatten.FlattenOpts{
+			flattenOpts := []dataflatten.FlattenOpts{
 				dataflatten.WithSlogger(c.slogger),
 				dataflatten.WithQuery(strings.Split(dataQuery, "/")),
-			}...)
+			}
+			flattenOpts = append(flattenOpts, prefilter.Opts()...) // no-op if the prefilter doesn't exist
+			flattened, err := dataflatten.Json(rawTrustedCerts, flattenOpts...)
 			if err != nil {
 				c.slogger.Log(ctx, slog.LevelWarn,
 					"could not flatten trusted certs",
@@ -118,7 +129,7 @@ func (c *certTrustSettingsTable) generate(ctx context.Context, queryContext tabl
 			rowData := map[string]string{
 				"domain": domain,
 			}
-			results = append(results, dataflattentable.ToMap(flattened, dataQuery, rowData)...)
+			results = append(results, dataflattentable.ToMap(flattened, dataQuery, prefilter.Expr(), rowData)...)
 		}
 	}
 

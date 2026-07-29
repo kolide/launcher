@@ -6,6 +6,7 @@ package wmitable
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -77,6 +78,15 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		tablehelpers.WithAllowedCharacters(allowedCharacters+`:\= '".`),
 	)
 
+	prefilter, err := dataflattentable.ExtractPrefilterFromQuery(queryContext)
+	if err != nil {
+		t.slogger.Log(ctx, slog.LevelWarn,
+			"could not extract prefilter",
+			"err", err,
+		)
+		return nil, fmt.Errorf("extracting prefilter from query context: %w", err)
+	}
+
 	flattenQueries := tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*"))
 
 	for _, class := range classes {
@@ -110,7 +120,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 					}
 
 					for _, dataQuery := range flattenQueries {
-						results = append(results, t.flattenRowsFromWmi(ctx, dataQuery, wmiResults, class, rawProperties, ns, whereClause)...)
+						results = append(results, t.flattenRowsFromWmi(ctx, dataQuery, prefilter, wmiResults, class, rawProperties, ns, whereClause)...)
 					}
 				}
 			}
@@ -131,7 +141,7 @@ func (t *Table) runQuery(ctx context.Context, class string, properties []string,
 	return wmi.Query(ctx, t.slogger, class, properties, wmi.ConnectUseMaxWait(), wmi.ConnectNamespace(ns), wmi.WithWhere(whereClause))
 }
 
-func (t *Table) flattenRowsFromWmi(ctx context.Context, dataQuery string, wmiResults []map[string]interface{}, wmiClass, wmiProperties, wmiNamespace, whereClause string) []map[string]string {
+func (t *Table) flattenRowsFromWmi(ctx context.Context, dataQuery string, prefilter *dataflatten.Prefilter, wmiResults []map[string]interface{}, wmiClass, wmiProperties, wmiNamespace, whereClause string) []map[string]string {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -139,6 +149,7 @@ func (t *Table) flattenRowsFromWmi(ctx context.Context, dataQuery string, wmiRes
 		dataflatten.WithSlogger(t.slogger),
 		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 	}
+	flattenOpts = append(flattenOpts, prefilter.Opts()...) // no-op if the prefilter doesn't exist
 
 	// wmi.Query returns []map[string]interface{}, but dataflatten
 	// wants it as []interface{}. So let's whomp it.
@@ -163,5 +174,5 @@ func (t *Table) flattenRowsFromWmi(ctx context.Context, dataQuery string, wmiRes
 		"whereclause": whereClause,
 	}
 
-	return dataflattentable.ToMap(flatData, dataQuery, rowData)
+	return dataflattentable.ToMap(flatData, dataQuery, prefilter.Expr(), rowData)
 }

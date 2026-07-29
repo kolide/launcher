@@ -51,6 +51,15 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	ctx, span := observability.StartSpan(ctx, "table_name", "kolide_secedit")
 	defer span.End()
 
+	prefilter, err := dataflattentable.ExtractPrefilterFromQuery(queryContext)
+	if err != nil {
+		t.slogger.Log(ctx, slog.LevelWarn,
+			"could not extract prefilter",
+			"err", err,
+		)
+		return nil, fmt.Errorf("extracting prefilter from query context: %w", err)
+	}
+
 	var results []map[string]string
 
 	for _, mergedpolicy := range tablehelpers.GetConstraints(queryContext, "mergedpolicy", tablehelpers.WithDefaults("false")) {
@@ -73,7 +82,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 				continue
 			}
 
-			flatData, err := t.flattenOutput(dataQuery, secEditResults)
+			flatData, err := t.flattenOutput(dataQuery, prefilter, secEditResults)
 			if err != nil {
 				t.slogger.Log(ctx, slog.LevelInfo,
 					"flatten failed",
@@ -86,17 +95,18 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 				"mergedpolicy": mergedpolicy,
 			}
 
-			results = append(results, dataflattentable.ToMap(flatData, dataQuery, rowData)...)
+			results = append(results, dataflattentable.ToMap(flatData, dataQuery, prefilter.Expr(), rowData)...)
 		}
 	}
 	return results, nil
 }
 
-func (t *Table) flattenOutput(dataQuery string, systemOutput []byte) ([]dataflatten.Row, error) {
+func (t *Table) flattenOutput(dataQuery string, prefilter *dataflatten.Prefilter, systemOutput []byte) ([]dataflatten.Row, error) {
 	flattenOpts := []dataflatten.FlattenOpts{
 		dataflatten.WithSlogger(t.slogger),
 		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 	}
+	flattenOpts = append(flattenOpts, prefilter.Opts()...) // no-op if the prefilter doesn't exist
 
 	return dataflatten.Ini(systemOutput, flattenOpts...)
 }

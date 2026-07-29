@@ -100,6 +100,15 @@ func (t *Table) generateWithLauncherExec(ctx context.Context, queryContext table
 	ctx, span := observability.StartSpan(ctx, "table_name", t.name)
 	defer span.End()
 
+	prefilter, err := dataflattentable.ExtractPrefilterFromQuery(queryContext)
+	if err != nil {
+		t.slogger.Log(ctx, slog.LevelWarn,
+			"could not extract prefilter",
+			"err", err,
+		)
+		return nil, fmt.Errorf("extracting prefilter from query context: %w", err)
+	}
+
 	var results []map[string]string
 	for _, locale := range tablehelpers.GetConstraints(queryContext, "locale", tablehelpers.WithDefaults(defaultLocale)) {
 		res, err := callQueryWindowsUpdatesSubcommand(ctx, locale, t.mode)
@@ -116,6 +125,7 @@ func (t *Table) generateWithLauncherExec(ctx context.Context, queryContext table
 				dataflatten.WithSlogger(t.slogger),
 				dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 			}
+			flattenOpts = append(flattenOpts, prefilter.Opts()...) // no-op if the prefilter doesn't exist
 
 			flatData, err := dataflatten.Json(res.RawResults, flattenOpts...)
 			if err != nil {
@@ -131,7 +141,7 @@ func (t *Table) generateWithLauncherExec(ctx context.Context, queryContext table
 				"is_default": strconv.Itoa(res.IsDefaultLocale),
 			}
 
-			results = append(results, dataflattentable.ToMap(flatData, dataQuery, rowData)...)
+			results = append(results, dataflattentable.ToMap(flatData, dataQuery, prefilter.Expr(), rowData)...)
 		}
 	}
 
@@ -221,6 +231,15 @@ func (t *Table) searchLocale(ctx context.Context, locale string, queryContext ta
 	}
 	defer comshim.Done()
 
+	prefilter, err := dataflattentable.ExtractPrefilterFromQuery(queryContext)
+	if err != nil {
+		t.slogger.Log(ctx, slog.LevelWarn,
+			"could not extract prefilter",
+			"err", err,
+		)
+		return nil, fmt.Errorf("extracting prefilter from query context: %w", err)
+	}
+
 	var results []map[string]string
 
 	searcher, setLocale, isDefaultLocale, err := getSearcher(locale)
@@ -234,7 +253,7 @@ func (t *Table) searchLocale(ctx context.Context, locale string, queryContext ta
 	}
 
 	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
-		flatData, err := t.flattenOutput(dataQuery, searchResults)
+		flatData, err := t.flattenOutput(dataQuery, prefilter, searchResults)
 		if err != nil {
 			t.slogger.Log(ctx, slog.LevelInfo,
 				"flatten failed",
@@ -248,18 +267,19 @@ func (t *Table) searchLocale(ctx context.Context, locale string, queryContext ta
 			"is_default": strconv.Itoa(isDefaultLocale),
 		}
 
-		results = append(results, dataflattentable.ToMap(flatData, dataQuery, rowData)...)
+		results = append(results, dataflattentable.ToMap(flatData, dataQuery, prefilter.Expr(), rowData)...)
 	}
 
 	return results, nil
 }
 
 //nolint:unused
-func (t *Table) flattenOutput(dataQuery string, searchResults interface{}) ([]dataflatten.Row, error) {
+func (t *Table) flattenOutput(dataQuery string, prefilter *dataflatten.Prefilter, searchResults interface{}) ([]dataflatten.Row, error) {
 	flattenOpts := []dataflatten.FlattenOpts{
 		dataflatten.WithSlogger(t.slogger),
 		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 	}
+	flattenOpts = append(flattenOpts, prefilter.Opts()...) // no-op if the prefilter doesn't exist
 
 	// dataflatten won't parse the raw searchResults. As a workaround,
 	// we marshal to json. This is a deficiency in dataflatten.

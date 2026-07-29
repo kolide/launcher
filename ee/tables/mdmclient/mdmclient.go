@@ -82,6 +82,15 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		tablehelpers.WithDefaults(""),
 	}
 
+	prefilter, err := dataflattentable.ExtractPrefilterFromQuery(queryContext)
+	if err != nil {
+		t.slogger.Log(ctx, slog.LevelWarn,
+			"could not extract prefilter",
+			"err", err,
+		)
+		return nil, fmt.Errorf("extracting prefilter from query context: %w", err)
+	}
+
 	for _, mdmclientCommand := range tablehelpers.GetConstraints(queryContext, "command", gcOpts...) {
 		if mdmclientCommand == "" {
 			t.slogger.Log(ctx, slog.LevelInfo,
@@ -108,7 +117,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 				continue
 			}
 
-			flatData, err := t.flattenOutput(ctx, dataQuery, mdmclientOutput)
+			flatData, err := t.flattenOutput(ctx, dataQuery, prefilter, mdmclientOutput)
 			if err != nil {
 				t.slogger.Log(ctx, slog.LevelInfo,
 					"flatten failed",
@@ -121,13 +130,13 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 				"command": mdmclientCommand,
 			}
 
-			results = append(results, dataflattentable.ToMap(flatData, dataQuery, rowData)...)
+			results = append(results, dataflattentable.ToMap(flatData, dataQuery, prefilter.Expr(), rowData)...)
 		}
 	}
 	return results, nil
 }
 
-func (t *Table) flattenOutput(ctx context.Context, dataQuery string, systemOutput []byte) ([]dataflatten.Row, error) {
+func (t *Table) flattenOutput(ctx context.Context, dataQuery string, prefilter *dataflatten.Prefilter, systemOutput []byte) ([]dataflatten.Row, error) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -144,6 +153,7 @@ func (t *Table) flattenOutput(ctx context.Context, dataQuery string, systemOutpu
 		dataflatten.WithSlogger(t.slogger),
 		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 	}
+	flattenOpts = append(flattenOpts, prefilter.Opts()...) // no-op if the prefilter doesn't exist
 
 	return dataflatten.Plist(converted, flattenOpts...)
 }

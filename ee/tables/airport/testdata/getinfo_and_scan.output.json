@@ -5,6 +5,7 @@
         "option": "getinfo",
         "parent": "0",
         "query": "*",
+        "prefilter": "",
         "value": "wpa2-psk"
     },
     {
@@ -13,6 +14,7 @@
         "option": "getinfo",
         "parent": "0",
         "query": "*",
+        "prefilter": "",
         "value": "a0:a0:a0:a0:a0:a0"
     },
     {
@@ -21,6 +23,7 @@
         "option": "getinfo",
         "parent": "0",
         "query": "*",
+        "prefilter": "",
         "value": "8"
     },
     {
@@ -29,6 +32,7 @@
         "option": "getinfo",
         "parent": "0",
         "query": "*",
+        "prefilter": "",
         "value": "2"
     },
     {
@@ -37,6 +41,7 @@
         "option": "getinfo",
         "parent": "0",
         "query": "*",
+        "prefilter": "",
         "value": "0"
     },
     {
@@ -45,6 +50,7 @@
         "option": "getinfo",
         "parent": "0",
         "query": "*",
+        "prefilter": "",
         "value": "-94"
     },
     {
@@ -53,6 +59,7 @@
         "option": "getinfo",
         "parent": "0",
         "query": "*",
+        "prefilter": "",
         "value": "station"
     },
     {
@@ -61,6 +68,7 @@
         "option": "getinfo",
         "parent": "0",
         "query": "*",
+        "prefilter": "",
         "value": "0"
     },
     {
@@ -69,6 +77,7 @@
         "option": "getinfo",
         "parent": "0",
         "query": "*",
+        "prefilter": "",
         "value": "running"
     },
     {
@@ -77,6 +86,7 @@
         "option": "getinfo",
         "parent": "0",
         "query": "*",
+        "prefilter": "",
         "value": "open"
     },
     {
@@ -85,6 +95,7 @@
         "option": "getinfo",
         "parent": "0",
         "query": "*",
+        "prefilter": "",
         "value": "some netwerk"
     },
     {
@@ -93,6 +104,7 @@
         "option": "getinfo",
         "parent": "0",
         "query": "*",
+        "prefilter": "",
         "value": "800"
     },
     {
@@ -101,6 +113,7 @@
         "option": "getinfo",
         "parent": "0",
         "query": "*",
+        "prefilter": "",
         "value": "2"
     },
     {
@@ -109,6 +122,7 @@
         "option": "getinfo",
         "parent": "0",
         "query": "*",
+        "prefilter": "",
         "value": "-55"
     },
     {
@@ -117,6 +131,7 @@
         "option": "getinfo",
         "parent": "0",
         "query": "*",
+        "prefilter": "",
         "value": "0"
     },
     {
@@ -125,6 +140,7 @@
         "option": "getinfo",
         "parent": "0",
         "query": "*",
+        "prefilter": "",
         "value": "216"
     },
     {
@@ -133,7 +149,8 @@
         "parent": "0",
         "key": "SSID",
         "value": "i got spaces!",
-        "query": "*"
+        "query": "*",
+        "prefilter": ""
     },
     {
         "option": "scan",
@@ -141,7 +158,8 @@
         "fullkey": "0/BSSID",
         "key": "BSSID",
         "value": "a0:a0:a0:a0:a0:a0",
-        "query": "*"
+        "query": "*",
+        "prefilter": ""
     },
     {
         "option": "scan",
@@ -149,7 +167,8 @@
         "parent": "0",
         "key": "RSSI",
         "value": "-92",
-        "query": "*"
+        "query": "*",
+        "prefilter": ""
     },
     {
         "option": "scan",
@@ -157,7 +176,8 @@
         "parent": "0",
         "key": "CHANNEL",
         "value": "108",
-        "query": "*"
+        "query": "*",
+        "prefilter": ""
     },
     {
         "option": "scan",
@@ -165,7 +185,8 @@
         "parent": "0",
         "key": "HT",
         "value": "Y",
-        "query": "*"
+        "query": "*",
+        "prefilter": ""
     },
     {
         "option": "scan",
@@ -173,7 +194,8 @@
         "parent": "0",
         "key": "CC",
         "value": "US",
-        "query": "*"
+        "query": "*",
+        "prefilter": ""
     },
     {
         "option": "scan",
@@ -181,7 +203,8 @@
         "parent": "0",
         "key": "SECURITY (auth/unicast/group)",
         "value": "WPA(PSK/AES,TKIP/TKIP) RSN(PSK/AES,TKIP/TKIP)",
-        "query": "*"
+        "query": "*",
+        "prefilter": ""
     },
     {
         "option": "scan",
@@ -189,7 +212,8 @@
         "parent": "1",
         "key": "SSID",
         "value": "no-spaces",
-        "query": "*"
+        "query": "*",
+        "prefilter": ""
     },
     {
         "option": "scan",
@@ -197,7 +221,8 @@
         "parent": "1",
         "key": "BSSID",
         "value": "b1:b1:b1:b1:b1:b1",
-        "query": "*"
+        "query": "*",
+        "prefilter": ""
     },
     {
         "option": "scan",
@@ -205,7 +230,8 @@
         "parent": "1",
         "key": "RSSI",
         "value": "-91",
-        "query": "*"
+        "query": "*",
+        "prefilter": ""
     },
     {
         "option": "scan",
@@ -213,7 +239,8 @@
         "parent": "1",
         "key": "CHANNEL",
         "value": "116",
-        "query": "*"
+        "query": "*",
+        "prefilter": ""
     },
     {
         "option": "scan",
@@ -221,7 +248,8 @@
         "parent": "1",
         "key": "HT",
         "value": "N",
-        "query": "*"
+        "query": "*",
+        "prefilter": ""
     },
     {
         "option": "scan",
@@ -229,7 +257,8 @@
         "parent": "1",
         "key": "CC",
         "value": "EU",
-        "query": "*"
+        "query": "*",
+        "prefilter": ""
     },
     {
         "option": "scan",
@@ -237,6 +266,7 @@
         "parent": "1",
         "key": "SECURITY (auth/unicast/group)",
         "value": "RSN(PSK/AES/AES)",
-        "query": "*"
+        "query": "*",
+        "prefilter": ""
     }
 ]

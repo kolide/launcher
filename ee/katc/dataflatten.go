@@ -19,21 +19,24 @@ const maxRecursiveUnmarshalDepth = 100
 // IndexedDB deserialization (which encode complex types as JSON strings,
 // sometimes nested) are expanded into their structured form before flattening.
 // dataQuery is a dataflatten query string (split on "/"); pass "*" to match all.
-func flattenRow(slogger *slog.Logger, row map[string][]byte, path string, dataQuery string) ([]map[string]string, error) {
+func flattenRow(slogger *slog.Logger, row map[string][]byte, path string, dataQuery string, prefilter *dataflatten.Prefilter) ([]map[string]string, error) {
 	flatInput := make(map[string]any, len(row))
 	for k, v := range row {
 		flatInput[k] = recursivelyUnmarshal(string(v), 0, maxRecursiveUnmarshalDepth)
 	}
 
-	flatRows, err := dataflatten.Flatten(flatInput,
+	flattenOpts := []dataflatten.FlattenOpts{
 		dataflatten.WithSlogger(slogger),
 		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
-	)
+	}
+	flattenOpts = append(flattenOpts, prefilter.Opts()...) // no-op if the prefilter doesn't exist
+
+	flatRows, err := dataflatten.Flatten(flatInput, flattenOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("flattening row: %w", err)
 	}
 
-	return dataflattentable.ToMap(flatRows, dataQuery, map[string]string{pathColumnName: path}), nil
+	return dataflattentable.ToMap(flatRows, dataQuery, prefilter.Expr(), map[string]string{pathColumnName: path}), nil
 }
 
 // recursivelyUnmarshal walks the given value, attempting to JSON-unmarshal any

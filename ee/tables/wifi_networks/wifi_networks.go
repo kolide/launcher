@@ -65,18 +65,34 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
+
+	prefilter, err := dataflattentable.ExtractPrefilterFromQuery(queryContext)
+	if err != nil {
+		t.slogger.Log(ctx, slog.LevelWarn,
+			"could not extract prefilter",
+			"err", err,
+		)
+		return nil, fmt.Errorf("extracting prefilter from query context: %w", err)
+	}
+
 	var results []map[string]string
 	var output bytes.Buffer
 
 	if err := t.getBytes(ctx, &output); err != nil {
 		return results, fmt.Errorf("getting raw data: %w", err)
 	}
-	rows, err := dataflatten.Json(output.Bytes(), dataflatten.WithSlogger(t.slogger))
+
+	flattenOpts := []dataflatten.FlattenOpts{
+		dataflatten.WithSlogger(t.slogger),
+	}
+	flattenOpts = append(flattenOpts, prefilter.Opts()...) // no-op if the prefilter doesn't exist
+
+	rows, err := dataflatten.Json(output.Bytes(), flattenOpts...)
 	if err != nil {
 		return results, fmt.Errorf("flattening json output: %w", err)
 	}
 
-	return append(results, dataflattentable.ToMap(rows, "", nil)...), nil
+	return append(results, dataflattentable.ToMap(rows, "", prefilter.Expr(), nil)...), nil
 }
 
 func execPwsh(slogger *slog.Logger) execer {

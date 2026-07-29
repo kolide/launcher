@@ -4,8 +4,8 @@
     "parent": "",
     "key": "app.normandy.first_run",
     "value": "false",
-    "query": "app.normandy.first_run",
-    "prefilter": "",
+    "query": "*",
+    "prefilter": "\"app.normandy.first_run\" in this ? {\"app.normandy.first_run\": this[\"app.normandy.first_run\"]} : {}",
     "path": "testdata/prefs.js"
   }
 ]

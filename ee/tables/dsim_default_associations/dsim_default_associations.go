@@ -45,6 +45,15 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	ctx, span := observability.StartSpan(ctx, "table_name", "kolide_dsim_default_associations")
 	defer span.End()
 
+	prefilter, err := dataflattentable.ExtractPrefilterFromQuery(queryContext)
+	if err != nil {
+		t.slogger.Log(ctx, slog.LevelWarn,
+			"could not extract prefilter",
+			"err", err,
+		)
+		return nil, fmt.Errorf("extracting prefilter from query context: %w", err)
+	}
+
 	var results []map[string]string
 
 	dismResults, err := t.execDism(ctx)
@@ -61,6 +70,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 			dataflatten.WithSlogger(t.slogger),
 			dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 		}
+		flattenOpts = append(flattenOpts, prefilter.Opts()...) // no-op if the prefilter doesn't exist
 
 		rows, err := dataflatten.Xml(dismResults, flattenOpts...)
 		if err != nil {
@@ -71,7 +81,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 			continue
 		}
 
-		results = append(results, dataflattentable.ToMap(rows, dataQuery, nil)...)
+		results = append(results, dataflattentable.ToMap(rows, dataQuery, prefilter.Expr(), nil)...)
 	}
 
 	return results, nil
