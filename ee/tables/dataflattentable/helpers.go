@@ -49,6 +49,9 @@ func Columns(additional ...table.ColumnDefinition) []table.ColumnDefinition {
 	return append(columns, additional...)
 }
 
+// ExtractPrefilterFromQuery retrieves and compiles the CEL given in the queryContext,
+// if one is available. The returned value is safe to use regardless of whether the
+// prefilter exists -- it is safe to call Expr() and Opts() on a nil prefilter.
 func ExtractPrefilterFromQuery(queryContext table.QueryContext) (*dataflatten.Prefilter, error) {
 	dataPrefilter := tablehelpers.GetConstraints(queryContext, "prefilter")
 	if len(dataPrefilter) == 0 {

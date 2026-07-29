@@ -130,7 +130,7 @@ OUTER:
 				continue
 			}
 
-			results = append(results, dataflattentable.ToMap(flattened, "", "", rowData)...)
+			results = append(results, dataflattentable.ToMap(flattened, "", prefilter.Expr(), rowData)...)
 			continue
 		}
 

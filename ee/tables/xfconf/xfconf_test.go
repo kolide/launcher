@@ -41,7 +41,7 @@ func Test_getUserConfig(t *testing.T) { //nolint:paralleltest
 	require.Equal(t, "false", lockScreenSuspendHibernate)
 
 	// Get the combined config without error
-	config, err := xfconf.generateForUser(&user.User{Username: testUsername}, table.QueryContext{}, defaultConfig)
+	config, err := xfconf.generateForUser(&user.User{Username: testUsername}, table.QueryContext{}, nil, defaultConfig)
 	require.NoError(t, err, "expected no error fetching xfconf config")
 
 	// Confirm we have some data in the config and that it looks correct
@@ -82,7 +82,7 @@ func Test_getUserConfig(t *testing.T) { //nolint:paralleltest
 			"query": constraintList,
 		},
 	}
-	constrainedConfig, err := xfconf.generateForUser(&user.User{Username: testUsername}, q, defaultConfig)
+	constrainedConfig, err := xfconf.generateForUser(&user.User{Username: testUsername}, q, nil, defaultConfig)
 	require.NoError(t, err, "expected no error fetching xfconf config with query constraints")
 	require.Equal(t, 1, len(constrainedConfig), "query wrong number of rows, expected exactly 1")
 	require.Equal(t, "channel/thunar-volman/autoopen/enabled", constrainedConfig[0]["fullkey"], "query fetched wrong row")

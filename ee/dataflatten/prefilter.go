@@ -48,6 +48,8 @@ func NewPrefilter(prefilter string) (*Prefilter, error) {
 	}, nil
 }
 
+// Expr returns the expression originally used to construct the prefilter.
+// It is nil-safe.
 func (p *Prefilter) Expr() string {
 	if p == nil {
 		return ""
@@ -55,6 +57,8 @@ func (p *Prefilter) Expr() string {
 	return p.expr
 }
 
+// Opts returns a FlattenOpt WithPrefilter for this prefilter.
+// It is nil-safe.
 func (p *Prefilter) Opts() []FlattenOpts {
 	if p == nil {
 		return nil
@@ -64,8 +68,12 @@ func (p *Prefilter) Opts() []FlattenOpts {
 
 // Apply runs the prefilter on the given object. It will return nil if the
 // object does not match the filter; otherwise, it will return a transformed
-// object with only the selected fields.
+// object with only the selected fields. It is nil-safe.
 func (p *Prefilter) Apply(obj any) (any, error) {
+	if p == nil {
+		return obj, nil
+	}
+
 	out, _, err := p.prg.Eval(map[string]any{celTopLevelVariable: obj})
 	if err != nil {
 		return nil, fmt.Errorf("running prefilter: %w", err)

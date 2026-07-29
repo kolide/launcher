@@ -155,6 +155,15 @@ func (tbl *execTableV2) generate(ctx context.Context, queryContext table.QueryCo
 	ctx, span := observability.StartSpan(ctx, "table_name", tbl.tableName)
 	defer span.End()
 
+	prefilter, err := ExtractPrefilterFromQuery(queryContext)
+	if err != nil {
+		tbl.slogger.Log(ctx, slog.LevelWarn,
+			"could not extract prefilter",
+			"err", err,
+		)
+		return nil, fmt.Errorf("extracting prefilter from query context: %w", err)
+	}
+
 	var results []map[string]string
 	var stdout, stdErr bytes.Buffer
 
@@ -173,7 +182,7 @@ func (tbl *execTableV2) generate(ctx context.Context, queryContext table.QueryCo
 						Path:  []string{"error"},
 						Value: "binary is not present on device",
 					},
-				}, "*", "", nil)...), nil
+				}, "*", prefilter.Expr(), nil)...), nil
 			}
 
 			return nil, nil
@@ -192,19 +201,10 @@ func (tbl *execTableV2) generate(ctx context.Context, queryContext table.QueryCo
 					Path:  []string{"error"},
 					Value: stdErr.String(),
 				},
-			}, "*", "", nil)...), nil
+			}, "*", prefilter.Expr(), nil)...), nil
 		}
 
 		return nil, nil
-	}
-
-	prefilter, err := ExtractPrefilterFromQuery(queryContext)
-	if err != nil {
-		tbl.slogger.Log(ctx, slog.LevelWarn,
-			"could not extract prefilter",
-			"err", err,
-		)
-		return results, fmt.Errorf("extracting prefilter from query context: %w", err)
 	}
 
 	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
