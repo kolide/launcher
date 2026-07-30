@@ -20,7 +20,10 @@ const (
 	celCostLimit = 10000000
 )
 
-type Prefilter struct{ prg cel.Program }
+type Prefilter struct {
+	prg  cel.Program
+	expr string // stored so it's easy to return in row data
+}
 
 func NewPrefilter(prefilter string) (*Prefilter, error) {
 	env, err := cel.NewEnv(
@@ -39,13 +42,39 @@ func NewPrefilter(prefilter string) (*Prefilter, error) {
 		return nil, fmt.Errorf("constructing program: %w", err)
 	}
 
-	return &Prefilter{prg: prg}, nil
+	return &Prefilter{
+		prg:  prg,
+		expr: prefilter,
+	}, nil
+}
+
+// Expr returns the expression originally used to construct the prefilter.
+// It is nil-safe.
+func (p *Prefilter) Expr() string {
+	if p == nil {
+		return ""
+	}
+	return p.expr
+}
+
+// Opts returns a FlattenOpt WithPrefilter for this prefilter.
+// It is nil-safe.
+func (p *Prefilter) Opts() []FlattenOpts {
+	if p == nil {
+		return nil
+	}
+	return []FlattenOpts{WithPrefilter(p)}
 }
 
 // Apply runs the prefilter on the given object. It will return nil if the
 // object does not match the filter; otherwise, it will return a transformed
-// object with only the selected fields.
+// object with only the selected fields. If the prefilter is uninitialized,
+// then the object will be returned unchanged.
 func (p *Prefilter) Apply(obj any) (any, error) {
+	if p == nil {
+		return obj, nil
+	}
+
 	out, _, err := p.prg.Eval(map[string]any{celTopLevelVariable: obj})
 	if err != nil {
 		return nil, fmt.Errorf("running prefilter: %w", err)

@@ -48,6 +48,15 @@ func (t *xfconfTable) generate(ctx context.Context, queryContext table.QueryCont
 	ctx, span := observability.StartSpan(ctx, "table_name", "kolide_xfconf")
 	defer span.End()
 
+	prefilter, err := dataflattentable.ExtractPrefilterFromQuery(queryContext)
+	if err != nil {
+		t.slogger.Log(ctx, slog.LevelWarn,
+			"could not extract prefilter",
+			"err", err,
+		)
+		return nil, fmt.Errorf("extracting prefilter from query context: %w", err)
+	}
+
 	var results []map[string]string
 
 	users := tablehelpers.GetConstraints(queryContext, "username")
@@ -73,7 +82,7 @@ func (t *xfconfTable) generate(ctx context.Context, queryContext table.QueryCont
 			continue
 		}
 
-		userRows, err := t.generateForUser(u, queryContext, defaultConfig)
+		userRows, err := t.generateForUser(u, queryContext, prefilter, defaultConfig)
 		if err != nil {
 			t.slogger.Log(ctx, slog.LevelWarn,
 				"could not generate config for user",
@@ -122,7 +131,7 @@ func getDefaultXfconfDirs() []string {
 }
 
 // generateForUser returns flattened rows for the given user.
-func (t *xfconfTable) generateForUser(u *user.User, queryContext table.QueryContext, defaultConfig map[string]map[string]interface{}) ([]map[string]string, error) {
+func (t *xfconfTable) generateForUser(u *user.User, queryContext table.QueryContext, prefilter *dataflatten.Prefilter, defaultConfig map[string]map[string]interface{}) ([]map[string]string, error) {
 	var results []map[string]string
 
 	// Fetch the user's config from the filesystem once, so we don't have to do it
@@ -133,7 +142,7 @@ func (t *xfconfTable) generateForUser(u *user.User, queryContext table.QueryCont
 	}
 
 	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
-		userConfig, err := t.getCombinedFlattenedConfig(u, userConfig, defaultConfig, dataQuery)
+		userConfig, err := t.getCombinedFlattenedConfig(u, userConfig, defaultConfig, dataQuery, prefilter)
 		if err != nil {
 			return nil, fmt.Errorf("could not get xfconf settings for user %s and query %s: %w", u.Username, dataQuery, err)
 		}
@@ -193,13 +202,14 @@ func (t *xfconfTable) getConfigFromDirectory(dir string) (map[string]map[string]
 
 // getCombinedFlattenedConfig flattens and combines the given user config and default config;
 // in the case of duplicate settings, it takes the value from the user config.
-func (t *xfconfTable) getCombinedFlattenedConfig(u *user.User, userConfig map[string]map[string]interface{}, defaultConfig map[string]map[string]interface{}, dataQuery string) ([]map[string]string, error) {
+func (t *xfconfTable) getCombinedFlattenedConfig(u *user.User, userConfig map[string]map[string]interface{}, defaultConfig map[string]map[string]interface{}, dataQuery string, prefilter *dataflatten.Prefilter) ([]map[string]string, error) {
 	var results []map[string]string
 
 	flattenOpts := []dataflatten.FlattenOpts{
 		dataflatten.WithSlogger(t.slogger),
 		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 	}
+	flattenOpts = append(flattenOpts, prefilter.Opts()...) // no-op if the prefilter doesn't exist
 
 	// Flatten user-specific settings
 	for userConfigPath, userConfigData := range userConfig {
@@ -209,7 +219,7 @@ func (t *xfconfTable) getCombinedFlattenedConfig(u *user.User, userConfig map[st
 		}
 
 		rowData := map[string]string{"username": u.Username, "path": userConfigPath}
-		results = append(results, dataflattentable.ToMap(userConfigRows, dataQuery, rowData)...)
+		results = append(results, dataflattentable.ToMap(userConfigRows, dataQuery, prefilter.Expr(), rowData)...)
 	}
 
 	// Add in the default settings
@@ -220,7 +230,7 @@ func (t *xfconfTable) getCombinedFlattenedConfig(u *user.User, userConfig map[st
 		}
 
 		rowData := map[string]string{"username": u.Username, "path": defaultConfigPath}
-		results = append(results, dataflattentable.ToMap(defaultConfigRows, dataQuery, rowData)...)
+		results = append(results, dataflattentable.ToMap(defaultConfigRows, dataQuery, prefilter.Expr(), rowData)...)
 	}
 
 	// Deduplicate the user and default configs, by taking the first instance in the results array

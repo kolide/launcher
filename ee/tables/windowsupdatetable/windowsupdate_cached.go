@@ -5,6 +5,7 @@ package windowsupdatetable
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"strconv"
 	"strings"
@@ -50,6 +51,15 @@ func CachedWindowsUpdatesTablePlugin(flags types.Flags, slogger *slog.Logger, ca
 func (c *CachedWindowsUpdatesTable) generateFromCachedData(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	ctx, span := observability.StartSpan(ctx, "table_name", c.name)
 	defer span.End()
+
+	prefilter, err := dataflattentable.ExtractPrefilterFromQuery(queryContext)
+	if err != nil {
+		c.slogger.Log(ctx, slog.LevelWarn,
+			"could not extract prefilter",
+			"err", err,
+		)
+		return nil, fmt.Errorf("extracting prefilter from query context: %w", err)
+	}
 
 	var results []map[string]string
 
@@ -97,6 +107,7 @@ func (c *CachedWindowsUpdatesTable) generateFromCachedData(ctx context.Context, 
 				dataflatten.WithSlogger(c.slogger),
 				dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 			}
+			flattenOpts = append(flattenOpts, prefilter.Opts()...) // no-op if the prefilter doesn't exist
 
 			flatData, err := dataflatten.Json(res.Results.RawResults, flattenOpts...)
 			if err != nil {
@@ -114,7 +125,7 @@ func (c *CachedWindowsUpdatesTable) generateFromCachedData(ctx context.Context, 
 				"age":        resultsAgeInSecondsStr,
 			}
 
-			results = append(results, dataflattentable.ToMap(flatData, dataQuery, rowData)...)
+			results = append(results, dataflattentable.ToMap(flatData, dataQuery, prefilter.Expr(), rowData)...)
 		}
 	}
 

@@ -72,6 +72,16 @@ func (t *falconctlOptionsTable) generate(ctx context.Context, queryContext table
 
 	var results []map[string]string
 
+	// Prefilter applies to all iterations, so grab that first
+	prefilter, err := dataflattentable.ExtractPrefilterFromQuery(queryContext)
+	if err != nil {
+		t.slogger.Log(ctx, slog.LevelWarn,
+			"could not extract prefilter",
+			"err", err,
+		)
+		return nil, fmt.Errorf("extracting prefilter from query context: %w", err)
+	}
+
 	// Note that we don't use tablehelpers.AllowedValues here, because that would disallow us from
 	// passing `where options = "--aid --aph"`, and allowing that, allows us a single exec.
 OUTER:
@@ -120,7 +130,7 @@ OUTER:
 				continue
 			}
 
-			results = append(results, dataflattentable.ToMap(flattened, "", rowData)...)
+			results = append(results, dataflattentable.ToMap(flattened, "", prefilter.Expr(), rowData)...)
 			continue
 		}
 
@@ -140,6 +150,7 @@ OUTER:
 				dataflatten.WithSlogger(t.slogger),
 				dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 			}
+			flattenOpts = append(flattenOpts, prefilter.Opts()...) // no-op if the prefilter doesn't exist
 
 			flattened, err := dataflatten.Flatten(parsed, flattenOpts...)
 			if err != nil {
@@ -150,7 +161,7 @@ OUTER:
 				continue
 			}
 
-			results = append(results, dataflattentable.ToMap(flattened, dataQuery, rowData)...)
+			results = append(results, dataflattentable.ToMap(flattened, dataQuery, prefilter.Expr(), rowData)...)
 		}
 	}
 

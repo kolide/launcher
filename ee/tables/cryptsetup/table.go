@@ -46,6 +46,15 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	ctx, span := observability.StartSpan(ctx, "table_name", "kolide_cryptsetup_status")
 	defer span.End()
 
+	prefilter, err := dataflattentable.ExtractPrefilterFromQuery(queryContext)
+	if err != nil {
+		t.slogger.Log(ctx, slog.LevelWarn,
+			"could not extract prefilter",
+			"err", err,
+		)
+		return nil, fmt.Errorf("extracting prefilter from query context: %w", err)
+	}
+
 	var results []map[string]string
 
 	requestedNames := tablehelpers.GetConstraints(queryContext, "name",
@@ -79,7 +88,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		}
 
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
-			flatData, err := t.flattenOutput(dataQuery, status)
+			flatData, err := t.flattenOutput(dataQuery, prefilter, status)
 			if err != nil {
 				t.slogger.Log(ctx, slog.LevelInfo,
 					"flatten failed",
@@ -90,18 +99,19 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 			rowData := map[string]string{"name": name}
 
-			results = append(results, dataflattentable.ToMap(flatData, dataQuery, rowData)...)
+			results = append(results, dataflattentable.ToMap(flatData, dataQuery, prefilter.Expr(), rowData)...)
 		}
 	}
 
 	return results, nil
 }
 
-func (t *Table) flattenOutput(dataQuery string, status map[string]interface{}) ([]dataflatten.Row, error) {
+func (t *Table) flattenOutput(dataQuery string, prefilter *dataflatten.Prefilter, status map[string]interface{}) ([]dataflatten.Row, error) {
 	flattenOpts := []dataflatten.FlattenOpts{
 		dataflatten.WithSlogger(t.slogger),
 		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 	}
+	flattenOpts = append(flattenOpts, prefilter.Opts()...) // no-op if the prefilter doesn't exist
 
 	return dataflatten.Flatten(status, flattenOpts...)
 }

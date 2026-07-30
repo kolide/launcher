@@ -43,6 +43,15 @@ func (t *gcTable) generate(ctx context.Context, queryContext table.QueryContext)
 	ctx, span := observability.StartSpan(ctx, "table_name", gcTableName)
 	defer span.End()
 
+	prefilter, err := dataflattentable.ExtractPrefilterFromQuery(queryContext)
+	if err != nil {
+		t.slogger.Log(ctx, slog.LevelWarn,
+			"could not extract prefilter",
+			"err", err,
+		)
+		return nil, fmt.Errorf("extracting prefilter from query context: %w", err)
+	}
+
 	var results []map[string]string
 
 	debug.ReadGCStats(&t.stats)
@@ -62,10 +71,15 @@ func (t *gcTable) generate(ctx context.Context, queryContext table.QueryContext)
 			return nil, fmt.Errorf("json: %w", err)
 		}
 
-		flatData, err := dataflatten.Json(
-			jsonBytes,
+		flattenOpts := []dataflatten.FlattenOpts{
 			dataflatten.WithSlogger(t.slogger),
 			dataflatten.WithQuery(strings.Split(dataQuery, "/")),
+		}
+		flattenOpts = append(flattenOpts, prefilter.Opts()...) // no-op if the prefilter doesn't exist
+
+		flatData, err := dataflatten.Json(
+			jsonBytes,
+			flattenOpts...,
 		)
 		if err != nil {
 			t.slogger.Log(ctx, slog.LevelInfo,
@@ -74,7 +88,7 @@ func (t *gcTable) generate(ctx context.Context, queryContext table.QueryContext)
 			)
 			continue
 		}
-		results = append(results, dataflattentable.ToMap(flatData, dataQuery, nil)...)
+		results = append(results, dataflattentable.ToMap(flatData, dataQuery, prefilter.Expr(), nil)...)
 	}
 	return results, nil
 }

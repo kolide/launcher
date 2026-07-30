@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"log/slog"
 	"maps"
 	"os"
@@ -79,6 +80,15 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		return nil, errors.New("kolide_jwt requires at least one path or raw_data to be specified")
 	}
 
+	prefilter, err := dataflattentable.ExtractPrefilterFromQuery(queryContext)
+	if err != nil {
+		t.slogger.Log(ctx, slog.LevelWarn,
+			"could not extract prefilter",
+			"err", err,
+		)
+		return nil, fmt.Errorf("extracting prefilter from query context: %w", err)
+	}
+
 	for _, keyJSON := range tablehelpers.GetConstraints(queryContext, "signing_keys", tablehelpers.WithDefaults("")) {
 		for _, includeRawJWT := range tablehelpers.GetConstraints(queryContext, "include_raw_jwt", tablehelpers.WithAllowedValues(allowedIncludeValues), tablehelpers.WithDefaults("false")) {
 			for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
@@ -101,7 +111,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 						"include_raw_jwt": includeRawJWT,
 					}
 
-					results = append(results, t.processJWT(ctx, fileData, keyJSON, dataQuery, rowData)...)
+					results = append(results, t.processJWT(ctx, fileData, keyJSON, dataQuery, prefilter, rowData)...)
 				}
 
 				for _, rawData := range rawDatas {
@@ -112,7 +122,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 						"include_raw_jwt": includeRawJWT,
 					}
 
-					results = append(results, t.processJWT(ctx, []byte(rawData), keyJSON, dataQuery, rowData)...)
+					results = append(results, t.processJWT(ctx, []byte(rawData), keyJSON, dataQuery, prefilter, rowData)...)
 				}
 			}
 		}
@@ -121,7 +131,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	return results, nil
 }
 
-func (t *Table) processJWT(ctx context.Context, rawData []byte, keyJSON string, dataQuery string, rowData map[string]string) []map[string]string {
+func (t *Table) processJWT(ctx context.Context, rawData []byte, keyJSON string, dataQuery string, prefilter *dataflatten.Prefilter, rowData map[string]string) []map[string]string {
 	var keyMap map[string]string
 	if err := json.Unmarshal([]byte(keyJSON), &keyMap); err != nil {
 		t.slogger.Log(ctx, slog.LevelInfo, "error unmarshaling JWT signing keys", "err", err)
@@ -159,6 +169,7 @@ func (t *Table) processJWT(ctx context.Context, rawData []byte, keyJSON string, 
 		dataflatten.WithSlogger(t.slogger),
 		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 	}
+	flattenOpts = append(flattenOpts, prefilter.Opts()...) // no-op if the prefilter doesn't exist
 
 	flattened, err := dataflatten.Flatten(data, flattenOpts...)
 	if err != nil {
@@ -166,7 +177,7 @@ func (t *Table) processJWT(ctx context.Context, rawData []byte, keyJSON string, 
 		return nil
 	}
 
-	return dataflattentable.ToMap(flattened, dataQuery, rowData)
+	return dataflattentable.ToMap(flattened, dataQuery, prefilter.Expr(), rowData)
 }
 
 // JWTKeyFunc handles taking in an array of public keys to validate against the JWT signature.

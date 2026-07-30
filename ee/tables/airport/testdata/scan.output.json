@@ -5,7 +5,8 @@
         "parent": "0",
         "key": "SSID",
         "value": "i got spaces!",
-        "query": "*"
+        "query": "*",
+        "prefilter": ""
     },
     {
         "option": "scan",
@@ -13,7 +14,8 @@
         "fullkey": "0/BSSID",
         "key": "BSSID",
         "value": "a0:a0:a0:a0:a0:a0",
-        "query": "*"
+        "query": "*",
+        "prefilter": ""
     },
     {
         "option": "scan",
@@ -21,7 +23,8 @@
         "parent": "0",
         "key": "RSSI",
         "value": "-92",
-        "query": "*"
+        "query": "*",
+        "prefilter": ""
     },
     {
         "option": "scan",
@@ -29,7 +32,8 @@
         "parent": "0",
         "key": "CHANNEL",
         "value": "108",
-        "query": "*"
+        "query": "*",
+        "prefilter": ""
     },
     {
         "option": "scan",
@@ -37,7 +41,8 @@
         "parent": "0",
         "key": "HT",
         "value": "Y",
-        "query": "*"
+        "query": "*",
+        "prefilter": ""
     },
     {
         "option": "scan",
@@ -45,7 +50,8 @@
         "parent": "0",
         "key": "CC",
         "value": "US",
-        "query": "*"
+        "query": "*",
+        "prefilter": ""
     },
     {
         "option": "scan",
@@ -53,7 +59,8 @@
         "parent": "0",
         "key": "SECURITY (auth/unicast/group)",
         "value": "WPA(PSK/AES,TKIP/TKIP) RSN(PSK/AES,TKIP/TKIP)",
-        "query": "*"
+        "query": "*",
+        "prefilter": ""
     },
     {
         "option": "scan",
@@ -61,7 +68,8 @@
         "parent": "1",
         "key": "SSID",
         "value": "no-spaces",
-        "query": "*"
+        "query": "*",
+        "prefilter": ""
     },
     {
         "option": "scan",
@@ -69,7 +77,8 @@
         "parent": "1",
         "key": "BSSID",
         "value": "b1:b1:b1:b1:b1:b1",
-        "query": "*"
+        "query": "*",
+        "prefilter": ""
     },
     {
         "option": "scan",
@@ -77,7 +86,8 @@
         "parent": "1",
         "key": "RSSI",
         "value": "-91",
-        "query": "*"
+        "query": "*",
+        "prefilter": ""
     },
     {
         "option": "scan",
@@ -85,7 +95,8 @@
         "parent": "1",
         "key": "CHANNEL",
         "value": "116",
-        "query": "*"
+        "query": "*",
+        "prefilter": ""
     },
     {
         "option": "scan",
@@ -93,7 +104,8 @@
         "parent": "1",
         "key": "HT",
         "value": "N",
-        "query": "*"
+        "query": "*",
+        "prefilter": ""
     },
     {
         "option": "scan",
@@ -101,7 +113,8 @@
         "parent": "1",
         "key": "CC",
         "value": "EU",
-        "query": "*"
+        "query": "*",
+        "prefilter": ""
     },
     {
         "option": "scan",
@@ -109,6 +122,7 @@
         "parent": "1",
         "key": "SECURITY (auth/unicast/group)",
         "value": "RSN(PSK/AES/AES)",
-        "query": "*"
+        "query": "*",
+        "prefilter": ""
     }
 ]

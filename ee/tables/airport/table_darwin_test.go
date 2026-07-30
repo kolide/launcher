@@ -37,6 +37,8 @@ func Test_generateAirportData_HappyPath(t *testing.T) {
 		// this is the dataflatten query that would be written as part of the sql cmd
 		query string
 
+		prefilter string
+
 		// path to to the file that is a json of the expected output
 		expectedResultsFilePath string
 	}{
@@ -54,6 +56,14 @@ func Test_generateAirportData_HappyPath(t *testing.T) {
 			},
 			query:                   "/SSID",
 			expectedResultsFilePath: "testdata/scan_with_query.output.json",
+		},
+		{
+			name: "scan_with_prefilter",
+			optionsToReturnFilePath: map[string]string{
+				"scan": "testdata/scan.input.txt",
+			},
+			prefilter:               `this.map(o, has(o.SSID) ? {"SSID": o.SSID} : {})`,
+			expectedResultsFilePath: "testdata/scan_with_prefilter.output.json",
 		},
 		{
 			name: "getinfo",
@@ -79,6 +89,15 @@ func Test_generateAirportData_HappyPath(t *testing.T) {
 			query:                   "/SSID",
 			expectedResultsFilePath: "testdata/getinfo_and_scan_with_query.output.json",
 		},
+		{
+			name: "getinfo_and_scan_with_prefilter",
+			optionsToReturnFilePath: map[string]string{
+				"scan":    "testdata/scan.input.txt",
+				"getinfo": "testdata/getinfo.input.txt",
+			},
+			prefilter:               `this.map(o, has(o.SSID) ? {"SSID": o.SSID} : {})`,
+			expectedResultsFilePath: "testdata/getinfo_and_scan_with_prefilter.output.json",
+		},
 	}
 
 	for _, tt := range tests {
@@ -101,6 +120,10 @@ func Test_generateAirportData_HappyPath(t *testing.T) {
 
 			if tt.query != "" {
 				constraints["query"] = []string{tt.query}
+			}
+
+			if tt.prefilter != "" {
+				constraints["prefilter"] = []string{tt.prefilter}
 			}
 
 			got, err := generateAirportData(t.Context(), tablehelpers.MockQueryContext(constraints), executor, multislogger.NewNopLogger())
