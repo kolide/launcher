@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"sync"
 	"testing"
 	"time"
 
@@ -246,10 +247,10 @@ func TestCleanup(t *testing.T) {
 	require.NotNil(t, newActionRecord, "new action was not seeded in db")
 	require.NoError(t, err)
 
-	// start clean up
-	go func() {
+	var wg sync.WaitGroup
+	wg.Go(func() {
 		actionQueue.StartCleanup()
-	}()
+	})
 
 	// give it a chance to run
 	time.Sleep(500 * time.Millisecond)
@@ -263,13 +264,11 @@ func TestCleanup(t *testing.T) {
 	require.NotNil(t, newActionRecord, "new action was cleaned up but should not have been")
 	require.NoError(t, err)
 
-	// stop
 	actionQueue.StopCleanup(nil)
-	// give log a chance to log
-	time.Sleep(500 * time.Millisecond)
-	require.Contains(t, logBytes.String(), "cleanup")
+	wg.Wait() // cleanup should exit
 }
 
+// Consuming APIs expect that stop may be called multiple times.
 func TestStopCleanup_Multiple(t *testing.T) {
 	t.Parallel()
 
@@ -289,35 +288,19 @@ func TestStopCleanup_Multiple(t *testing.T) {
 	)
 	actionQueue.RegisterActor(testActorType, mockActor)
 
-	// start clean up
 	go actionQueue.StartCleanup()
-	time.Sleep(3 * time.Second)
-	interruptStart := time.Now()
+	time.Sleep(250 * time.Millisecond) // allow cleanup to run
 	actionQueue.StopCleanup(errors.New("test error"))
 
 	// Confirm we can call Interrupt multiple times without blocking
-	interruptComplete := make(chan struct{})
-	expectedInterrupts := 3
-	for i := 0; i < expectedInterrupts; i += 1 {
-		go func() {
+	var wg sync.WaitGroup
+	for range 3 {
+		wg.Go(func() {
 			actionQueue.StopCleanup(nil)
-			interruptComplete <- struct{}{}
-		}()
+		})
 	}
 
-	receivedInterrupts := 0
-	for receivedInterrupts < expectedInterrupts {
-		select {
-		case <-interruptComplete:
-			receivedInterrupts += 1
-			continue
-		case <-time.After(5 * time.Second):
-			t.Errorf("could not call interrupt multiple times and return within 5 seconds -- interrupted at %s, received %d interrupts before timeout; logs: \n%s\n", interruptStart.String(), receivedInterrupts, logBytes.String())
-			t.FailNow()
-		}
-	}
-
-	require.Equal(t, expectedInterrupts, receivedInterrupts)
+	wg.Wait() // all the cleanups should come back
 }
 
 func TestActionQueue_HandlesMalformedActions(t *testing.T) {

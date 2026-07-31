@@ -47,7 +47,7 @@ type ActionQueue struct {
 	oldNotificationsStore types.KVStore
 	slogger               *slog.Logger
 	actionCleanupInterval time.Duration
-	cancel                context.CancelFunc
+	done                  chan struct{}
 }
 
 type actionqueueOption func(*ActionQueue)
@@ -82,6 +82,7 @@ func New(k types.Knapsack, opts ...actionqueueOption) *ActionQueue {
 		actors:                make(map[string]actor, 0),
 		actionCleanupInterval: defaultCleanupInterval,
 		slogger:               k.Slogger().With("component", "actionqueue"),
+		done:                  make(chan struct{}),
 	}
 
 	for _, opt := range opts {
@@ -155,18 +156,17 @@ func (aq *ActionQueue) StartCleanup() error {
 }
 
 func (aq *ActionQueue) runCleanup() {
-	ctx, cancel := context.WithCancel(aq.ctx)
-	aq.cancel = cancel
-
 	t := time.NewTicker(aq.actionCleanupInterval)
 	defer t.Stop()
 
 	for {
 		select {
-		case <-ctx.Done():
-			aq.slogger.Log(context.TODO(), slog.LevelDebug,
+		case <-aq.ctx.Done():
+			aq.slogger.Log(aq.ctx, slog.LevelDebug,
 				"action cleanup stopped due to context cancel",
 			)
+			return
+		case <-aq.done:
 			return
 		case <-t.C:
 			aq.cleanupActions()
@@ -175,7 +175,11 @@ func (aq *ActionQueue) runCleanup() {
 }
 
 func (aq *ActionQueue) StopCleanup(err error) {
-	aq.cancel()
+	select {
+	case <-aq.done:
+	default:
+		close(aq.done)
+	}
 }
 
 func (aq *ActionQueue) storeActionRecord(actionToStore action) {
