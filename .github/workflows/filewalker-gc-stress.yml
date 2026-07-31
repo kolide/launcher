@@ -1,0 +1,124 @@
+name: filewalker-gc-stress
+
+# Stress-loops the ee/filewalker tests on Windows runners to reproduce rare
+# GC-integrity fatal errors seen in CI.
+# Variants for GC are included, per Claude:
+#   stock      -- default build (Green Tea GC on; the crashing config)
+#   nogreentea -- built with GOEXPERIMENT=nogreenteagc
+#   noavx512   -- stock build, run with GODEBUG disabling the AVX-512 features
+#                 gating Green Tea's span-scan path (VL/BW/DQ; avx512f is not
+#                 part of the gate and GODEBUG cpu toggles don't cascade)
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  STRESS_ITERATIONS: "100"
+  STRESS_BUDGET_MINUTES: "240"
+
+jobs:
+  gc_stress:
+    permissions:
+      contents: read
+    name: gc-stress (${{ matrix.os }}, ${{ matrix.variant.name }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - windows-2022
+          - windows-2025
+        variant:
+          - name: stock
+            goexperiment: ""
+            godebug: ""
+          - name: nogreentea
+            goexperiment: "nogreenteagc"
+            godebug: ""
+          - name: noavx512
+            goexperiment: ""
+            godebug: "cpu.avx512vl=off,cpu.avx512bw=off,cpu.avx512dq=off"
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - name: Check out code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.26.5"
+          check-latest: false
+          cache: false
+
+      - name: Compile test binary
+        shell: bash
+        env:
+          GOEXPERIMENT: ${{ matrix.variant.goexperiment }}
+        run: |
+          go version
+          go test -c -race -cover -o filewalker.test.exe ./ee/filewalker/
+
+      - name: Stress loop
+        shell: bash
+        env:
+          GOGC: "1"
+          GOTRACEBACK: system
+          GODEBUG: ${{ matrix.variant.godebug }}
+        run: |
+          mkdir -p failures
+          start=$(date +%s)
+          budget_secs=$(( STRESS_BUDGET_MINUTES * 60 ))
+          completed=0
+          fail=0
+
+          for (( i = 1; i <= STRESS_ITERATIONS; i++ )); do
+            if (( $(date +%s) - start >= budget_secs )); then
+              echo "hit ${STRESS_BUDGET_MINUTES}m budget after ${completed} iterations; stopping"
+              break
+            fi
+
+            iter_start=$(date +%s)
+            if ./filewalker.test.exe -test.count=1 -test.timeout=10m > iter.log 2>&1; then
+              rc=0
+            else
+              rc=$?
+            fi
+            dur=$(( $(date +%s) - iter_start ))
+            completed=$(( completed + 1 ))
+
+            if (( rc == 0 )); then
+              echo "iter ${i}: PASS (${dur}s)"
+              rm -f iter.log
+            else
+              fail=$(( fail + 1 ))
+              echo "iter ${i}: FAIL rc=${rc} (${dur}s) -- last lines:"
+              tail -n 30 iter.log
+              mv iter.log "failures/iter-$(printf '%03d' "$i")-rc${rc}.log"
+            fi
+          done
+
+          echo "${completed} iterations: $(( completed - fail )) passed, ${fail} failed" | tee -a "$GITHUB_STEP_SUMMARY"
+
+          if (( fail > 0 )); then
+            exit 1
+          fi
+
+      - name: Upload failure logs
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: filewalker-gc-stress-failures-${{ matrix.os }}-${{ matrix.variant.name }}
+          path: failures/
+          if-no-files-found: ignore
