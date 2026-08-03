@@ -5,8 +5,8 @@
         "parent": "0",
         "key": "SSID",
         "value": "i got spaces!",
-        "query": "/SSID",
-        "prefilter": ""
+        "query": "*",
+        "prefilter": "this.map(o, has(o.SSID) ? {\"SSID\": o.SSID} : {})"
     },
     {
         "option": "scan",
@@ -14,7 +14,7 @@
         "parent": "1",
         "key": "SSID",
         "value": "no-spaces",
-        "query": "/SSID",
-        "prefilter": ""
+        "query": "*",
+        "prefilter": "this.map(o, has(o.SSID) ? {\"SSID\": o.SSID} : {})"
     }
 ]

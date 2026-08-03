@@ -10,6 +10,9 @@ on:
   merge_group:
     types: [checks_requested]
 
+permissions:
+  contents: read
+
 jobs:
   # Our non-containerized launcher builds -- macOS and Windows. Linux is handled separately
   # below to preserve Ubuntu 20.04 support.
@@ -28,14 +31,19 @@ jobs:
     env:
       CACHE_KEY_PREFIX: '' # Deliberately empty -- only set to distinguish our second build (for reproducibility testing) from this main build
     steps: &non_container_build_steps
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit # Audit network and disk activity
+
       - name: Check out code
         id: checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # need a full checkout for `git describe`
 
       - name: Setup Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: "./go.mod"
           check-latest: true
@@ -50,13 +58,13 @@ jobs:
           echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
 
       - name: Go Build Cache
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.go-cache-paths.outputs.go-build }}
           key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
 
       - name: Go Mod Cache
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.go-cache-paths.outputs.go-mod }}
           key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
@@ -95,7 +103,7 @@ jobs:
         if: ${{ contains(matrix.os, 'macos') }}
 
       - name: Cache build output
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ./build
           key: ${{ env.CACHE_KEY_PREFIX }}${{ runner.os }}-${{ github.run_id }}
@@ -131,6 +139,11 @@ jobs:
       CACHE_KEY_PREFIX: '' # Deliberately empty -- only set to distinguish our second build (for reproducibility testing) from this main build
     steps: &container_build_steps
       # zstd is needed so we can restore cache later -- see https://github.com/actions/cache/issues/1455#issuecomment-2328358604
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit # Audit network and disk activity
+
       - name: Install build dependencies
         run: |
           apt-get -y update
@@ -139,7 +152,7 @@ jobs:
 
       - name: Check out code
         id: checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # need a full checkout for `git describe`
 
@@ -147,7 +160,7 @@ jobs:
         run: git config --global --add safe.directory /__w/launcher/launcher
 
       - name: Setup Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: "./go.mod"
           check-latest: true
@@ -160,13 +173,13 @@ jobs:
           echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
 
       - name: Go Build Cache
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.go-cache-paths.outputs.go-build }}
           key: ${{ runner.os }}-go-build-${{ hashFiles('go.sum') }}
 
       - name: Go Mod Cache
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.go-cache-paths.outputs.go-mod }}
           key: ${{ runner.os }}-go-mod-${{ hashFiles('go.sum') }}
@@ -175,7 +188,7 @@ jobs:
         run: make deps
 
       - name: Set up zig
-        uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        uses: step-security/setup-zig@1e9fbd457bcc3587b58845344a267f12f151709c # v2.2.2
 
       - name: Build (debug)
         if: github.ref_type != 'tag'
@@ -186,7 +199,7 @@ jobs:
         run: make -j2 github-build
 
       - name: Cache build output
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ./build
           key: ${{ env.CACHE_KEY_PREFIX }}${{ runner.os }}-${{ github.run_id }}
@@ -217,8 +230,13 @@ jobs:
           - macOS
           - Windows
     steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit # Audit network and disk activity
+
       - name: cache restore build 1 output
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ./build
           key: ${{ matrix.runneros }}-${{ github.run_id }}
@@ -229,7 +247,7 @@ jobs:
         run: mv ./build ./build1
 
       - name: cache restore build 2 output
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ./build
           key: reproducible-${{ matrix.runneros }}-${{ github.run_id }}
@@ -276,12 +294,17 @@ jobs:
       version: ${{ steps.version.outputs.version }}
     steps:
       # Needed so we can restore cache -- see https://github.com/actions/cache/issues/1455#issuecomment-2328358604
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit # Audit network and disk activity
+
       - name: Install zstd
         run: |
           apt-get -y update
           apt-get -y install zstd
       - name: cache restore build output
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ./build
           key: ${{ runner.os }}-${{ github.run_id }}
@@ -310,21 +333,26 @@ jobs:
           - macos-15
           - windows-latest
     steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit # Audit network and disk activity
+
       - name: Check out code
         id: checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # need a full checkout for `git describe`
 
       - name: Setup Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: "./go.mod"
           check-latest: true
           cache: false
 
       - name: cache restore - build
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ./build
           key: ${{ runner.os }}-${{ github.run_id }}
@@ -337,14 +365,14 @@ jobs:
           echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
 
       - name: cache restore - GOCACHE
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.go-cache-paths.outputs.go-build }}
           key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
           enableCrossOsArchive: true
 
       - name: cache restore - GOMODCACHE
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.go-cache-paths.outputs.go-mod }}
           key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
@@ -354,7 +382,7 @@ jobs:
         run: make test
 
       - name: Upload coverage
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ runner.os }}-coverage.out
           path: ./coverage.out
@@ -376,21 +404,26 @@ jobs:
           - macos-15
           - windows-latest
     steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit # Audit network and disk activity
+
       - name: Check out code
         id: checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # need a full checkout for `git describe`
 
       - name: Setup Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: "./go.mod"
           check-latest: true
           cache: false
 
       - name: cache restore - build
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ./build
           key: ${{ runner.os }}-${{ github.run_id }}
@@ -403,14 +436,14 @@ jobs:
           echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
 
       - name: cache restore - GOCACHE
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.go-cache-paths.outputs.go-build }}
           key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
           enableCrossOsArchive: true
 
       - name: cache restore - GOMODCACHE
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.go-cache-paths.outputs.go-mod }}
           key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
@@ -435,7 +468,7 @@ jobs:
       - name: Download benchmark from main
         id: download-benchmark
         if: github.ref != 'refs/heads/main' && github.ref_type != 'tag'
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         continue-on-error: true
         with:
           name: ${{ runner.os }}-benchmark.txt
@@ -477,7 +510,7 @@ jobs:
           echo "::notice::Skipping benchmark comparison - no baseline found on main branch. This is expected for new benchmarks."
 
       - name: Save benchmark results
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ runner.os }}-benchmark.txt
           path: ./benchmark.txt
@@ -504,8 +537,13 @@ jobs:
       - version_baseline # version_baseline implies build_linux
       - build # need the other builds too
     steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit # Audit network and disk activity
+
       - name: cache restore build output
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ./build
           key: ${{ runner.os }}-${{ github.run_id }}
@@ -568,6 +606,11 @@ jobs:
       - version_baseline # version_baseline implies build_linux
       - build # need the other builds too
     steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit # Audit network and disk activity
+
       - name: OS Info
         run: |
           echo uname:
@@ -596,7 +639,7 @@ jobs:
           fi
 
       - name: cache restore build output
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ./build
           key: ${{ runner.os }}-${{ github.run_id }}
@@ -648,8 +691,13 @@ jobs:
       - exec_testing
       - container_exec_testing
     steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit # Audit network and disk activity
+
       - name: cache restore build output
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ./build
           key: ${{ matrix.artifactos }}-${{ github.run_id }}
@@ -657,7 +705,7 @@ jobs:
           enableCrossOsArchive: true
 
       - name: Upload Build
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ matrix.artifactos }}-build
           path: build/
@@ -683,8 +731,13 @@ jobs:
       - build
       - build_linux
     steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit # Audit network and disk activity
+
       - name: cache restore build output
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ./build
           key: ${{ runner.os }}-${{ github.run_id }}
@@ -699,7 +752,7 @@ jobs:
           "$launcher_bin" specs --output "launcher-specs-${RUNNER_OS}.json"
 
       - name: Upload table schema
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: schema-${{ runner.os }}
           path: launcher-specs-${{ runner.os }}.json
@@ -716,8 +769,13 @@ jobs:
       # Reuse the Linux launcher binary built by build_linux rather than
       # rebuilding from source -- the merge logic is platform-independent, so the
       # cached binary does the combine without a checkout, Go toolchain, or deps.
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit # Audit network and disk activity
+
       - name: cache restore build output
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ./build
           key: ${{ runner.os }}-${{ github.run_id }}
@@ -725,7 +783,7 @@ jobs:
           enableCrossOsArchive: true
 
       - name: Download platform schemas
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: schema-*
           path: schemas
@@ -747,7 +805,7 @@ jobs:
             "${schema_files[@]}"
 
       - name: Upload combined schema
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: launcher-schema
           path: launcher-schema.json
@@ -790,11 +848,16 @@ jobs:
           - macos-15
           - windows-latest
     steps:
-      - uses: actions/checkout@v7
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit # Audit network and disk activity
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # need a full checkout for `git describe`
 
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: "./go.mod"
           check-latest: true
@@ -808,13 +871,13 @@ jobs:
           echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
 
       - name: Go Build Cache
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.go-cache-paths.outputs.go-build }}
           key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
 
       - name: Go Mod Cache
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.go-cache-paths.outputs.go-mod }}
           key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
@@ -850,6 +913,11 @@ jobs:
       contents: read
     runs-on: ubuntu-latest
     steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit # Audit network and disk activity
+
       - run: true
     needs:
       - build

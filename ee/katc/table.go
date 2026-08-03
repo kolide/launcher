@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/kolide/launcher/v2/ee/dataflatten"
 	"github.com/kolide/launcher/v2/ee/observability"
 	"github.com/kolide/launcher/v2/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
@@ -151,8 +152,18 @@ func (k *katcTable) generate(ctx context.Context, queryContext table.QueryContex
 	// constraint so callers can filter to a path with WHERE query = 'a/b/*'.
 	// Defaults to "*" (match everything) when no constraint is supplied.
 	var dataQueries []string
+	var prefilter *dataflatten.Prefilter
 	if k.dataFlatten {
 		dataQueries = tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*"))
+		var err error
+		prefilter, err = dataflattentable.ExtractPrefilterFromQuery(queryContext)
+		if err != nil {
+			k.slogger.Log(ctx, slog.LevelWarn,
+				"could not extract prefilter",
+				"err", err,
+			)
+			return nil, fmt.Errorf("extracting prefilter from query context: %w", err)
+		}
 	}
 
 	// Process data
@@ -196,12 +207,13 @@ func (k *katcTable) generate(ctx context.Context, queryContext table.QueryContex
 			for _, dataRawRow := range rowBatch {
 				if k.dataFlatten {
 					for _, dataQuery := range dataQueries {
-						flatRows, err := flattenRow(k.slogger, dataRawRow, s.path, dataQuery)
+						flatRows, err := flattenRow(k.slogger, dataRawRow, s.path, dataQuery, prefilter)
 						if err != nil {
 							k.slogger.Log(ctx, slog.LevelWarn,
 								"flattening row",
 								"path", s.path,
 								"query", dataQuery,
+								"prefilter", prefilter.Expr(),
 								"err", err,
 							)
 							continue

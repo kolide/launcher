@@ -10,6 +10,7 @@ package ioreg
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"strings"
 
@@ -66,6 +67,15 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		tablehelpers.WithSlogger(t.slogger),
 	}
 
+	prefilter, err := dataflattentable.ExtractPrefilterFromQuery(queryContext)
+	if err != nil {
+		t.slogger.Log(ctx, slog.LevelWarn,
+			"could not extract prefilter",
+			"err", err,
+		)
+		return nil, fmt.Errorf("extracting prefilter from query context: %w", err)
+	}
+
 	for _, ioC := range tablehelpers.GetConstraints(queryContext, "c", gcOpts...) {
 		// We always need "-a", it's the "archive" output
 		ioregArgs := []string{"-a"}
@@ -119,7 +129,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 									continue
 								}
 
-								flatData, err := t.flattenOutput(dataQuery, ioregOutput)
+								flatData, err := t.flattenOutput(dataQuery, prefilter, ioregOutput)
 								if err != nil {
 									t.slogger.Log(ctx, slog.LevelInfo,
 										"flatten failed",
@@ -137,7 +147,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 									"r": ioR,
 								}
 
-								results = append(results, dataflattentable.ToMap(flatData, dataQuery, rowData)...)
+								results = append(results, dataflattentable.ToMap(flatData, dataQuery, prefilter.Expr(), rowData)...)
 							}
 						}
 					}
@@ -149,11 +159,12 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	return results, nil
 }
 
-func (t *Table) flattenOutput(dataQuery string, systemOutput []byte) ([]dataflatten.Row, error) {
+func (t *Table) flattenOutput(dataQuery string, prefilter *dataflatten.Prefilter, systemOutput []byte) ([]dataflatten.Row, error) {
 	flattenOpts := []dataflatten.FlattenOpts{
 		dataflatten.WithSlogger(t.slogger),
 		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 	}
+	flattenOpts = append(flattenOpts, prefilter.Opts()...) // no-op if the prefilter doesn't exist
 
 	return dataflatten.Plist(systemOutput, flattenOpts...)
 }

@@ -5,6 +5,7 @@
     "key": "browser.contextual-services.contextId",
     "value": "{97961fa4-2a6a-470f-a916-45a3f51fc393}",
     "query": "*",
+    "prefilter": "",
     "path": "testdata/prefs3.js"
   }
 ]

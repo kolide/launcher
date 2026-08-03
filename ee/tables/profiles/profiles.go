@@ -69,12 +69,21 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	var results []map[string]string
 
+	prefilter, err := dataflattentable.ExtractPrefilterFromQuery(queryContext)
+	if err != nil {
+		t.slogger.Log(ctx, slog.LevelWarn,
+			"could not extract prefilter",
+			"err", err,
+		)
+		return nil, fmt.Errorf("extracting prefilter from query context: %w", err)
+	}
+
 	for _, command := range tablehelpers.GetConstraints(queryContext, "command", tablehelpers.WithAllowedValues(allowedCommands), tablehelpers.WithDefaults("show")) {
 		for _, profileType := range tablehelpers.GetConstraints(queryContext, "type", tablehelpers.WithAllowedCharacters(typeAllowedCharacters), tablehelpers.WithDefaults("")) {
 			for _, user := range tablehelpers.GetConstraints(queryContext, "user", tablehelpers.WithAllowedCharacters(userAllowedCharacters), tablehelpers.WithDefaults("_all")) {
 				for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 
-					rowData, err := t.generateProfile(ctx, command, profileType, user, dataQuery)
+					rowData, err := t.generateProfile(ctx, command, profileType, user, dataQuery, prefilter)
 					if err != nil {
 						t.slogger.Log(ctx, slog.LevelWarn,
 							"generating profile",
@@ -97,7 +106,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	return results, nil
 }
 
-func (t *Table) generateProfile(ctx context.Context, command string, profileType string, user string, dataQuery string) ([]map[string]string, error) {
+func (t *Table) generateProfile(ctx context.Context, command string, profileType string, user string, dataQuery string, prefilter *dataflatten.Prefilter) ([]map[string]string, error) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -156,6 +165,7 @@ func (t *Table) generateProfile(ctx context.Context, command string, profileType
 		dataflatten.WithSlogger(t.slogger),
 		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 	}
+	flattenOpts = append(flattenOpts, prefilter.Opts()...) // no-op if the prefilter doesn't exist
 
 	flatData, err := dataflatten.PlistFile(outputFile, flattenOpts...)
 	if err != nil {
@@ -172,5 +182,5 @@ func (t *Table) generateProfile(ctx context.Context, command string, profileType
 		"user":    user,
 	}
 
-	return dataflattentable.ToMap(flatData, dataQuery, rowData), nil
+	return dataflattentable.ToMap(flatData, dataQuery, prefilter.Expr(), rowData), nil
 }

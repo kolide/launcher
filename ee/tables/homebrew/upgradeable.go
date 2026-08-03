@@ -73,6 +73,15 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	uid := strconv.FormatUint(uint64(stat.Uid), 10)
 
+	prefilter, err := dataflattentable.ExtractPrefilterFromQuery(queryContext)
+	if err != nil {
+		t.slogger.Log(ctx, slog.LevelWarn,
+			"could not extract prefilter",
+			"err", err,
+		)
+		return nil, fmt.Errorf("extracting prefilter from query context: %w", err)
+	}
+
 	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 		// Brew can take a while to load the first time the command is ran, so leaving 60 seconds for the timeout here.
 		var output bytes.Buffer
@@ -93,6 +102,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 			dataflatten.WithSlogger(t.slogger),
 			dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 		}
+		flattenOpts = append(flattenOpts, prefilter.Opts()...) // no-op if the prefilter doesn't exist
 
 		flattened, err := dataflatten.Json(output.Bytes(), flattenOpts...)
 		if err != nil {
@@ -104,7 +114,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 			"uid": uid,
 		}
 
-		results = append(results, dataflattentable.ToMap(flattened, dataQuery, rowData)...)
+		results = append(results, dataflattentable.ToMap(flattened, dataQuery, prefilter.Expr(), rowData)...)
 	}
 
 	return results, nil

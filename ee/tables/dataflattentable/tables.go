@@ -146,22 +146,15 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		dataflatten.WithNestedPlist(),
 	}
 
-	var prefilterExpr string
-	if dataPrefilter := tablehelpers.GetConstraints(queryContext, "prefilter"); len(dataPrefilter) > 0 {
-		if len(dataPrefilter) > 1 {
-			return results, fmt.Errorf("The %s table allows for a maximum of 1 prefilter constraint", t.tableName)
-		}
-		prefilterExpr = dataPrefilter[0]
-		p, err := dataflatten.NewPrefilter(prefilterExpr)
-		if err != nil {
-			t.slogger.Log(ctx, slog.LevelWarn,
-				"could not initialize prefilter",
-				"err", err,
-			)
-			return results, fmt.Errorf("compiling prefilter: %w", err)
-		}
-		flattenOpts = append(flattenOpts, dataflatten.WithPrefilter(p))
+	prefilter, err := ExtractPrefilterFromQuery(queryContext)
+	if err != nil {
+		t.slogger.Log(ctx, slog.LevelWarn,
+			"could not extract prefilter",
+			"err", err,
+		)
+		return results, fmt.Errorf("extracting prefilter from query context: %w", err)
 	}
+	flattenOpts = append(flattenOpts, prefilter.Opts()...) // no-op if the prefilter doesn't exist
 
 	for _, requestedPath := range requestedPaths {
 
@@ -173,7 +166,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 		for _, filePath := range filePaths {
 			for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
-				subresults, err := t.generatePath(ctx, queryContext, filePath, dataQuery, prefilterExpr, append(flattenOpts, dataflatten.WithQuery(strings.Split(dataQuery, "/")))...)
+				subresults, err := t.generatePath(ctx, queryContext, filePath, dataQuery, prefilter.Expr(), append(flattenOpts, dataflatten.WithQuery(strings.Split(dataQuery, "/")))...)
 				if err != nil {
 					t.slogger.Log(ctx, slog.LevelInfo,
 						"failed to get data for path",
@@ -190,7 +183,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	for _, rawdata := range requestedRawDatas {
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
-			subresults, err := t.generateRawData(ctx, queryContext, rawdata, dataQuery, prefilterExpr, append(flattenOpts, dataflatten.WithQuery(strings.Split(dataQuery, "/")))...)
+			subresults, err := t.generateRawData(ctx, queryContext, rawdata, dataQuery, prefilter.Expr(), append(flattenOpts, dataflatten.WithQuery(strings.Split(dataQuery, "/")))...)
 			if err != nil {
 				t.slogger.Log(ctx, slog.LevelInfo,
 					"failed to generate for raw_data",
@@ -217,11 +210,10 @@ func (t *Table) generateRawData(ctx context.Context, qc table.QueryContext, rawd
 	}
 
 	rowData := map[string]string{
-		"raw_data":  rawdata,
-		"prefilter": prefilter,
+		"raw_data": rawdata,
 	}
 
-	return ToMap(data, dataQuery, rowData), nil
+	return ToMap(data, dataQuery, prefilter, rowData), nil
 }
 
 func (t *Table) generatePath(ctx context.Context, qc table.QueryContext, filePath string, dataQuery string, prefilter string, flattenOpts ...dataflatten.FlattenOpts) ([]map[string]string, error) {
@@ -245,9 +237,8 @@ func (t *Table) generatePath(ctx context.Context, qc table.QueryContext, filePat
 	}
 
 	rowData := map[string]string{
-		"path":      filePath,
-		"prefilter": prefilter,
+		"path": filePath,
 	}
 
-	return ToMap(data, dataQuery, rowData), nil
+	return ToMap(data, dataQuery, prefilter, rowData), nil
 }

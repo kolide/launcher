@@ -56,6 +56,7 @@ func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsque
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_wsone_uem_status_dependency", json.Parser, allowedcmd.Ws1HubUtil, []string{"status", "--dependency"}),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_wsone_uem_status_profile", json.Parser, allowedcmd.Ws1HubUtil, []string{"status", "--profile"}),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_falconctl_systags", simple_array.New("systags"), allowedcmd.Falconctl, []string{"-g", "--systags"}),
+		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_apt_phased_updates", apt.Parser, allowedcmd.Apt, []string{"list", "'?phasing'"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_apt_upgradeable", apt.Parser, allowedcmd.Apt, []string{"list", "--upgradeable"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_dnf_upgradeable", dnf.Parser, allowedcmd.Dnf, []string{"check-update"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_dpkg_version_info", dpkg.Parser, allowedcmd.Dpkg, []string{"-p"}, dataflattentable.WithIncludeStderr()),

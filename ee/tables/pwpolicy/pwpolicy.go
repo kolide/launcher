@@ -57,6 +57,15 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	var results []map[string]string
 
+	prefilter, err := dataflattentable.ExtractPrefilterFromQuery(queryContext)
+	if err != nil {
+		t.slogger.Log(ctx, slog.LevelWarn,
+			"could not extract prefilter",
+			"err", err,
+		)
+		return nil, fmt.Errorf("extracting prefilter from query context: %w", err)
+	}
+
 	for _, pwpolicyUsername := range tablehelpers.GetConstraints(queryContext, "username", tablehelpers.WithDefaults("")) {
 		pwpolicyArgs := []string{pwpolicyCmd}
 
@@ -78,6 +87,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 				dataflatten.WithSlogger(t.slogger),
 				dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 			}
+			flattenOpts = append(flattenOpts, prefilter.Opts()...) // no-op if the prefilter doesn't exist
 
 			flatData, err := dataflatten.Plist(pwPolicyOutput, flattenOpts...)
 			if err != nil {
@@ -92,7 +102,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 				"username": pwpolicyUsername,
 			}
 
-			results = append(results, dataflattentable.ToMap(flatData, dataQuery, rowData)...)
+			results = append(results, dataflattentable.ToMap(flatData, dataQuery, prefilter.Expr(), rowData)...)
 		}
 	}
 

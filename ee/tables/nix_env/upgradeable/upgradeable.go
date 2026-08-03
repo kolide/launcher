@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
 
@@ -47,6 +48,15 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	var results []map[string]string
 
+	prefilter, err := dataflattentable.ExtractPrefilterFromQuery(queryContext)
+	if err != nil {
+		t.slogger.Log(ctx, slog.LevelWarn,
+			"could not extract prefilter",
+			"err", err,
+		)
+		return nil, fmt.Errorf("extracting prefilter from query context: %w", err)
+	}
+
 	uids := tablehelpers.GetConstraints(queryContext, "uid", tablehelpers.WithAllowedCharacters(allowedCharacters))
 	if len(uids) < 1 {
 		return results, errors.New("kolide_nix_upgradeable requires at least one user id to be specified")
@@ -66,6 +76,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 				dataflatten.WithSlogger(t.slogger),
 				dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 			}
+			flattenOpts = append(flattenOpts, prefilter.Opts()...) // no-op if the prefilter doesn't exist
 
 			flattened, err := dataflatten.Xml(output.Bytes(), flattenOpts...)
 			if err != nil {
@@ -77,7 +88,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 				"uid": uid,
 			}
 
-			results = append(results, dataflattentable.ToMap(flattened, dataQuery, rowData)...)
+			results = append(results, dataflattentable.ToMap(flattened, dataQuery, prefilter.Expr(), rowData)...)
 		}
 	}
 

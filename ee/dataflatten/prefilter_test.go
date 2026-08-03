@@ -61,6 +61,36 @@ func TestNewPrefilter(t *testing.T) {
 	}
 }
 
+func TestPrefilterExpr(t *testing.T) {
+	t.Parallel()
+
+	// Test nil case first
+	var p *Prefilter
+	require.Equal(t, "", p.Expr())
+
+	expectedExpr := `has(this.type) && this.type == "user" ? {
+  ?"timestamp": this.?timestamp
+} : {}`
+	p, err := NewPrefilter(expectedExpr)
+	require.NoError(t, err)
+	require.Equal(t, expectedExpr, p.Expr())
+}
+
+func TestPrefilterOpts(t *testing.T) {
+	t.Parallel()
+
+	// Test nil case first
+	var p *Prefilter
+	require.Nil(t, p.Opts())
+
+	p, err := NewPrefilter(`has(this.type) && this.type == "user" ? {
+  ?"timestamp": this.?timestamp
+} : {}`)
+	require.NoError(t, err)
+	gotOpts := p.Opts()
+	require.Equal(t, 1, len(gotOpts))
+}
+
 func TestApply(t *testing.T) {
 	t.Parallel()
 

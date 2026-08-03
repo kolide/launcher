@@ -1,0 +1,5 @@
+package-id: com.example.pkg
+file-length: 123
+files:
+/usr/bin/foo
+install-time: 1700000000

@@ -59,6 +59,16 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	var results []map[string]string
 
+	// Prefilter applies to all paths, so grab that first
+	prefilter, err := dataflattentable.ExtractPrefilterFromQuery(queryContext)
+	if err != nil {
+		t.slogger.Log(ctx, slog.LevelWarn,
+			"could not extract prefilter",
+			"err", err,
+		)
+		return nil, fmt.Errorf("extracting prefilter from query context: %w", err)
+	}
+
 	filePaths := tablehelpers.GetConstraints(queryContext, "path")
 
 	if len(filePaths) == 0 {
@@ -73,6 +83,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 			flattenOpts := []dataflatten.FlattenOpts{
 				dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 			}
+			flattenOpts = append(flattenOpts, prefilter.Opts()...) // no-op if the prefilter doesn't exist
 
 			rawKeyVals, err := parsePreferences(filePath)
 			if err != nil {
@@ -95,7 +106,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 			}
 
 			rowData := map[string]string{"path": filePath}
-			results = append(results, dataflattentable.ToMap(flatData, dataQuery, rowData)...)
+			results = append(results, dataflattentable.ToMap(flatData, dataQuery, prefilter.Expr(), rowData)...)
 		}
 	}
 

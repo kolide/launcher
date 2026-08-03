@@ -12,6 +12,7 @@ import (
 )
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"strings"
 
@@ -49,12 +50,27 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	ctx, span := observability.StartSpan(ctx, "table_name", "kolide_macos_recommended_updates")
 	defer span.End()
 
+	prefilter, err := dataflattentable.ExtractPrefilterFromQuery(queryContext)
+	if err != nil {
+		t.slogger.Log(ctx, slog.LevelWarn,
+			"could not extract prefilter",
+			"err", err,
+		)
+		return nil, fmt.Errorf("extracting prefilter from query context: %w", err)
+	}
+
 	var results []map[string]string
 
 	data := getUpdates(ctx)
 
 	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
-		flattened, err := dataflatten.Flatten(data, dataflatten.WithSlogger(t.slogger), dataflatten.WithQuery(strings.Split(dataQuery, "/")))
+		flattenOpts := []dataflatten.FlattenOpts{
+			dataflatten.WithSlogger(t.slogger),
+			dataflatten.WithQuery(strings.Split(dataQuery, "/")),
+		}
+		flattenOpts = append(flattenOpts, prefilter.Opts()...) // no-op if the prefilter doesn't exist
+
+		flattened, err := dataflatten.Flatten(data, flattenOpts...)
 		if err != nil {
 			t.slogger.Log(ctx, slog.LevelInfo,
 				"error flattening data",
@@ -62,7 +78,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 			)
 			return nil, nil
 		}
-		results = append(results, dataflattentable.ToMap(flattened, dataQuery, nil)...)
+		results = append(results, dataflattentable.ToMap(flattened, dataQuery, prefilter.Expr(), nil)...)
 	}
 
 	return results, nil

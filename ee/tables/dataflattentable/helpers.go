@@ -1,15 +1,18 @@
 package dataflattentable
 
 import (
+	"fmt"
 	"maps"
+	"strings"
 
 	"github.com/kolide/launcher/v2/ee/dataflatten"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
 // ToMap is a helper function to convert Flatten output directly for
 // consumption by osquery tables.
-func ToMap(rows []dataflatten.Row, query string, rowData map[string]string) []map[string]string {
+func ToMap(rows []dataflatten.Row, query string, prefilter string, rowData map[string]string) []map[string]string {
 	results := make([]map[string]string, len(rows))
 
 	for i, row := range rows {
@@ -23,6 +26,7 @@ func ToMap(rows []dataflatten.Row, query string, rowData map[string]string) []ma
 		res["key"] = k
 		res["value"] = row.Value
 		res["query"] = query
+		res["prefilter"] = prefilter
 
 		results[i] = res
 	}
@@ -44,4 +48,27 @@ func Columns(additional ...table.ColumnDefinition) []table.ColumnDefinition {
 	}
 
 	return append(columns, additional...)
+}
+
+// ExtractPrefilterFromQuery retrieves and compiles the CEL given in the queryContext,
+// if one is available. The returned value is safe to use regardless of whether the
+// prefilter exists -- it is safe to call Expr() and Opts() on a nil prefilter.
+func ExtractPrefilterFromQuery(queryContext table.QueryContext) (*dataflatten.Prefilter, error) {
+	dataPrefilter := tablehelpers.GetConstraints(queryContext, "prefilter")
+	if len(dataPrefilter) == 0 {
+		return nil, nil
+	}
+	if len(dataPrefilter) > 1 {
+		return nil, fmt.Errorf("got %d prefilter constraints, expected only 1", len(dataPrefilter))
+	}
+	prefilterExpr := dataPrefilter[0]
+	if strings.TrimSpace(prefilterExpr) == "" {
+		return nil, nil
+	}
+	p, err := dataflatten.NewPrefilter(prefilterExpr)
+	if err != nil {
+		return nil, fmt.Errorf("creating prefilter: %w", err)
+	}
+
+	return p, nil
 }

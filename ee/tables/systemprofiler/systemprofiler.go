@@ -109,6 +109,15 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	ctx, span := observability.StartSpan(ctx, "table_name", "kolide_system_profiler")
 	defer span.End()
 
+	prefilter, err := dataflattentable.ExtractPrefilterFromQuery(queryContext)
+	if err != nil {
+		t.slogger.Log(ctx, slog.LevelWarn,
+			"could not extract prefilter",
+			"err", err,
+		)
+		return nil, fmt.Errorf("extracting prefilter from query context: %w", err)
+	}
+
 	var results []map[string]string
 
 	requestedDatatypes := tablehelpers.GetConstraints(queryContext, "datatype",
@@ -150,16 +159,16 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	if q, ok := queryContext.Constraints["query"]; ok && len(q.Constraints) != 0 {
 		for _, constraint := range q.Constraints {
 			dataQuery := constraint.Expression
-			results = append(results, t.getRowsFromOutput(ctx, dataQuery, detailLevel, systemProfilerOutput)...)
+			results = append(results, t.getRowsFromOutput(ctx, dataQuery, prefilter, detailLevel, systemProfilerOutput)...)
 		}
 	} else {
-		results = append(results, t.getRowsFromOutput(ctx, "", detailLevel, systemProfilerOutput)...)
+		results = append(results, t.getRowsFromOutput(ctx, "", prefilter, detailLevel, systemProfilerOutput)...)
 	}
 
 	return results, nil
 }
 
-func (t *Table) getRowsFromOutput(ctx context.Context, dataQuery, detailLevel string, systemProfilerOutput []byte) []map[string]string {
+func (t *Table) getRowsFromOutput(ctx context.Context, dataQuery string, prefilter *dataflatten.Prefilter, detailLevel string, systemProfilerOutput []byte) []map[string]string {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -169,6 +178,7 @@ func (t *Table) getRowsFromOutput(ctx context.Context, dataQuery, detailLevel st
 		dataflatten.WithSlogger(t.slogger),
 		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 	}
+	flattenOpts = append(flattenOpts, prefilter.Opts()...) // no-op if the prefilter doesn't exist
 
 	var systemProfilerResults []Result
 	if err := plist.Unmarshal(systemProfilerOutput, &systemProfilerResults); err != nil {
@@ -198,7 +208,7 @@ func (t *Table) getRowsFromOutput(ctx context.Context, dataQuery, detailLevel st
 			"detaillevel":    detailLevel,
 		}
 
-		results = append(results, dataflattentable.ToMap(flatData, dataQuery, rowData)...)
+		results = append(results, dataflattentable.ToMap(flatData, dataQuery, prefilter.Expr(), rowData)...)
 	}
 
 	return results
