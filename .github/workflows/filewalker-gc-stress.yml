@@ -62,6 +62,67 @@ jobs:
           check-latest: false
           cache: false
 
+      # No GODEBUG here on purpose: this reports the raw hardware view.
+      - name: Host and CPU info
+        shell: bash
+        env:
+          MATRIX_OS: ${{ matrix.os }}
+          VARIANT_NAME: ${{ matrix.variant.name }}
+        run: |
+          echo "=== runner env ==="
+          echo "COMPUTERNAME=${COMPUTERNAME:-} RUNNER_NAME=${RUNNER_NAME:-}"
+          echo "ImageOS=${ImageOS:-} ImageVersion=${ImageVersion:-}"
+          echo "PROCESSOR_IDENTIFIER=${PROCESSOR_IDENTIFIER:-} PROCESSOR_REVISION=${PROCESSOR_REVISION:-} NUMBER_OF_PROCESSORS=${NUMBER_OF_PROCESSORS:-}"
+
+          echo "=== CPU (CIM) ==="
+          powershell -NoProfile -Command "Get-CimInstance Win32_Processor | Format-List Name,Manufacturer,Description,Family,Stepping,NumberOfCores,NumberOfLogicalProcessors,MaxClockSpeed,L2CacheSize,L3CacheSize,ProcessorId" || true
+
+          echo "=== CPU (registry, incl. microcode Update Revision) ==="
+          reg query "HKLM\\HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0" || true
+
+          echo "=== OS build ==="
+          powershell -NoProfile -Command "Get-CimInstance Win32_OperatingSystem | Format-List Caption,Version,BuildNumber,OSArchitecture" || true
+          powershell -NoProfile -Command "Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' | Format-List DisplayVersion,CurrentBuildNumber,UBR" || true
+
+          echo "=== system / hypervisor / BIOS ==="
+          powershell -NoProfile -Command "Get-CimInstance Win32_ComputerSystem | Format-List Manufacturer,Model,TotalPhysicalMemory,NumberOfProcessors,HypervisorPresent" || true
+          powershell -NoProfile -Command "Get-CimInstance Win32_BIOS | Format-List Manufacturer,SMBIOSBIOSVersion,ReleaseDate" || true
+
+          echo "=== Azure IMDS (VM SKU) ==="
+          curl -s --connect-timeout 5 -H "Metadata:true" "http://169.254.169.254/metadata/instance/compute?api-version=2021-02-01" || echo "IMDS unavailable"
+          echo ""
+
+          echo "=== CPUID feature flags (golang.org/x/sys/cpu) ==="
+          mkdir -p gcstress-cpuinfo
+          cat > gcstress-cpuinfo/main.go <<'EOF'
+          package main
+
+          import (
+          	"fmt"
+          	"reflect"
+
+          	"golang.org/x/sys/cpu"
+          )
+
+          func main() {
+          	v := reflect.ValueOf(cpu.X86)
+          	t := v.Type()
+          	for i := 0; i < t.NumField(); i++ {
+          		if t.Field(i).Type.Kind() == reflect.Bool {
+          			fmt.Printf("%s=%v\n", t.Field(i).Name, v.Field(i).Bool())
+          		}
+          	}
+          }
+          EOF
+          go run ./gcstress-cpuinfo | tee cpuflags.txt || true
+          rm -rf gcstress-cpuinfo
+
+          cpu_name=$(powershell -NoProfile -Command "(Get-CimInstance Win32_Processor).Name" | tr -d '\r' || true)
+          microcode=$(reg query "HKLM\\HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0" /v "Update Revision" 2>/dev/null | awk '/Update Revision/ {print $NF}' || true)
+          vm_size=$(curl -s --connect-timeout 5 -H "Metadata:true" "http://169.254.169.254/metadata/instance/compute/vmSize?api-version=2021-02-01&format=text" || echo "unknown")
+          avx512=$(grep "AVX512" cpuflags.txt | sed 's/^Has//;s/=true/:1/;s/=false/:0/' | paste -sd' ' - || true)
+          echo "**${MATRIX_OS} / ${VARIANT_NAME}**: ${cpu_name} | ucode ${microcode:-?} | ${vm_size} | AVX512 ${avx512}" | tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: Compile test binary
         shell: bash
         env:
