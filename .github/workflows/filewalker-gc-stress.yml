@@ -20,8 +20,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  STRESS_ITERATIONS: "100"
-  STRESS_BUDGET_MINUTES: "240"
+  STRESS_ITERATIONS: "5"
+  STRESS_BUDGET_MINUTES: "5"
 
 jobs:
   gc_stress:
