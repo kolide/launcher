@@ -2,12 +2,16 @@ name: filewalker-gc-stress
 
 # Stress-loops the ee/filewalker tests on Windows runners to reproduce rare
 # GC-integrity fatal errors seen in CI.
-# Variants for GC are included, per Claude:
-#   stock      -- default build (Green Tea GC on; the crashing config)
-#   nogreentea -- built with GOEXPERIMENT=nogreenteagc
-#   noavx512   -- stock build, run with GODEBUG disabling the AVX-512 features
-#                 gating Green Tea's span-scan path (VL/BW/DQ; avx512f is not
-#                 part of the gate and GODEBUG cpu toggles don't cascade)
+#
+# Findings so far: failures correlate with one host type -- Intel Xeon
+# Platinum 8573C (Emerald Rapids, AMX-capable) on Standard_D4ds_v6 -- and
+# reproduce with the Green Tea GC disabled, so GC variant and AVX-512 are
+# exonerated. Current suspect: Go async preemption (SuspendThread /
+# Get/SetThreadContext) mishandling extended CPU state on AMX hosts.
+# Variants:
+#   stock          -- default build and runtime config (the crashing config)
+#   asyncpreemptoff -- GODEBUG=asyncpreemptoff=1 at run time; if this passes
+#                      on an 8573C host, async preemption is implicated
 
 on:
   pull_request:
@@ -38,14 +42,9 @@ jobs:
           - windows-2025
         variant:
           - name: stock
-            goexperiment: ""
             godebug: ""
-          - name: nogreentea
-            goexperiment: "nogreenteagc"
-            godebug: ""
-          - name: noavx512
-            goexperiment: ""
-            godebug: "cpu.avx512vl=off,cpu.avx512bw=off,cpu.avx512dq=off"
+          - name: asyncpreemptoff
+            godebug: "asyncpreemptoff=1"
     steps:
       - name: Harden runner
         uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
@@ -118,15 +117,15 @@ jobs:
           rm -rf gcstress-cpuinfo
 
           cpu_name=$(powershell -NoProfile -Command "(Get-CimInstance Win32_Processor).Name" | tr -d '\r' || true)
-          microcode=$(reg query "HKLM\\HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0" /v "Update Revision" 2>/dev/null | awk '/Update Revision/ {print $NF}' || true)
+          # No /v flag: Git Bash's MSYS path conversion mangles it into a file path.
+          # $1/$2 match excludes the "Previous Update Revision" line.
+          microcode=$(reg query "HKLM\\HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0" 2>/dev/null | awk '$1=="Update" && $2=="Revision" {print $NF}' | tr -d '\r' || true)
           vm_size=$(curl -s --connect-timeout 5 -H "Metadata:true" "http://169.254.169.254/metadata/instance/compute/vmSize?api-version=2021-02-01&format=text" || echo "unknown")
           avx512=$(grep "AVX512" cpuflags.txt | sed 's/^Has//;s/=true/:1/;s/=false/:0/' | paste -sd' ' - || true)
           echo "**${MATRIX_OS} / ${VARIANT_NAME}**: ${cpu_name} | ucode ${microcode:-?} | ${vm_size} | AVX512 ${avx512}" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Compile test binary
         shell: bash
-        env:
-          GOEXPERIMENT: ${{ matrix.variant.goexperiment }}
         run: |
           go version
           go test -c -race -cover -o filewalker.test.exe ./ee/filewalker/
