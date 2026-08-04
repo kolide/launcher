@@ -65,7 +65,7 @@ func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsque
 
 	keychainAclsTable := osquery_user_exec_table.TablePlugin(
 		k, slogger, "kolide_keychain_acls",
-		currentOsquerydBinaryPath, keychainItemsQuery,
+		currentOsquerydBinaryPath, keychainAclsQuery,
 		[]table.ColumnDefinition{
 			table.TextColumn("keychain_path"),
 			table.TextColumn("authorizations"),
@@ -78,7 +78,7 @@ func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsque
 
 	keychainItemsTable := osquery_user_exec_table.TablePlugin(
 		k, slogger, "kolide_keychain_items",
-		currentOsquerydBinaryPath, keychainAclsQuery,
+		currentOsquerydBinaryPath, keychainItemsQuery,
 		[]table.ColumnDefinition{
 			table.TextColumn("label"),
 			table.TextColumn("description"),
