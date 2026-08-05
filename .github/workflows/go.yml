@@ -46,11 +46,14 @@ jobs:
           oidc-service-slug: 'ga-kolide-launcher'
 
       - name: Configure GOPROXY
-        # For now, we only use Cloudsmith on builds we're going to distribute: refs/head/main for nightly builds, and 'tag' for stable builds
+        # For now, we only use Cloudsmith on builds we're going to distribute: refs/head/main for nightly builds, and 'tag' for stable builds.
+        # cloudsmith-cli-action should mask the API key, but we add additional masks just to be safe.
         if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
         shell: bash
         run: |
-          goproxy="https://token:${CLOUDSMITH_API_KEY}@golang.cloudsmith.io/1password/op-golang/"
+          echo "::add-mask::${CLOUDSMITH_API_KEY}"
+          [ -z "${CLOUDSMITH_API_KEY:-}" ] && exit 1
+          goproxy="https://${CLOUDSMITH_USERNAME}:${CLOUDSMITH_API_KEY}@golang.cloudsmith.io/1password/op-golang/"
           echo "::add-mask::$goproxy"
           echo "GOPROXY=$goproxy" >> "$GITHUB_ENV"
 
@@ -164,11 +167,14 @@ jobs:
           oidc-service-slug: 'ga-kolide-launcher'
 
       - name: Configure GOPROXY
-        # For now, we only use Cloudsmith on builds we're going to distribute: refs/head/main for nightly builds, and 'tag' for stable builds
+        # For now, we only use Cloudsmith on builds we're going to distribute: refs/head/main for nightly builds, and 'tag' for stable builds.
+        # cloudsmith-cli-action should mask the API key, but we add additional masks just to be safe.
         if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
         shell: bash
         run: |
-          goproxy="https://token:${CLOUDSMITH_API_KEY}@golang.cloudsmith.io/1password/op-golang/"
+          echo "::add-mask::${CLOUDSMITH_API_KEY}"
+          [ -z "${CLOUDSMITH_API_KEY:-}" ] && exit 1
+          goproxy="https://${CLOUDSMITH_USERNAME}:${CLOUDSMITH_API_KEY}@golang.cloudsmith.io/1password/op-golang/"
           echo "::add-mask::$goproxy"
           echo "GOPROXY=$goproxy" >> "$GITHUB_ENV"
 
