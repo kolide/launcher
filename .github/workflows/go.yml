@@ -36,6 +36,24 @@ jobs:
         with:
           egress-policy: audit # Audit network and disk activity
 
+      - name: Setup Cloudsmith CLI # Exports CLOUDSMITH_API_KEY
+        uses: step-security/cloudsmith-cli-action@dd1da513017145043c2d29a38b3b85c2b609b5ad # v2.0.3
+        # For now, we only use Cloudsmith on builds we're going to distribute: refs/head/main for nightly builds, and 'tag' for stable builds
+        if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
+        with:
+          oidc-auth-only: 'true' # Just the auth, don't need the CLI installed in CI
+          oidc-namespace: '1password'
+          oidc-service-slug: 'ga-kolide-launcher'
+
+      - name: Configure GOPROXY
+        # For now, we only use Cloudsmith on builds we're going to distribute: refs/head/main for nightly builds, and 'tag' for stable builds
+        if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
+        shell: bash
+        run: |
+          goproxy="https://token:${CLOUDSMITH_API_KEY}@golang.cloudsmith.io/1password/op-golang/"
+          echo "::add-mask::$goproxy"
+          echo "GOPROXY=$goproxy" >> "$GITHUB_ENV"
+
       - name: Check out code
         id: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -68,15 +86,6 @@ jobs:
         with:
           path: ${{ steps.go-cache-paths.outputs.go-mod }}
           key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
-
-      - name: Setup Cloudsmith CLI # Exports CLOUDSMITH_API_KEY
-        uses: step-security/cloudsmith-cli-action@dd1da513017145043c2d29a38b3b85c2b609b5ad # v2.0.3
-        # For now, we only use Cloudsmith on builds we're going to distribute: refs/head/main for nightly builds, and 'tag' for stable builds
-        if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
-        with:
-          oidc-auth-only: 'true' # Just the auth, don't need the CLI installed in CI
-          oidc-namespace: '1password'
-          oidc-service-slug: 'ga-kolide-launcher'
 
       - name: Get dependencies
         run: make deps
@@ -145,6 +154,24 @@ jobs:
         with:
           egress-policy: audit # Audit network and disk activity
 
+      - name: Setup Cloudsmith CLI # Exports CLOUDSMITH_API_KEY
+        uses: step-security/cloudsmith-cli-action@dd1da513017145043c2d29a38b3b85c2b609b5ad # v2.0.3
+        # For now, we only use Cloudsmith on builds we're going to distribute: refs/head/main for nightly builds, and 'tag' for stable builds
+        if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
+        with:
+          oidc-auth-only: 'true' # Just the auth, don't need the CLI installed in CI
+          oidc-namespace: '1password'
+          oidc-service-slug: 'ga-kolide-launcher'
+
+      - name: Configure GOPROXY
+        # For now, we only use Cloudsmith on builds we're going to distribute: refs/head/main for nightly builds, and 'tag' for stable builds
+        if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
+        shell: bash
+        run: |
+          goproxy="https://token:${CLOUDSMITH_API_KEY}@golang.cloudsmith.io/1password/op-golang/"
+          echo "::add-mask::$goproxy"
+          echo "GOPROXY=$goproxy" >> "$GITHUB_ENV"
+
       - name: Install build dependencies
         run: |
           apt-get -y update
@@ -184,15 +211,6 @@ jobs:
         with:
           path: ${{ steps.go-cache-paths.outputs.go-mod }}
           key: ${{ runner.os }}-go-mod-${{ hashFiles('go.sum') }}
-
-      - name: Setup Cloudsmith CLI # Exports CLOUDSMITH_API_KEY
-        uses: step-security/cloudsmith-cli-action@dd1da513017145043c2d29a38b3b85c2b609b5ad # v2.0.3
-        # For now, we only use Cloudsmith on builds we're going to distribute: refs/head/main for nightly builds, and 'tag' for stable builds
-        if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
-        with:
-          oidc-auth-only: 'true' # Just the auth, don't need the CLI installed in CI
-          oidc-namespace: '1password'
-          oidc-service-slug: 'ga-kolide-launcher'
 
       - name: Get dependencies
         run: make deps
