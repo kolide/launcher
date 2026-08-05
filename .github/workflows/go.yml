@@ -71,9 +71,8 @@ jobs:
 
       - name: Setup Cloudsmith CLI # Exports CLOUDSMITH_API_KEY
         uses: step-security/cloudsmith-cli-action@dd1da513017145043c2d29a38b3b85c2b609b5ad # v2.0.3
-        # We only use Cloudsmith on builds we're going to distribute: refs/head/main for nightly builds, and 'tag' for stable builds
-        # TODO RM uncomment
-        # if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
+        # For now, we only use Cloudsmith on builds we're going to distribute: refs/head/main for nightly builds, and 'tag' for stable builds
+        if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
         with:
           oidc-auth-only: 'true' # Just the auth, don't need the CLI installed in CI
           oidc-namespace: '1password'
@@ -188,9 +187,8 @@ jobs:
 
       - name: Setup Cloudsmith CLI # Exports CLOUDSMITH_API_KEY
         uses: step-security/cloudsmith-cli-action@dd1da513017145043c2d29a38b3b85c2b609b5ad # v2.0.3
-        # We only use Cloudsmith on builds we're going to distribute: refs/head/main for nightly builds, and 'tag' for stable builds
-        # TODO RM uncomment
-        # if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
+        # For now, we only use Cloudsmith on builds we're going to distribute: refs/head/main for nightly builds, and 'tag' for stable builds
+        if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
         with:
           oidc-auth-only: 'true' # Just the auth, don't need the CLI installed in CI
           oidc-namespace: '1password'
