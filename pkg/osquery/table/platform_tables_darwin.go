@@ -33,7 +33,6 @@ import (
 	"github.com/kolide/launcher/v2/ee/tables/profiles"
 	"github.com/kolide/launcher/v2/ee/tables/pwpolicy"
 	"github.com/kolide/launcher/v2/ee/tables/security"
-	"github.com/kolide/launcher/v2/ee/tables/spotlight"
 	"github.com/kolide/launcher/v2/ee/tables/systemprofiler"
 	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/v2/ee/tables/zfs"
@@ -98,13 +97,10 @@ func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsque
 		brew_upgradeable.TablePlugin(k, slogger),
 		ChromeLoginKeychainInfo(k, slogger),
 		firmwarepasswd.TablePlugin(k, slogger),
-		GDriveSyncConfig(k, slogger),
-		GDriveSyncHistoryInfo(k, slogger),
 		MDMInfo(k, slogger),
 		macos_software_update.MacOSUpdate(k, slogger),
 		macos_software_update.RecommendedUpdates(k, slogger),
 		MachoInfo(k, slogger),
-		spotlight.TablePlugin(k, slogger),
 		TouchIDUserConfig(k, slogger),
 		TouchIDSystemConfig(k, slogger),
 		ioreg.TablePlugin(k, slogger),

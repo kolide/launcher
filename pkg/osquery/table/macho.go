@@ -4,6 +4,7 @@ import (
 	"context"
 	"debug/macho"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
 
@@ -34,19 +35,34 @@ func generateMacho(ctx context.Context, queryContext table.QueryContext) ([]map[
 		return nil, errors.New("The kolide_macho_info table requires that you specify a constraint WHERE path =")
 	}
 	path := q.Constraints[0].Expression
-	f, err := macho.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
 
-	var results []map[string]string
-	results = append(results, map[string]string{
+	f, thinErr := macho.Open(path)
+	if thinErr == nil {
+		defer f.Close()
+
+		return []map[string]string{machoResult(path, f.Cpu.String())}, nil
+	}
+
+	fatFile, err := macho.OpenFat(path)
+	if err != nil {
+		return nil, fmt.Errorf("opening Mach-O binary: %w", thinErr)
+	}
+	defer fatFile.Close()
+
+	results := make([]map[string]string, 0, len(fatFile.Arches))
+	for _, arch := range fatFile.Arches {
+		results = append(results, machoResult(path, arch.File.Cpu.String()))
+	}
+
+	return results, nil
+}
+
+func machoResult(path, cpu string) map[string]string {
+	return map[string]string{
 		"path": path,
 		"name": appFromPath(path),
-		"cpu":  f.Cpu.String(),
-	})
-	return results, nil
+		"cpu":  cpu,
+	}
 }
 
 func appFromPath(path string) string {
