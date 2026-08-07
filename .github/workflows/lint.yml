@@ -132,6 +132,27 @@ jobs:
         with:
           egress-policy: audit # Audit network and disk activity
 
+      - name: Setup Cloudsmith CLI # Exports CLOUDSMITH_API_KEY
+        uses: step-security/cloudsmith-cli-action@dd1da513017145043c2d29a38b3b85c2b609b5ad # v2.0.3
+        # We don't distribute the results of running table specs here, but we use Cloudsmith where we can (main and tags) nonetheless.
+        if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
+        with:
+          oidc-auth-only: 'true' # Just the auth, don't need the CLI installed in CI
+          oidc-namespace: '1password'
+          oidc-service-slug: 'ga-kolide-launcher'
+
+      - name: Configure GOPROXY
+        # We don't distribute the results of running table specs here, but we use Cloudsmith where we can (main and tags) nonetheless.
+        # cloudsmith-cli-action should mask the API key, but we add additional masks just to be safe.
+        if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
+        shell: bash
+        run: |
+          echo "::add-mask::${CLOUDSMITH_API_KEY}"
+          [ -z "${CLOUDSMITH_API_KEY:-}" ] && exit 1
+          goproxy="https://token:${CLOUDSMITH_API_KEY}@golang.cloudsmith.io/1password/op-golang/"
+          echo "::add-mask::$goproxy"
+          echo "GOPROXY=$goproxy" >> "$GITHUB_ENV"
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Go
