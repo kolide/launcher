@@ -28,10 +28,6 @@ func newSignalListener(sigChannel chan os.Signal, cancel context.CancelFunc, slo
 func (s *signalListener) Execute() error {
 	signal.Notify(s.sigChannel, os.Interrupt, syscall.SIGTERM)
 	sig := <-s.sigChannel
-	// tell sender in `os/signal` package to stop sending on `s.sigChannel`
-	// to avoid panics for sending on a closed channel
-	// after we close the signal channel in `Interrupt`
-	defer signal.Stop(s.sigChannel)
 	s.slogger.Log(context.TODO(), slog.LevelInfo,
 		"beginning shutdown via signal",
 		"signal_received", sig,
@@ -45,6 +41,9 @@ func (s *signalListener) Interrupt(_ error) {
 		return
 	}
 
+	// tell sender in `os/signal` package to stop sending on `s.sigChannel`
+	// to avoid panics for sending on a closed channel
+	signal.Stop(s.sigChannel)
 	s.cancel()
 	close(s.sigChannel)
 }
