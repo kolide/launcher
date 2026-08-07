@@ -51,6 +51,7 @@ jobs:
   govulncheck:
     permissions:
       contents: read
+      id-token: write # Required to create an OIDC token for Cloudsmith auth
     strategy:
       fail-fast: false
       matrix:
@@ -65,7 +66,7 @@ jobs:
 
       - name: Setup Cloudsmith CLI # Exports CLOUDSMITH_API_KEY
         uses: step-security/cloudsmith-cli-action@dd1da513017145043c2d29a38b3b85c2b609b5ad # v2.0.3
-        # For now, we only use Cloudsmith on builds we're going to distribute: refs/head/main for nightly builds, and 'tag' for stable builds
+        # We don't distribute any artifacts from this job, but we still use Cloudsmith where we can (main and tags).
         if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
         with:
           oidc-auth-only: 'true' # Just the auth, don't need the CLI installed in CI
@@ -73,7 +74,7 @@ jobs:
           oidc-service-slug: 'ga-kolide-launcher'
 
       - name: Configure GOPROXY
-        # For now, we only use Cloudsmith on builds we're going to distribute: refs/head/main for nightly builds, and 'tag' for stable builds.
+        # We don't distribute any artifacts from this job, but we still use Cloudsmith where we can (main and tags).
         # cloudsmith-cli-action should mask the API key, but we add additional masks just to be safe.
         if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
         shell: bash
@@ -120,6 +121,7 @@ jobs:
   table_specs:
     permissions:
       contents: read
+      id-token: write # Required to create an OIDC token for Cloudsmith auth
     strategy:
       fail-fast: false
       matrix:

@@ -872,6 +872,7 @@ jobs:
   package_builder_test:
     permissions:
       contents: read
+      id-token: write # Required to create an OIDC token for Cloudsmith auth
     name: package_builder
     runs-on: ${{ matrix.os }}
     strategy:
