@@ -18,7 +18,7 @@ import (
 	"github.com/kolide/launcher/v2/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
-	"github.com/kolide/launcher/v2/pkg/windows/windowsupdate"
+	"github.com/kolide/launcher/v2/ee/windowsupdate"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 

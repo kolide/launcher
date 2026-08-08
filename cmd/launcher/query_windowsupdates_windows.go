@@ -11,8 +11,8 @@ import (
 
 	comshim "github.com/NozomiNetworks/go-comshim"
 	"github.com/kolide/launcher/v2/ee/tables/windowsupdatetable"
+	"github.com/kolide/launcher/v2/ee/windowsupdate"
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
-	"github.com/kolide/launcher/v2/pkg/windows/windowsupdate"
 	"github.com/peterbourgon/ff/v3"
 )
 
