@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 	"strings"
 
 	"github.com/kolide/launcher/v2/ee/agent/types"
@@ -68,7 +69,7 @@ func machoResult(path, cpu string) map[string]string {
 }
 
 func appFromPath(path string) string {
-	parts := strings.SplitSeq(path, "/")
+	parts := strings.SplitSeq(filepath.ToSlash(path), "/")
 	for part := range parts {
 		if strings.HasSuffix(part, ".app") {
 			return part
