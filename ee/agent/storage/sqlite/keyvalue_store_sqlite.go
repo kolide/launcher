@@ -25,7 +25,8 @@ type storeName int
 const (
 	StartupSettingsStore storeName = iota
 	WatchdogLogStore     storeName = 1
-	busyTimeoutMs        int       = 10000 // 10 seconds
+
+	busyTimeoutMs int = 10000 // 10 seconds
 )
 
 var missingMigrationErrFormat = regexp.MustCompile(`no migration found for version \d+`)
@@ -180,7 +181,7 @@ func dbLocation(rootDirectory string) string {
 // when there's database contention.
 // See: https://sqlite.org/c3ref/busy_timeout.html
 func open(dbFilepath string) (*sql.DB, error) {
-	conn, err := sql.Open("sqlite", fmt.Sprintf("file://%s?_busy_timeout=%d", dbFilepath, busyTimeoutMs))
+	conn, err := sql.Open("sqlite", fmt.Sprintf("file:%s?_busy_timeout=%d", dbFilepath, busyTimeoutMs))
 	if err != nil {
 		return nil, fmt.Errorf("opening db: %w", err)
 	}
