@@ -41,6 +41,9 @@ func (s *signalListener) Interrupt(_ error) {
 		return
 	}
 
+	// tell sender in `os/signal` package to stop sending on `s.sigChannel`
+	// to avoid panics for sending on a closed channel
+	signal.Stop(s.sigChannel)
 	s.cancel()
 	close(s.sigChannel)
 }
