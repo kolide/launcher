@@ -146,6 +146,7 @@ func TestGetSet_Simultaneous(t *testing.T) {
 
 	queryCount := int64(100)
 	queryWait := semaphore.NewWeighted(queryCount)
+	queryErrors := make(chan error, queryCount)
 	for i := range queryCount {
 		queryWait.Acquire(t.Context(), 1)
 		go func(idx int) {
@@ -153,11 +154,14 @@ func TestGetSet_Simultaneous(t *testing.T) {
 			// Alternate between get and set operations so we test both reads and writes
 			if idx%2 == 0 {
 				flagVal := []byte(strconv.Itoa(idx))
-				require.NoError(t, s.Set(flagKey, flagVal), "expected no error setting kv pair")
+				if err := s.Set(flagKey, flagVal); err != nil {
+					queryErrors <- err
+				}
 				return
 			}
-			_, err := s.Get(flagKey)
-			require.NoError(t, err, "expected no error getting value")
+			if _, err := s.Get(flagKey); err != nil {
+				queryErrors <- err
+			}
 		}(int(i))
 	}
 
@@ -165,7 +169,17 @@ func TestGetSet_Simultaneous(t *testing.T) {
 	queryCtx, queryCancel := context.WithTimeout(t.Context(), time.Duration(busyTimeoutMs*1000000*5))
 	defer queryCancel()
 
-	require.NoError(t, queryWait.Acquire(queryCtx, queryCount), "timed out or errored waiting for simultaneous queries to complete")
+	// Confirm queries completed
+	require.NoError(t, queryWait.Acquire(queryCtx, queryCount), "timed out waiting for simultaneous queries to complete")
+
+	// Confirm no errors for queries
+	select {
+	case exampleErr := <-queryErrors:
+		t.Fatalf("got %d errors out of %d operations; example: %v", len(queryErrors), queryCount, exampleErr)
+	default:
+		// No errors
+	}
+	close(queryErrors)
 
 	require.NoError(t, s.Close())
 }
