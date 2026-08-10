@@ -103,29 +103,6 @@ Implementation: `runSpecs`, `runMergeSpecs`, `mergeSpecFile`, `readSpecs`,
 `schemaConflicts`, and `unionPlatforms` in `cmd/launcher/specs.go`; tests in
 `cmd/launcher/specs_test.go`.
 
-### Auditing table reliability
-
-Treat every schema entry as a customer-facing capability. Before adding a table
-to the published schema, record:
-
-- its owner, purpose, and any internal consumers;
-- the source-data prerequisite and required query constraints;
-- supported operating-system and application versions;
-- an expected successful result and a recommended replacement;
-- the date and environment of the latest real-device validation.
-
-Cover parsing and output shape with fixtures in CI, but do not treat a fixture
-test as proof that a third-party application's current storage format still
-works. Periodically run the published tables on real devices across supported
-platforms and current application versions. Classify an empty result without
-the prerequisite data as inconclusive, an error or malformed result as broken,
-and a duplicate capability as replaceable.
-
-Review the generated schema diff for every launcher release. New tables should
-not become customer-visible without an owner, fixture coverage, and real-device
-validation. Tables that fail this review should be removed from the runtime
-registry and schema after checking for and migrating internal consumers.
-
 ### CI: generate, combine, publish
 
 In `.github/workflows/go.yml`:
