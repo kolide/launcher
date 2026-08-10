@@ -74,7 +74,7 @@ func NewLocalizationConsumer(slogger *slog.Logger, kvStore types.KVStore) (*Loca
 		return nil, fmt.Errorf("failed to unmarshal localization data from store: %w", err)
 	}
 
-	maps.Copy(t.localizationData.Translations, localizationFromStore.Translations)
+	t.mergeTranslations(localizationFromStore.Translations)
 
 	// set the locale to the one from the store
 	t.localizationData.Locale = localizationFromStore.Locale
@@ -89,7 +89,7 @@ func (t *LocalizationConsumer) Update(data io.Reader) error {
 		return fmt.Errorf("failed to decode localization update: %w", err)
 	}
 
-	maps.Copy(t.localizationData.Translations, updatedLocalizationData.Translations)
+	t.mergeTranslations(updatedLocalizationData.Translations)
 	t.localizationData.Locale = updatedLocalizationData.Locale
 
 	// marshal updated localization data into a byte slice
@@ -104,6 +104,26 @@ func (t *LocalizationConsumer) Update(data io.Reader) error {
 	}
 
 	return nil
+}
+
+// mergeTranslations folds incoming per-locale translations into the current set,
+// section by section. The server only sends the sections it owns (e.g. the
+// notification "Learn More" label), so replacing a locale's whole entry would
+// blank out the datetime translations that ship in the embedded assets. Empty
+// incoming sections are left alone so the embedded values survive.
+func (t *LocalizationConsumer) mergeTranslations(incoming map[string]types.Translations) {
+	for locale, in := range incoming {
+		merged := t.localizationData.Translations[locale]
+
+		if in.Datetime != (types.Datetime{}) {
+			merged.Datetime = in.Datetime
+		}
+		if in.Notifications != (types.Notifications{}) {
+			merged.Notifications = in.Notifications
+		}
+
+		t.localizationData.Translations[locale] = merged
+	}
 }
 
 func (t *LocalizationConsumer) LocalizationData() types.LocalizationData {

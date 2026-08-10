@@ -92,3 +92,36 @@ func TestLocalizationConsumer(t *testing.T) {
 		})
 	}
 }
+
+// TestLocalizationConsumer_NotificationsOnlyUpdate covers the shape of update the
+// server actually sends: a single locale carrying only the notification action
+// label. The embedded datetime translations for that locale must survive.
+func TestLocalizationConsumer_NotificationsOnlyUpdate(t *testing.T) {
+	t.Parallel()
+
+	slogger := slog.Default()
+	store := inmemory.NewStore()
+
+	consumer, err := NewLocalizationConsumer(slogger, store)
+	require.NoError(t, err)
+
+	embeddedXMinutes := consumer.localizationData.Translations["es-ES"].Datetime.DistanceInWords.XMinutes.Other
+	require.NotEmpty(t, embeddedXMinutes, "es-ES asset should ship datetime translations")
+
+	update := []byte(`{"locale":"es-ES","translations":{"es-ES":{"notifications":{"actions":{"learn_more":"Más información"}}}}}`)
+	require.NoError(t, consumer.Update(bytes.NewReader(update)))
+
+	esES := consumer.localizationData.Translations["es-ES"]
+	require.Equal(t, "Más información", esES.Notifications.Actions.LearnMore)
+	require.Equal(t, embeddedXMinutes, esES.Datetime.DistanceInWords.XMinutes.Other,
+		"notifications-only update should not blank embedded datetime translations")
+
+	// a restart reads the merged data back out of the store, which must also
+	// preserve the embedded datetime translations
+	consumer, err = NewLocalizationConsumer(slogger, store)
+	require.NoError(t, err)
+
+	esES = consumer.localizationData.Translations["es-ES"]
+	require.Equal(t, "Más información", esES.Notifications.Actions.LearnMore)
+	require.Equal(t, embeddedXMinutes, esES.Datetime.DistanceInWords.XMinutes.Other)
+}
