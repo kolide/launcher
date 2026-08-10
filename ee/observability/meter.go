@@ -16,6 +16,7 @@ const (
 	// Custom units
 	unitRestart = "{restart}"
 	unitFailure = "{failure}"
+	unitQuery   = "{query}"
 
 	// Define our meter names and descriptions. All meter names should have "launcher." prepended.
 	goMemoryUsageGaugeName                       = "launcher.memory.golang"
@@ -48,6 +49,12 @@ const (
 	windowsUpdatesQueryFailureCounterDescription = "The number of failures when querying the Windows Update Agent API"
 	tablewrapperTimeoutCounterName               = "launcher.tablewrapper.timeout"
 	tablewrapperTimeoutCounterDescription        = "The number of timeouts when querying a Kolide extension table"
+	tablewrapperQueryCounterName                 = "launcher.tablewrapper.query"
+	tablewrapperQueryCounterDescription          = "The number of queries against a Kolide extension table"
+	tablewrapperErrorCounterName                 = "launcher.tablewrapper.error"
+	tablewrapperErrorCounterDescription          = "The number of errors when querying a Kolide extension table"
+	tablewrapperEmptyCounterName                 = "launcher.tablewrapper.empty"
+	tablewrapperEmptyCounterDescription          = "The number of queries against a Kolide extension table that succeeded but returned no rows"
 	autoupdateFailureCounterName                 = "launcher.autoupdate.failed"
 	autoupdateFailureCounterDescription          = "The number of TUF autoupdate failures"
 	checkupErrorCounterName                      = "launcher.checkup.error"
@@ -75,6 +82,9 @@ var (
 	OsqueryRestartCounter             metric.Int64Counter
 	WindowsUpdatesQueryFailureCounter metric.Int64Counter
 	TablewrapperTimeoutCounter        metric.Int64Counter
+	TablewrapperQueryCounter          metric.Int64Counter
+	TablewrapperErrorCounter          metric.Int64Counter
+	TablewrapperEmptyCounter          metric.Int64Counter
 	AutoupdateFailureCounter          metric.Int64Counter
 	CheckupErrorCounter               metric.Int64Counter
 )
@@ -139,6 +149,15 @@ func ReinitializeMetrics() {
 	TablewrapperTimeoutCounter = int64CounterOrNoop(tablewrapperTimeoutCounterName,
 		metric.WithDescription(tablewrapperTimeoutCounterDescription),
 		metric.WithUnit(unitFailure))
+	TablewrapperQueryCounter = int64CounterOrNoop(tablewrapperQueryCounterName,
+		metric.WithDescription(tablewrapperQueryCounterDescription),
+		metric.WithUnit(unitQuery))
+	TablewrapperErrorCounter = int64CounterOrNoop(tablewrapperErrorCounterName,
+		metric.WithDescription(tablewrapperErrorCounterDescription),
+		metric.WithUnit(unitFailure))
+	TablewrapperEmptyCounter = int64CounterOrNoop(tablewrapperEmptyCounterName,
+		metric.WithDescription(tablewrapperEmptyCounterDescription),
+		metric.WithUnit(unitQuery))
 	AutoupdateFailureCounter = int64CounterOrNoop(autoupdateFailureCounterName,
 		metric.WithDescription(autoupdateFailureCounterDescription),
 		metric.WithUnit(unitFailure))
