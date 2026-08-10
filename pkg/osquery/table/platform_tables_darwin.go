@@ -95,7 +95,6 @@ func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsque
 		keychainItemsTable,
 		appicons.AppIcons(k, slogger),
 		brew_upgradeable.TablePlugin(k, slogger),
-		ChromeLoginKeychainInfo(k, slogger),
 		firmwarepasswd.TablePlugin(k, slogger),
 		MDMInfo(k, slogger),
 		macos_software_update.MacOSUpdate(k, slogger),
