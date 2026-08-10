@@ -37,6 +37,8 @@ func generateMacho(ctx context.Context, queryContext table.QueryContext) ([]map[
 	path := q.Constraints[0].Expression
 
 	f, thinErr := macho.Open(path)
+	// macho.Open only handles thin binaries. When it succeeds, return that
+	// single architecture before falling back to macho.OpenFat.
 	if thinErr == nil {
 		defer f.Close()
 
