@@ -17,7 +17,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// DEPRECATED use kolide_chrome_login_data_emails
+// DEPRECATED use katc_chrome_login_data_emails
 func ChromeLoginKeychainInfo(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	c := &ChromeLoginKeychain{
 		slogger: slogger.With("table", "kolide_chrome_login_keychain"),
@@ -28,7 +28,7 @@ func ChromeLoginKeychainInfo(flags types.Flags, slogger *slog.Logger) *table.Plu
 		table.TextColumn("username_value"),
 	}
 	return tablewrapper.New(flags, slogger, "kolide_chrome_login_keychain", columns, c.generate,
-		tablewrapper.WithDescription("Saved login URLs and usernames from Chrome's Login Data database on macOS. Deprecated in favor of kolide_chrome_login_data_emails."),
+		tablewrapper.WithDescription("Saved login URLs and usernames from Chrome's Login Data database on macOS. Deprecated in favor of katc_chrome_login_data_emails."),
 	)
 }
 

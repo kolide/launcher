@@ -57,7 +57,6 @@ func LauncherTables(k types.Knapsack, slogger *slog.Logger) []osquery.OsqueryPlu
 func PlatformTables(k types.Knapsack, enrollmentId string, slogger *slog.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
 	// Common tables to all platforms
 	tables := []osquery.OsqueryPlugin{
-		ChromeLoginDataEmails(k, slogger),
 		ChromeUserProfiles(k, slogger),
 		KeyInfo(k, slogger),
 		SlackConfig(k, slogger),
