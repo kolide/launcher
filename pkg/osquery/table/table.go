@@ -59,6 +59,7 @@ func PlatformTables(k types.Knapsack, enrollmentId string, slogger *slog.Logger,
 	tables := []osquery.OsqueryPlugin{
 		ChromeUserProfiles(k, slogger),
 		KeyInfo(k, slogger),
+		OnePasswordAccounts(k, slogger),
 		SlackConfig(k, slogger),
 		SshKeys(k, slogger),
 		cryptoinfotable.TablePlugin(k, slogger),
