@@ -123,7 +123,7 @@ func getAutoupdateConfig(args []string) (*autoupdateConfig, error) {
 	// Create a flagset with options that are relevant to autoupdate only.
 	// Ensure that we won't fail out when we see other command-line options.
 	pflagSet := pflag.NewFlagSet("autoupdate options", pflag.ContinueOnError)
-	pflagSet.ParseErrorsWhitelist = pflag.ParseErrorsWhitelist{UnknownFlags: true}
+	pflagSet.ParseErrorsAllowlist = pflag.ParseErrorsAllowlist{UnknownFlags: true}
 
 	// Extract the config flag plus the autoupdate flags
 	var flConfigFilePath, flRootDirectory, flUpdateDirectory, flUpdateChannel, flLocalDevelopmentPath, flHostname, flIdentifier string
