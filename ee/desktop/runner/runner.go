@@ -1169,6 +1169,10 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(uid, socketPath, menuPath s
 	// Carve-out for tests: allow for overriding executable path
 	if r.executablePath != "" {
 		cmd.Path = r.executablePath
+		// cmd.Args[0] will also always be the executable path, but we do the length check just in case.
+		if len(cmd.Args) >= 1 {
+			cmd.Args[0] = r.executablePath
+		}
 	}
 
 	cmd.Env = []string{
