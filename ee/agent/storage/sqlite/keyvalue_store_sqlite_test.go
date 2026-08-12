@@ -1,9 +1,12 @@
 package agentsqlite
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"testing"
+	"time"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/sqlite"
@@ -12,6 +15,7 @@ import (
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
+	"golang.org/x/sync/semaphore"
 )
 
 func TestMain(m *testing.M) {
@@ -126,6 +130,56 @@ func TestGetSet(t *testing.T) {
 	returnedVal, err := s.Get(flagKey)
 	require.NoError(t, err, "expected no error getting value")
 	require.Equal(t, flagVal, returnedVal, "flag value mismatch")
+
+	require.NoError(t, s.Close())
+}
+
+func TestGetSet_Simultaneous(t *testing.T) {
+	t.Parallel()
+
+	testRootDir := t.TempDir()
+
+	s, err := OpenRW(t.Context(), testRootDir, StartupSettingsStore)
+	require.NoError(t, err, "creating test store")
+
+	flagKey := []byte(keys.UpdateChannel.String())
+
+	queryCount := int64(100)
+	queryWait := semaphore.NewWeighted(queryCount)
+	queryErrors := make(chan error, queryCount)
+	for i := range queryCount {
+		queryWait.Acquire(t.Context(), 1)
+		go func(idx int) {
+			defer queryWait.Release(1)
+			// Alternate between get and set operations so we test both reads and writes
+			if idx%2 == 0 {
+				flagVal := []byte(strconv.Itoa(idx))
+				if err := s.Set(flagKey, flagVal); err != nil {
+					queryErrors <- err
+				}
+				return
+			}
+			if _, err := s.Get(flagKey); err != nil {
+				queryErrors <- err
+			}
+		}(int(i))
+	}
+
+	// Wait up to 5x busyTimeout for all queries to complete
+	queryCtx, queryCancel := context.WithTimeout(t.Context(), time.Duration(busyTimeoutMs*1000000*5))
+	defer queryCancel()
+
+	// Confirm queries completed
+	require.NoError(t, queryWait.Acquire(queryCtx, queryCount), "timed out waiting for simultaneous queries to complete")
+
+	// Confirm no errors for queries
+	select {
+	case exampleErr := <-queryErrors:
+		t.Fatalf("got %d errors out of %d operations; example: %v", len(queryErrors), queryCount, exampleErr)
+	default:
+		// No errors
+	}
+	close(queryErrors)
 
 	require.NoError(t, s.Close())
 }

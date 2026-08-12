@@ -25,6 +25,8 @@ type storeName int
 const (
 	StartupSettingsStore storeName = iota
 	WatchdogLogStore     storeName = 1
+
+	busyTimeoutMs int = 10000 // 10 seconds
 )
 
 var missingMigrationErrFormat = regexp.MustCompile(`no migration found for version \d+`)
@@ -69,7 +71,7 @@ func OpenRO(ctx context.Context, slogger *slog.Logger, rootDirectory string, nam
 		return nil, fmt.Errorf("unsupported table %d", name)
 	}
 
-	conn, err := sql.Open("sqlite", dbLocation(rootDirectory))
+	conn, err := open(dbLocation(rootDirectory))
 	if err != nil {
 		return nil, fmt.Errorf("opening startup db in %s: %w", rootDirectory, err)
 	}
@@ -125,7 +127,7 @@ func validatedDbConn(ctx context.Context, rootDirectory string) (*sql.DB, error)
 	}
 
 	// Open and validate connection
-	conn, err := sql.Open("sqlite", startupDbFilepath)
+	conn, err := open(startupDbFilepath)
 	if err != nil {
 		return nil, fmt.Errorf("opening startup db in %s: %w", rootDirectory, err)
 	}
@@ -148,7 +150,7 @@ func validateDb(ctx context.Context, dbFilepath string) error {
 		return fmt.Errorf("determining if db exists: %w", err)
 	}
 
-	conn, err := sql.Open("sqlite", dbFilepath)
+	conn, err := open(dbFilepath)
 	if err != nil {
 		return fmt.Errorf("creating connection: %w", err)
 	}
@@ -172,6 +174,18 @@ func dbLocation(rootDirectory string) string {
 	// so we adjust the rootDirectory with filepath.ToSlash and then
 	// use path.Join instead of filepath.Join here.
 	return path.Join(filepath.ToSlash(rootDirectory), "kv.sqlite")
+}
+
+// open standardizes the options included in the DSN when creating a connection.
+// Notably, it sets _busy_timeout so that we do not immediately get SQLITE_BUSY
+// when there's database contention.
+// See: https://sqlite.org/c3ref/busy_timeout.html
+func open(dbFilepath string) (*sql.DB, error) {
+	conn, err := sql.Open("sqlite", fmt.Sprintf("file:%s?_busy_timeout=%d", dbFilepath, busyTimeoutMs))
+	if err != nil {
+		return nil, fmt.Errorf("opening db: %w", err)
+	}
+	return conn, nil
 }
 
 // migrate makes sure that the database schema is correct.
