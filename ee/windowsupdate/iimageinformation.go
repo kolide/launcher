@@ -7,7 +7,6 @@ import (
 // IImageInformation contains information about a localized image that is associated with an update or a category.
 // https://docs.microsoft.com/en-us/windows/win32/api/wuapi/nn-wuapi-iimageinformation
 type IImageInformation struct {
-	disp    *ole.IDispatch //nolint:unused
 	AltText string
 	Height  int64
 	Source  string
@@ -15,6 +14,6 @@ type IImageInformation struct {
 }
 
 func toIImageInformation(imageInformationDisp *ole.IDispatch) (*IImageInformation, error) {
-	// TODO
+	// TODO: implement property extraction
 	return nil, nil
 }
