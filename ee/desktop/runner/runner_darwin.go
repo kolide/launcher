@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os/exec"
 	"os/user"
 	"strings"
 	"time"
@@ -18,7 +17,7 @@ import (
 )
 
 // For notifications to work, we must run in the user context with launchctl asuser.
-func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, uid string, cmd *exec.Cmd) error {
+func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, uid string, cmd *allowedcmd.TracedCmd) error {
 	_, span := observability.StartSpan(ctx, "uid", uid)
 	defer span.End()
 

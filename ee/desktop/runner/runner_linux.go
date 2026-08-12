@@ -9,7 +9,6 @@ import (
 	"io/fs"
 	"log/slog"
 	"os"
-	"os/exec"
 	"os/user"
 	"path/filepath"
 	"regexp"
@@ -31,7 +30,7 @@ const (
 // Display takes the format host:displaynumber.screen
 var displayRegex = regexp.MustCompile(`^[a-z]*:\d+.?\d*$`)
 
-func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, uid string, cmd *exec.Cmd) error {
+func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, uid string, cmd *allowedcmd.TracedCmd) error {
 	ctx, span := observability.StartSpan(ctx, "uid", uid)
 	defer span.End()
 

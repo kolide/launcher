@@ -13,7 +13,6 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -28,6 +27,7 @@ import (
 	"github.com/kolide/launcher/v2/ee/agent"
 	"github.com/kolide/launcher/v2/ee/agent/flags/keys"
 	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/allowedcmd"
 	"github.com/kolide/launcher/v2/ee/consoleuser"
 	runnerserver "github.com/kolide/launcher/v2/ee/desktop/runner/server"
 	"github.com/kolide/launcher/v2/ee/desktop/user/client"
@@ -850,11 +850,6 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 		return nil
 	}
 
-	executablePath, err := r.determineExecutablePath()
-	if err != nil {
-		return fmt.Errorf("determining executable path: %w", err)
-	}
-
 	// We use a slightly longer timeout here in case we've just booted up
 	// and are waiting for dependent services to start before we start up
 	// the desktop process.
@@ -876,7 +871,7 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 		r.waitForReadyToSpawnDesktopState(ctx, uid)
 
 		// we've decided to spawn a new desktop user process for this user
-		if err := r.spawnForUser(ctx, uid, executablePath); err != nil {
+		if err := r.spawnForUser(ctx, uid); err != nil {
 			return fmt.Errorf("spawning new desktop user process for %s: %w", uid, err)
 		}
 	}
@@ -884,7 +879,7 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 	return nil
 }
 
-func (r *DesktopUsersProcessesRunner) spawnForUser(ctx context.Context, uid string, executablePath string) error {
+func (r *DesktopUsersProcessesRunner) spawnForUser(ctx context.Context, uid string) error {
 	ctx, span := observability.StartSpan(ctx, "uid", uid)
 	defer span.End()
 
@@ -898,7 +893,7 @@ func (r *DesktopUsersProcessesRunner) spawnForUser(ctx context.Context, uid stri
 		return fmt.Errorf("getting socket path: %w", err)
 	}
 
-	cmd, err := r.desktopCommand(executablePath, uid, socketPath, r.menuPath())
+	cmd, err := r.desktopCommand(uid, socketPath, r.menuPath())
 	if err != nil {
 		observability.SetError(span, fmt.Errorf("creating desktop command: %w", err))
 		return fmt.Errorf("creating desktop command: %w", err)
@@ -1009,21 +1004,6 @@ func (r *DesktopUsersProcessesRunner) waitOnProcessAsync(uid string, proc *os.Pr
 			)
 		}
 	})
-}
-
-// determineExecutablePath returns DesktopUsersProcessesRunner.executablePath if it is set,
-// otherwise it returns the path to the current binary.
-func (r *DesktopUsersProcessesRunner) determineExecutablePath() (string, error) {
-	if r.executablePath != "" {
-		return r.executablePath, nil
-	}
-
-	executable, err := os.Executable()
-	if err != nil {
-		return "", fmt.Errorf("error getting executable path: %w", err)
-	}
-
-	return executable, nil
 }
 
 func (r *DesktopUsersProcessesRunner) userHasDesktopProcess(uid string) bool {
@@ -1180,11 +1160,16 @@ func (r *DesktopUsersProcessesRunner) writeLocalizationFile() error {
 }
 
 // desktopCommand invokes the launcher desktop executable with the appropriate env vars
-func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socketPath, menuPath string) (*exec.Cmd, error) {
-	// Whenever we swap to using allowedcmd.Launcher instead, we should account for
-	// allowedcmd automatically setting some env vars already for us, including GOMAXPROCS.
-	// We may need to update or override some of them.
-	cmd := exec.Command(executablePath, "desktop") //nolint:forbidigo,noctx // We trust that the launcher executable path is correct, so we don't need to use allowedcmd
+func (r *DesktopUsersProcessesRunner) desktopCommand(uid, socketPath, menuPath string) (*allowedcmd.TracedCmd, error) {
+	cmd, err := allowedcmd.Launcher.Cmd(context.TODO(), "desktop")
+	if err != nil {
+		return nil, fmt.Errorf("creating launcher desktop command: %w", err)
+	}
+
+	// Carve-out for tests: allow for overriding executable path
+	if r.executablePath != "" {
+		cmd.Path = r.executablePath
+	}
 
 	cmd.Env = []string{
 		// When we set cmd.Env (as we're doing here/below), cmd will no longer include the default cmd.Environ()
@@ -1207,7 +1192,8 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 		fmt.Sprintf("WINDIR=%s", os.Getenv("WINDIR")),
 		// pass the desktop enabled flag so if it's already enabled, we show desktop immeadiately
 		fmt.Sprintf("DESKTOP_ENABLED=%v", r.knapsack.DesktopEnabled()),
-		// Set GOMAXPROCS for the desktop subprocess (Go respects this natively)
+		// Set GOMAXPROCS for the desktop subprocess (Go respects this natively).
+		// This overrides the GOMAXPROCS value set by allowedcmd.
 		fmt.Sprintf("GOMAXPROCS=%d", r.knapsack.DesktopGoMaxProcs()),
 		"LAUNCHER_SKIP_UPDATES=true", // We already know that we want to run the version of launcher in `executablePath`, so there's no need to perform lookups
 	}

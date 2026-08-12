@@ -6,16 +6,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os/exec"
 	"strings"
 	"syscall"
 
+	"github.com/kolide/launcher/v2/ee/allowedcmd"
 	"github.com/kolide/launcher/v2/ee/consoleuser"
 	"github.com/kolide/launcher/v2/ee/observability"
 	"github.com/kolide/systray"
 )
 
-func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, uid string, cmd *exec.Cmd) error {
+func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, uid string, cmd *allowedcmd.TracedCmd) error {
 	ctx, span := observability.StartSpan(ctx, "uid", uid)
 	defer span.End()
 
