@@ -25,7 +25,7 @@ require (
 	github.com/theupdateframework/go-tuf v0.7.0
 	github.com/tklauser/go-sysconf v0.3.15 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
-	go.etcd.io/bbolt v1.3.6
+	go.etcd.io/bbolt v1.5.0
 	golang.org/x/crypto v0.53.0
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0
 	golang.org/x/image v0.43.0
@@ -55,7 +55,7 @@ require (
 	github.com/kolide/toast v1.0.2
 	github.com/saltosystems/winrt-go v0.0.0-20240510082706-db61b37f5877
 	github.com/shirou/gopsutil/v4 v4.25.8
-	github.com/spf13/pflag v1.0.9
+	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.19.0
 	github.com/theupdateframework/go-tuf/v2 v2.4.1
 	github.com/zricethezav/gitleaks/v8 v8.30.0
