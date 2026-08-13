@@ -30,6 +30,9 @@ const (
 	notificationServiceObj       = "/org/freedesktop/Notifications"
 	notificationServiceInterface = "org.freedesktop.Notifications"
 	signalActionInvoked          = "org.freedesktop.Notifications.ActionInvoked"
+	desktopPortalPath            = "/org/freedesktop/portal/desktop"
+	desktopPortalName            = "org.freedesktop.portal.Desktop"
+	methodOpenUri                = "org.freedesktop.portal.OpenURI.OpenURI"
 )
 
 // We default to xdg-open first because, if available, it appears to be better at picking
@@ -55,6 +58,33 @@ func NewDesktopNotifier(slogger *slog.Logger, iconFilepath string, localizationP
 		sentNotificationIds: make(map[uint32]bool),
 		lock:                sync.RWMutex{},
 	}
+}
+
+// OpenViaDbus opens the given URI via call to XDG Desktop Portal's OpenURI method.
+// We treat it as successful if the portal accepts; we do not wait for the response.
+// See: https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.OpenURI.html
+func OpenViaDbus(conn *dbus.Conn, uri string) error {
+	if conn == nil {
+		return errors.New("no connection available")
+	}
+
+	desktopPortal := conn.Object(
+		desktopPortalName,
+		desktopPortalPath,
+	)
+
+	var requestHandle dbus.ObjectPath
+	if err := desktopPortal.Call(
+		methodOpenUri,
+		0,
+		"",                        // parent_window
+		uri,                       // uri
+		map[string]dbus.Variant{}, // options
+	).Store(&requestHandle); err != nil {
+		return fmt.Errorf("calling OpenURI: %w", err)
+	}
+
+	return nil
 }
 
 func (d *dbusNotifier) Execute() error {
@@ -100,6 +130,17 @@ func (d *dbusNotifier) Execute() error {
 			// Attempt to open a browser to the given URL
 			actionUri := signal.Body[1].(string)
 
+			// Try via dbus before falling back to xdg-open and www-browser --
+			// we see improved behavior when using dbus.
+			err := OpenViaDbus(d.conn, actionUri)
+			if err == nil {
+				continue
+			}
+			d.slogger.Log(context.TODO(), slog.LevelWarn,
+				"couldn't open URI via dbus, falling back to exec",
+				"err", err,
+			)
+
 			for _, browserLauncher := range browserLaunchers {
 				cmd, err := browserLauncher.Cmd(context.TODO(), actionUri)
 				if err != nil {
@@ -137,10 +178,21 @@ func (d *dbusNotifier) Interrupt(err error) {
 
 	if d.conn != nil {
 		d.conn.RemoveSignal(d.signal)
-		d.conn.RemoveMatchSignal(
+		if err := d.conn.RemoveMatchSignal(
 			dbus.WithMatchObjectPath(notificationServiceObj),
 			dbus.WithMatchInterface(notificationServiceInterface),
-		)
+		); err != nil {
+			d.slogger.Log(context.TODO(), slog.LevelWarn,
+				"could not remove match signal during shutdown",
+				"err", err,
+			)
+		}
+		if err := d.conn.Close(); err != nil {
+			d.slogger.Log(context.TODO(), slog.LevelWarn,
+				"could not close session bus connection during shutdown",
+				"err", err,
+			)
+		}
 	}
 }
 
