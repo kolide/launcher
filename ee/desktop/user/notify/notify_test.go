@@ -12,9 +12,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	// ioCompletionProcessor will continue to run forever until the process (go test in this case) exits,
-	// so we need goleak to ignore that one.
-	goleak.VerifyTestMain(m, goleak.IgnoreAnyFunction("github.com/Microsoft/go-winio.ioCompletionProcessor"))
+	goleak.VerifyTestMain(m)
 }
 
 // TestInterrupt_Multiple confirms that Interrupt can be called multiple times without blocking;
