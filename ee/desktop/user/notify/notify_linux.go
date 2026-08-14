@@ -7,10 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/godbus/dbus/v5"
+	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/v2/ee/allowedcmd"
 )
 
@@ -27,12 +30,17 @@ type dbusNotifier struct {
 }
 
 const (
-	notificationServiceObj       = "/org/freedesktop/Notifications"
-	notificationServiceInterface = "org.freedesktop.Notifications"
-	signalActionInvoked          = "org.freedesktop.Notifications.ActionInvoked"
-	desktopPortalPath            = "/org/freedesktop/portal/desktop"
-	desktopPortalName            = "org.freedesktop.portal.Desktop"
-	methodOpenUri                = "org.freedesktop.portal.OpenURI.OpenURI"
+	notificationServiceObj          = "/org/freedesktop/Notifications"
+	notificationServiceInterface    = "org.freedesktop.Notifications"
+	signalActionInvoked             = "org.freedesktop.Notifications.ActionInvoked"
+	desktopPortalPath               = "/org/freedesktop/portal/desktop"
+	desktopPortalName               = "org.freedesktop.portal.Desktop"
+	methodOpenUri                   = "org.freedesktop.portal.OpenURI.OpenURI"
+	portalRequestInterface          = "org.freedesktop.portal.Request"
+	desktopPortalRequestPathPattern = "/org/freedesktop/portal/desktop/request/%s/%s"
+	portalResponseSignal            = "org.freedesktop.portal.Request.Response"
+	portalResponseMember            = "Response"
+	portalResponseTimeout           = 5 * time.Second
 )
 
 // We default to xdg-open first because, if available, it appears to be better at picking
@@ -53,38 +61,11 @@ func NewDesktopNotifier(slogger *slog.Logger, iconFilepath string, localizationP
 		localizationPath:    localizationPath,
 		slogger:             slogger.With("component", "desktop_notifier"),
 		conn:                conn,
-		signal:              make(chan *dbus.Signal),
+		signal:              make(chan *dbus.Signal, 5),
 		interrupt:           make(chan struct{}),
 		sentNotificationIds: make(map[uint32]bool),
 		lock:                sync.RWMutex{},
 	}
-}
-
-// OpenViaDbus opens the given URI via call to XDG Desktop Portal's OpenURI method.
-// We treat it as successful if the portal accepts; we do not wait for the response.
-// See: https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.OpenURI.html
-func OpenViaDbus(conn *dbus.Conn, uri string) error {
-	if conn == nil {
-		return errors.New("no connection available")
-	}
-
-	desktopPortal := conn.Object(
-		desktopPortalName,
-		desktopPortalPath,
-	)
-
-	var requestHandle dbus.ObjectPath
-	if err := desktopPortal.Call(
-		methodOpenUri,
-		0,
-		"",                        // parent_window
-		uri,                       // uri
-		map[string]dbus.Variant{}, // options
-	).Store(&requestHandle); err != nil {
-		return fmt.Errorf("calling OpenURI: %w", err)
-	}
-
-	return nil
 }
 
 func (d *dbusNotifier) Execute() error {
@@ -117,8 +98,16 @@ func (d *dbusNotifier) Execute() error {
 				continue
 			}
 
+			if len(signal.Body) < 2 {
+				// Malformed signal -- we expect notification ID + action URI
+				continue
+			}
+
 			// Confirm that this is a Kolide-originated notification by checking for known notification IDs
-			notificationId := signal.Body[0].(uint32)
+			notificationId, ok := signal.Body[0].(uint32)
+			if !ok {
+				continue
+			}
 			d.lock.RLock()
 			if _, found := d.sentNotificationIds[notificationId]; !found {
 				// This notification didn't come from us -- ignore it
@@ -128,11 +117,14 @@ func (d *dbusNotifier) Execute() error {
 			d.lock.RUnlock()
 
 			// Attempt to open a browser to the given URL
-			actionUri := signal.Body[1].(string)
+			actionUri, ok := signal.Body[1].(string)
+			if !ok {
+				continue
+			}
 
 			// Try via dbus before falling back to xdg-open and www-browser --
 			// we see improved behavior when using dbus.
-			err := OpenViaDbus(d.conn, actionUri)
+			err := OpenViaDbus(actionUri)
 			if err == nil {
 				continue
 			}
@@ -286,4 +278,99 @@ func (d *dbusNotifier) sendNotificationViaNotifySend(n Notification) error {
 	}
 
 	return nil
+}
+
+// OpenViaDbus opens the given URI via call to XDG Desktop Portal's OpenURI method.
+// See: https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.OpenURI.html
+func OpenViaDbus(uri string) error {
+	conn, err := dbus.ConnectSessionBus()
+	if err != nil {
+		return fmt.Errorf("connecting to dbus: %w", err)
+	}
+	defer conn.Close()
+
+	// Determine our sender identity so that we can match on responses to our request only.
+	names := conn.Names()
+	if len(names) == 0 {
+		return errors.New("connection has no unique name")
+	}
+	// Our request handle takes the following form: /org/freedesktop/portal/desktop/request/SENDER/TOKEN,
+	// where SENDER is our name, with the initial ':' removed and all '.' replaced by '_'".
+	// See: https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.Request.html#org-freedesktop-portal-request
+	sender := strings.ReplaceAll(strings.TrimPrefix(names[0], ":"), ".", "_")
+
+	// Generate the token:
+	handleToken := "kolide_" + ulid.New()
+	requestPath := fmt.Sprintf(desktopPortalRequestPathPattern, sender, handleToken)
+
+	// Now, prepare to receive response from calling OpenURI:
+	// First, subscribe to responses.
+	matchSignalOpts := []dbus.MatchOption{
+		dbus.WithMatchObjectPath(dbus.ObjectPath(requestPath)),
+		dbus.WithMatchInterface(portalRequestInterface),
+		dbus.WithMatchMember(portalResponseMember),
+		dbus.WithMatchSender(desktopPortalName),
+	}
+	if err := conn.AddMatchSignal(matchSignalOpts...); err != nil {
+		return fmt.Errorf("adding match signal for response from portal: %w", err)
+	}
+	defer conn.RemoveMatchSignal(matchSignalOpts...)
+
+	// Next, set up channel to receive responses on.
+	portalResponse := make(chan *dbus.Signal, 5)
+	conn.Signal(portalResponse)
+	defer conn.RemoveSignal(portalResponse)
+
+	// Prepare to call Desktop Portal's OpenURI:
+	desktopPortal := conn.Object(
+		desktopPortalName,
+		desktopPortalPath,
+	)
+	var requestHandle dbus.ObjectPath
+	if err := desktopPortal.Call(
+		methodOpenUri,
+		0,
+		"",  // parent_window
+		uri, // uri
+		map[string]dbus.Variant{
+			"handle_token": dbus.MakeVariant(handleToken),
+		}, // options
+	).Store(&requestHandle); err != nil {
+		return fmt.Errorf("calling OpenURI: %w", err)
+	}
+
+	// Finally, await response until timeout
+	ctx, cancel := context.WithTimeout(context.Background(), portalResponseTimeout)
+	defer cancel()
+	for {
+		select {
+		case signal, open := <-portalResponse:
+			if !open {
+				return errors.New("dbus signal channel closed, cannot proceed")
+			}
+
+			if signal == nil || signal.Name != portalResponseSignal || signal.Path != requestHandle || signal.Sender != desktopPortalName {
+				// Not a signal, not a response signal, or not a response signal to _our_ request
+				continue
+			}
+
+			if len(signal.Body) < 1 {
+				return errors.New("received empty response")
+			}
+
+			responseCode, ok := signal.Body[0].(uint32)
+			if !ok {
+				return fmt.Errorf("unexpected response type %T", signal.Body[0])
+			}
+
+			// 0 is success; 1 is user cancelled
+			// See: https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.Request.html#org-freedesktop-portal-request-response
+			if responseCode == 0 || responseCode == 1 {
+				return nil
+			}
+			return fmt.Errorf("open failed: response code %d", responseCode)
+		case <-ctx.Done():
+			return fmt.Errorf("waiting for response: %w", ctx.Err())
+		}
+	}
 }

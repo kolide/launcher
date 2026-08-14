@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/godbus/dbus/v5"
 	"github.com/kolide/launcher/v2/ee/allowedcmd"
 	"github.com/kolide/launcher/v2/ee/desktop/user/notify"
 )
@@ -16,15 +15,14 @@ import (
 func open(url string) error {
 	// Try via dbus before falling back to xdg-open --
 	// we see improved behavior when using dbus.
-	if conn, err := dbus.SessionBus(); err == nil {
-		if err := notify.OpenViaDbus(conn, url); err == nil {
-			return nil
-		}
+	dbusErr := notify.OpenViaDbus(url)
+	if dbusErr == nil {
+		return nil
 	}
 
 	cmd, err := allowedcmd.XdgOpen.Cmd(context.TODO(), url)
 	if err != nil {
-		return fmt.Errorf("creating command: %w", err)
+		return fmt.Errorf("falling back creating command (after dbus failure %v): %w", dbusErr, err)
 	}
 
 	return cmd.Start()
