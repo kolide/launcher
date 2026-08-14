@@ -62,14 +62,7 @@ func NewDesktopNotifier(slogger *slog.Logger, iconFilepath string, localizationP
 
 func (d *dbusNotifier) Execute() error {
 	if d.conn != nil {
-		// Match on the sender as well as the path and interface: more than one connection can export
-		// /org/freedesktop/Notifications and emit ActionInvoked for the same click. Under GNOME, the
-		// shell emits it and a separate relay process that owns the org.freedesktop.Notifications name
-		// re-emits an identical copy, so without a sender match we handle one click twice and open two
-		// browser tabs. The bus resolves the well-known name to its current owner and keeps the rule up
-		// to date as ownership changes.
 		if err := d.conn.AddMatchSignal(
-			dbus.WithMatchSender(notificationServiceInterface),
 			dbus.WithMatchObjectPath(notificationServiceObj),
 			dbus.WithMatchInterface(notificationServiceInterface),
 		); err != nil {
@@ -170,7 +163,6 @@ func (d *dbusNotifier) Interrupt(err error) {
 	if d.conn != nil {
 		d.conn.RemoveSignal(d.signal)
 		if err := d.conn.RemoveMatchSignal(
-			dbus.WithMatchSender(notificationServiceInterface),
 			dbus.WithMatchObjectPath(notificationServiceObj),
 			dbus.WithMatchInterface(notificationServiceInterface),
 		); err != nil {
