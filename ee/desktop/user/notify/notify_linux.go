@@ -30,6 +30,9 @@ const (
 	notificationServiceObj       = "/org/freedesktop/Notifications"
 	notificationServiceInterface = "org.freedesktop.Notifications"
 	signalActionInvoked          = "org.freedesktop.Notifications.ActionInvoked"
+	desktopPortalPath            = "/org/freedesktop/portal/desktop"
+	desktopPortalName            = "org.freedesktop.portal.Desktop"
+	methodOpenUri                = "org.freedesktop.portal.OpenURI.OpenURI"
 )
 
 // We default to xdg-open first because, if available, it appears to be better at picking
@@ -50,7 +53,7 @@ func NewDesktopNotifier(slogger *slog.Logger, iconFilepath string, localizationP
 		localizationPath:    localizationPath,
 		slogger:             slogger.With("component", "desktop_notifier"),
 		conn:                conn,
-		signal:              make(chan *dbus.Signal),
+		signal:              make(chan *dbus.Signal, 5),
 		interrupt:           make(chan struct{}),
 		sentNotificationIds: make(map[uint32]bool),
 		lock:                sync.RWMutex{},
@@ -87,8 +90,16 @@ func (d *dbusNotifier) Execute() error {
 				continue
 			}
 
+			if len(signal.Body) < 2 {
+				// Malformed signal -- we expect notification ID + action URI
+				continue
+			}
+
 			// Confirm that this is a Kolide-originated notification by checking for known notification IDs
-			notificationId := signal.Body[0].(uint32)
+			notificationId, ok := signal.Body[0].(uint32)
+			if !ok {
+				continue
+			}
 			d.lock.RLock()
 			if _, found := d.sentNotificationIds[notificationId]; !found {
 				// This notification didn't come from us -- ignore it
@@ -98,7 +109,21 @@ func (d *dbusNotifier) Execute() error {
 			d.lock.RUnlock()
 
 			// Attempt to open a browser to the given URL
-			actionUri := signal.Body[1].(string)
+			actionUri, ok := signal.Body[1].(string)
+			if !ok {
+				continue
+			}
+
+			// Try via dbus before falling back to xdg-open and www-browser --
+			// we see improved behavior when using dbus.
+			err := OpenViaDbus(actionUri)
+			if err == nil {
+				continue
+			}
+			d.slogger.Log(context.TODO(), slog.LevelWarn,
+				"couldn't open URI via dbus, falling back to exec",
+				"err", err,
+			)
 
 			for _, browserLauncher := range browserLaunchers {
 				cmd, err := browserLauncher.Cmd(context.TODO(), actionUri)
@@ -137,10 +162,21 @@ func (d *dbusNotifier) Interrupt(err error) {
 
 	if d.conn != nil {
 		d.conn.RemoveSignal(d.signal)
-		d.conn.RemoveMatchSignal(
+		if err := d.conn.RemoveMatchSignal(
 			dbus.WithMatchObjectPath(notificationServiceObj),
 			dbus.WithMatchInterface(notificationServiceInterface),
-		)
+		); err != nil {
+			d.slogger.Log(context.TODO(), slog.LevelWarn,
+				"could not remove match signal during shutdown",
+				"err", err,
+			)
+		}
+		if err := d.conn.Close(); err != nil {
+			d.slogger.Log(context.TODO(), slog.LevelWarn,
+				"could not close session bus connection during shutdown",
+				"err", err,
+			)
+		}
 	}
 }
 
@@ -231,6 +267,36 @@ func (d *dbusNotifier) sendNotificationViaNotifySend(n Notification) error {
 			"err", err,
 		)
 		return fmt.Errorf("could not send notification via notify-send: %s: %w", string(out), err)
+	}
+
+	return nil
+}
+
+// OpenViaDbus opens the given URI via call to XDG Desktop Portal's OpenURI method.
+// We do not check responses because we cannot distinguish between a failure and the user
+// simply closing the browser.
+// See: https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.OpenURI.html
+func OpenViaDbus(uri string) error {
+	conn, err := dbus.ConnectSessionBus()
+	if err != nil {
+		return fmt.Errorf("connecting to dbus: %w", err)
+	}
+	defer conn.Close()
+
+	// Prepare to call Desktop Portal's OpenURI:
+	desktopPortal := conn.Object(
+		desktopPortalName,
+		desktopPortalPath,
+	)
+	var requestHandle dbus.ObjectPath
+	if err := desktopPortal.Call(
+		methodOpenUri,
+		0,
+		"",                        // parent_window
+		uri,                       // uri
+		map[string]dbus.Variant{}, // options
+	).Store(&requestHandle); err != nil {
+		return fmt.Errorf("calling OpenURI: %w", err)
 	}
 
 	return nil
