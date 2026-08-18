@@ -97,9 +97,12 @@ void getSoftwareUpdateConfiguration(
           : [manager doesAutomaticCriticalUpdateInstall];
   *doesAutomaticCriticalUpdateInstall = value ? 1 : 0;
 
-  NSDate* lastCheckSuccessfulDate =
-      os_framework ? (NSDate*)[settings latestSuccessfulScanDate]
-                   : (NSDate*)[manager lastCheckSuccessfulDate];
+  // MacOS 27 (build version 26) removed [SUOSUShimController
+  // latestSuccessfulScanDate]. On MacOS 26 that method just forwarded to
+  // [SUPreferenceManager lastScanSuccessfulDate] (also removed in 27), which
+  // reads the same LastSuccessfulDate preference that SUSharedPrefs reads, so
+  // we now just read it directly via SUSharedPrefs on every version.
+  NSDate* lastCheckSuccessfulDate = (NSDate*)[manager lastCheckSuccessfulDate];
   *lastCheckTimestamp = [lastCheckSuccessfulDate timeIntervalSince1970];
 
   [settings dealloc];
