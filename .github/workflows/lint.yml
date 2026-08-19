@@ -81,7 +81,7 @@ jobs:
         run: |
           echo "::add-mask::${CLOUDSMITH_API_KEY}"
           [ -z "${CLOUDSMITH_API_KEY:-}" ] && exit 1
-          goproxy="https://token:${CLOUDSMITH_API_KEY}@golang.cloudsmith.io/1password/op-golang/"
+          goproxy="https://token:${CLOUDSMITH_API_KEY}@go.pkg.1infra.dev/op-golang/"
           echo "::add-mask::$goproxy"
           echo "GOPROXY=$goproxy" >> "$GITHUB_ENV"
 
@@ -151,7 +151,7 @@ jobs:
         run: |
           echo "::add-mask::${CLOUDSMITH_API_KEY}"
           [ -z "${CLOUDSMITH_API_KEY:-}" ] && exit 1
-          goproxy="https://token:${CLOUDSMITH_API_KEY}@golang.cloudsmith.io/1password/op-golang/"
+          goproxy="https://token:${CLOUDSMITH_API_KEY}@go.pkg.1infra.dev/op-golang/"
           echo "::add-mask::$goproxy"
           echo "GOPROXY=$goproxy" >> "$GITHUB_ENV"
 
