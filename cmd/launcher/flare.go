@@ -44,7 +44,7 @@ func runFlare(systemMultiSlogger *multislogger.MultiSlogger, args []string) erro
 		return fmt.Errorf("parsing flags: %w", err)
 	}
 
-	opts, err := launcher.ParseOptions("flare", []string{"-config", *flConfigFilePath})
+	opts, err := launcher.ParseOptions(systemMultiSlogger.Logger, "flare", []string{"-config", *flConfigFilePath})
 	if err != nil {
 		return err
 	}

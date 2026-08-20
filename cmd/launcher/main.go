@@ -83,7 +83,7 @@ func runMain() int {
 
 	// create initial logger. As this is prior to options parsing,
 	// use the environment to determine verbosity.  It will be
-	// re-leveled during options parsing.
+	// re-leveled after options parsing.
 	logger := logutil.NewServerLogger(env.Bool("LAUNCHER_DEBUG", false))
 	ctx = ctxlog.NewContext(ctx, logger)
 
@@ -148,7 +148,7 @@ func runMain() int {
 	}
 
 	// Fall back to running launcher
-	opts, err := launcher.ParseOptions("", os.Args[1:])
+	opts, err := launcher.ParseOptions(systemSlogger.Logger, "", os.Args[1:])
 	if err != nil {
 		if launcher.IsInfoCmd(err) {
 			return 0

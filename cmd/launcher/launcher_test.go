@@ -60,7 +60,7 @@ func Test_runLauncher(t *testing.T) {
 			})
 			downloadOnceFunc() // get an osquery binary
 			require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
-			defaultOpts, err := launcher.ParseOptions("launcher", []string{
+			defaultOpts, err := launcher.ParseOptions(multislogger.NewNopLogger(), "launcher", []string{
 				"--root_directory", testRootDir,
 				"--osqueryd_path", testOsqueryBinary,
 			})

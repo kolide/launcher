@@ -20,7 +20,7 @@ import (
 )
 
 func runInteractive(systemMultiSlogger *multislogger.MultiSlogger, args []string) error {
-	opts, err := launcher.ParseOptions("interactive", args)
+	opts, err := launcher.ParseOptions(systemMultiSlogger.Logger, "interactive", args)
 	if err != nil {
 		return err
 	}

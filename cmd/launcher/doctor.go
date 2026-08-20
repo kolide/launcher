@@ -21,7 +21,7 @@ func runDoctor(systemMultiSlogger *multislogger.MultiSlogger, args []string) err
 	launcher.DefaultAutoupdate = true
 	launcher.SetDefaultPaths()
 
-	opts, err := launcher.ParseOptions("doctor", os.Args[2:])
+	opts, err := launcher.ParseOptions(systemMultiSlogger.Logger, "doctor", os.Args[2:])
 	if err != nil {
 		return err
 	}
