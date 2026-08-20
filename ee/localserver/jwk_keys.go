@@ -84,7 +84,7 @@ func (j *jwk) ecdsaPubKey() (*ecdsa.PublicKey, error) {
 	// Finally, parse the pubkey. This will also validate that the key is on the curve.
 	pubKey, err := ecdsa.ParseUncompressedPublicKey(curve, buf)
 	if err != nil {
-		return nil, fmt.Errorf(`invalid ECDSA public key: %w`, err)
+		return nil, fmt.Errorf("invalid ECDSA public key: %w", err)
 	}
 
 	return pubKey, nil
