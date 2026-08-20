@@ -161,13 +161,17 @@ func buildManifests(hostName string) (*chromeManifest, *firefoxManifest, error) 
 	slices.Sort(allowedChromeOrigins)
 	slices.Sort(allowedFirefoxExtensions)
 
-	return &chromeManifest{
-			manifest:       sharedManifest,
-			AllowedOrigins: allowedChromeOrigins,
-		}, &firefoxManifest{
-			manifest:          sharedManifest,
-			AllowedExtensions: allowedFirefoxExtensions,
-		}, nil
+	chrome := &chromeManifest{
+		manifest:       sharedManifest,
+		AllowedOrigins: allowedChromeOrigins,
+	}
+	firefox := &firefoxManifest{
+		manifest:          sharedManifest,
+		AllowedExtensions: allowedFirefoxExtensions,
+	}
+
+	return chrome, firefox, nil
+
 }
 
 func RemoveNativeMessagingManifest(rootDir string, identifier string) error {
