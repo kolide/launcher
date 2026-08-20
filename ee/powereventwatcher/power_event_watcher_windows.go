@@ -208,7 +208,7 @@ func New(ctx context.Context, slogger *slog.Logger, pes powerEventSubscriber) (*
 		syscall.NewCallback(p.onPowerEvent),  // Callback -- executed every time an event matching our query occurs
 		uintptr(uint32(1)),                   // Flags -- EvtSubscribeToFutureEvents has value 1
 	)
-	if err != nil && err.Error() != operationSuccessfulMsg {
+	if err != nil && err.Error() != operationSuccessfulMsg { //nolint:staticcheck // Ignore SA4023; the operationSuccessfulMsg check here is sufficient
 		return nil, fmt.Errorf("could not subscribe to future power events: %w", err)
 	}
 
@@ -277,7 +277,7 @@ func (p *powerEventWatcher) onPowerEvent(action uint32, _ uintptr, eventHandle u
 		uintptr(unsafe.Pointer(&bufUsed)),       // BufferUsed -- modified by call: the size, in bytes, of buffer used
 		uintptr(unsafe.Pointer(&propertyCount)), // PropertyCount -- modified by call: only matters if we used EvtRenderEventValues
 	)
-	if err != nil && err.Error() != operationSuccessfulMsg {
+	if err != nil && err.Error() != operationSuccessfulMsg { //nolint:staticcheck // Ignore SA4023; the operationSuccessfulMsg check here is sufficient
 		p.slogger.Log(context.TODO(), slog.LevelWarn,
 			"error calling EvtRender to get event details",
 			"last_err", err,

@@ -218,7 +218,7 @@ func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUser
 
 	if runtime.GOOS == "darwin" {
 		runner.osVersion, err = osversion()
-		if err != nil {
+		if err != nil { //nolint:staticcheck // Ignore SA4023 on Windows/Linux; this only runs on darwin, where err is not always nil
 			runner.slogger.Log(context.TODO(), slog.LevelError,
 				"getting os version",
 				"err", err,
@@ -1356,7 +1356,7 @@ func (r *DesktopUsersProcessesRunner) checkOsUpdate() {
 	}
 
 	currentOsVersion, err := osversion()
-	if err != nil {
+	if err != nil { //nolint:staticcheck // Ignore SA4023 on Windows/Linux; this only runs on darwin, where err is not always nil
 		r.slogger.Log(context.TODO(), slog.LevelError,
 			"getting os version",
 			"err", err,
