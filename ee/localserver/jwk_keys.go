@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"math/big"
 	"strings"
 )
 
@@ -46,7 +45,12 @@ func (j *jwk) ecdsaPubKey() (*ecdsa.PublicKey, error) {
 		return nil, err
 	}
 
-	// Decode the x and y coordinates using base64 URL decoding (unpadded).
+	// We can't construct an ecdsa.PublicKey using j.X and j.Y directly, because direct access
+	// to those fields has been deprecated. Instead, we construct the SEC1 uncompressed
+	// encoding inside a buffer, and then pass that off to the ecdsa package to parse.
+	// See https://www.secg.org/sec1-v2.pdf 2.3.3.
+
+	// First, decode the x and y coordinates using base64 URL decoding (unpadded).
 	xBytes, err := base64.RawURLEncoding.DecodeString(j.X)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding x coordinate: %v", err)
@@ -56,15 +60,28 @@ func (j *jwk) ecdsaPubKey() (*ecdsa.PublicKey, error) {
 		return nil, fmt.Errorf("error decoding y coordinate: %v", err)
 	}
 
-	// Convert the bytes into big.Int values.
-	x := new(big.Int).SetBytes(xBytes)
-	y := new(big.Int).SetBytes(yBytes)
+	// Next, figure out how many bytes we need for each coordinate, so we know how many bytes
+	// we need in the buffer. curve.Params().BitSize gives us the bitsize for the curve; we
+	// add 7 so that we don't miss any additional data for curve sizes that don't divide into 8
+	// evenly (e.g. for P-521, 521 / 8 = 65.125, which rounds to 65, so we may be missing data).
+	// This is how crypto/ellpitic performs this calculation. We expect 32 for P-256, 48 for P-384,
+	// 66 for P-521.
+	coordinateLen := (curve.Params().BitSize + 7) / 8
 
-	// Construct the ECDSA public key.
-	pubKey := &ecdsa.PublicKey{
-		Curve: curve,
-		X:     x, //nolint:staticcheck
-		Y:     y, //nolint:staticcheck
+	// Now, construct the buffer:
+	// The first byte 0x04 indicates that point compression is off; then follows all of the
+	// bytes in X; then follows all of the bytes in Y.
+	buf := make([]byte, 1+2*coordinateLen)
+	buf[0] = 0x04
+	for i := range coordinateLen {
+		buf[i+1] = xBytes[i]
+		buf[i+1+coordinateLen] = yBytes[i]
+	}
+
+	// Finally, parse the pubkey.
+	pubKey, err := ecdsa.ParseUncompressedPublicKey(curve, buf)
+	if err != nil {
+		return nil, fmt.Errorf(`invalid ECDSA public key: %w`, err)
 	}
 
 	// this is a little weird, but it's the recommended way to validate a public key,
