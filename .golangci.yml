@@ -120,6 +120,11 @@ linters:
       - linters:
           - staticcheck
         text: QF1001
+      # Impossible comparison of interface value with untyped nil
+      # https://staticcheck.dev/docs/checks/#SA4023
+      - linters:
+          - staticcheck
+        text: SA4023
     paths:
       - test-cmds
       - third_party$
