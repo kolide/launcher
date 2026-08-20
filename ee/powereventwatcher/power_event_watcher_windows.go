@@ -198,7 +198,7 @@ func New(ctx context.Context, slogger *slog.Logger, pes powerEventSubscriber) (*
 
 	// EvtSubscribe: https://learn.microsoft.com/en-us/windows/win32/api/winevt/nf-winevt-evtsubscribe
 	// Flags: https://learn.microsoft.com/en-us/windows/win32/api/winevt/ne-winevt-evt_subscribe_flags
-	subscriptionHandle, _, err := p.subscribeProcedure.Call(
+	subscriptionHandle, _, err := p.subscribeProcedure.Call( //nolint:staticcheck // Ignore SA4023
 		0,                                    // Session -- NULL because we're querying the local computer
 		0,                                    // SignalEvent -- NULL because we're setting a callback
 		uintptr(unsafe.Pointer(channelPath)), // ChannelPath -- the channel in the event log
@@ -208,7 +208,7 @@ func New(ctx context.Context, slogger *slog.Logger, pes powerEventSubscriber) (*
 		syscall.NewCallback(p.onPowerEvent),  // Callback -- executed every time an event matching our query occurs
 		uintptr(uint32(1)),                   // Flags -- EvtSubscribeToFutureEvents has value 1
 	)
-	if err != nil && err.Error() != operationSuccessfulMsg {
+	if err != nil && err.Error() != operationSuccessfulMsg { //nolint:staticcheck // Ignore SA4023; the operationSuccessfulMsg check here is sufficient
 		return nil, fmt.Errorf("could not subscribe to future power events: %w", err)
 	}
 
@@ -268,7 +268,7 @@ func (p *powerEventWatcher) onPowerEvent(action uint32, _ uintptr, eventHandle u
 	buf := make([]byte, bufferSize)
 	var bufUsed uint32
 	var propertyCount uint32
-	_, _, err := p.renderEventLogProcedure.Call(
+	_, _, err := p.renderEventLogProcedure.Call( //nolint:staticcheck // Ignore SA4023
 		0,                                       // Context -- unused
 		eventHandle,                             // Fragment -- the event handle
 		uintptr(uint32(1)),                      // Flags -- EvtRenderEventXml has value 1
@@ -277,7 +277,7 @@ func (p *powerEventWatcher) onPowerEvent(action uint32, _ uintptr, eventHandle u
 		uintptr(unsafe.Pointer(&bufUsed)),       // BufferUsed -- modified by call: the size, in bytes, of buffer used
 		uintptr(unsafe.Pointer(&propertyCount)), // PropertyCount -- modified by call: only matters if we used EvtRenderEventValues
 	)
-	if err != nil && err.Error() != operationSuccessfulMsg {
+	if err != nil && err.Error() != operationSuccessfulMsg { //nolint:staticcheck // Ignore SA4023; the operationSuccessfulMsg check here is sufficient
 		p.slogger.Log(context.TODO(), slog.LevelWarn,
 			"error calling EvtRender to get event details",
 			"last_err", err,
