@@ -312,6 +312,12 @@ func Test_ValidateCertChain(t *testing.T) {
 		chain, err := newChain(pubEncryptionKey, keys...)
 		require.NoError(t, err)
 
+		// Get starting value of root key so we can confirm that our validation process does not change it
+		startingRootKey, ok := trustedKeysMap[chain.Links[0].SignedBy]
+		require.True(t, ok)
+		startingRootKeyBytes, err := startingRootKey.Bytes()
+		require.NoError(t, err)
+
 		require.NoError(t, chain.validate(trustedKeysMap),
 			"should be able to validate chain",
 		)
@@ -327,6 +333,13 @@ func Test_ValidateCertChain(t *testing.T) {
 		require.Equal(t, testUserId, chain.userUuid,
 			"user uuid should be set in validate",
 		)
+
+		postValidationRootKey, ok := trustedKeysMap[chain.Links[0].SignedBy]
+		require.True(t, ok)
+		postValidationRootKeyBytes, err := postValidationRootKey.Bytes()
+		require.NoError(t, err)
+
+		require.Equal(t, startingRootKeyBytes, postValidationRootKeyBytes)
 	})
 }
 
