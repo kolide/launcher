@@ -409,7 +409,10 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		// getOsqEnrollDetails has a 12-second timeout for performing the query, so we set our retry interval
 		// to slightly longer than that.
 		osquery.CollectAndSetEnrollmentDetails(ctx, slogger, k, 120*time.Second, 15*time.Second)
-		logShipper.Ping() // Let the logshipper know about the updated serial number
+		// Let the logshipper know about the updated serial number
+		if logShipper != nil {
+			logShipper.Ping()
+		}
 	})
 
 	// init osquery instance history
