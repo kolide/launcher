@@ -67,6 +67,9 @@ func (j *jwk) ecdsaPubKey() (*ecdsa.PublicKey, error) {
 	// This is how crypto/ellpitic performs this calculation. We expect 32 for P-256, 48 for P-384,
 	// 66 for P-521.
 	coordinateLen := (curve.Params().BitSize + 7) / 8
+	if len(xBytes) != coordinateLen || len(yBytes) != coordinateLen {
+		return nil, fmt.Errorf("unexpected coordinate size: expected %d, got X len %d and Y len %d", coordinateLen, len(xBytes), len(yBytes))
+	}
 
 	// Now, construct the buffer:
 	// The first byte 0x04 indicates that point compression is off; then follows all of the

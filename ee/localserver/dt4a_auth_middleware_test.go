@@ -489,13 +489,13 @@ func toJWK(t *testing.T, key any, kid string) (*jwk, error) {
 		}
 
 		// Extract X and Y raw bytes from key
-		sec1Compressed, err := k.Bytes()
+		sec1Uncompressed, err := k.Bytes()
 		require.NoError(t, err)
 		coordinateLen := (k.Curve.Params().BitSize + 7) / 8
 
-		// Format of sec1Compressed is header 0x04, then X bytes, then Y bytes
-		xBytes := sec1Compressed[1 : coordinateLen+1]
-		yBytes := sec1Compressed[coordinateLen+1:]
+		// Format of sec1Uncompressed is header 0x04, then X bytes, then Y bytes
+		xBytes := sec1Uncompressed[1 : coordinateLen+1]
+		yBytes := sec1Uncompressed[coordinateLen+1:]
 
 		// Encode x and y coordinates using base64 URL encoding (unpadded).
 		xStr := base64.RawURLEncoding.EncodeToString(xBytes)

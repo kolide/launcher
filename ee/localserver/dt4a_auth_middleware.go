@@ -265,7 +265,7 @@ func (c *chain) validate(trustedKeys map[string]*ecdsa.PublicKey) error {
 		}
 	}
 
-	// Get copy of root key
+	// Get reference to root key
 	parentEcdsa, ok := trustedKeys[c.Links[0].SignedBy]
 	if !ok {
 		return fmt.Errorf("root key with kid %s not found in trusted keys", c.Links[0].SignedBy)
