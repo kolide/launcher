@@ -64,7 +64,7 @@ func (j *jwk) ecdsaPubKey() (*ecdsa.PublicKey, error) {
 	// we need in the buffer. curve.Params().BitSize gives us the bitsize for the curve; we
 	// add 7 so that we don't miss any additional data for curve sizes that don't divide into 8
 	// evenly (e.g. for P-521, 521 / 8 = 65.125, which rounds to 65, so we may be missing data).
-	// This is how crypto/ellpitic performs this calculation. We expect 32 for P-256, 48 for P-384,
+	// This is how crypto/elliptic performs this calculation. We expect 32 for P-256, 48 for P-384,
 	// 66 for P-521.
 	coordinateLen := (curve.Params().BitSize + 7) / 8
 	if len(xBytes) != coordinateLen || len(yBytes) != coordinateLen {
@@ -81,17 +81,10 @@ func (j *jwk) ecdsaPubKey() (*ecdsa.PublicKey, error) {
 		buf[i+1+coordinateLen] = yBytes[i]
 	}
 
-	// Finally, parse the pubkey.
+	// Finally, parse the pubkey. This will also validate that the key is on the curve.
 	pubKey, err := ecdsa.ParseUncompressedPublicKey(curve, buf)
 	if err != nil {
 		return nil, fmt.Errorf(`invalid ECDSA public key: %w`, err)
-	}
-
-	// this is a little weird, but it's the recommended way to validate a public key,
-	// under the hood it calls Curve.IsOnCurve(...), but if you call that directly
-	// you get deprecated warnings
-	if _, err := pubKey.ECDH(); err != nil {
-		return nil, fmt.Errorf("invalid public key: %w", err)
 	}
 
 	return pubKey, nil
