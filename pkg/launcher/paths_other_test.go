@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDetermineRootDirectoryOverride(t *testing.T) {
+func TestDetermineRootDirectoryOverride_NonWindowsPassthrough(t *testing.T) {
 	t.Parallel()
 
 	// On non-Windows OSes, we don't override the root directory -- confirm we always return
