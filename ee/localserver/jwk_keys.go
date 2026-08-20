@@ -39,7 +39,7 @@ func parseEllipticCurve(str string) (elliptic.Curve, error) {
 	}
 }
 
-// ecdsaPubKey converts jwk in to ecdsa public key
+// ecdsaPubKey converts jwk into ecdsa public key
 func (j *jwk) ecdsaPubKey() (*ecdsa.PublicKey, error) {
 	curve, err := parseEllipticCurve(j.Curve)
 	if err != nil {
@@ -63,8 +63,8 @@ func (j *jwk) ecdsaPubKey() (*ecdsa.PublicKey, error) {
 	// Construct the ECDSA public key.
 	pubKey := &ecdsa.PublicKey{
 		Curve: curve,
-		X:     x,
-		Y:     y,
+		X:     x, //nolint:staticcheck
+		Y:     y, //nolint:staticcheck
 	}
 
 	// this is a little weird, but it's the recommended way to validate a public key,
@@ -77,7 +77,7 @@ func (j *jwk) ecdsaPubKey() (*ecdsa.PublicKey, error) {
 	return pubKey, nil
 }
 
-// x25519PubKey converts jwk in to x25519 key (*[32]byte)
+// x25519PubKey converts jwk into x25519 key (*[32]byte)
 func (j *jwk) x25519PubKey() (*[32]byte, error) {
 	// Decode the "x" coordinate using base64 URL decoding (unpadded).
 	xBytes, err := base64.RawURLEncoding.DecodeString(j.X)
