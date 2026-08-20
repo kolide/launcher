@@ -63,8 +63,8 @@ func (j *jwk) ecdsaPubKey() (*ecdsa.PublicKey, error) {
 	// Construct the ECDSA public key.
 	pubKey := &ecdsa.PublicKey{
 		Curve: curve,
-		X:     x,
-		Y:     y,
+		X:     x, //nolint:staticcheck
+		Y:     y, //nolint:staticcheck
 	}
 
 	// this is a little weird, but it's the recommended way to validate a public key,
