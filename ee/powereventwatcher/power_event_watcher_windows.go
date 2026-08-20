@@ -198,7 +198,7 @@ func New(ctx context.Context, slogger *slog.Logger, pes powerEventSubscriber) (*
 
 	// EvtSubscribe: https://learn.microsoft.com/en-us/windows/win32/api/winevt/nf-winevt-evtsubscribe
 	// Flags: https://learn.microsoft.com/en-us/windows/win32/api/winevt/ne-winevt-evt_subscribe_flags
-	subscriptionHandle, _, err := p.subscribeProcedure.Call(
+	subscriptionHandle, _, err := p.subscribeProcedure.Call( //nolint:staticcheck // Ignore SA4023
 		0,                                    // Session -- NULL because we're querying the local computer
 		0,                                    // SignalEvent -- NULL because we're setting a callback
 		uintptr(unsafe.Pointer(channelPath)), // ChannelPath -- the channel in the event log
@@ -268,7 +268,7 @@ func (p *powerEventWatcher) onPowerEvent(action uint32, _ uintptr, eventHandle u
 	buf := make([]byte, bufferSize)
 	var bufUsed uint32
 	var propertyCount uint32
-	_, _, err := p.renderEventLogProcedure.Call(
+	_, _, err := p.renderEventLogProcedure.Call( //nolint:staticcheck // Ignore SA4023
 		0,                                       // Context -- unused
 		eventHandle,                             // Fragment -- the event handle
 		uintptr(uint32(1)),                      // Flags -- EvtRenderEventXml has value 1
