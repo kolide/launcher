@@ -118,7 +118,7 @@ func Test_Dt4aAuthMiddleware(t *testing.T) {
 		pubcallerPubKey, _, err := box.GenerateKey(rand.Reader)
 		require.NoError(t, err)
 
-		chain, err := newChain(pubcallerPubKey, invalidKeys...)
+		chain, err := newChain(t, pubcallerPubKey, invalidKeys...)
 		require.NoError(t, err)
 
 		chainMarshalled, err := json.Marshal(chain)
@@ -146,7 +146,7 @@ func Test_Dt4aAuthMiddleware(t *testing.T) {
 		callerPubKey, callerPrivKey, err := box.GenerateKey(rand.Reader)
 		require.NoError(t, err)
 
-		chain, err := newChain(callerPubKey, validKeys...)
+		chain, err := newChain(t, callerPubKey, validKeys...)
 		require.NoError(t, err)
 
 		chainMarshalled, err := json.Marshal(chain)
@@ -200,7 +200,7 @@ func Test_ValidateCertChain(t *testing.T) {
 
 	t.Run("trusted root is nil", func(t *testing.T) {
 		t.Parallel()
-		chain, err := newChain(pubEncryptionKey, keys...)
+		chain, err := newChain(t, pubEncryptionKey, keys...)
 		require.NoError(t, err)
 
 		chain.Links[0] = chainLink{}
@@ -218,7 +218,7 @@ func Test_ValidateCertChain(t *testing.T) {
 	t.Run("key not found", func(t *testing.T) {
 		t.Parallel()
 
-		chain, err := newChain(pubEncryptionKey, keys...)
+		chain, err := newChain(t, pubEncryptionKey, keys...)
 		require.NoError(t, err)
 
 		require.ErrorContains(t, chain.validate(make(map[string]*ecdsa.PublicKey)), "not found in trusted keys")
@@ -227,7 +227,7 @@ func Test_ValidateCertChain(t *testing.T) {
 	t.Run("bad sig last item in chain", func(t *testing.T) {
 		t.Parallel()
 
-		chain, err := newChain(pubEncryptionKey, keys...)
+		chain, err := newChain(t, pubEncryptionKey, keys...)
 		require.NoError(t, err)
 
 		// replace last item in chain
@@ -239,7 +239,7 @@ func Test_ValidateCertChain(t *testing.T) {
 	t.Run("invalid signature in chain", func(t *testing.T) {
 		t.Parallel()
 
-		chain, err := newChain(pubEncryptionKey, keys...)
+		chain, err := newChain(t, pubEncryptionKey, keys...)
 		require.NoError(t, err)
 
 		chain.Links[1].Payload = base64.URLEncoding.EncodeToString([]byte("ahhh"))
@@ -250,7 +250,7 @@ func Test_ValidateCertChain(t *testing.T) {
 	t.Run("invalid public encryption key", func(t *testing.T) {
 		t.Parallel()
 
-		chain, err := newChain(pubEncryptionKey, keys...)
+		chain, err := newChain(t, pubEncryptionKey, keys...)
 		require.NoError(t, err)
 
 		badPubEncryptionKey, _, err := box.GenerateKey(rand.Reader)
@@ -280,7 +280,7 @@ func Test_ValidateCertChain(t *testing.T) {
 	t.Run("handles expired chain", func(t *testing.T) {
 		t.Parallel()
 
-		chain, err := newChain(pubEncryptionKey, keys...)
+		chain, err := newChain(t, pubEncryptionKey, keys...)
 		require.NoError(t, err)
 
 		// get first payload
@@ -309,7 +309,7 @@ func Test_ValidateCertChain(t *testing.T) {
 	t.Run("valid chain", func(t *testing.T) {
 		t.Parallel()
 
-		chain, err := newChain(pubEncryptionKey, keys...)
+		chain, err := newChain(t, pubEncryptionKey, keys...)
 		require.NoError(t, err)
 
 		// Get starting value of root key so we can confirm that our validation process does not change it
@@ -410,7 +410,7 @@ func Test_originIsAllowlisted(t *testing.T) {
 // newChain creates a new chain of keys, where each key signs the next key in the chain
 // leaving this in the _test file since we will always be receiving a chain of keys
 // so this is only needed for testing
-func newChain(counterPartyPubEncryptionKey *[32]byte, ecdsaKeys ...*ecdsa.PrivateKey) (*chain, error) {
+func newChain(t *testing.T, counterPartyPubEncryptionKey *[32]byte, ecdsaKeys ...*ecdsa.PrivateKey) (*chain, error) {
 	if len(ecdsaKeys) == 0 {
 		return nil, errors.New("no keys provided")
 	}
@@ -430,9 +430,9 @@ func newChain(counterPartyPubEncryptionKey *[32]byte, ecdsaKeys ...*ecdsa.Privat
 		var err error
 
 		if i == len(ecdsaKeys)-1 {
-			childKey, err = toJWK(counterPartyPubEncryptionKey, "counter_party_pub_encryption_key")
+			childKey, err = toJWK(t, counterPartyPubEncryptionKey, "counter_party_pub_encryption_key")
 		} else {
-			childKey, err = toJWK(&ecdsaKeys[i+1].PublicKey, fmt.Sprint(i))
+			childKey, err = toJWK(t, &ecdsaKeys[i+1].PublicKey, fmt.Sprint(i))
 		}
 
 		if err != nil {
@@ -472,7 +472,7 @@ func newChain(counterPartyPubEncryptionKey *[32]byte, ecdsaKeys ...*ecdsa.Privat
 
 // toJWK accepts either an *ecdsa.PublicKey or *[32]byte (for X25519)
 // along with an optional kid value and returns a jwk object
-func toJWK(key any, kid string) (*jwk, error) {
+func toJWK(t *testing.T, key any, kid string) (*jwk, error) {
 	switch k := key.(type) {
 	case *ecdsa.PublicKey:
 		// determine curve
@@ -488,9 +488,18 @@ func toJWK(key any, kid string) (*jwk, error) {
 			return nil, fmt.Errorf("unsupported elliptic curve, %s", crv)
 		}
 
+		// Extract X and Y raw bytes from key
+		sec1Compressed, err := k.Bytes()
+		require.NoError(t, err)
+		coordinateLen := (k.Curve.Params().BitSize + 7) / 8
+
+		// Format of sec1Compressed is header 0x04, then X bytes, then Y bytes
+		xBytes := sec1Compressed[1 : coordinateLen+1]
+		yBytes := sec1Compressed[coordinateLen+1:]
+
 		// Encode x and y coordinates using base64 URL encoding (unpadded).
-		xStr := base64.RawURLEncoding.EncodeToString(k.X.Bytes()) //nolint:staticcheck
-		yStr := base64.RawURLEncoding.EncodeToString(k.Y.Bytes()) //nolint:staticcheck
+		xStr := base64.RawURLEncoding.EncodeToString(xBytes)
+		yStr := base64.RawURLEncoding.EncodeToString(yBytes)
 
 		return &jwk{
 			Curve: crv,
