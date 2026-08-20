@@ -1,3 +1,5 @@
+//go:build windows
+
 // Package oleconv provides functions to convert from ole.VARIANT to
 // expected types.
 //
