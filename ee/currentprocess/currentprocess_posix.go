@@ -2,9 +2,18 @@
 
 package currentprocess
 
-import "errors"
+import (
+	"os"
+	"strconv"
+)
 
-// Unreachable on non-Windows, included for compilation.
+// Returns whether the current process is root.
 func IsElevated() (bool, error) {
-	return false, errors.New("OS does not support elevation check")
+	return os.Geteuid() == 0, nil
+}
+
+// Returns the current process's numerical user id. All platforms
+// return strings because of Windows.
+func Uid() (string, error) {
+	return strconv.Itoa(os.Getuid()), nil
 }

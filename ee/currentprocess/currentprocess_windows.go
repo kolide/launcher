@@ -4,6 +4,7 @@ package currentprocess
 
 import (
 	"fmt"
+	"os/user"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -26,4 +27,14 @@ func IsElevated() (bool, error) {
 	}
 
 	return outLen == uint32(unsafe.Sizeof(elevation)) && elevation != 0, nil
+}
+
+// Returns the current process's fully-qualified owner, DOMAIN\User.
+func Uid() (string, error) {
+	currentUser, err := user.Current()
+	if err != nil {
+		return "", fmt.Errorf("getting current user: %w", err)
+	}
+
+	return currentUser.Username, nil
 }
