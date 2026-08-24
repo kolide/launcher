@@ -113,12 +113,11 @@ func DetermineRootDirectoryOverride(logger *slog.Logger, optsRootDirectory, koli
 	elevated, err := runningElevated() //nolint:staticcheck // Linux/MacOS unreachable, always errors
 	if err != nil {                    //nolint:staticcheck
 		logger.Log(context.TODO(), slog.LevelWarn,
-			"failed to check if process is elevated, returning passed root directory",
-			"root_directory", optsRootDirectory,
+			"failed to check if process is elevated, assuming privileged",
 			"err", err,
 		)
-
-		return optsRootDirectory
+		// historically we never checked privileges here, so fall through
+		elevated = true
 	}
 
 	return rootDirectoryOverride(optsRootDirectory, rootDirOverrideOpts{
