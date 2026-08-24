@@ -21,23 +21,24 @@ func runDoctor(systemMultiSlogger *multislogger.MultiSlogger, args []string) err
 	launcher.DefaultAutoupdate = true
 	launcher.SetDefaultPaths()
 
-	opts, err := launcher.ParseOptions(systemMultiSlogger.Logger, "doctor", os.Args[2:])
-	if err != nil {
-		return err
-	}
-
-	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
-
-	slogLevel := slog.LevelInfo
-	if opts.Debug {
-		slogLevel = slog.LevelDebug
-	}
-
+	slogLevel := new(slog.LevelVar)
+	slogLevel.Set(slog.LevelInfo)
 	// Add handler to write to stdout
 	systemMultiSlogger.AddHandler(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level:     slogLevel,
 		AddSource: true,
 	}))
+
+	opts, err := launcher.ParseOptions(systemMultiSlogger.Logger, "doctor", os.Args[2:])
+	if err != nil {
+		return err
+	}
+
+	if opts.Debug {
+		slogLevel.Set(slog.LevelDebug)
+	}
+
+	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
 
 	flagController := flags.NewFlagController(systemMultiSlogger.Logger, nil, fcOpts...)
 	k := knapsack.New(nil, flagController, nil, nil, nil)

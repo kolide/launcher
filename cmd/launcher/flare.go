@@ -38,7 +38,15 @@ func runFlare(systemMultiSlogger *multislogger.MultiSlogger, args []string) erro
 		flOutputDir        = flagset.String("output_dir", ".", "path to directory to save flare output")
 		flUploadRequestURL = flagset.String("upload_request_url", "https://api.kolide.com/api/agent/flare", "URL to request a signed upload URL")
 		flConfigFilePath   = flagset.String("config", launcher.DefaultConfigFilePath, "config file to parse options from (optional)")
+		slogLevel          = new(slog.LevelVar)
 	)
+	slogLevel.Set(slog.LevelInfo)
+
+	// Add handler to write to stdout
+	systemMultiSlogger.AddHandler(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level:     slogLevel,
+		AddSource: true,
+	}))
 
 	if err := ff.Parse(flagset, args); err != nil {
 		return fmt.Errorf("parsing flags: %w", err)
@@ -49,16 +57,9 @@ func runFlare(systemMultiSlogger *multislogger.MultiSlogger, args []string) erro
 		return err
 	}
 
-	slogLevel := slog.LevelInfo
 	if opts.Debug {
-		slogLevel = slog.LevelDebug
+		slogLevel.Set(slog.LevelDebug)
 	}
-
-	// Add handler to write to stdout
-	systemMultiSlogger.AddHandler(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level:     slogLevel,
-		AddSource: true,
-	}))
 
 	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
 	flagController := flags.NewFlagController(systemMultiSlogger.Logger, inmemory.NewStore(), fcOpts...)
