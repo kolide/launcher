@@ -34,25 +34,20 @@ func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, uid string,
 	ctx, span := observability.StartSpan(ctx, "uid", uid)
 	defer span.End()
 
-	currentUser, err := user.Current()
-	if err != nil {
-		return fmt.Errorf("getting current user: %w", err)
-	}
-
 	runningUser, err := user.LookupId(uid)
 	if err != nil || runningUser == nil {
 		return fmt.Errorf("looking up user with uid %s: %w", uid, err)
 	}
 
-	// current user not root
-	if currentUser.Uid != "0" {
-		// if the user is running for itself, just run without setting credentials
-		if currentUser.Uid == runningUser.Uid {
-			return cmd.Start()
-		}
+	// Set any necessary environment variables on the command (like DISPLAY)
+	envVars := r.userEnvVars(ctx, uid, runningUser.Username)
+	for k, v := range envVars {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
+	}
 
-		// if the user is running for another user, we have an error because we can't set credentials
-		return fmt.Errorf("current user %s is not root and can't start process for other user %s", currentUser.Uid, uid)
+	// no special credentials need to be set
+	if r.isCurrentUser(uid) {
+		return cmd.Start()
 	}
 
 	// the remaining code in this function is not covered by unit test since it requires root privileges
@@ -74,12 +69,6 @@ func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, uid string,
 			Uid: uint32(runningUserUid),
 			Gid: uint32(runningUserGid),
 		},
-	}
-
-	// Set any necessary environment variables on the command (like DISPLAY)
-	envVars := r.userEnvVars(ctx, uid, runningUser.Username)
-	for k, v := range envVars {
-		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
 	}
 
 	return cmd.Start()
