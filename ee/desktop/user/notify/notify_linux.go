@@ -209,15 +209,17 @@ func (d *dbusNotifier) sendNotificationViaDbus(n Notification) error {
 
 	notificationsService := conn.Object(notificationServiceInterface, notificationServiceObj)
 	call := notificationsService.Call("org.freedesktop.Notifications.Notify",
-		0,                         // no flags
-		"Kolide",                  // app_name
-		uint32(0),                 // replaces_id -- 0 means this notification won't replace any existing notifications
-		d.iconFilepath,            // app_icon
-		n.Title,                   // summary
-		n.Body,                    // body
-		actions,                   // actions
-		map[string]dbus.Variant{}, // hints
-		int32(0))                  // expire_timeout -- 0 means the notification will not expire
+		0,              // no flags
+		"Kolide",       // app_name
+		uint32(0),      // replaces_id -- 0 means this notification won't replace any existing notifications
+		d.iconFilepath, // app_icon
+		n.Title,        // summary
+		n.Body,         // body
+		actions,        // actions
+		map[string]dbus.Variant{
+			"urgency": dbus.MakeVariant(uint8(2)), // Without an urgency of "critical", the notification auto-closes extremely quickly
+		}, // hints
+		int32(0)) // expire_timeout -- 0 means the notification will not expire
 
 	if call.Err != nil {
 		d.slogger.Log(context.TODO(), slog.LevelError,
@@ -251,7 +253,8 @@ func (d *dbusNotifier) sendNotificationViaNotifySend(n Notification) error {
 		n.Body += " " + learnMoreLabel(d.localizationPath) + ": " + n.ActionUri
 	}
 
-	args := []string{n.Title, n.Body}
+	// We set an urgency of "critical" so that the notification does not auto-close quickly.
+	args := []string{n.Title, n.Body, "-u", "critical"}
 	if d.iconFilepath != "" {
 		args = append(args, "-i", d.iconFilepath)
 	}
