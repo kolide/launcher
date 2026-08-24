@@ -111,8 +111,8 @@ func DetermineRootDirectoryOverride(logger *slog.Logger, optsRootDirectory, koli
 		return optsRootDirectory
 	}
 
-	elevated, err := currentprocess.IsElevated() //nolint:staticcheck // Linux/MacOS unreachable, always errors
-	if err != nil {                              //nolint:staticcheck
+	elevated, err := currentprocess.IsElevated()
+	if err != nil {
 		logger.Log(context.TODO(), slog.LevelWarn,
 			"failed to check if process is elevated, assuming privileged",
 			"err", err,
