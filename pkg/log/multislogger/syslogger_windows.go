@@ -8,18 +8,22 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/kolide/launcher/v2/ee/currentprocess"
 	"github.com/kolide/launcher/v2/pkg/log/eventlog"
-	"golang.org/x/sys/windows"
 )
 
 const serviceName = "launcher"
 
 func SystemSlogger() (*MultiSlogger, io.Closer, error) {
-	if !windows.GetCurrentProcessToken().IsElevated() {
+	// On a failure to determine elevation, assume we are unprivileged rather than
+	// attempting an eventlog write we may not be permitted to make.
+	elevated, err := currentprocess.IsElevated()
+	if err != nil || !elevated {
 		syslogger := defaultSystemSlogger()
 
 		syslogger.Log(context.TODO(), slog.LevelInfo,
 			"launcher running on windows without elevated permissions, using default stdout instead of eventlog",
+			"err", err,
 		)
 
 		return syslogger, io.NopCloser(nil), nil
