@@ -14,24 +14,31 @@ type signalListener struct {
 	sigChannel  chan os.Signal
 	cancel      context.CancelFunc
 	slogger     *slog.Logger
+	interrupt   chan struct{}
 	interrupted atomic.Bool
 }
 
 func newSignalListener(sigChannel chan os.Signal, cancel context.CancelFunc, slogger *slog.Logger) *signalListener {
+	signal.Notify(sigChannel, os.Interrupt, syscall.SIGTERM)
 	return &signalListener{
 		sigChannel: sigChannel,
 		cancel:     cancel,
 		slogger:    slogger.With("component", "signal_listener"),
+		interrupt:  make(chan struct{}, 1),
 	}
 }
 
 func (s *signalListener) Execute() error {
-	signal.Notify(s.sigChannel, os.Interrupt, syscall.SIGTERM)
-	sig := <-s.sigChannel
-	s.slogger.Log(context.TODO(), slog.LevelInfo,
-		"beginning shutdown via signal",
-		"signal_received", sig,
-	)
+	select {
+	case sig := <-s.sigChannel:
+		s.slogger.Log(context.TODO(), slog.LevelInfo,
+			"beginning shutdown via signal",
+			"signal_received", sig,
+		)
+	case <-s.interrupt:
+		// Rungroup shutdown
+	}
+
 	return nil
 }
 
@@ -44,6 +51,6 @@ func (s *signalListener) Interrupt(_ error) {
 	// tell sender in `os/signal` package to stop sending on `s.sigChannel`
 	// to avoid panics for sending on a closed channel
 	signal.Stop(s.sigChannel)
+	close(s.interrupt)
 	s.cancel()
-	close(s.sigChannel)
 }
