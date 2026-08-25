@@ -1,4 +1,5 @@
-// runner handles multiuser process management for launcher desktop
+// runner spawns child processes to run the unprivileged launcher for all users
+// logged in.
 package runner
 
 import (
@@ -1159,8 +1160,10 @@ func (r *DesktopUsersProcessesRunner) writeLocalizationFile() error {
 	return nil
 }
 
-// desktopCommand invokes the launcher desktop executable with the appropriate env vars
+// desktopCommand invokes the launcher desktop executable with configuration
+// to interface with this process over a socket and URL
 func (r *DesktopUsersProcessesRunner) desktopCommand(uid, socketPath, menuPath string) (*allowedcmd.TracedCmd, error) {
+	// desktop subcommand runs the more limited desktop launcher
 	cmd, err := allowedcmd.Launcher.Cmd(context.TODO(), "desktop")
 	if err != nil {
 		return nil, fmt.Errorf("creating launcher desktop command: %w", err)
@@ -1199,7 +1202,7 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(uid, socketPath, menuPath s
 		// Set GOMAXPROCS for the desktop subprocess (Go respects this natively).
 		// This overrides the GOMAXPROCS value set by allowedcmd.
 		fmt.Sprintf("GOMAXPROCS=%d", r.knapsack.DesktopGoMaxProcs()),
-		"LAUNCHER_SKIP_UPDATES=true", // We already know that we want to run the version of launcher in `executablePath`, so there's no need to perform lookups
+		"LAUNCHER_SKIP_UPDATES=true", // run the _exact_ binary that we run and dodge cross-version incompatibility
 	}
 
 	stdErr, err := cmd.StderrPipe()

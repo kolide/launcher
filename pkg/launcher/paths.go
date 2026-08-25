@@ -166,10 +166,10 @@ func rootDirectoryOverride(rootDirectory string, opts rootDirOverrideOpts) strin
 		return rootDirectory
 	}
 
-	// override paths are not usable for unprivileged users
+	// unprivileged launcher cannot utilize system-owned override paths
 	if !opts.isPrivileged {
 		logger.Log(context.TODO(), slog.LevelWarn,
-			"not running elevated, initializing launcher at configured root path and skipping well-known override locations",
+			"not running elevated, initializing launcher at configured root path and skipping evaluation of well-known overrides",
 			"root_directory", rootDirectory,
 		)
 		return rootDirectory

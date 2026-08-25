@@ -134,8 +134,9 @@ func runMain() int {
 		}
 	}
 
-	// if the launcher is being ran with a positional argument,
-	// handle that argument.
+	// if the launcher is being run with a positional argument, we
+	// bypass launcher proper's option parsing and let the subcommand
+	// figure it out.
 	if len(os.Args) > 1 && !strings.HasPrefix(os.Args[1], `-`) {
 		if err := runSubcommands(systemSlogger); err != nil {
 			systemSlogger.Log(ctx, slog.LevelError,
@@ -147,7 +148,7 @@ func runMain() int {
 		return 0
 	}
 
-	// Fall back to running launcher
+	// Default to running launcher proper with its extensive set of options.
 	opts, err := launcher.ParseOptions(systemSlogger.Logger, "", os.Args[1:])
 	if err != nil {
 		if launcher.IsInfoCmd(err) {
@@ -160,7 +161,7 @@ func runMain() int {
 		return 0
 	}
 
-	// recreate the logger with  the appropriate level.
+	// recreate the logger with the appropriate level.
 	logger = logutil.NewServerLogger(opts.Debug)
 
 	// set up slogger for internal launcher logging

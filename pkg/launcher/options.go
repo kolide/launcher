@@ -185,9 +185,13 @@ func (i *ArrayFlags) Set(value string) error {
 	return nil
 }
 
-// ParseOptions parses the options that may be configured via command-line flags
-// and/or environment variables, determines order of precedence and returns a
-// typed struct of options for further application use
+// ParseOptions handles flags, environment variable overrides, and
+// their order of precedence for launcher. These generally apply
+// to the proper launcher runtime that communicates with a
+// controlserver and runs osquery. A parsed set of options is
+// returned.
+//
+// Launcher subcommands may opt-in to these flags, but most do not.
 func ParseOptions(logger *slog.Logger, subcommandName string, args []string) (*Options, error) {
 	flagsetName := "launcher"
 	if subcommandName != "" {
