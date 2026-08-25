@@ -46,7 +46,7 @@ func runWindowsSvc(systemSlogger *multislogger.MultiSlogger, args []string) erro
 		"version", version.Version().Version,
 	)
 
-	opts, err := launcher.ParseOptions("", os.Args[2:])
+	opts, err := launcher.ParseOptions(systemSlogger.Logger, "", os.Args[2:])
 	if err != nil {
 		systemSlogger.Log(context.TODO(), slog.LevelInfo,
 			"error parsing options",
@@ -141,7 +141,7 @@ func runWindowsSvcForeground(systemSlogger *multislogger.MultiSlogger, args []st
 	localSlogger.AddHandler(handler)
 	systemSlogger.AddHandler(handler)
 
-	opts, err := launcher.ParseOptions("", os.Args[2:])
+	opts, err := launcher.ParseOptions(systemSlogger.Logger, "", os.Args[2:])
 	if err != nil {
 		level.Info(logger).Log("err", err)
 		return fmt.Errorf("parsing options: %w", err)

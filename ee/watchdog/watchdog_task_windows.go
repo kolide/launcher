@@ -35,7 +35,7 @@ func RunWatchdogTask(systemSlogger *multislogger.MultiSlogger, args []string) er
 	ff.Parse(flagset, args)
 
 	// pass the config file through our standard options parsing to get all default options
-	opts, err := launcher.ParseOptions("watchdog", []string{"-config", *flConfigFilePath})
+	opts, err := launcher.ParseOptions(systemSlogger.Logger, "watchdog", []string{"-config", *flConfigFilePath})
 	if err != nil {
 		return fmt.Errorf("parsing watchdog options: %w", err)
 	}

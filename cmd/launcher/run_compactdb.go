@@ -39,19 +39,19 @@ func runCompactDb(systemMultiSlogger *multislogger.MultiSlogger, args []string) 
 		launcherOptions = append(launcherOptions, "-config", *flConfigFilePath)
 	}
 
-	opts, err := launcher.ParseOptions("compactdb", launcherOptions)
+	// Add handler to write to stdout
+	systemMultiSlogger.AddHandler(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level:     slog.LevelDebug,
+		AddSource: true,
+	}))
+
+	opts, err := launcher.ParseOptions(systemMultiSlogger.Logger, "compactdb", launcherOptions)
 	if err != nil {
 		return fmt.Errorf("parsing launcher options: %w", err)
 	}
 	if opts.RootDirectory == "" {
 		return errors.New("no root directory specified")
 	}
-
-	// Add handler to write to stdout
-	systemMultiSlogger.AddHandler(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level:     slog.LevelDebug,
-		AddSource: true,
-	}))
 
 	boltPath := filepath.Join(opts.RootDirectory, "launcher.db")
 	if *flDbFileName != "" {

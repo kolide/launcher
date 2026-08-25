@@ -1,10 +1,12 @@
 package launcher
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,6 +16,7 @@ import (
 	"time"
 
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/peterbourgon/ff/v3"
 )
 
@@ -182,10 +185,14 @@ func (i *ArrayFlags) Set(value string) error {
 	return nil
 }
 
-// ParseOptions parses the options that may be configured via command-line flags
-// and/or environment variables, determines order of precedence and returns a
-// typed struct of options for further application use
-func ParseOptions(subcommandName string, args []string) (*Options, error) {
+// ParseOptions handles flags, environment variable overrides, and
+// their order of precedence for launcher. These generally apply
+// to the proper launcher runtime that communicates with a
+// controlserver and runs osquery. A parsed set of options is
+// returned.
+//
+// Launcher subcommands may opt-in to these flags, but most do not.
+func ParseOptions(logger *slog.Logger, subcommandName string, args []string) (*Options, error) {
 	flagsetName := "launcher"
 	if subcommandName != "" {
 		flagsetName = fmt.Sprintf("launcher %s", subcommandName)
@@ -195,6 +202,9 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		flagset.Usage = func() { usage(flagset) }
 	} else {
 		flagset.Usage = commandUsage(flagset, flagsetName)
+	}
+	if logger == nil {
+		logger = multislogger.NewNopLogger()
 	}
 
 	var (
@@ -312,6 +322,10 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 
 	// On windows, we should make sure osquerydPath ends in .exe
 	if runtime.GOOS == "windows" && !strings.HasSuffix(osquerydPath, ".exe") {
+		logger.Log(context.TODO(), slog.LevelInfo,
+			"appending missing file extension to osqueryd path",
+			"original_path", osquerydPath,
+		)
 		osquerydPath = osquerydPath + ".exe"
 	}
 
@@ -378,10 +392,7 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 
 	if runtime.GOOS == "windows" {
 		// check for old root directories before returning the configured option in case we've stomped over with windows MSI install
-		updatedRootDirectory := DetermineRootDirectoryOverride(*flRootDirectory, *flKolideServerURL, *flPackageIdentifier)
-		if updatedRootDirectory != *flRootDirectory {
-			*flRootDirectory = updatedRootDirectory
-		}
+		*flRootDirectory = DetermineRootDirectoryOverride(logger, *flRootDirectory, *flKolideServerURL, *flPackageIdentifier)
 	}
 
 	opts := &Options{

@@ -50,7 +50,7 @@ func (lf *launcherFlags) Run(_ context.Context, extraFh io.Writer) error {
 		return nil
 	}
 
-	if _, err := launcher.ParseOptions("", []string{fmt.Sprintf("--config=%s", configFilePath)}); err != nil {
+	if _, err := launcher.ParseOptions(lf.k.Slogger(), "", []string{fmt.Sprintf("--config=%s", configFilePath)}); err != nil {
 		lf.summary = fmt.Sprintf("failed to parse flags: %s", err)
 		return nil
 	}

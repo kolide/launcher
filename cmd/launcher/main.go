@@ -83,7 +83,7 @@ func runMain() int {
 
 	// create initial logger. As this is prior to options parsing,
 	// use the environment to determine verbosity.  It will be
-	// re-leveled during options parsing.
+	// re-leveled after options parsing.
 	logger := logutil.NewServerLogger(env.Bool("LAUNCHER_DEBUG", false))
 	ctx = ctxlog.NewContext(ctx, logger)
 
@@ -134,8 +134,9 @@ func runMain() int {
 		}
 	}
 
-	// if the launcher is being ran with a positional argument,
-	// handle that argument.
+	// if the launcher is being run with a positional argument, we
+	// bypass launcher proper's option parsing and let the subcommand
+	// figure it out.
 	if len(os.Args) > 1 && !strings.HasPrefix(os.Args[1], `-`) {
 		if err := runSubcommands(systemSlogger); err != nil {
 			systemSlogger.Log(ctx, slog.LevelError,
@@ -147,8 +148,8 @@ func runMain() int {
 		return 0
 	}
 
-	// Fall back to running launcher
-	opts, err := launcher.ParseOptions("", os.Args[1:])
+	// Default to running launcher proper with its extensive set of options.
+	opts, err := launcher.ParseOptions(systemSlogger.Logger, "", os.Args[1:])
 	if err != nil {
 		if launcher.IsInfoCmd(err) {
 			return 0
@@ -160,7 +161,7 @@ func runMain() int {
 		return 0
 	}
 
-	// recreate the logger with  the appropriate level.
+	// recreate the logger with the appropriate level.
 	logger = logutil.NewServerLogger(opts.Debug)
 
 	// set up slogger for internal launcher logging

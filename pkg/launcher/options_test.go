@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/kolide/kit/stringutil"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
@@ -90,7 +91,7 @@ func TestOptionsFromFlags(t *testing.T) { //nolint:paralleltest
 		}
 	}
 
-	opts, err := ParseOptions("", testFlags)
+	opts, err := ParseOptions(multislogger.NewNopLogger(), "", testFlags)
 	require.NoError(t, err)
 	require.Equal(t, expectedOpts, opts)
 }
@@ -112,7 +113,7 @@ func TestOptionsFromEnv(t *testing.T) { //nolint:paralleltest
 		name := fmt.Sprintf("KOLIDE_LAUNCHER_%s", strings.ToUpper(strings.TrimLeft(k, "-")))
 		t.Setenv(name, val)
 	}
-	opts, err := ParseOptions("", []string{})
+	opts, err := ParseOptions(multislogger.NewNopLogger(), "", []string{})
 	require.NoError(t, err)
 	require.Equal(t, expectedOpts, opts)
 }
@@ -143,7 +144,7 @@ func TestOptionsFromFile(t *testing.T) { // nolint:paralleltest
 
 	require.NoError(t, flagFile.Close())
 
-	opts, err := ParseOptions("", []string{"-config", flagFile.Name()})
+	opts, err := ParseOptions(multislogger.NewNopLogger(), "", []string{"-config", flagFile.Name()})
 	require.NoError(t, err)
 	require.Equal(t, expectedOpts, opts)
 }
@@ -178,7 +179,7 @@ func TestAutoupdateDownloadSPlayCanBeDisabledFromFlagsFile(t *testing.T) { //nol
 
 	require.NoError(t, flagFile.Close())
 
-	opts, err := ParseOptions("", []string{"-config", flagFile.Name()})
+	opts, err := ParseOptions(multislogger.NewNopLogger(), "", []string{"-config", flagFile.Name()})
 	require.NoError(t, err)
 	require.Equal(t, expectedOpts, opts)
 }
@@ -215,7 +216,7 @@ func TestOsqueryLogPublishFlags(t *testing.T) { //nolint:paralleltest
 
 	require.NoError(t, flagFile.Close())
 
-	opts, err := ParseOptions("", []string{"-config", flagFile.Name()})
+	opts, err := ParseOptions(multislogger.NewNopLogger(), "", []string{"-config", flagFile.Name()})
 	require.NoError(t, err)
 	require.Equal(t, expectedOpts, opts)
 }
@@ -313,7 +314,7 @@ func TestOptionsSetControlServerHost(t *testing.T) { // nolint:paralleltest
 	for _, tt := range testCases { // nolint:paralleltest
 		os.Clearenv()
 		t.Run(tt.testName, func(t *testing.T) {
-			opts, err := ParseOptions("", tt.testFlags)
+			opts, err := ParseOptions(multislogger.NewNopLogger(), "", tt.testFlags)
 			require.NoError(t, err, "could not parse options")
 			require.Equal(t, tt.expectedControlServer, opts.ControlServerURL, "incorrect control server")
 			require.Equal(t, tt.expectedInsecureControlTLS, opts.InsecureControlTLS, "incorrect insecure TLS")

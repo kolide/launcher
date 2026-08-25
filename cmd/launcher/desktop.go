@@ -29,6 +29,10 @@ import (
 	"github.com/peterbourgon/ff/v3"
 )
 
+// runDesktop executes the userland, unprivileged launcher in the background
+// which surfaces notifications and provides a tray icon. It bypasses launcher
+// proper's option parsing and its arguments are set explicitly by the parent
+// process.
 func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 	var (
 		flagset = flag.NewFlagSet("kolide desktop", flag.ExitOnError)

@@ -49,7 +49,7 @@ func CheckOutLatestWithoutConfig(binary autoupdatableBinary, slogger *slog.Logge
 	}
 
 	// check for old root directories before returning final config in case we've stomped over with windows MSI install
-	updatedRootDirectory := launcher.DetermineRootDirectoryOverride(cfg.rootDirectory, cfg.hostname, cfg.identifier)
+	updatedRootDirectory := launcher.DetermineRootDirectoryOverride(slogger, cfg.rootDirectory, cfg.hostname, cfg.identifier)
 	if updatedRootDirectory != cfg.rootDirectory {
 		slogger.Log(context.TODO(), slog.LevelInfo,
 			"old root directory contents detected, overriding for autoupdate config",

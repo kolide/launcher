@@ -37,7 +37,7 @@ func runUninstall(_ *multislogger.MultiSlogger, args []string) error {
 		launcherOptions = append(launcherOptions, "-config", *flConfigFilePath)
 	}
 
-	opts, err := launcher.ParseOptions("uninstall", launcherOptions)
+	opts, err := launcher.ParseOptions(multislogger.NewNopLogger(), "uninstall", launcherOptions)
 	if err != nil {
 		return fmt.Errorf("parsing launcher options: %w", err)
 	}

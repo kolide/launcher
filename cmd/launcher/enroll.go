@@ -34,7 +34,7 @@ func runEnroll(systemMultiSlogger *multislogger.MultiSlogger, args []string) err
 	if err := ff.Parse(flagset, args); err != nil {
 		return fmt.Errorf("parsing flags: %w", err)
 	}
-	opts, err := launcher.ParseOptions("enroll", []string{"-config", *flConfigFilePath})
+	opts, err := launcher.ParseOptions(systemMultiSlogger.Logger, "enroll", []string{"-config", *flConfigFilePath})
 	if err != nil {
 		return fmt.Errorf("parsing options for subcommand enroll: %w", err)
 	}
