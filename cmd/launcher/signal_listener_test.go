@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"os"
+	"syscall"
 	"testing"
 	"time"
 
@@ -17,6 +18,45 @@ func TestMain(m *testing.M) {
 	// ioCompletionProcessor will continue to run forever until the process (go test in this case) exits,
 	// so we need goleak to ignore that one.
 	goleak.VerifyTestMain(m, goleak.IgnoreAnyFunction("github.com/Microsoft/go-winio.ioCompletionProcessor"))
+}
+
+func TestInterruptBeforeExecute(t *testing.T) {
+	t.Parallel()
+
+	sigChannel := make(chan os.Signal, 1)
+	_, cancel := context.WithCancel(t.Context())
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+	sigListener := newSignalListener(sigChannel, cancel, slogger)
+
+	// Call Interrupt and Execute out of order -- Execute should immediately return
+	sigListener.Interrupt(errors.New("test error"))
+	err := sigListener.Execute()
+	require.NoError(t, err)
+
+	// Send a sigterm, confirm no panic
+	sigChannel <- syscall.SIGTERM
+}
+
+func TestSigtermBeforeExecute(t *testing.T) {
+	t.Parallel()
+
+	sigChannel := make(chan os.Signal, 1)
+	_, cancel := context.WithCancel(t.Context())
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+	sigListener := newSignalListener(sigChannel, cancel, slogger)
+
+	// Send a sigterm, confirm no panic
+	sigChannel <- syscall.SIGTERM
+
+	// Start up the listener, then shut it down
+	go sigListener.Execute()
+	sigListener.Interrupt(errors.New("test error"))
 }
 
 func TestInterrupt_Multiple(t *testing.T) {
