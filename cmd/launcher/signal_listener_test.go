@@ -40,6 +40,25 @@ func TestInterruptBeforeExecute(t *testing.T) {
 	sigChannel <- syscall.SIGTERM
 }
 
+func TestSigtermBeforeExecute(t *testing.T) {
+	t.Parallel()
+
+	sigChannel := make(chan os.Signal, 1)
+	_, cancel := context.WithCancel(t.Context())
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+	sigListener := newSignalListener(sigChannel, cancel, slogger)
+
+	// Send a sigterm, confirm no panic
+	sigChannel <- syscall.SIGTERM
+
+	// Start up the listener, then shut it down
+	go sigListener.Execute()
+	sigListener.Interrupt(errors.New("test error"))
+}
+
 func TestInterrupt_Multiple(t *testing.T) {
 	t.Parallel()
 
