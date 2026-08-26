@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/kolide/launcher/v2/ee/currentprocess"
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 )
 
@@ -110,8 +111,8 @@ func DetermineRootDirectoryOverride(logger *slog.Logger, optsRootDirectory, koli
 		return optsRootDirectory
 	}
 
-	elevated, err := runningElevated() //nolint:staticcheck // Linux/MacOS unreachable, always errors
-	if err != nil {                    //nolint:staticcheck
+	elevated, err := currentprocess.IsElevated() //nolint:staticcheck // Linux/MacOS unreachable, always errors
+	if err != nil {                              //nolint:staticcheck
 		logger.Log(context.TODO(), slog.LevelWarn,
 			"failed to check if process is elevated, assuming privileged",
 			"err", err,
