@@ -1,6 +1,6 @@
 //go:build windows
 
-package launcher
+package currentprocess
 
 import (
 	"fmt"
@@ -12,7 +12,7 @@ import (
 // Detects UAC elevation or when running as LocalSystem.
 // Impl is copied from windows.Token.IsElevated, but exposes the error
 // on a failure to check.
-func runningElevated() (bool, error) {
+func IsElevated() (bool, error) {
 	var elevation uint32
 	var outLen uint32
 	if err := windows.GetTokenInformation(
