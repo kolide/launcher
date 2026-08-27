@@ -1684,19 +1684,25 @@ func TestGetQueries_WorksWithSecretlessEnrollment(t *testing.T) {
 	assert.False(t, s.RequestEnrollmentFuncInvoked)
 	assert.False(t, s.RequestQueriesFuncInvoked)
 
-	// Now, fire off a bunch of sequential GetQueries requests, so that we'll (probably) have one
-	// processing while we simulate secretless enrollment completing
+	// Once the key is set, GetQueries rarely can be mid-evaluation of whether to enroll.
+	// It checks the key before it begins enrollment, and if it's there it stores it.
+	k.On("EnsureEnrollmentStored", testifymock.Anything).Return(nil).Maybe()
+
+	// Set the node key in the middle of our GetQueries calls, simulating secretless enrollment completing in a
+	// different goroutine.
+	nodekeyMockCall.Unset()
+	nodekeyMockCall = k.On("NodeKey", testifymock.Anything).Return("", nil).Times(10)
+	k.On("NodeKey", testifymock.Anything).Return(nodeKeyFromSecretlessEnrollment, nil).NotBefore(nodekeyMockCall)
+
+	// In parallel, hopefully running at different stages.
 	resultChan := make(chan struct{}, 100)
-	go func() {
-		for range 100 {
+	for range 100 {
+		go func() {
+			time.Sleep(time.Microsecond) // jitter from yielding more than sleeping
 			_, _ = e.GetQueries(t.Context())
 			resultChan <- struct{}{}
-		}
-	}()
-
-	// Now, set the node key, to simulate secretless enrollment completing in a different thread.
-	nodekeyMockCall.Unset()
-	k.On("NodeKey", testifymock.Anything).Return(nodeKeyFromSecretlessEnrollment, nil)
+		}()
+	}
 
 	// Wait for our previous queries to complete
 	for range 100 {
