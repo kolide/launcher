@@ -111,7 +111,7 @@ func TestExtensionSocketPath(t *testing.T) {
 	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
 	setUpMockStores(t, k)
-	osqHistory := setupHistory(t, k)
+	setupHistory(t, k)
 	testServer := setupMockDeviceServer(t)
 	k.On("KolideServerURL").Return(testServer).Maybe()
 	k.On("InsecureTransportTLS").Return(true).Maybe()
@@ -126,7 +126,7 @@ func TestExtensionSocketPath(t *testing.T) {
 	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 
-	waitHealthy(t, runner, logBytes, osqHistory)
+	waitHealthy(t, runner, logBytes)
 
 	// wait for the launcher-provided extension to register
 	time.Sleep(2 * time.Second)
