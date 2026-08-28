@@ -19,22 +19,34 @@ const (
 	launchRetryDelay = 10 * time.Second
 )
 
+const (
+	runnerUnstarted int32 = iota
+	runnerRunning
+	runnerShutdown
+)
+
 // settingsStoreWriter writes to our startup settings store
 type settingsStoreWriter interface {
 	WriteSettings() error
 }
 
+type wrappedInstance struct {
+	*OsqueryInstance
+	cancel func()
+}
+
 type Runner struct {
-	enrollmentIds    []string                    // we expect to run one instance per enrollment ID
-	instances        map[string]*OsqueryInstance // maps enrollment ID to currently-running instance
-	instanceLock     sync.Mutex                  // locks access to `instances` to avoid e.g. restarting an instance that isn't running yet
+	enrollmentIds    []string                   // we expect to run one instance per enrollment ID
+	instances        map[string]wrappedInstance // maps enrollment ID to currently-running instance
+	instanceLock     sync.Mutex                 // locks access to `instances` to avoid e.g. restarting an instance that isn't running yet
 	slogger          *slog.Logger
 	knapsack         types.Knapsack
 	logPublishClient types.OsqueryPublisher  // client used for cutting over to new osquery log publication service (agent-ingester)
 	settingsWriter   settingsStoreWriter     // writes to startup settings store
 	opts             []OsqueryInstanceOption // global options applying to all osquery instances
-	shutdown         chan struct{}
-	interrupted      *atomic.Bool
+	shutdown         chan struct{}           // closed by Shutdown to stop all instances
+	done             chan struct{}           // closed when all instances have stopped
+	state            atomic.Int32            // runnerUnstarted -> runnerRunning -> runnerShutdown
 	needsRestart     *atomic.Bool
 	restartLock      sync.Mutex // use a restart lock to ensure we don't get multiple quick succession restarts due to in modern standy flapping
 }
@@ -42,14 +54,14 @@ type Runner struct {
 func New(k types.Knapsack, logPublishClient types.OsqueryPublisher, settingsWriter settingsStoreWriter, opts ...OsqueryInstanceOption) *Runner {
 	runner := &Runner{
 		enrollmentIds:    k.EnrollmentIDs(),
-		instances:        make(map[string]*OsqueryInstance),
+		instances:        make(map[string]wrappedInstance),
 		slogger:          k.Slogger().With("component", "osquery_runner"),
 		knapsack:         k,
 		logPublishClient: logPublishClient,
 		settingsWriter:   settingsWriter,
 		shutdown:         make(chan struct{}),
+		done:             make(chan struct{}),
 		opts:             opts,
-		interrupted:      &atomic.Bool{},
 		needsRestart:     &atomic.Bool{},
 	}
 
@@ -65,31 +77,30 @@ func New(k types.Knapsack, logPublishClient types.OsqueryPublisher, settingsWrit
 }
 
 func (r *Runner) Run() error {
+	if !r.state.CompareAndSwap(runnerUnstarted, runnerRunning) {
+		// Shut down before we were ever scheduled -- nothing to run
+		return nil
+	}
+	defer close(r.done)
+
+	stopCtx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+	go func() {
+		select {
+		case <-r.shutdown:
+			cancel()
+		case <-stopCtx.Done():
+		}
+	}()
+
 	// Create a group to track the workers running each instance
-	wg, ctx := errgroup.WithContext(context.TODO())
+	wg, ctx := errgroup.WithContext(stopCtx)
 
 	// Start each worker for each instance
 	for _, enrollmentId := range r.enrollmentIds {
 		id := enrollmentId
 		wg.Go(func() error {
-			if err := r.runInstance(id); err != nil {
-				// This is likely due to calling runner.Interrupt -- if not, the error will have
-				// already been logged at the error level in r.runInstance
-				r.slogger.Log(ctx, slog.LevelInfo,
-					"instance terminated, proceeding with runner shutdown",
-					"err", err,
-				)
-
-				if err := r.Shutdown(); err != nil {
-					r.slogger.Log(ctx, slog.LevelError,
-						"could not shut down runner after failure to run osquery instance",
-						"err", err,
-					)
-				}
-				return err
-			}
-
-			return nil
+			return r.runInstance(ctx, id)
 		})
 	}
 
@@ -101,111 +112,43 @@ func (r *Runner) Run() error {
 	return nil
 }
 
-// runInstance starts a worker that launches the instance for the given enrollment ID, and
-// then ensures that instance stays up. It exits if `Shutdown` is called, or if the instance
-// exits and cannot be restarted.
-func (r *Runner) runInstance(enrollmentId string) error {
+// runInstance repeatedly runs the instance for the given enrollment ID, registering
+// each in r.instances. It returns only when ctx is cancelled.
+func (r *Runner) runInstance(ctx context.Context, enrollmentId string) error {
 	slogger := r.slogger.With("enrollment_id", enrollmentId)
-	ctx := context.TODO()
 
-	// First, launch the instance.
-	instance, err := r.launchInstanceWithRetries(ctx, enrollmentId)
-	if err != nil {
-		// We only receive an error on launch if the runner has been shut down -- in that case,
-		// return now.
-		return fmt.Errorf("starting instance for %s: %w", enrollmentId, err)
-	}
-
-	// This loop restarts the instance as necessary. It exits when `Shutdown` is called,
-	// or if the instance exits and cannot be restarted.
-	for {
-		<-instance.Exited()
-		slogger.Log(context.TODO(), slog.LevelInfo,
-			"osquery instance exited",
-		)
-
-		observability.OsqueryRestartCounter.Add(ctx, 1)
-
-		select {
-		case <-r.shutdown:
-			// Intentional shutdown of runner -- exit worker
-			return nil
-		default:
-			// Continue on to restart the instance
-		}
-
-		// The osquery instance either exited on its own, or we called `Restart`.
-		// Either way, we wait for exit to complete, and then restart the instance.
-		if err := instance.WaitShutdown(ctx); err != nil && !errors.Is(err, context.Canceled) {
-			slogger.Log(context.TODO(), slog.LevelError,
-				"received error on instance shutdown after instance exit or instance restart",
-				"err", err,
-			)
-		}
-
-		var launchErr error
-		instance, launchErr = r.launchInstanceWithRetries(ctx, enrollmentId)
-		if launchErr != nil {
-			// We only receive an error on launch if the runner has been shut down -- in that case,
-			// return now.
-			return fmt.Errorf("restarting instance for %s after unexpected exit: %w", enrollmentId, launchErr)
-		}
-	}
-}
-
-// launchInstanceWithRetries repeatedly tries to create and launch a new osquery instance.
-// It will retry until it succeeds, or until the runner is shut down.
-func (r *Runner) launchInstanceWithRetries(ctx context.Context, enrollmentId string) (*OsqueryInstance, error) {
-	ctx, span := observability.StartSpan(ctx)
-	defer span.End()
-
-	for {
-		// Never attempt to launch an instance if shutdown has already been initiated
-		if r.interrupted.Load() {
-			return nil, fmt.Errorf("runner received shutdown, halting before initiating launching instance for %s", enrollmentId)
-		}
-
+	for ctx.Err() == nil {
 		// Add the instance to our instances map right away, so that if we receive a shutdown
 		// request during launch, we can shut down the instance.
-		r.instanceLock.Lock()
+		instanceCtx, instanceCancel := context.WithCancel(ctx)
 		instance := newInstance(enrollmentId, r.knapsack, r.logPublishClient, r.settingsWriter, r.opts...)
-		r.instances[enrollmentId] = instance
+		r.instanceLock.Lock()
+		r.instances[enrollmentId] = wrappedInstance{
+			OsqueryInstance: instance,
+			cancel:          instanceCancel,
+		}
 		r.instanceLock.Unlock()
-		err := instance.Launch()
 
-		// Success!
-		if err == nil {
-			r.slogger.Log(ctx, slog.LevelInfo,
-				"runner successfully launched instance",
-				"enrollment_id", enrollmentId,
-			)
+		err := instance.Launch(instanceCtx)
+		instanceCancel()
 
-			return instance, nil
-		}
-
-		// Launching was not successful. Shut down the instance, log the error, and wait to retry.
-		r.slogger.Log(ctx, slog.LevelWarn,
-			"could not launch instance, will retry after delay",
+		observability.OsqueryRestartCounter.Add(ctx, 1)
+		slogger.Log(ctx, slog.LevelInfo,
+			"osquery instance exited, will restart after delay",
 			"err", err,
-			"enrollment_id", enrollmentId,
 		)
-		instance.BeginShutdown()
-		if err := instance.WaitShutdown(ctx); err != context.Canceled && err != nil {
-			r.slogger.Log(ctx, slog.LevelWarn,
-				"error shutting down instance that failed to launch",
-				"err", err,
-				"enrollment_id", enrollmentId,
-			)
-		}
 
+		// Instances for an enrollment ID share a database path, and a predecessor may not have
+		// released its locks yet (see calculateOsqueryPaths) -- space launches out.
 		select {
-		case <-r.shutdown:
-			return nil, fmt.Errorf("runner received shutdown, halting before successfully launching instance for %s", enrollmentId)
+		case <-ctx.Done():
+			return nil
 		case <-time.After(launchRetryDelay):
-			// Continue to retry
-			continue
+			// Continue to relaunch
 		}
 	}
+
+	return nil
 }
 
 func (r *Runner) Query(query string) ([]map[string]string, error) {
@@ -222,61 +165,35 @@ func (r *Runner) Query(query string) ([]map[string]string, error) {
 }
 
 func (r *Runner) Interrupt(_ error) {
-	if err := r.Shutdown(); err != nil {
-		r.slogger.Log(context.TODO(), slog.LevelWarn,
-			"could not shut down runner on interrupt",
-			"err", err,
-		)
-	}
+	r.Shutdown()
 }
 
 // Shutdown instructs the runner to permanently stop the running instance (no
 // restart will be attempted).
-func (r *Runner) Shutdown() error {
-	ctx, span := observability.StartSpan(context.TODO())
+func (r *Runner) Shutdown() {
+	_, span := observability.StartSpan(context.TODO())
 	defer span.End()
 
-	if r.interrupted.Swap(true) {
+	switch r.state.Swap(runnerShutdown) {
+	case runnerRunning:
+		close(r.shutdown)
+		<-r.done
+	case runnerUnstarted:
+		// rungroup may interrupt us before Run is ever scheduled. The Swap above
+		// guarantees Run's CompareAndSwap fails, so nothing will launch.
+	case runnerShutdown:
 		// Already shut down, nothing else to do
-		return nil
 	}
-
-	close(r.shutdown)
-
-	if err := r.triggerShutdownForInstances(ctx); err != nil {
-		return fmt.Errorf("triggering shutdown for instances during runner shutdown: %w", err)
-	}
-
-	return nil
 }
 
-// triggerShutdownForInstances asks all instances in `r.instances` to shut down.
-func (r *Runner) triggerShutdownForInstances(ctx context.Context) error {
-	ctx, span := observability.StartSpan(ctx)
-	defer span.End()
-
+// restartInstances cancels all running instances' contexts
+func (r *Runner) restartInstances() {
 	r.instanceLock.Lock()
 	defer r.instanceLock.Unlock()
 
-	// Shut down the instances in parallel
-	shutdownWg, ctx := errgroup.WithContext(ctx)
-	for enrollmentId, instance := range r.instances {
-		id := enrollmentId
-		i := instance
-		shutdownWg.Go(func() error {
-			i.BeginShutdown()
-			if err := i.WaitShutdown(ctx); err != context.Canceled && err != nil {
-				return fmt.Errorf("shutting down instance %s: %w", id, err)
-			}
-			return nil
-		})
+	for _, instance := range r.instances {
+		instance.cancel()
 	}
-
-	if err := shutdownWg.Wait(); err != nil {
-		return fmt.Errorf("shutting down all instances: %+v", err)
-	}
-
-	return nil
 }
 
 // FlagsChanged satisfies the types.FlagsChangeObserver interface -- handles updates to flags
@@ -387,10 +304,8 @@ func (r *Runner) Restart(ctx context.Context) error {
 
 	r.needsRestart.Store(false)
 
-	// Shut down the instances -- this will trigger a restart in each `runInstance`.
-	if err := r.triggerShutdownForInstances(ctx); err != nil {
-		return fmt.Errorf("triggering shutdown for instances during runner restart: %w", err)
-	}
+	// Stop the instances -- this will trigger a relaunch in each `runInstance`.
+	r.restartInstances()
 
 	return nil
 }
