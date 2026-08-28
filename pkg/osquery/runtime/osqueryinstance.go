@@ -416,18 +416,6 @@ func (i *OsqueryInstance) Launch(ctx context.Context) (err error) {
 		return fmt.Errorf("couldn't create osqueryd command: %w", err)
 	}
 
-	// Assign a PGID that matches the PID. This lets us kill the entire process group later.
-	cmd.SysProcAttr = setpgid()
-
-	// Kill children too (the default Cancel only kills osqueryd itself)
-	cmd.Cancel = func() error {
-		if err := killProcessGroup(cmd); err != nil &&
-			!strings.Contains(err.Error(), "process already finished") && !strings.Contains(err.Error(), "no such process") {
-			return err
-		}
-		return nil
-	}
-
 	// remove any socket already at the extension socket path to ensure
 	// that it's not left over from a previous instance
 	if err := os.RemoveAll(i.paths.extensionSocketPath); err != nil {
@@ -823,6 +811,18 @@ func (i *OsqueryInstance) createOsquerydCommand(ctx context.Context, osquerydBin
 	// https://eclecticlight.co/2020/08/13/macos-version-numbering-isnt-so-simple/
 	// https://github.com/osquery/osquery/pull/6824
 	cmd.Env = append(cmd.Env, "SYSTEM_VERSION_COMPAT=0")
+
+	// Assign a PGID that matches the PID. This lets us kill the entire process group later.
+	cmd.SysProcAttr = setpgid()
+
+	// Kill children too (the default Cancel only kills osqueryd itself)
+	cmd.Cancel = func() error {
+		if err := killProcessGroup(cmd); err != nil &&
+			!strings.Contains(err.Error(), "process already finished") && !strings.Contains(err.Error(), "no such process") {
+			return err
+		}
+		return nil
+	}
 
 	// On Windows, we need to ensure the `SystemDrive` environment variable is set to _something_,
 	// so if it isn't already set, we set it to an empty string.
