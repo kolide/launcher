@@ -112,7 +112,6 @@ type OsqueryInstance struct {
 	errgroup                *errgroup.LoggedErrgroup
 	paths                   *osqueryFilePaths
 	saasExtension           *launcherosq.Extension
-	cmd                     *exec.Cmd
 	emsLock                 sync.RWMutex // Lock for extensionManagerServers
 	extensionManagerServers map[string]*osquery.ExtensionManagerServer
 	extensionManagerClient  *osquery.ExtensionManagerClient
@@ -244,40 +243,6 @@ func newInstance(enrollmentId string, knapsack types.Knapsack, logPublishClient 
 	return i
 }
 
-// BeginShutdown cancels the context associated with the errgroup.
-func (i *OsqueryInstance) BeginShutdown() {
-	i.slogger.Log(context.TODO(), slog.LevelInfo,
-		"instance shutdown requested",
-	)
-	i.errgroup.Shutdown()
-}
-
-// WaitShutdown waits for the instance's errgroup routines to exit, then returns the
-// initial error. It should be called after either `Exited` has returned, or after
-// the instance has been asked to shut down via call to `BeginShutdown`.
-func (i *OsqueryInstance) WaitShutdown(ctx context.Context) error {
-	// Wait for shutdown to complete
-	exitErr := i.errgroup.Wait(ctx)
-
-	// Record shutdown in stats, if initialized
-	if i.history != nil {
-		if err := i.history.SetExited(i.runId, exitErr); err != nil {
-			i.slogger.Log(ctx, slog.LevelWarn,
-				"error recording osquery instance exit to history",
-				"exit_err", exitErr,
-				"err", err,
-			)
-		}
-	}
-
-	return exitErr
-}
-
-// Exited returns a channel to monitor for signal that instance has shut itself down
-func (i *OsqueryInstance) Exited() <-chan struct{} {
-	return i.errgroup.Exited()
-}
-
 // ReloadKatcExtension can be called on a running osquery instance to reload its KATC extension
 // manager server, to add new KATC tables or update existing KATC tables' configurations
 // without restarting the entire instance.
@@ -343,17 +308,41 @@ func (i *OsqueryInstance) startKatcExtensionManagerServer(ctx context.Context, c
 	return nil
 }
 
-// Launch starts the osquery instance and its components. It will run until one of its
-// components becomes unhealthy, or until it is asked to shutdown via `BeginShutdown`.
-func (i *OsqueryInstance) Launch() error {
-	ctx, span := observability.StartSpan(context.Background())
+// [TODO]
+func (i *OsqueryInstance) Launch(ctx context.Context) (err error) {
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
-	// Create SaaS extension immediately
+	// Record shutdown in stats, if initialized
+	if i.history != nil {
+		defer func() {
+			if histErr := i.history.SetExited(i.runId, err); histErr != nil {
+				i.slogger.Log(ctx, slog.LevelWarn,
+					"error recording osquery instance exit to history",
+					"exit_err", err,
+					"err", histErr,
+				)
+			}
+		}()
+	}
+
+	i.errgroup = errgroup.NewLoggedErrgroup(ctx, i.slogger)
+
+	// Create SaaS extension immediately.
 	if err := i.startKolideSaasExtension(ctx); err != nil {
 		observability.SetError(span, fmt.Errorf("could not create Kolide SaaS extension: %w", err))
 		return fmt.Errorf("creating Kolide SaaS extension: %w", err)
 	}
+
+	// Now that the errgroup has a goroutine, errgroup.Wait is safe per docs.
+	// Races can occur without a goroutine.
+	defer func() {
+		i.errgroup.Shutdown()
+		err = errors.Join(err, i.errgroup.Wait(ctx))
+	}()
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel() // halt any in-flight goroutines not bound by the errgroup before waiting
 
 	// Based on the root directory, calculate the file names of all of the
 	// required osquery artifact files.
@@ -366,25 +355,6 @@ func (i *OsqueryInstance) Launch() error {
 
 	// Register as many of our shutdown functions ahead of time as we can, so that we can make sure
 	// we fully clean up after any partially-launched erroring instances.
-	i.errgroup.AddShutdownGoroutine(ctx, "kill_osquery_process", func() error {
-		if i.cmd == nil || i.cmd.Process == nil {
-			return nil
-		}
-
-		// kill osqueryd and children
-		if err := killProcessGroup(i.cmd); err != nil {
-			if strings.Contains(err.Error(), "process already finished") || strings.Contains(err.Error(), "no such process") {
-				i.slogger.Log(ctx, slog.LevelDebug,
-					"tried to stop osquery, but process already gone",
-				)
-				return nil
-			}
-
-			return fmt.Errorf("killing osquery process: %w", err)
-		}
-
-		return nil
-	})
 	// Clean up PID file on shutdown
 	i.errgroup.AddShutdownGoroutine(ctx, "remove_pid_file", func() error {
 		// We do a couple retries -- on Windows, the PID file may still be in use
@@ -436,14 +406,23 @@ func (i *OsqueryInstance) Launch() error {
 	// Now that we have accepted options from the caller and/or determined what
 	// they should be due to them not being set, we are ready to create and start
 	// the *exec.Cmd instance that will run osqueryd.
-	i.cmd, err = i.createOsquerydCommand(currentOsquerydBinaryPath)
+	cmd, err := i.createOsquerydCommand(ctx, currentOsquerydBinaryPath)
 	if err != nil {
 		observability.SetError(span, fmt.Errorf("couldn't create osqueryd command: %w", err))
 		return fmt.Errorf("couldn't create osqueryd command: %w", err)
 	}
 
 	// Assign a PGID that matches the PID. This lets us kill the entire process group later.
-	i.cmd.SysProcAttr = setpgid()
+	cmd.SysProcAttr = setpgid()
+
+	// Kill children too (the default Cancel only kills osqueryd itself)
+	cmd.Cancel = func() error {
+		if err := killProcessGroup(cmd); err != nil &&
+			!strings.Contains(err.Error(), "process already finished") && !strings.Contains(err.Error(), "no such process") {
+			return err
+		}
+		return nil
+	}
 
 	// remove any socket already at the extension socket path to ensure
 	// that it's not left over from a previous instance
@@ -456,7 +435,7 @@ func (i *OsqueryInstance) Launch() error {
 	}
 
 	// Launch osquery process (async)
-	if err := i.startOsquerydProcess(ctx); err != nil {
+	if err := i.startOsquerydProcess(ctx, cmd); err != nil {
 		return fmt.Errorf("starting osqueryd process: %w", err)
 	}
 
@@ -464,7 +443,7 @@ func (i *OsqueryInstance) Launch() error {
 	// successfully started. ("successful" is independent of exit
 	// code. eg: this runs if we could exec. Failure to exec is above.)
 	i.errgroup.StartGoroutine(ctx, "monitor_osquery_process", func() error {
-		err := i.cmd.Wait()
+		err := cmd.Wait()
 		switch {
 		case err == nil, isExitOk(err):
 			i.slogger.Log(ctx, slog.LevelInfo,
@@ -473,7 +452,7 @@ func (i *OsqueryInstance) Launch() error {
 			return errors.New("osquery process exited successfully")
 		default:
 			msgPairs := append(
-				getOsqueryInfoForLog(i.cmd.Path),
+				getOsqueryInfoForLog(cmd.Path),
 				"err", err,
 			)
 
@@ -487,6 +466,8 @@ func (i *OsqueryInstance) Launch() error {
 
 	// Start an extension manager for the extensions that osquery
 	// needs for config/log/etc. Serves as a health check.
+	// TODO: this write is unsynchronized, but Healthy/Query/instanceStarted read
+	// i.extensionManagerClient from other goroutines.
 	i.extensionManagerClient, err = i.StartOsqueryClient()
 	if err != nil {
 		observability.SetError(span, fmt.Errorf("could not create an extension client: %w", err))
@@ -565,26 +546,29 @@ func (i *OsqueryInstance) Launch() error {
 		return nil
 	})
 
-	return nil
+	span.End() // osqueryd started
+
+	<-i.errgroup.Exited()
+	return nil // defer captures actual error
 }
 
-// startOsquerydProcess starts the osquery instance's `cmd` in the background
-func (i *OsqueryInstance) startOsquerydProcess(ctx context.Context) error {
+// startOsquerydProcess starts `cmd` in the background
+func (i *OsqueryInstance) startOsquerydProcess(ctx context.Context, cmd *exec.Cmd) error {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	i.slogger.Log(ctx, slog.LevelInfo,
 		"launching osqueryd",
-		"path", i.cmd.Path,
-		"args", strings.Join(i.cmd.Args, " "),
+		"path", cmd.Path,
+		"args", strings.Join(cmd.Args, " "),
 	)
 
-	if err := i.startFunc(i.cmd); err != nil {
+	if err := i.startFunc(cmd); err != nil {
 		// Failure here is indicative of a failure to exec. A missing
 		// binary? Bad permissions? TODO: Consider catching errors in the
 		// update system and falling back to an earlier version.
 		msgPairs := append(
-			getOsqueryInfoForLog(i.cmd.Path),
+			getOsqueryInfoForLog(cmd.Path),
 			"err", err,
 		)
 
@@ -599,7 +583,7 @@ func (i *OsqueryInstance) startOsquerydProcess(ctx context.Context) error {
 	span.AddEvent("launched_osqueryd")
 	i.slogger.Log(ctx, slog.LevelInfo,
 		"launched osquery process",
-		"osqueryd_pid", i.cmd.Process.Pid,
+		"osqueryd_pid", cmd.Process.Pid,
 	)
 
 	return nil
@@ -632,7 +616,11 @@ func (i *OsqueryInstance) healthcheckWithRetries(ctx context.Context, maxHealthC
 			"err", err,
 		)
 
-		time.Sleep(retryInterval)
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-time.After(retryInterval):
+		}
 	}
 
 	return nil
@@ -728,7 +716,7 @@ func calculateOsqueryPaths(rootDirectory string, enrollmentId string, runId stri
 
 // createOsquerydCommand uses osqueryOptions to return an *exec.Cmd
 // which will launch a properly configured osqueryd process.
-func (i *OsqueryInstance) createOsquerydCommand(osquerydBinary string) (*exec.Cmd, error) {
+func (i *OsqueryInstance) createOsquerydCommand(ctx context.Context, osquerydBinary string) (*exec.Cmd, error) {
 	// Get the certs for the instance
 	certs, err := launcherosq.InstallCaCerts(i.knapsack.RootDirectory(), i.slogger)
 	if err != nil {
@@ -761,7 +749,7 @@ func (i *OsqueryInstance) createOsquerydCommand(osquerydBinary string) (*exec.Cm
 	}
 
 	// We trust the autoupdate library to find the correct path, so this is an allowable use of exec.Command
-	cmd := exec.Command( //nolint:forbidigo,noctx
+	cmd := exec.CommandContext(ctx, //nolint:forbidigo
 		osquerydBinary,
 		args...,
 	)
