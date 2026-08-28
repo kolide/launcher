@@ -1079,42 +1079,6 @@ func WithStartFunc(f func(cmd *exec.Cmd) error) OsqueryInstanceOption {
 	}
 }
 
-// TestExtensionIsCleanedUp tests that the osquery extension cleans
-// itself up. Unfortunately, this test has proved very flakey on
-// circle-ci, but just fine on laptops.
-func TestExtensionIsCleanedUp(t *testing.T) {
-	t.Skip("https://github.com/kolide/launcher/issues/478")
-	t.Parallel()
-	requirePermissions(t)
-	downloadOnceFunc()
-	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
-	setupOnceFunc()
-
-	runner, logBytes, osqHistory := setupOsqueryInstanceForTests(t)
-	ensureShutdownOnCleanup(t, runner, logBytes)
-
-	requirePgidMatch(t, runner.instances[types.DefaultEnrollmentID].cmd.Process.Pid)
-
-	// kill the current osquery process but not the extension
-	require.NoError(t, runner.instances[types.DefaultEnrollmentID].cmd.Process.Kill())
-
-	// We need to (a) let the runner restart osquery, and (b) wait for
-	// the extension to die. Both of these may take up to 30s. We'll
-	// start a clock, wait for the respawn, and after 32s, test that the
-	// extension process is no longer running. See
-	// https://github.com/kolide/launcher/pull/342 and associated for
-	// background.
-	timer1 := time.NewTimer(35 * time.Second)
-
-	// Wait for osquery to respawn
-	waitHealthy(t, runner, logBytes, osqHistory)
-
-	// Ensure we've waited at least 32s
-	<-timer1.C
-
-	waitShutdown(t, runner, logBytes)
-}
-
 // TestRestart tests that the launcher can restart the osqueryd process.
 func TestRestart(t *testing.T) {
 	t.Parallel()
