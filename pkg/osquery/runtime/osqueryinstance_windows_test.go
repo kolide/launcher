@@ -35,7 +35,7 @@ func TestCreateOsqueryCommandEnvVars(t *testing.T) {
 		extensionSocketPath: "/foo/bar/osquery.sock",
 	}
 
-	cmd, err := i.createOsquerydCommand("") // we do not actually exec so don't need to download a real osquery for this test
+	cmd, err := i.createOsquerydCommand(t.Context(), "") // we do not actually exec so don't need to download a real osquery for this test
 	require.NoError(t, err)
 
 	systemDriveEnvVarFound := false
