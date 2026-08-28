@@ -308,7 +308,11 @@ func (i *OsqueryInstance) startKatcExtensionManagerServer(ctx context.Context, c
 	return nil
 }
 
-// [TODO]
+// Launch runs the instance until a component fails or ctx is canceled. When nil
+// is returned, the osquery instance has exited and all artifacts cleaned up.
+//
+// The first error is returned when occurs and the osquery instance or its cleanup may
+// continue to run in the background and fail.
 func (i *OsqueryInstance) Launch(ctx context.Context) (err error) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
@@ -439,31 +443,6 @@ func (i *OsqueryInstance) Launch(ctx context.Context) (err error) {
 		return fmt.Errorf("starting osqueryd process: %w", err)
 	}
 
-	// This loop runs in the background when the process was
-	// successfully started. ("successful" is independent of exit
-	// code. eg: this runs if we could exec. Failure to exec is above.)
-	i.errgroup.StartGoroutine(ctx, "monitor_osquery_process", func() error {
-		err := cmd.Wait()
-		switch {
-		case err == nil, isExitOk(err):
-			i.slogger.Log(ctx, slog.LevelInfo,
-				"osquery exited successfully",
-			)
-			return errors.New("osquery process exited successfully")
-		default:
-			msgPairs := append(
-				getOsqueryInfoForLog(cmd.Path),
-				"err", err,
-			)
-
-			i.slogger.Log(ctx, slog.LevelWarn,
-				"error running osquery command",
-				msgPairs...,
-			)
-			return fmt.Errorf("running osqueryd command: %w", err)
-		}
-	})
-
 	// Start an extension manager for the extensions that osquery
 	// needs for config/log/etc. Serves as a health check.
 	// TODO: this write is unsynchronized, but Healthy/Query/instanceStarted read
@@ -579,12 +558,34 @@ func (i *OsqueryInstance) startOsquerydProcess(ctx context.Context, cmd *exec.Cm
 		observability.SetError(span, fmt.Errorf("fatal error starting osqueryd process: %w", err))
 		return fmt.Errorf("fatal error starting osqueryd process: %w", err)
 	}
-
 	span.AddEvent("launched_osqueryd")
-	i.slogger.Log(ctx, slog.LevelInfo,
-		"launched osquery process",
-		"osqueryd_pid", cmd.Process.Pid,
-	)
+
+	i.errgroup.StartGoroutine(ctx, "osqueryd_execute", func() error {
+		i.slogger.Log(ctx, slog.LevelInfo,
+			"launched osquery process",
+			"osqueryd_pid", cmd.Process.Pid,
+		)
+
+		err := cmd.Wait()
+		switch {
+		case err == nil, isExitOk(err):
+			i.slogger.Log(ctx, slog.LevelInfo,
+				"osquery exited successfully",
+			)
+			return errors.New("osquery process exited successfully")
+		default:
+			msgPairs := append(
+				getOsqueryInfoForLog(cmd.Path),
+				"err", err,
+			)
+
+			i.slogger.Log(ctx, slog.LevelWarn,
+				"error running osquery command",
+				msgPairs...,
+			)
+			return fmt.Errorf("running osqueryd command: %w", err)
+		}
+	})
 
 	return nil
 }
