@@ -834,7 +834,7 @@ func (i *OsqueryInstance) createOsquerydCommand(ctx context.Context, osquerydBin
 
 	// Kill children too (the default Cancel only kills osqueryd itself)
 	cmd.Cancel = func() error {
-		if err := killProcessGroup(cmd); err != nil &&
+		if err := killProcessGroup(cmd.Process.Pid); err != nil &&
 			!strings.Contains(err.Error(), "process already finished") && !strings.Contains(err.Error(), "no such process") {
 			return err
 		}

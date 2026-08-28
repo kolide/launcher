@@ -22,10 +22,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func requirePgidMatch(t *testing.T, pid int) {
+// TestOsquerydPgidMatch confirms osqueryd is its own process group leader, which
+// killProcessGroup relies on to take down osqueryd's children.
+func TestOsquerydPgidMatch(t *testing.T) {
+	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
+	setupOnceFunc()
+
+	runner, logBytes, _ := setupOsqueryInstanceForTests(t)
+	ensureShutdownOnCleanup(t, runner, logBytes)
+
+	pid := instancePid(t, runner, types.DefaultEnrollmentID)
 	pgid, err := syscall.Getpgid(pid)
 	require.NoError(t, err)
-	require.Equal(t, pgid, pid)
+	require.Equal(t, pid, pgid)
+
+	waitShutdown(t, runner, logBytes)
 }
 
 // hasPermissionsToRunTest always return true for non-windows platforms since
