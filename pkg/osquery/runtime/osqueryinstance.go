@@ -233,6 +233,9 @@ func newInstance(enrollmentId string, knapsack types.Knapsack, logPublishClient 
 		runId:                   runId,
 		extensionManagerServers: make(map[string]*osquery.ExtensionManagerServer),
 		history:                 knapsack.OsqueryHistory(),
+		startFunc: func(cmd *exec.Cmd) error {
+			return cmd.Start()
+		},
 	}
 
 	for _, opt := range opts {
@@ -240,10 +243,6 @@ func newInstance(enrollmentId string, knapsack types.Knapsack, logPublishClient 
 	}
 
 	i.errgroup = errgroup.NewLoggedErrgroup(context.Background(), i.slogger)
-
-	i.startFunc = func(cmd *exec.Cmd) error {
-		return cmd.Start()
-	}
 
 	return i
 }
