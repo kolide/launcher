@@ -98,8 +98,6 @@ func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsque
 		brew_upgradeable.TablePlugin(k, slogger),
 		ChromeLoginKeychainInfo(k, slogger),
 		firmwarepasswd.TablePlugin(k, slogger),
-		GDriveSyncConfig(k, slogger),
-		GDriveSyncHistoryInfo(k, slogger),
 		MDMInfo(k, slogger),
 		macos_software_update.MacOSUpdate(k, slogger),
 		macos_software_update.RecommendedUpdates(k, slogger),
