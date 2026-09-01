@@ -19,6 +19,11 @@ func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, uid string,
 	ctx, span := observability.StartSpan(ctx, "uid", uid)
 	defer span.End()
 
+	// Windows does not users to attach to their own session
+	if r.isCurrentUser(uid) {
+		return cmd.Start()
+	}
+
 	explorerProc, err := consoleuser.ExplorerProcess(ctx, uid)
 	if err != nil {
 		return fmt.Errorf("getting user explorer process: %w", err)

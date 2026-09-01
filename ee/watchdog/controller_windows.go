@@ -18,11 +18,11 @@ import (
 	"github.com/kolide/launcher/v2/ee/agent/flags/keys"
 	agentsqlite "github.com/kolide/launcher/v2/ee/agent/storage/sqlite"
 	"github.com/kolide/launcher/v2/ee/agent/types"
+	"github.com/kolide/launcher/v2/ee/currentprocess"
 	"github.com/kolide/launcher/v2/ee/log"
 	"github.com/kolide/launcher/v2/ee/observability"
 	"github.com/kolide/launcher/v2/ee/powereventwatcher"
 	"github.com/kolide/launcher/v2/pkg/launcher"
-	"golang.org/x/sys/windows"
 )
 
 const (
@@ -251,8 +251,12 @@ func (wc *WatchdogController) shouldManageWatchdog() bool {
 		return false
 	}
 
-	// we also don't alter watchdog installation if we're running without elevated permissions
-	if !windows.GetCurrentProcessToken().IsElevated() {
+	if elevated, err := currentprocess.IsElevated(); err != nil {
+		// historical behavior treats failure to check as
+		// not elevated
+		wc.slogger.Log(context.TODO(), slog.LevelError, "failed to check if process is elevated", "err", err)
+		return false
+	} else if !elevated {
 		return false
 	}
 

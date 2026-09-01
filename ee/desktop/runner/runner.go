@@ -30,6 +30,7 @@ import (
 	"github.com/kolide/launcher/v2/ee/agent/types"
 	"github.com/kolide/launcher/v2/ee/allowedcmd"
 	"github.com/kolide/launcher/v2/ee/consoleuser"
+	"github.com/kolide/launcher/v2/ee/currentprocess"
 	runnerserver "github.com/kolide/launcher/v2/ee/desktop/runner/server"
 	"github.com/kolide/launcher/v2/ee/desktop/user/client"
 	"github.com/kolide/launcher/v2/ee/desktop/user/menu"
@@ -112,6 +113,11 @@ func (e NoExplorerProcessError) Error() string {
 	return fmt.Sprintf("no explorer process found for uid: %s", e.uid)
 }
 
+func (e NoExplorerProcessError) Is(target error) bool {
+	_, ok := target.(NoExplorerProcessError)
+	return ok
+}
+
 // DesktopUsersProcessesRunner creates a launcher desktop process each time it detects
 // a new console (GUI) user. If the current console user's desktop process dies, it
 // will create a new one.
@@ -146,8 +152,12 @@ type DesktopUsersProcessesRunner struct {
 	knapsack types.Knapsack
 	// runnerServer is a local server that desktop processes call to monitor parent
 	runnerServer *runnerserver.RunnerServer
-	// osVersion is the version of the OS cached in new
+	// osVersion is the version of the OS, cached in new
 	osVersion string
+	// currentUid is the process owning uid, cached in new
+	currentUid string
+	// elevated is whether the process runs elevated, cached in new
+	elevated bool
 	// cachedMenuData is the cached label values of the currently displayed menu data, used for detecting changes
 	cachedMenuData *menuItemCache
 }
@@ -189,6 +199,24 @@ func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUser
 	}
 
 	runner.slogger = k.Slogger().With("component", "desktop_runner")
+
+	elevated, err := currentprocess.IsElevated()
+	if err != nil {
+		runner.slogger.Log(context.TODO(), slog.LevelWarn,
+			"failed to check if process is elevated, will assume process is privileged",
+			"err", err,
+		)
+		elevated = true // fail loud: maybe succeed rather than never try
+	}
+	runner.elevated = elevated
+
+	runner.currentUid, err = currentprocess.Uid()
+	if err != nil {
+		runner.slogger.Log(context.TODO(), slog.LevelWarn,
+			"failed to get current process uid, assuming we are not a console user",
+			"err", err,
+		)
+	}
 
 	for _, opt := range opts {
 		opt(runner)
@@ -843,6 +871,14 @@ func (r *DesktopUsersProcessesRunner) writeDefaultMenuTemplateFile() {
 	}
 }
 
+// isCurrentUser reports whether uid is the user this process runs as. Windows UIDs
+// are fully qualified names, hence the case insensitive check.
+func (r *DesktopUsersProcessesRunner) isCurrentUser(uid string) bool {
+	return strings.EqualFold(uid, r.currentUid)
+}
+
+// Fans out over all users on this device. We can spawn a launcher desktop subprocess
+// for console users if required and we have permission. At minimum, we check for ourselves.
 func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 	if r.knapsack.InModernStandby() {
 		r.slogger.Log(context.TODO(), slog.LevelDebug,
@@ -857,13 +893,27 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 	defer cancel()
 
-	consoleUsers, err := consoleuser.CurrentUids(ctx)
-	if err != nil {
-		return fmt.Errorf("getting console users: %w", err)
+	var consoleUsers []string
+
+	// Querying console users on Windows requires privilege, other platforms
+	// use session information to establish process configuration even when ran
+	// unprivileged
+	if runtime.GOOS == "windows" && !r.elevated {
+		consoleUsers = []string{r.currentUid}
+	} else {
+		var err error
+		if consoleUsers, err = consoleuser.CurrentUids(ctx); err != nil {
+			return fmt.Errorf("getting console users: %w", err)
+		}
 	}
 
 	for _, uid := range consoleUsers {
 		if r.userHasDesktopProcess(uid) {
+			continue
+		}
+
+		// Only a privileged process can start a process for somebody else.
+		if !r.isCurrentUser(uid) && !r.elevated {
 			continue
 		}
 
