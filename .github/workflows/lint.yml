@@ -40,7 +40,7 @@ jobs:
       - run: make deps
 
       - name: golangci-lint
-        uses: step-security/golangci-lint-action@ce3368d2f0a15c79206a120861e3f847c8beb466 # v9.2.1
+        uses: step-security/golangci-lint-action@2697867e9c204558ca23d0decdd0039dc21f2b93 # v9.3.0
         with:
           skip-save-cache: true
 
