@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
@@ -74,6 +75,8 @@ const (
 	healthcheckTimeout = 10 * time.Second
 )
 
+var errOsquerydNotStarted = errors.New("osqueryd process not started")
+
 // OsqueryInstanceOption is a functional option pattern for defining how an
 // osqueryd instance should be configured. For more information on this pattern,
 // see the following blog post:
@@ -117,6 +120,7 @@ type OsqueryInstance struct {
 	extensionManagerClient  *osquery.ExtensionManagerClient
 	history                 types.OsqueryHistorian
 	startFunc               func(cmd *exec.Cmd) error
+	osquerydPid             atomic.Int64
 }
 
 // Healthy will check to determine whether or not the osquery process that is
@@ -282,6 +286,16 @@ func (i *OsqueryInstance) instanceStarted() bool {
 	defer i.emsLock.RUnlock()
 
 	return len(i.extensionManagerServers) > 0 && i.extensionManagerClient != nil
+}
+
+// pid returns the pid of the osqueryd process launched by this instance. It is
+// available once the child process is spawned.
+func (i *OsqueryInstance) pid() (int, error) {
+	if pid := i.osquerydPid.Load(); pid != 0 {
+		return int(pid), nil
+	}
+
+	return 0, errOsquerydNotStarted
 }
 
 // startKatcExtensionManagerServer starts a new extension manager server that provides
@@ -548,10 +562,13 @@ func (i *OsqueryInstance) startOsquerydProcess(ctx context.Context, cmd *exec.Cm
 	}
 	span.AddEvent("launched_osqueryd")
 
+	pid := cmd.Process.Pid
+	i.osquerydPid.Store(int64(pid))
+
 	i.errgroup.StartGoroutine(ctx, "osqueryd_execute", func() error {
 		i.slogger.Log(ctx, slog.LevelInfo,
 			"launched osquery process",
-			"osqueryd_pid", cmd.Process.Pid,
+			"osqueryd_pid", pid,
 		)
 
 		err := cmd.Wait()
