@@ -49,16 +49,13 @@ const (
 
 	katcExtensionName = "katc"
 
-	// How long to wait before erroring because the osquery process has not started up successfully.
+	// How long to wait before failing when the osquery client fails to connect.
 	// This is a generous timeout -- the average osquery startup takes just over a second, and the
 	// 95th percentile startup takes just over two seconds. We rounded up to 10 seconds to give
 	// extra time for our outliers. 10 seconds also matches rungroup.InterruptTimeout, ensuring
 	// we don't leave behind osquery processes still trying to start up after exiting launcher.
 	// See writeup in https://github.com/kolide/launcher/pull/2041 for data and details.
 	osqueryStartupTimeout = 10 * time.Second
-
-	// How often to check whether the osquery process has started up successfully
-	osqueryStartupRecheckInterval = 1 * time.Second
 
 	// How long to wait before erroring because we cannot open the osquery
 	// extension socket.
@@ -463,21 +460,6 @@ func (i *OsqueryInstance) Launch() error {
 		return fmt.Errorf("starting osqueryd process: %w", err)
 	}
 
-	if i.history == nil {
-		i.slogger.Log(ctx, slog.LevelWarn,
-			"osquery history is not initialized in knapsack, unable to record stats",
-			"err", err,
-		)
-	} else {
-		err := i.history.NewInstance(i.enrollmentId, i.runId)
-		if err != nil {
-			i.slogger.Log(ctx, slog.LevelWarn,
-				"could not create new osquery instance history",
-				"err", err,
-			)
-		}
-	}
-
 	// This loop runs in the background when the process was
 	// successfully started. ("successful" is independent of exit
 	// code. eg: this runs if we could exec. Failure to exec is above.)
@@ -504,13 +486,29 @@ func (i *OsqueryInstance) Launch() error {
 	})
 
 	// Start an extension manager for the extensions that osquery
-	// needs for config/log/etc.
+	// needs for config/log/etc. Serves as a health check.
 	i.extensionManagerClient, err = i.StartOsqueryClient()
 	if err != nil {
 		observability.SetError(span, fmt.Errorf("could not create an extension client: %w", err))
 		return fmt.Errorf("could not create an extension client: %w", err)
 	}
 	span.AddEvent("extension_client_created")
+	i.slogger.Log(ctx, slog.LevelDebug, "osquery socket created")
+
+	// historically, we only logged initialize once we could connect to the extension
+	if i.history == nil {
+		i.slogger.Log(ctx, slog.LevelWarn,
+			"osquery history is not initialized in knapsack, unable to record stats",
+		)
+	} else {
+		err := i.history.NewInstance(i.enrollmentId, i.runId)
+		if err != nil {
+			i.slogger.Log(ctx, slog.LevelWarn,
+				"could not create new osquery instance history",
+				"err", err,
+			)
+		}
+	}
 
 	kolideSaasPlugins := []osquery.OsqueryPlugin{
 		config.NewPlugin(KolideSaasExtensionName, i.saasExtension.GenerateConfigs),
@@ -570,8 +568,7 @@ func (i *OsqueryInstance) Launch() error {
 	return nil
 }
 
-// startOsquerydProcess starts the osquery instance's `cmd` and waits for the osqueryd process
-// to create a socket file, indicating it's started up successfully.
+// startOsquerydProcess starts the osquery instance's `cmd` in the background
 func (i *OsqueryInstance) startOsquerydProcess(ctx context.Context) error {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
@@ -592,7 +589,7 @@ func (i *OsqueryInstance) startOsquerydProcess(ctx context.Context) error {
 		)
 
 		i.slogger.Log(ctx, slog.LevelWarn,
-			"fatal error starting osquery -- could not exec.",
+			"fatal error starting osquery process",
 			msgPairs...,
 		)
 		observability.SetError(span, fmt.Errorf("fatal error starting osqueryd process: %w", err))
@@ -603,29 +600,6 @@ func (i *OsqueryInstance) startOsquerydProcess(ctx context.Context) error {
 	i.slogger.Log(ctx, slog.LevelInfo,
 		"launched osquery process",
 		"osqueryd_pid", i.cmd.Process.Pid,
-	)
-
-	// wait for osquery to create the socket before moving on,
-	// this is intended to serve as a kind of health check
-	// for osquery, if it's started successfully it will create
-	// a socket
-	if err := backoff.WaitFor(func() error {
-		_, err := os.Stat(i.paths.extensionSocketPath)
-		if err != nil {
-			i.slogger.Log(ctx, slog.LevelDebug,
-				"osquery extension socket not created yet ... will retry",
-				"path", i.paths.extensionSocketPath,
-			)
-		}
-		return err
-	}, osqueryStartupTimeout, osqueryStartupRecheckInterval); err != nil {
-		observability.SetError(span, fmt.Errorf("timeout waiting for osqueryd to create socket at %s: %w", i.paths.extensionSocketPath, err))
-		return fmt.Errorf("timeout waiting for osqueryd to create socket at %s: %w", i.paths.extensionSocketPath, err)
-	}
-
-	span.AddEvent("socket_created")
-	i.slogger.Log(ctx, slog.LevelDebug,
-		"osquery socket created",
 	)
 
 	return nil
@@ -878,15 +852,17 @@ func (i *OsqueryInstance) createOsquerydCommand(osquerydBinary string) (*exec.Cm
 }
 
 // StartOsqueryClient will create and return a new osquery client with a connection
-// over the socket at the provided path. It will retry for up to 10 seconds to create
-// the connection in the event of a failure.
+// over the socket at the provided path. It will retry the connection on failure.
 func (i *OsqueryInstance) StartOsqueryClient() (*osquery.ExtensionManagerClient, error) {
 	var client *osquery.ExtensionManagerClient
 	if err := backoff.WaitFor(func() error {
 		var newErr error
 		client, newErr = osquery.NewClient(i.paths.extensionSocketPath, socketOpenTimeout/2, osquery.DefaultWaitTime(1*time.Second), osquery.MaxWaitTime(maxSocketWaitTime))
 		return newErr
-	}, socketOpenTimeout, socketOpenInterval); err != nil {
+	},
+		socketOpenTimeout+osqueryStartupTimeout, // the client serves as a startup signal
+		socketOpenInterval,
+	); err != nil {
 		return nil, fmt.Errorf("could not create an extension client: %w", err)
 	}
 
