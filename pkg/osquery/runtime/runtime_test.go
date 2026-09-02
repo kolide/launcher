@@ -4,7 +4,6 @@ package runtime
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -36,7 +35,6 @@ import (
 	"github.com/kolide/launcher/v2/pkg/service"
 	"github.com/kolide/launcher/v2/pkg/threadsafebuffer"
 	"github.com/osquery/osquery-go/plugin/distributed"
-	"github.com/shirou/gopsutil/v4/process"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -480,131 +478,6 @@ func TestPing(t *testing.T) {
 	k.AssertExpectations(t)
 
 	waitShutdown(t, runner, logBytes)
-}
-
-// waitShutdown is used as a test helper, it performs additional tests to ensure proper shutdown
-// at the end of a passing test run. Tests can additionally use ensureShutdownOnCleanup as a cleanup method
-// to ensure a shutdown is attempted in the event of an earlier test failure, but this is the correct method
-// to use inline at the end of any tests that trigger runner.Run()
-func waitShutdown(t *testing.T, runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer) {
-	// We don't want to retry shutdowns because subsequent shutdown calls don't do anything --
-	// they return nil immediately, which would give `backoff` the impression that shutdown has
-	// completed when it hasn't.
-	// Instead, call `Shutdown` once, wait for our timeout (1 minute), and report failure if
-	// `Shutdown` has not returned.
-	shutdownErr := make(chan error)
-	go func() {
-		shutdownErr <- runner.Shutdown()
-	}()
-
-	select {
-	case err := <-shutdownErr:
-		require.NoError(t, err, fmt.Sprintf("runner logs:\n\n%s", logBytes.String()))
-	case <-time.After(1 * time.Minute):
-		t.Error("runner did not shut down within timeout", fmt.Sprintf("runner logs: %s", logBytes.String()))
-		t.FailNow()
-	}
-}
-
-// ensureShutdownOnCleanup adds a cleanup method which will attempt to shutdown any runners which have not
-// previously been interrupted. Failures here will be logged but will not fail the test itself. most tests
-// should already contain a waitShutdown which actually test this logic- this is here purely to ensure shutdown
-// without triggering any confusing failures on top of whatever has already gone wrong.
-// This is expected to be a no-op throughout any happy paths of testing
-func ensureShutdownOnCleanup(t *testing.T, runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer) {
-	t.Cleanup(func() {
-		// no further action required if the test already triggered Shutdown
-		if runner.interrupted.Load() {
-			return
-		}
-		// We don't want to retry shutdowns because subsequent shutdown calls don't do anything --
-		// they return nil immediately, which would give `backoff` the impression that shutdown has
-		// completed when it hasn't.
-		// Instead, call `Shutdown` once, wait for our timeout (1 minute), and report failure if
-		// `Shutdown` has not returned.
-		shutdownErr := make(chan error)
-		go func() {
-			shutdownErr <- runner.Shutdown()
-		}()
-
-		select {
-		case err := <-shutdownErr:
-			if err != nil {
-				t.Logf("ensureShutdownOnCleanup encountered error: %v", err)
-			}
-
-			return
-		case <-time.After(1 * time.Minute):
-			t.Logf("runner did not shut down within timeout. runner logs: %s", logBytes.String())
-			return
-		}
-	})
-}
-
-// waitHealthy expects the instance to be healthy within 30 seconds, or else
-// fatals the test.
-func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer, osqHistory *history.History) {
-	err := backoff.WaitFor(func() error {
-		// Instance self-reports as healthy
-		if err := runner.Healthy(); err != nil {
-			return fmt.Errorf("instance not healthy: %w", err)
-		}
-
-		// Confirm osquery instance setup is complete
-		if runner.instances[types.DefaultEnrollmentID] == nil {
-			return errors.New("default instance does not exist yet")
-		}
-
-		osqHistory := runner.knapsack.OsqueryHistory()
-		if osqHistory == nil {
-			return errors.New("osquery history is uninitialized in knapsack")
-		}
-
-		latestInstanceStats, err := osqHistory.LatestInstanceStats(types.DefaultEnrollmentID)
-		if err != nil {
-			return fmt.Errorf("gathering latest default history instance for waitHealthy: %w", err)
-		}
-
-		if latestInstanceStats == nil {
-			return errors.New("no latest instance stats for enrollment id")
-		}
-
-		if startTime, ok := latestInstanceStats["start_time"]; !ok || startTime == "" {
-			return errors.New("no start time set for latest instance stats")
-		}
-
-		if connectTime, ok := latestInstanceStats["connect_time"]; !ok || connectTime == "" {
-			return errors.New("no connect time set for latest instance stats")
-		}
-
-		// Good to go
-		return nil
-	}, osqueryStartupTimeout+socketOpenTimeout, 1*time.Second)
-
-	// Instance is healthy -- return
-	if err == nil {
-		time.Sleep(2 * time.Second)
-		return
-	}
-
-	debugInfo := fmt.Sprintf("instance not healthy by %s: runner logs:\n\n%s", time.Now().String(), logBytes.String())
-
-	// Instance is not healthy -- gather info about osquery proc, then fail
-	require.NotNil(t, runner.instances[types.DefaultEnrollmentID].cmd, "cmd not set on instance", debugInfo)
-	require.NotNil(t, runner.instances[types.DefaultEnrollmentID].cmd.Process, "instance cmd does not have process", debugInfo)
-	osqueryProc, err := process.NewProcessWithContext(t.Context(), int32(runner.instances[types.DefaultEnrollmentID].cmd.Process.Pid))
-	require.NoError(t, err, "getting osquery process info after instance failed to become healthy", debugInfo)
-
-	isRunning, err := osqueryProc.IsRunningWithContext(t.Context())
-	require.NoError(t, err, "checking if osquery process is running after instance failed to become healthy", debugInfo)
-
-	if isRunning {
-		t.Error("instance not healthy before timeout, though osquery process is running", debugInfo)
-		t.FailNow()
-	} else {
-		t.Error("instance not healthy before timeout, osquery process is not running", debugInfo)
-		t.FailNow()
-	}
 }
 
 func TestSimplePath(t *testing.T) {
