@@ -1157,6 +1157,43 @@ func TestRestart(t *testing.T) {
 	waitShutdown(t, runner, logBytes)
 }
 
+// runner should wait out a slow-starting osqueryd.
+func TestOsquerySlowStart(t *testing.T) {
+	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
+	setupOnceFunc()
+
+	for _, tt := range []struct {
+		name  string
+		delay time.Duration
+	}{
+		{"slow", osqueryStartupTimeout / 2},
+		// longer than we used to wait for the socket alone, so this only passes
+		// if the extension client is allowed the full startup budget
+		{"slower", osqueryStartupTimeout + socketOpenTimeout/2},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			runner, logBytes, osqHistory := newTestRunner(t, delayOsqueryd(t, tt.delay))
+			ensureShutdownOnCleanup(t, runner, logBytes)
+			go runner.Run()
+
+			// nothing can be healthy before the delay elapses, and waiting here keeps
+			// waitHealthy's deadline from overlapping the instance's own startup budget
+			time.Sleep(tt.delay - 1*time.Second)
+			require.Error(t, runner.Healthy(), "healthy before delayed osqueryd could have started")
+			time.Sleep(1 * time.Second)
+
+			waitHealthy(t, runner, logBytes, osqHistory)
+
+			waitShutdown(t, runner, logBytes)
+		})
+	}
+}
+
 // sets up an osquery instance and returns it.
 func newTestRunner(t *testing.T, opts ...OsqueryInstanceOption) (runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer, osqHistory *history.History) {
 	rootDirectory := testRootDirectory(t)

@@ -50,40 +50,6 @@ func delayOsqueryd(t *testing.T, delay time.Duration) OsqueryInstanceOption {
 	})
 }
 
-// runner should wait out wait out a slow-starting osqueryd.
-func TestOsquerySlowStart(t *testing.T) {
-	t.Parallel()
-	requirePermissions(t)
-	downloadOnceFunc()
-	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
-	setupOnceFunc()
-
-	for _, tt := range []struct {
-		name  string
-		delay time.Duration
-	}{
-		{"slow", osqueryStartupTimeout / 2},
-		// longer than we used to wait for the socket alone, so this only passes
-		// if the extension client is allowed the full startup budget
-		{"slower", osqueryStartupTimeout + socketOpenTimeout/2},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			runner, logBytes, osqHistory := newTestRunner(t, delayOsqueryd(t, tt.delay))
-			ensureShutdownOnCleanup(t, runner, logBytes)
-			go runner.Run()
-
-			// nothing can be healthy before the delay elapses, and waiting here keeps
-			// waitHealthy's deadline from overlapping the instance's own startup budget
-			time.Sleep(tt.delay)
-			waitHealthy(t, runner, logBytes, osqHistory)
-
-			waitShutdown(t, runner, logBytes)
-		})
-	}
-}
-
 // TestExtensionSocketPath tests that the launcher can start osqueryd with a custom extension socket path.
 // This is only run on non-windows platforms because the extension socket path is semi random on windows.
 func TestExtensionSocketPath(t *testing.T) {
