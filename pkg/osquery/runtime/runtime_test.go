@@ -1157,8 +1157,8 @@ func TestRestart(t *testing.T) {
 	waitShutdown(t, runner, logBytes)
 }
 
-// sets up an osquery instance with a running extension to be used in tests.
-func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer, osqHistory *history.History) {
+// sets up an osquery instance and returns it.
+func newTestRunner(t *testing.T, opts ...OsqueryInstanceOption) (runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer, osqHistory *history.History) {
 	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger := setUpTestSlogger()
@@ -1209,7 +1209,12 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 	s.On("WriteSettings").Return(nil).Maybe()
 	lpc := makeTestOsqLogPublisher(t, k)
 
-	runner = New(k, lpc, s)
+	return New(k, lpc, s, opts...), logBytes, osqHistory
+}
+
+// sets up an osquery instance with a running extension to be used in tests.
+func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer, osqHistory *history.History) {
+	runner, logBytes, osqHistory = newTestRunner(t)
 	go runner.Run()
 	waitHealthy(t, runner, logBytes, osqHistory)
 
