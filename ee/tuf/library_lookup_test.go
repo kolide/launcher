@@ -2,6 +2,7 @@ package tuf
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
@@ -10,6 +11,7 @@ import (
 	agentsqlite "github.com/kolide/launcher/v2/ee/agent/storage/sqlite"
 	tufci "github.com/kolide/launcher/v2/ee/tuf/ci"
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
+	"github.com/kolide/launcher/v2/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/require"
 )
 
@@ -65,11 +67,16 @@ func TestCheckOutLatest_withTufRepository(t *testing.T) {
 			tufci.CopyBinary(t, tooRecentPath)
 			require.NoError(t, os.Chmod(tooRecentPath, 0755))
 
+			var logBytes threadsafebuffer.ThreadSafeBuffer
+			slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+				Level: slog.LevelDebug,
+			}))
+
 			// Check it
-			latest, err := CheckOutLatest(t.Context(), binary, rootDir, "", "", "nightly", multislogger.NewNopLogger())
-			require.NoError(t, err, "unexpected error on checking out latest")
-			require.Equal(t, executablePath, latest.Path)
-			require.Equal(t, executableVersion, latest.Version)
+			latest, err := CheckOutLatest(t.Context(), binary, rootDir, "", "", "nightly", slogger)
+			require.NoError(t, err, "unexpected error on checking out latest", logBytes.String())
+			require.Equal(t, executablePath, latest.Path, "wrong path", logBytes.String())
+			require.Equal(t, executableVersion, latest.Version, "wrong version", logBytes.String())
 		})
 	}
 }
@@ -106,11 +113,16 @@ func TestCheckOutLatest_withTufRepository_withPinnedVersion(t *testing.T) {
 			tufci.CopyBinary(t, releaseTargetPath)
 			require.NoError(t, os.Chmod(releaseTargetPath, 0755))
 
+			var logBytes threadsafebuffer.ThreadSafeBuffer
+			slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+				Level: slog.LevelDebug,
+			}))
+
 			// Check it
-			latest, err := CheckOutLatest(t.Context(), binary, rootDir, "", pinnedVersion, "nightly", multislogger.NewNopLogger())
-			require.NoError(t, err, "unexpected error on checking out latest")
-			require.Equal(t, executablePath, latest.Path)
-			require.Equal(t, executableVersion, latest.Version)
+			latest, err := CheckOutLatest(t.Context(), binary, rootDir, "", pinnedVersion, "nightly", slogger)
+			require.NoError(t, err, "unexpected error on checking out latest", logBytes.String())
+			require.Equal(t, executablePath, latest.Path, "wrong path", logBytes.String())
+			require.Equal(t, executableVersion, latest.Version, "wrong version", logBytes.String())
 		})
 	}
 }
