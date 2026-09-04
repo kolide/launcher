@@ -169,8 +169,11 @@ func InitRemoteTufServer(t *testing.T, testReleaseVersion string) (tufServerURL 
 	// Quick validation that we set up the repo properly: metadata files should exist; targets should exist
 	require.DirExists(t, filepath.Join(tufDir, "repository"))
 	require.FileExists(t, filepath.Join(tufDir, "repository", "1.root.json")) // We only performed one commit, so we can assume version 1
+	require.FileExists(t, filepath.Join(tufDir, "repository", "root.json"))
 	require.FileExists(t, filepath.Join(tufDir, "repository", "1.snapshot.json"))
+	require.FileExists(t, filepath.Join(tufDir, "repository", "snapshot.json"))
 	require.FileExists(t, filepath.Join(tufDir, "repository", "1.targets.json"))
+	require.FileExists(t, filepath.Join(tufDir, "repository", "targets.json"))
 	require.FileExists(t, filepath.Join(tufDir, "repository", "timestamp.json")) // Timestamp file does not have versioning
 	require.FileExists(t, filepath.Join(tufDir, "repository", "targets", "launcher", runtime.GOOS, arch, "stable", "release.json"))
 	require.FileExists(t, filepath.Join(tufDir, "repository", "targets", "launcher", runtime.GOOS, arch, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion)))
