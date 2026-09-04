@@ -145,20 +145,23 @@ func InitRemoteTufServer(t *testing.T, testReleaseVersion string) (tufServerURL 
 
 	// Save metadata to filesystem dir
 	for _, name := range []string{"targets", "snapshot", "timestamp", "root"} {
+		filename := fmt.Sprintf("%s.json", name)
 		var err error
 		switch name {
 		case "targets":
-			filename := fmt.Sprintf("%d.%s.json", targets["targets"].Signed.Version, name)
-			err = targets["targets"].ToFile(filepath.Join(tufDir, "repository", filename), true)
+			require.NoError(t, targets["targets"].ToFile(filepath.Join(tufDir, "repository", filename), true))
+			versionedFilename := fmt.Sprintf("%d.%s.json", targets["targets"].Signed.Version, name)
+			require.NoError(t, targets["targets"].ToFile(filepath.Join(tufDir, "repository", versionedFilename), true))
 		case "snapshot":
-			filename := fmt.Sprintf("%d.%s.json", snapshot.Signed.Version, name)
-			err = snapshot.ToFile(filepath.Join(tufDir, "repository", filename), true)
+			require.NoError(t, snapshot.ToFile(filepath.Join(tufDir, "repository", filename), true))
+			versionedFilename := fmt.Sprintf("%d.%s.json", snapshot.Signed.Version, name)
+			require.NoError(t, snapshot.ToFile(filepath.Join(tufDir, "repository", versionedFilename), true))
 		case "timestamp":
-			filename := fmt.Sprintf("%s.json", name)
-			err = timestamp.ToFile(filepath.Join(tufDir, "repository", filename), true)
+			require.NoError(t, timestamp.ToFile(filepath.Join(tufDir, "repository", filename), true))
 		case "root":
-			filename := fmt.Sprintf("%d.%s.json", root.Signed.Version, name)
-			err = root.ToFile(filepath.Join(tufDir, "repository", filename), true)
+			require.NoError(t, root.ToFile(filepath.Join(tufDir, "repository", filename), true))
+			versionedFilename := fmt.Sprintf("%d.%s.json", root.Signed.Version, name)
+			require.NoError(t, root.ToFile(filepath.Join(tufDir, "repository", versionedFilename), true))
 		}
 		require.NoError(t, err)
 	}
