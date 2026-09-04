@@ -4,7 +4,6 @@ package runtime
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -36,7 +35,6 @@ import (
 	"github.com/kolide/launcher/v2/pkg/service"
 	"github.com/kolide/launcher/v2/pkg/threadsafebuffer"
 	"github.com/osquery/osquery-go/plugin/distributed"
-	"github.com/shirou/gopsutil/v4/process"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -144,7 +142,7 @@ func TestBadBinaryPath(t *testing.T) {
 	waitShutdown(t, runner, logBytes)
 
 	// Confirm we tried to launch the instance by examining the logs.
-	require.Contains(t, logBytes.String(), "could not launch instance, will retry after delay")
+	require.Contains(t, logBytes.String(), "fatal error starting osquery process")
 
 	k.AssertExpectations(t)
 }
@@ -194,7 +192,7 @@ func TestWithOsqueryFlags(t *testing.T) {
 	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
 	setUpMockStores(t, k)
-	osqHistory := setupHistory(t, k)
+	setupHistory(t, k)
 	lpc := makeTestOsqLogPublisher(t, k)
 	testServer := setupMockDeviceServer(t)
 	k.On("KolideServerURL").Return(testServer).Maybe()
@@ -206,7 +204,7 @@ func TestWithOsqueryFlags(t *testing.T) {
 	runner := New(k, lpc, s)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
-	waitHealthy(t, runner, logBytes, osqHistory)
+	waitHealthy(t, runner, logBytes)
 	waitShutdown(t, runner, logBytes)
 }
 
@@ -257,7 +255,7 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
 	setUpMockStores(t, k)
-	osqHistory := setupHistory(t, k)
+	setupHistory(t, k)
 	lpc := makeTestOsqLogPublisher(t, k)
 	testServer := setupMockDeviceServer(t)
 	k.On("KolideServerURL").Return(testServer).Maybe()
@@ -275,19 +273,12 @@ func TestFlagsChanged(t *testing.T) {
 	go runner.Run()
 
 	// Wait for the instance to start
-	waitHealthy(t, runner, logBytes, osqHistory)
+	waitHealthy(t, runner, logBytes)
 
-	// Confirm watchdog is disabled
-	watchdogDisabled := false
-	for _, a := range runner.instances[types.DefaultEnrollmentID].cmd.Args {
-		if strings.Contains(a, "disable_watchdog") {
-			watchdogDisabled = true
-			break
-		}
-	}
-	require.True(t, watchdogDisabled, "instance not set up with watchdog disabled")
+	// Confirm watchdog is disabled -- the instance logs its full args at launch
+	require.Contains(t, logBytes.String(), "--disable_watchdog", "instance not set up with watchdog disabled")
 
-	startingInstance := runner.instances[types.DefaultEnrollmentID]
+	startingRunId := instanceRunId(runner, types.DefaultEnrollmentID)
 
 	// should start off false
 	require.False(t, runner.needsRestart.Load(), "runner should not be flagged as needing restart since it just started")
@@ -308,48 +299,26 @@ func TestFlagsChanged(t *testing.T) {
 	require.True(t, runner.needsRestart.Load(), "runner should be marked as needing a restart after WatchdogEnabled changed while in modern standby")
 
 	// no simulate coming out of modern standby -- this should trigger a restart
+	logsBeforeRestart := len(logBytes.String())
 	k.On("InModernStandby").Unset()
 	k.On("InModernStandby").Return(false)
 	runner.FlagsChanged(t.Context(), keys.InModernStandby)
 
 	// Wait for the instance to restart, then confirm it's healthy post-restart
 	time.Sleep(2 * time.Second)
-	waitHealthy(t, runner, logBytes, osqHistory)
+	waitHealthy(t, runner, logBytes)
 
 	// Now confirm that the instance is new
-	require.NotEqual(t, startingInstance, runner.instances[types.DefaultEnrollmentID], "instance not replaced", logBytes.String())
+	require.NotEqual(t, startingRunId, instanceRunId(runner, types.DefaultEnrollmentID), "instance not replaced", logBytes.String())
 
 	require.False(t, runner.needsRestart.Load(), "runner should no longer be marked as needing a restart after restart completed")
 
-	// Confirm osquery watchdog is now enabled
-	watchdogMemoryLimitMBFound := false
-	watchdogUtilizationLimitPercentFound := false
-	watchdogDelaySecFound := false
-	for _, a := range runner.instances[types.DefaultEnrollmentID].cmd.Args {
-		if strings.Contains(a, "disable_watchdog") {
-			t.Error("disable_watchdog flag set")
-			t.FailNow()
-		}
-
-		if a == "--watchdog_memory_limit=150" {
-			watchdogMemoryLimitMBFound = true
-			continue
-		}
-
-		if a == "--watchdog_utilization_limit=20" {
-			watchdogUtilizationLimitPercentFound = true
-			continue
-		}
-
-		if a == "--watchdog_delay=120" {
-			watchdogDelaySecFound = true
-			continue
-		}
-	}
-
-	require.True(t, watchdogMemoryLimitMBFound, "watchdog memory limit not set")
-	require.True(t, watchdogUtilizationLimitPercentFound, "watchdog CPU limit not set")
-	require.True(t, watchdogDelaySecFound, "watchdog delay sec not set")
+	// Confirm osquery watchdog is now enabled -- the instance logs its args at launch
+	restartLogs := logBytes.String()[logsBeforeRestart:]
+	require.NotContains(t, restartLogs, "--disable_watchdog", "watchdog still disabled after restart")
+	require.Contains(t, restartLogs, "--watchdog_memory_limit=150", "watchdog memory limit not set")
+	require.Contains(t, restartLogs, "--watchdog_utilization_limit=20", "watchdog CPU limit not set")
+	require.Contains(t, restartLogs, "--watchdog_delay=120", "watchdog delay sec not set")
 
 	k.AssertExpectations(t)
 
@@ -408,7 +377,7 @@ func TestPing(t *testing.T) {
 	k.On("ResultLogsStore").Return(inmemory.NewStore()).Maybe()
 	k.On("BboltDB").Return(storageci.SetupDB(t)).Maybe()
 	k.On("WindowsUpdatesCacheStore").Return(inmemory.NewStore()).Maybe()
-	osqHistory := setupHistory(t, k)
+	setupHistory(t, k)
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil).Maybe()
 	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
@@ -427,8 +396,8 @@ func TestPing(t *testing.T) {
 	go runner.Run()
 
 	// Wait for the instance to start
-	waitHealthy(t, runner, logBytes, osqHistory)
-	startingInstance := runner.instances[types.DefaultEnrollmentID]
+	waitHealthy(t, runner, logBytes)
+	startingRunId := instanceRunId(runner, types.DefaultEnrollmentID)
 
 	// Confirm the instance doesn't have the KATC table yet
 	testKatcTableName := "katc_test"
@@ -459,7 +428,7 @@ func TestPing(t *testing.T) {
 	require.NoError(t, err, "could not query new table", logBytes.String())
 
 	// Confirm that the instance did not restart
-	require.Equal(t, startingInstance, runner.instances[types.DefaultEnrollmentID], "instance restarted, but it should not have")
+	require.Equal(t, startingRunId, instanceRunId(runner, types.DefaultEnrollmentID), "instance restarted, but it should not have")
 
 	// Now, add a new table to our KATC configuration
 	secondTestKatcTableName := "katc_test"
@@ -485,7 +454,7 @@ func TestPing(t *testing.T) {
 	require.NoError(t, err, "could not query new table", logBytes.String())
 
 	// Confirm that the instance did not restart
-	require.Equal(t, startingInstance, runner.instances[types.DefaultEnrollmentID], "instance restarted, but it should not have")
+	require.Equal(t, startingRunId, instanceRunId(runner, types.DefaultEnrollmentID), "instance restarted, but it should not have")
 
 	// Delete both tables from the KATC config
 	require.NoError(t, katcConfigStore.Delete([]byte(testKatcTableName), []byte(secondTestKatcTableName)))
@@ -504,136 +473,11 @@ func TestPing(t *testing.T) {
 	require.NoError(t, err, "able to query deleted tables", logBytes.String())
 
 	// Confirm that the instance did not restart
-	require.Equal(t, startingInstance, runner.instances[types.DefaultEnrollmentID], "instance restarted, but it should not have")
+	require.Equal(t, startingRunId, instanceRunId(runner, types.DefaultEnrollmentID), "instance restarted, but it should not have")
 
 	k.AssertExpectations(t)
 
 	waitShutdown(t, runner, logBytes)
-}
-
-// waitShutdown is used as a test helper, it performs additional tests to ensure proper shutdown
-// at the end of a passing test run. Tests can additionally use ensureShutdownOnCleanup as a cleanup method
-// to ensure a shutdown is attempted in the event of an earlier test failure, but this is the correct method
-// to use inline at the end of any tests that trigger runner.Run()
-func waitShutdown(t *testing.T, runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer) {
-	// We don't want to retry shutdowns because subsequent shutdown calls don't do anything --
-	// they return nil immediately, which would give `backoff` the impression that shutdown has
-	// completed when it hasn't.
-	// Instead, call `Shutdown` once, wait for our timeout (1 minute), and report failure if
-	// `Shutdown` has not returned.
-	shutdownErr := make(chan error)
-	go func() {
-		shutdownErr <- runner.Shutdown()
-	}()
-
-	select {
-	case err := <-shutdownErr:
-		require.NoError(t, err, fmt.Sprintf("runner logs:\n\n%s", logBytes.String()))
-	case <-time.After(1 * time.Minute):
-		t.Error("runner did not shut down within timeout", fmt.Sprintf("runner logs: %s", logBytes.String()))
-		t.FailNow()
-	}
-}
-
-// ensureShutdownOnCleanup adds a cleanup method which will attempt to shutdown any runners which have not
-// previously been interrupted. Failures here will be logged but will not fail the test itself. most tests
-// should already contain a waitShutdown which actually test this logic- this is here purely to ensure shutdown
-// without triggering any confusing failures on top of whatever has already gone wrong.
-// This is expected to be a no-op throughout any happy paths of testing
-func ensureShutdownOnCleanup(t *testing.T, runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer) {
-	t.Cleanup(func() {
-		// no further action required if the test already triggered Shutdown
-		if runner.interrupted.Load() {
-			return
-		}
-		// We don't want to retry shutdowns because subsequent shutdown calls don't do anything --
-		// they return nil immediately, which would give `backoff` the impression that shutdown has
-		// completed when it hasn't.
-		// Instead, call `Shutdown` once, wait for our timeout (1 minute), and report failure if
-		// `Shutdown` has not returned.
-		shutdownErr := make(chan error)
-		go func() {
-			shutdownErr <- runner.Shutdown()
-		}()
-
-		select {
-		case err := <-shutdownErr:
-			if err != nil {
-				t.Logf("ensureShutdownOnCleanup encountered error: %v", err)
-			}
-
-			return
-		case <-time.After(1 * time.Minute):
-			t.Logf("runner did not shut down within timeout. runner logs: %s", logBytes.String())
-			return
-		}
-	})
-}
-
-// waitHealthy expects the instance to be healthy within 30 seconds, or else
-// fatals the test.
-func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer, osqHistory *history.History) {
-	err := backoff.WaitFor(func() error {
-		// Instance self-reports as healthy
-		if err := runner.Healthy(); err != nil {
-			return fmt.Errorf("instance not healthy: %w", err)
-		}
-
-		// Confirm osquery instance setup is complete
-		if runner.instances[types.DefaultEnrollmentID] == nil {
-			return errors.New("default instance does not exist yet")
-		}
-
-		osqHistory := runner.knapsack.OsqueryHistory()
-		if osqHistory == nil {
-			return errors.New("osquery history is uninitialized in knapsack")
-		}
-
-		latestInstanceStats, err := osqHistory.LatestInstanceStats(types.DefaultEnrollmentID)
-		if err != nil {
-			return fmt.Errorf("gathering latest default history instance for waitHealthy: %w", err)
-		}
-
-		if latestInstanceStats == nil {
-			return errors.New("no latest instance stats for enrollment id")
-		}
-
-		if startTime, ok := latestInstanceStats["start_time"]; !ok || startTime == "" {
-			return errors.New("no start time set for latest instance stats")
-		}
-
-		if connectTime, ok := latestInstanceStats["connect_time"]; !ok || connectTime == "" {
-			return errors.New("no connect time set for latest instance stats")
-		}
-
-		// Good to go
-		return nil
-	}, osqueryStartupTimeout+socketOpenTimeout, 1*time.Second)
-
-	// Instance is healthy -- return
-	if err == nil {
-		time.Sleep(2 * time.Second)
-		return
-	}
-
-	debugInfo := fmt.Sprintf("instance not healthy by %s: runner logs:\n\n%s", time.Now().String(), logBytes.String())
-
-	// Instance is not healthy -- gather info about osquery proc, then fail
-	require.NotNil(t, runner.instances[types.DefaultEnrollmentID].cmd, "cmd not set on instance", debugInfo)
-	require.NotNil(t, runner.instances[types.DefaultEnrollmentID].cmd.Process, "instance cmd does not have process", debugInfo)
-	osqueryProc, err := process.NewProcessWithContext(t.Context(), int32(runner.instances[types.DefaultEnrollmentID].cmd.Process.Pid))
-	require.NoError(t, err, "getting osquery process info after instance failed to become healthy", debugInfo)
-
-	isRunning, err := osqueryProc.IsRunningWithContext(t.Context())
-	require.NoError(t, err, "checking if osquery process is running after instance failed to become healthy", debugInfo)
-
-	if isRunning {
-		t.Error("instance not healthy before timeout, though osquery process is running", debugInfo)
-		t.FailNow()
-	} else {
-		t.Error("instance not healthy before timeout, osquery process is not running", debugInfo)
-		t.FailNow()
-	}
 }
 
 func TestSimplePath(t *testing.T) {
@@ -681,7 +525,7 @@ func TestSimplePath(t *testing.T) {
 	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
 	setUpMockStores(t, k)
-	osqHistory := setupHistory(t, k)
+	setupHistory(t, k)
 	testServer := setupMockDeviceServer(t)
 	k.On("KolideServerURL").Return(testServer).Maybe()
 	k.On("InsecureTransportTLS").Return(true).Maybe()
@@ -693,7 +537,7 @@ func TestSimplePath(t *testing.T) {
 	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 
-	waitHealthy(t, runner, logBytes, osqHistory)
+	waitHealthy(t, runner, logBytes)
 	waitShutdown(t, runner, logBytes)
 }
 
@@ -761,14 +605,14 @@ func TestMultipleInstances(t *testing.T) {
 
 	// Start the instance
 	go runner.Run()
-	waitHealthy(t, runner, logBytes, osqHistory)
+	waitHealthy(t, runner, logBytes)
 
 	// Confirm the default instance was started
-	require.Contains(t, runner.instances, types.DefaultEnrollmentID)
-	require.NotNil(t, runner.instances[types.DefaultEnrollmentID].history)
+	require.NotEmpty(t, instanceRunId(runner, types.DefaultEnrollmentID), "no default instance")
 
 	// Confirm the additional instance was started
-	require.Contains(t, runner.instances, extraEnrollmentId)
+	require.NotEmpty(t, instanceRunId(runner, extraEnrollmentId), "no extra instance")
+	waitConnected(t, osqHistory, extraEnrollmentId)
 	extraInstanceStats, err := osqHistory.LatestInstanceStats(extraEnrollmentId)
 	require.NoError(t, err)
 	require.Contains(t, extraInstanceStats, "start_time")
@@ -786,20 +630,18 @@ func TestMultipleInstances(t *testing.T) {
 	waitShutdown(t, runner, logBytes)
 
 	// Confirm both instances exited
-	require.Contains(t, runner.instances, types.DefaultEnrollmentID)
 	defaultInstanceStats, err := osqHistory.LatestInstanceStats(types.DefaultEnrollmentID)
 	require.NoError(t, err)
 	require.Contains(t, defaultInstanceStats, "exit_time")
 	require.NotEmpty(t, defaultInstanceStats["exit_time"], "exit time should be added to default instance stats on shutdown")
 
-	require.Contains(t, runner.instances, extraEnrollmentId)
 	extraInstanceStats, err = osqHistory.LatestInstanceStats(extraEnrollmentId)
 	require.NoError(t, err)
 	require.Contains(t, extraInstanceStats, "exit_time")
 	require.NotEmpty(t, extraInstanceStats["exit_time"], "exit time should be added to secondary instance stats on shutdown")
 }
 
-func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
+func TestRunnerHandlesShutdownDuringLaunchWithMultipleInstances(t *testing.T) {
 	t.Parallel()
 	requirePermissions(t)
 	downloadOnceFunc()
@@ -844,7 +686,7 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
 	setUpMockStores(t, k)
-	osqHistory := setupHistory(t, k)
+	setupHistory(t, k)
 	testServer := setupMockDeviceServer(t)
 	k.On("KolideServerURL").Return(testServer).Maybe()
 	k.On("InsecureTransportTLS").Return(true).Maybe()
@@ -853,7 +695,18 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	s.On("WriteSettings").Return(nil).Maybe()
 	lpc := makeTestOsqLogPublisher(t, k)
 
-	runner := New(k, lpc, s)
+	// Park each launch after osqueryd starts until shutdown fires, so the shutdown is
+	// guaranteed to arrive mid-launch, with a live osqueryd to clean up
+	launchedPids := make(chan int, 2) // buffered for both instances
+	var runner *Runner
+	runner = New(k, lpc, s, WithStartFunc(func(cmd *exec.Cmd) error {
+		if err := cmd.Start(); err != nil {
+			return err
+		}
+		launchedPids <- cmd.Process.Pid
+		<-runner.shutdown
+		return nil
+	}))
 	ensureShutdownOnCleanup(t, runner, logBytes)
 
 	// Add in an extra instance
@@ -863,35 +716,13 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	k.On("NodeKey", extraEnrollmentId).Return(ulid.New(), nil).Maybe()
 	k.On("EnsureEnrollmentStored", extraEnrollmentId).Return(nil).Maybe()
 
-	// Start the instance
 	go runner.Run()
 
-	// Wait briefly for the launch routines to begin, then shut it down
-	waitHealthy(t, runner, logBytes, osqHistory)
+	// Shut down once both instances have a live osqueryd parked mid-launch
+	firstPid, secondPid := <-launchedPids, <-launchedPids
 	waitShutdown(t, runner, logBytes)
-
-	// Confirm the default instance was started, and then exited
-	require.Contains(t, runner.instances, types.DefaultEnrollmentID)
-	defaultInstanceStats, err := osqHistory.LatestInstanceStats(types.DefaultEnrollmentID)
-	require.NoError(t, err)
-	require.Contains(t, defaultInstanceStats, "start_time")
-	require.NotEmpty(t, defaultInstanceStats["start_time"], "start time should be added to default instance stats on start up")
-	require.Contains(t, defaultInstanceStats, "connect_time")
-	require.NotEmpty(t, defaultInstanceStats["connect_time"], "connect time should be added to default instance stats on start up")
-	require.Contains(t, defaultInstanceStats, "exit_time")
-	require.NotEmpty(t, defaultInstanceStats["exit_time"], "exit time should be added to default instance stats on shutdown")
-
-	// Confirm the additional instance was started, and then exited
-	require.Contains(t, runner.instances, extraEnrollmentId)
-	require.NotNil(t, runner.instances[extraEnrollmentId].history)
-	extraInstanceStats, err := osqHistory.LatestInstanceStats(extraEnrollmentId)
-	require.NoError(t, err)
-	require.Contains(t, extraInstanceStats, "start_time")
-	require.NotEmpty(t, extraInstanceStats["start_time"], "start time should be added to secondary instance stats on start up")
-	require.Contains(t, extraInstanceStats, "connect_time")
-	require.NotEmpty(t, extraInstanceStats["connect_time"], "connect time should be added to secondary instance stats on start up")
-	require.Contains(t, extraInstanceStats, "exit_time")
-	require.NotEmpty(t, extraInstanceStats["exit_time"], "exit time should be added to secondary instance stats on shutdown")
+	requireProcessGone(t, firstPid)
+	requireProcessGone(t, secondPid)
 }
 
 func TestMultipleShutdowns(t *testing.T) {
@@ -939,7 +770,7 @@ func TestMultipleShutdowns(t *testing.T) {
 	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
 	setUpMockStores(t, k)
-	osqHistory := setupHistory(t, k)
+	setupHistory(t, k)
 	testServer := setupMockDeviceServer(t)
 	k.On("KolideServerURL").Return(testServer).Maybe()
 	k.On("InsecureTransportTLS").Return(true).Maybe()
@@ -952,7 +783,7 @@ func TestMultipleShutdowns(t *testing.T) {
 	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 
-	waitHealthy(t, runner, logBytes, osqHistory)
+	waitHealthy(t, runner, logBytes)
 
 	for i := 0; i < 3; i += 1 {
 		waitShutdown(t, runner, logBytes)
@@ -1017,17 +848,15 @@ func TestOsqueryDies(t *testing.T) {
 	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 
-	waitHealthy(t, runner, logBytes, osqHistory)
+	waitHealthy(t, runner, logBytes)
 
-	require.Contains(t, runner.instances, types.DefaultEnrollmentID)
+	startingRunId := instanceRunId(runner, types.DefaultEnrollmentID)
+	require.NotEmpty(t, startingRunId, "no default instance")
 
 	// Simulate the osquery process unexpectedly dying
-	runner.instanceLock.Lock()
-	require.NoError(t, killProcessGroup(runner.instances[types.DefaultEnrollmentID].cmd))
-	runner.instances[types.DefaultEnrollmentID].errgroup.Wait(t.Context())
-	runner.instanceLock.Unlock()
+	require.NoError(t, killProcessGroup(instancePid(t, runner, types.DefaultEnrollmentID)))
 
-	waitHealthy(t, runner, logBytes, osqHistory)
+	waitHealthyReplacement(t, runner, startingRunId, logBytes)
 	allHistory, err := osqHistory.GetHistory()
 	require.NoError(t, err, "expected to be able to view osquery history after unexpected shutdown")
 	// At least 2 instances: the killed one and a healthy restart. On slow CI runners,
@@ -1039,8 +868,7 @@ func TestOsqueryDies(t *testing.T) {
 	require.Contains(t, firstInstance, "errors")
 	require.NotEmpty(t, firstInstance["errors"], "error should be added to stats when unexpected shutdown occurs")
 	require.NotEmpty(t, firstInstance["exit_time"], "exit time should be added to instance when unexpected shutdown occurs")
-	// the last instance will have already had its start and connect time checked by wait healthy
-	// check that there is no exit time or error set
+	// the last instance is still running -- check that there is no exit time or error set
 	require.Contains(t, lastInstance, "exit_time")
 	require.Contains(t, lastInstance, "errors")
 	require.Empty(t, lastInstance["errors"], "error should not be added to stats for newly created instance")
@@ -1067,7 +895,7 @@ func TestNotStarted(t *testing.T) {
 	runner := New(k, lpc, settingsstoremock.NewSettingsStoreWriter(t))
 
 	assert.Error(t, runner.Healthy())
-	assert.NoError(t, runner.Shutdown())
+	runner.Shutdown()
 }
 
 // WithStartFunc defines the function that will be used to exeute the osqueryd
@@ -1077,42 +905,6 @@ func WithStartFunc(f func(cmd *exec.Cmd) error) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
 		i.startFunc = f
 	}
-}
-
-// TestExtensionIsCleanedUp tests that the osquery extension cleans
-// itself up. Unfortunately, this test has proved very flakey on
-// circle-ci, but just fine on laptops.
-func TestExtensionIsCleanedUp(t *testing.T) {
-	t.Skip("https://github.com/kolide/launcher/issues/478")
-	t.Parallel()
-	requirePermissions(t)
-	downloadOnceFunc()
-	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
-	setupOnceFunc()
-
-	runner, logBytes, osqHistory := setupOsqueryInstanceForTests(t)
-	ensureShutdownOnCleanup(t, runner, logBytes)
-
-	requirePgidMatch(t, runner.instances[types.DefaultEnrollmentID].cmd.Process.Pid)
-
-	// kill the current osquery process but not the extension
-	require.NoError(t, runner.instances[types.DefaultEnrollmentID].cmd.Process.Kill())
-
-	// We need to (a) let the runner restart osquery, and (b) wait for
-	// the extension to die. Both of these may take up to 30s. We'll
-	// start a clock, wait for the respawn, and after 32s, test that the
-	// extension process is no longer running. See
-	// https://github.com/kolide/launcher/pull/342 and associated for
-	// background.
-	timer1 := time.NewTimer(35 * time.Second)
-
-	// Wait for osquery to respawn
-	waitHealthy(t, runner, logBytes, osqHistory)
-
-	// Ensure we've waited at least 32s
-	<-timer1.C
-
-	waitShutdown(t, runner, logBytes)
 }
 
 // TestRestart tests that the launcher can restart the osqueryd process.
@@ -1126,11 +918,20 @@ func TestRestart(t *testing.T) {
 	runner, logBytes, osqHistory := setupOsqueryInstanceForTests(t)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 
-	require.NoError(t, runner.Restart(t.Context()))
-	waitHealthy(t, runner, logBytes, osqHistory)
+	firstRunId := instanceRunId(runner, types.DefaultEnrollmentID)
+	firstPid := instancePid(t, runner, types.DefaultEnrollmentID)
+	waitConnected(t, osqHistory, types.DefaultEnrollmentID)
 
 	require.NoError(t, runner.Restart(t.Context()))
-	waitHealthy(t, runner, logBytes, osqHistory)
+	secondRunId := waitHealthyReplacement(t, runner, firstRunId, logBytes)
+	requireProcessGone(t, firstPid)
+	secondPid := instancePid(t, runner, types.DefaultEnrollmentID)
+	waitConnected(t, osqHistory, types.DefaultEnrollmentID)
+
+	require.NoError(t, runner.Restart(t.Context()))
+	waitHealthyReplacement(t, runner, secondRunId, logBytes)
+	requireProcessGone(t, secondPid)
+	waitConnected(t, osqHistory, types.DefaultEnrollmentID)
 
 	allStats, err := osqHistory.GetHistory()
 	require.NoError(t, err, "expected to be able to view osquery history after restarts")
@@ -1157,8 +958,45 @@ func TestRestart(t *testing.T) {
 	waitShutdown(t, runner, logBytes)
 }
 
-// sets up an osquery instance with a running extension to be used in tests.
-func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer, osqHistory *history.History) {
+// runner should wait out a slow-starting osqueryd.
+func TestOsquerySlowStart(t *testing.T) {
+	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
+	setupOnceFunc()
+
+	for _, tt := range []struct {
+		name  string
+		delay time.Duration
+	}{
+		{"slow", osqueryStartupTimeout / 2},
+		// longer than we used to wait for the socket alone, so this only passes
+		// if the extension client is allowed the full startup budget
+		{"slower", osqueryStartupTimeout + socketOpenTimeout/2},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			runner, logBytes, _ := newTestRunner(t, delayOsqueryd(t, tt.delay))
+			ensureShutdownOnCleanup(t, runner, logBytes)
+			go runner.Run()
+
+			// nothing can be healthy before the delay elapses, and waiting here keeps
+			// waitHealthy's deadline from overlapping the instance's own startup budget
+			time.Sleep(tt.delay - 1*time.Second)
+			require.Error(t, runner.Healthy(), "healthy before delayed osqueryd could have started")
+			time.Sleep(1 * time.Second)
+
+			waitHealthy(t, runner, logBytes)
+
+			waitShutdown(t, runner, logBytes)
+		})
+	}
+}
+
+// sets up an osquery instance and returns it.
+func newTestRunner(t *testing.T, opts ...OsqueryInstanceOption) (runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer, osqHistory *history.History) {
 	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger := setUpTestSlogger()
@@ -1209,11 +1047,14 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 	s.On("WriteSettings").Return(nil).Maybe()
 	lpc := makeTestOsqLogPublisher(t, k)
 
-	runner = New(k, lpc, s)
-	go runner.Run()
-	waitHealthy(t, runner, logBytes, osqHistory)
+	return New(k, lpc, s, opts...), logBytes, osqHistory
+}
 
-	requirePgidMatch(t, runner.instances[types.DefaultEnrollmentID].cmd.Process.Pid)
+// sets up an osquery instance with a running extension to be used in tests.
+func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer, osqHistory *history.History) {
+	runner, logBytes, osqHistory = newTestRunner(t)
+	go runner.Run()
+	waitHealthy(t, runner, logBytes)
 
 	return runner, logBytes, osqHistory
 }

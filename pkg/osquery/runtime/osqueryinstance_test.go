@@ -21,6 +21,7 @@ import (
 	"github.com/kolide/launcher/v2/pkg/backoff"
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	settingsstoremock "github.com/kolide/launcher/v2/pkg/osquery/mocks"
+	"github.com/kolide/launcher/v2/pkg/threadsafebuffer"
 	osquerygen "github.com/osquery/osquery-go/gen/osquery"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -83,7 +84,7 @@ func TestCreateOsqueryCommand(t *testing.T) {
 	i := newInstance(types.DefaultEnrollmentID, k, lpc, settingsstoremock.NewSettingsStoreWriter(t))
 	i.paths = paths
 
-	_, err := i.createOsquerydCommand("") // we do not actually exec so don't need to download a real osquery for this test
+	_, err := i.createOsquerydCommand(t.Context(), "") // we do not actually exec so don't need to download a real osquery for this test
 	require.NoError(t, err)
 
 	k.AssertExpectations(t)
@@ -110,7 +111,7 @@ func TestCreateOsqueryCommandWithFlags(t *testing.T) {
 	i := newInstance(types.DefaultEnrollmentID, k, lpc, settingsstoremock.NewSettingsStoreWriter(t))
 	i.paths = &osqueryFilePaths{}
 
-	cmd, err := i.createOsquerydCommand("") // we do not actually exec so don't need to download a real osquery for this test
+	cmd, err := i.createOsquerydCommand(t.Context(), "") // we do not actually exec so don't need to download a real osquery for this test
 	require.NoError(t, err)
 
 	// count of flags that cannot be overridden with this option:
@@ -148,7 +149,7 @@ func TestCreateOsqueryCommand_SetsEnabledWatchdogSettingsAppropriately(t *testin
 	i := newInstance(types.DefaultEnrollmentID, k, lpc, settingsstoremock.NewSettingsStoreWriter(t))
 	i.paths = &osqueryFilePaths{}
 
-	cmd, err := i.createOsquerydCommand("") // we do not actually exec so don't need to download a real osquery for this test
+	cmd, err := i.createOsquerydCommand(t.Context(), "") // we do not actually exec so don't need to download a real osquery for this test
 	require.NoError(t, err)
 
 	watchdogMemoryLimitMBFound := false
@@ -201,7 +202,7 @@ func TestCreateOsqueryCommand_SetsDisabledWatchdogSettingsAppropriately(t *testi
 	i := newInstance(types.DefaultEnrollmentID, k, lpc, settingsstoremock.NewSettingsStoreWriter(t))
 	i.paths = &osqueryFilePaths{}
 
-	cmd, err := i.createOsquerydCommand("") // we do not actually exec so don't need to download a real osquery for this test
+	cmd, err := i.createOsquerydCommand(t.Context(), "") // we do not actually exec so don't need to download a real osquery for this test
 	require.NoError(t, err)
 
 	disableWatchdogFound := false
@@ -271,6 +272,24 @@ func Test_healthcheckWithRetries(t *testing.T) {
 	require.Error(t, i.healthcheckWithRetries(t.Context(), 5, 100*time.Millisecond))
 }
 
+// Launch's error on clean shutdown is unspecified (whichever errgroup member won the
+// race), so stop asserts only that Launch returns.
+func launchInstanceForTest(t *testing.T, i *OsqueryInstance, logBytes *threadsafebuffer.ThreadSafeBuffer) (stop func()) {
+	ctx, cancel := context.WithCancel(t.Context())
+	launchDone := make(chan error, 1)
+	go func() { launchDone <- i.Launch(ctx) }()
+
+	return func() {
+		cancel()
+		select {
+		case <-launchDone:
+		case <-time.After(1 * time.Minute):
+			t.Error("instance did not shut down within timeout", fmt.Sprintf("instance logs: %s", logBytes.String()))
+			t.FailNow()
+		}
+	}
+}
+
 func TestHealthy(t *testing.T) {
 	t.Parallel()
 	downloadOnceFunc()
@@ -326,7 +345,7 @@ func TestHealthy(t *testing.T) {
 
 	// Run the instance
 	i := newInstance(types.DefaultEnrollmentID, k, lpc, s)
-	go i.Launch()
+	stop := launchInstanceForTest(t, i, logBytes)
 
 	// Wait for `Healthy` to pass
 	require.NoError(t, backoff.WaitFor(func() error {
@@ -360,19 +379,7 @@ func TestHealthy(t *testing.T) {
 	}, 10*time.Second, 1*time.Second))
 
 	// Now shut down the instance
-	i.BeginShutdown()
-	shutdownErr := make(chan error)
-	go func() {
-		shutdownErr <- i.WaitShutdown(t.Context())
-	}()
-
-	select {
-	case err := <-shutdownErr:
-		require.True(t, errors.Is(err, context.Canceled), fmt.Sprintf("unexpected err at %s: %v; instance logs:\n\n%s", time.Now().String(), err, logBytes.String()))
-	case <-time.After(1 * time.Minute):
-		t.Error("instance did not shut down within timeout", fmt.Sprintf("instance logs: %s", logBytes.String()))
-		t.FailNow()
-	}
+	stop()
 
 	k.AssertExpectations(t)
 }
@@ -433,7 +440,7 @@ func TestLaunch(t *testing.T) {
 
 	i := newInstance(types.DefaultEnrollmentID, k, lpc, s)
 	require.False(t, i.instanceStarted())
-	go i.Launch()
+	stop := launchInstanceForTest(t, i, logBytes)
 
 	// Wait for the instance to become healthy
 	require.NoError(t, backoff.WaitFor(func() error {
@@ -459,19 +466,7 @@ func TestLaunch(t *testing.T) {
 	require.True(t, i.instanceStarted())
 
 	// Now wait for full shutdown
-	i.BeginShutdown()
-	shutdownErr := make(chan error)
-	go func() {
-		shutdownErr <- i.WaitShutdown(t.Context())
-	}()
-
-	select {
-	case err := <-shutdownErr:
-		require.True(t, errors.Is(err, context.Canceled), fmt.Sprintf("unexpected err at %s: %v; instance logs:\n\n%s", time.Now().String(), err, logBytes.String()))
-	case <-time.After(1 * time.Minute):
-		t.Error("instance did not shut down within timeout", fmt.Sprintf("instance logs: %s", logBytes.String()))
-		t.FailNow()
-	}
+	stop()
 
 	k.AssertExpectations(t)
 }
@@ -543,7 +538,7 @@ func TestReloadKatcExtension(t *testing.T) {
 
 	// Create an instance and launch it
 	i := newInstance(types.DefaultEnrollmentID, k, lpc, s)
-	go i.Launch()
+	stop := launchInstanceForTest(t, i, logBytes)
 
 	// Wait for the instance to become healthy
 	require.NoError(t, backoff.WaitFor(func() error {
@@ -665,19 +660,7 @@ func TestReloadKatcExtension(t *testing.T) {
 	require.Error(t, err)
 
 	// All done testing -- now wait for full shutdown
-	i.BeginShutdown()
-	shutdownErr := make(chan error)
-	go func() {
-		shutdownErr <- i.WaitShutdown(t.Context())
-	}()
-
-	select {
-	case err := <-shutdownErr:
-		require.True(t, errors.Is(err, context.Canceled), fmt.Sprintf("unexpected err at %s: %v; instance logs:\n\n%s", time.Now().String(), err, logBytes.String()))
-	case <-time.After(1 * time.Minute):
-		t.Error("instance did not shut down within timeout", fmt.Sprintf("instance logs: %s", logBytes.String()))
-		t.FailNow()
-	}
+	stop()
 
 	k.AssertExpectations(t)
 }
