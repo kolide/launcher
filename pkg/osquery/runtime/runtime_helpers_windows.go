@@ -20,7 +20,7 @@ func setpgid() *syscall.SysProcAttr {
 	return &syscall.SysProcAttr{}
 }
 
-func killProcessGroup(origCmd *exec.Cmd) error {
+func killProcessGroup(pid int) error {
 	ctx, span := observability.StartSpan(context.Background())
 	defer span.End()
 
@@ -28,7 +28,7 @@ func killProcessGroup(origCmd *exec.Cmd) error {
 	defer cancel()
 
 	// some discussion here https://github.com/golang/dep/pull/857
-	cmd, err := allowedcmd.Taskkill.Cmd(ctx, "/F", "/T", "/PID", fmt.Sprint(origCmd.Process.Pid))
+	cmd, err := allowedcmd.Taskkill.Cmd(ctx, "/F", "/T", "/PID", fmt.Sprint(pid))
 	if err != nil {
 		observability.SetError(span, fmt.Errorf("creating command: %w", err))
 		return fmt.Errorf("creating command: %w", err)

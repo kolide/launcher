@@ -4,7 +4,6 @@ package runtime
 
 import (
 	"fmt"
-	"os/exec"
 	"path/filepath"
 	"syscall"
 )
@@ -14,9 +13,9 @@ func setpgid() *syscall.SysProcAttr {
 }
 
 // kill process group kills a process and all its children.
-func killProcessGroup(cmd *exec.Cmd) error {
-	if err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL); err != nil {
-		return fmt.Errorf("kill process group %d: %w", cmd.Process.Pid, err)
+func killProcessGroup(pid int) error {
+	if err := syscall.Kill(-pid, syscall.SIGKILL); err != nil {
+		return fmt.Errorf("kill process group %d: %w", pid, err)
 	}
 	return nil
 }
