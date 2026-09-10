@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -26,6 +27,124 @@ func TestRun_NoActors(t *testing.T) {
 
 	testRunGroup := NewRunGroup()
 	require.NoError(t, testRunGroup.Run())
+}
+
+// A clean exit returns nil.
+func TestRun_AllActorsExitCleanly(t *testing.T) {
+	t.Parallel()
+
+	testRunGroup := NewRunGroup()
+	for i := range 3 {
+		testRunGroup.Add(fmt.Sprintf("actor%d", i), func() error { return nil }, func(error) {})
+	}
+
+	require.NoError(t, testRunGroup.Run())
+}
+
+// Many actors can safely error at once; the winner of the race has their error bubble up.
+func TestRun_MultipleActorsError(t *testing.T) {
+	t.Parallel()
+
+	testRunGroup := NewRunGroup()
+	firstError := errors.New("test error from firstErroringActor")
+	secondError := errors.New("test error from secondErroringActor")
+	testRunGroup.Add("firstErroringActor", func() error { return firstError }, func(error) {})
+	testRunGroup.Add("secondErroringActor", func() error { return secondError }, func(error) {})
+
+	require.Contains(t, []error{firstError, secondError}, testRunGroup.Run())
+}
+
+// Test explicitly forces handling one actor erroring while RunGroup walks the actor list and runs the others.
+func TestRun_ActorErrorsDuringStartup(t *testing.T) {
+	t.Parallel()
+
+	testRunGroup := NewRunGroup()
+	actorCtx, releaseActors := context.WithCancel(t.Context())
+	defer releaseActors()
+
+	expectedError := errors.New("test error from interruptingActor")
+	testRunGroup.Add("interruptingActor", func() error { return expectedError }, func(error) {})
+
+	for i := range 3 {
+		testRunGroup.Add(fmt.Sprintf("actor%d", i), func() error {
+			<-actorCtx.Done()
+			return nil
+		}, func(error) {
+			releaseActors()
+		})
+	}
+
+	require.ErrorIs(t, testRunGroup.Run(), expectedError)
+}
+
+// Test explicitly forces one actor erroring only once every other actor's execute is already underway.
+func TestRun_ActorErrorsAfterStartup(t *testing.T) {
+	t.Parallel()
+
+	testRunGroup := NewRunGroup()
+	actorCtx, releaseActors := context.WithCancel(t.Context())
+	defer releaseActors()
+
+	var actorsStarted sync.WaitGroup
+	for i := range 3 {
+		actorsStarted.Add(1)
+		testRunGroup.Add(fmt.Sprintf("actor%d", i), func() error {
+			actorsStarted.Done()
+			<-actorCtx.Done()
+			return nil
+		}, func(error) {
+			releaseActors()
+		})
+	}
+
+	expectedError := errors.New("test error from interruptingActor")
+	testRunGroup.Add("interruptingActor", func() error {
+		actorsStarted.Wait()
+		time.Sleep(50 * time.Millisecond) // allow RunGroup.Run to park, waiting for an error
+		return expectedError
+	}, func(error) {})
+
+	require.ErrorIs(t, testRunGroup.Run(), expectedError)
+}
+
+// Panics in an interrupt should be handled.
+func TestRun_RecoversFromPanicInInterrupt(t *testing.T) {
+	t.Parallel()
+
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+
+	testRunGroup := NewRunGroup()
+	testRunGroup.SetSlogger(slogger)
+
+	expectedError := errors.New("test error from interruptingActor")
+	testRunGroup.Add("interruptingActor", func() error { return expectedError }, func(error) {})
+
+	actorCtx, releaseActor := context.WithCancel(t.Context())
+	defer releaseActor()
+
+	testRunGroup.Add("panickingActor", func() error {
+		<-actorCtx.Done()
+		return nil
+	}, func(error) {
+		releaseActor()
+		panic("test panic in rungroup interrupt") //nolint:forbidigo // Fine to use panic in tests
+	})
+
+	runCompleted := make(chan error, 1)
+	go func() { runCompleted <- testRunGroup.Run() }()
+
+	select {
+	case err := <-runCompleted:
+		require.ErrorIs(t, err, expectedError, "rungroup.Run didn't return interruptingActor's error")
+	case <-time.After(InterruptTimeout / 2):
+		t.Errorf("a panicking interrupt stalled shutdown. logs: %s", logBytes.String())
+		t.FailNow()
+	}
+
+	require.Contains(t, logBytes.String(), "panic occurred in goroutine")
 }
 
 // RunGroup should interrupt its actors on the first error, allow a slow actor to finish,
