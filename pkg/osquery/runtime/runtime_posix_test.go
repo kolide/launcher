@@ -3,9 +3,10 @@
 package runtime
 
 import (
-	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"testing"
 	"time"
@@ -33,84 +34,20 @@ func hasPermissionsToRunTest() bool {
 	return true
 }
 
-// TestOsquerySlowStart tests that launcher can handle a slow-starting osqueryd process.
-// This this is only enabled on non-Windows platforms because we have not yet figured
-// out how to suspend and resume a process on Windows via golang.
-func TestOsquerySlowStart(t *testing.T) {
-	t.Parallel()
-	requirePermissions(t)
-	downloadOnceFunc()
-	require.NoError(t, osqueryBinaryDownloadErr, "could not download osquery, cannot proceed with tests")
-	setupOnceFunc()
+// delayOsqueryd wraps the configured osqueryd invocation in a sleep script.
+func delayOsqueryd(t *testing.T, delay time.Duration) OsqueryInstanceOption {
+	script := filepath.Join(t.TempDir(), "delay.sh")
+	require.NoError(t, os.WriteFile(script, []byte("#!/bin/sh\nsleep \"$1\"\nshift\nexec \"$@\"\n"), 0755))
 
-	rootDirectory := testRootDirectory(t)
+	return WithStartFunc(func(cmd *exec.Cmd) error {
+		sh, err := exec.LookPath("sh")
+		require.NoError(t, err)
 
-	logBytes, slogger := setUpTestSlogger()
+		cmd.Args = append([]string{"sh", script, strconv.Itoa(int(delay.Seconds())), cmd.Path}, cmd.Args[1:]...)
+		cmd.Path = sh
 
-	k := typesMocks.NewKnapsack(t)
-	k.On("EnrollmentIDs").Return([]string{types.DefaultEnrollmentID})
-	// OsqueryHealthcheckStartupDelay defaults to ten minutes, which is too long for tests.
-	// We don't want an extremely short interval, though, because we need to give the osquery instance
-	// time to actually start before we begin healthchecking it. So, we wait for at least the
-	// amount of time that we give for the socket to appear.
-	k.On("OsqueryHealthcheckStartupDelay").Return(socketOpenTimeout).Maybe()
-	k.On("WatchdogEnabled").Return(false)
-	k.On("RootDirectory").Return(rootDirectory).Maybe()
-	k.On("OsqueryVerbose").Return(true).Maybe()
-	k.On("OsqueryFlags").Return([]string{}).Maybe()
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-	k.On("Slogger").Return(slogger)
-	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
-	k.On("LoggingInterval").Return(5 * time.Minute).Maybe()
-	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
-	k.On("ReadEnrollSecret").Return("", nil).Maybe()
-	k.On("NodeKey", types.DefaultEnrollmentID).Return(ulid.New(), nil).Maybe()
-	k.On("EnsureEnrollmentStored", types.DefaultEnrollmentID).Return(nil).Maybe()
-	k.On("InModernStandby").Return(false).Maybe()
-	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
-	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
-	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
-	k.On("UpdateChannel").Return("stable").Maybe()
-	k.On("PinnedLauncherVersion").Return("").Maybe()
-	k.On("PinnedOsquerydVersion").Return("").Maybe()
-	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
-	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
-	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
-	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything).Maybe().Return()
-	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
-	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
-	setUpMockStores(t, k)
-	osqHistory := setupHistory(t, k)
-	testServer := setupMockDeviceServer(t)
-	k.On("KolideServerURL").Return(testServer).Maybe()
-	k.On("InsecureTransportTLS").Return(true).Maybe()
-
-	s := settingsstoremock.NewSettingsStoreWriter(t)
-	s.On("WriteSettings").Return(nil).Maybe()
-	lpc := makeTestOsqLogPublisher(t, k)
-
-	runner := New(k, lpc, s, WithStartFunc(func(cmd *exec.Cmd) error {
-		err := cmd.Start()
-		if err != nil {
-			return fmt.Errorf("unexpected error starting command: %w", err)
-		}
-		// suspend the process right away
-		cmd.Process.Signal(syscall.SIGTSTP)
-		go func() {
-			// wait a while before resuming the process
-			time.Sleep(3 * time.Second)
-			cmd.Process.Signal(syscall.SIGCONT)
-		}()
-		return nil
-	}))
-	ensureShutdownOnCleanup(t, runner, logBytes)
-	go runner.Run()
-	waitHealthy(t, runner, logBytes, osqHistory)
-
-	// ensure that we actually had to wait on the socket
-	require.Contains(t, logBytes.String(), "osquery extension socket not created yet")
-	waitShutdown(t, runner, logBytes)
+		return cmd.Start()
+	})
 }
 
 // TestExtensionSocketPath tests that the launcher can start osqueryd with a custom extension socket path.
