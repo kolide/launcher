@@ -8,12 +8,12 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
-	"time"
 
 	"github.com/groob/plist"
 	"github.com/kolide/launcher/v2/ee/agent/types"
 	"github.com/kolide/launcher/v2/ee/allowedcmd"
 	"github.com/kolide/launcher/v2/ee/observability"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 )
@@ -33,22 +33,26 @@ func MDMInfo(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		table.TextColumn("installed_from_dep"),
 		table.TextColumn("user_approved"),
 	}
-	return tablewrapper.New(flags, slogger, "kolide_mdm_info", columns, generateMDMInfo,
+	generate := func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+		return generateMDMInfo(ctx, slogger, queryContext)
+	}
+
+	return tablewrapper.New(flags, slogger, "kolide_mdm_info", columns, generate,
 		tablewrapper.WithDescription("macOS MDM enrollment status and configuration, including server URL, enrollment method (DEP or user-approved), and payload details. Useful for verifying MDM enrollment and compliance."),
 	)
 }
 
-func generateMDMInfo(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+func generateMDMInfo(ctx context.Context, slogger *slog.Logger, queryContext table.QueryContext) ([]map[string]string, error) {
 	ctx, span := observability.StartSpan(ctx, "table_name", "kolide_mdm_info")
 	defer span.End()
 
-	profiles, err := getMDMProfile(ctx)
+	profiles, err := getMDMProfile(ctx, slogger)
 	if err != nil {
 		return nil, err
 	}
 
 	depEnrolled, userApproved := "unknown", "unknown"
-	status, err := getMDMProfileStatus(ctx)
+	status, err := getMDMProfileStatus(ctx, slogger)
 	if err == nil { // only supported on 10.13.4+
 		depEnrolled = strconv.FormatBool(status.DEPEnrolled)
 		userApproved = strconv.FormatBool(status.UserApproved)
@@ -95,18 +99,11 @@ func generateMDMInfo(ctx context.Context, queryContext table.QueryContext) ([]ma
 	return results, nil
 }
 
-func getMDMProfile(ctx context.Context) (*profilesOutput, error) {
+func getMDMProfile(ctx context.Context, slogger *slog.Logger) (*profilesOutput, error) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	cmd, err := allowedcmd.Profiles.Cmd(ctx, "-L", "-o", "stdout-xml")
-	if err != nil {
-		return nil, fmt.Errorf("creating profiles command: %w", err)
-	}
-	out, err := cmd.Output()
+	out, err := tablehelpers.RunSimple(ctx, slogger, 10, allowedcmd.Profiles, []string{"-L", "-o", "stdout-xml"})
 	if err != nil {
 		return nil, fmt.Errorf("calling /usr/bin/profiles to get MDM profile payload: %w", err)
 	}
@@ -144,18 +141,11 @@ type payloadContent struct {
 	SignMessage             bool
 }
 
-func getMDMProfileStatus(ctx context.Context) (profileStatus, error) {
+func getMDMProfileStatus(ctx context.Context, slogger *slog.Logger) (profileStatus, error) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	cmd, err := allowedcmd.Profiles.Cmd(ctx, "status", "-type", "enrollment")
-	if err != nil {
-		return profileStatus{}, fmt.Errorf("creating profiles command: %w", err)
-	}
-	out, err := cmd.Output()
+	out, err := tablehelpers.RunSimple(ctx, slogger, 10, allowedcmd.Profiles, []string{"status", "-type", "enrollment"})
 	if err != nil {
 		return profileStatus{}, fmt.Errorf("calling /usr/bin/profiles to get MDM profile status: %w", err)
 	}
