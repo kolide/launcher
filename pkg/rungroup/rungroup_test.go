@@ -1,9 +1,12 @@
 package rungroup
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -11,6 +14,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 )
+
+// Longest any test here should need: waiting out both rungroup timeouts, plus slack for a slow machine
+const testTimeout = InterruptTimeout + executeReturnTimeout + 5*time.Second
 
 func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m)
@@ -23,9 +29,132 @@ func TestRun_NoActors(t *testing.T) {
 	require.NoError(t, testRunGroup.Run())
 }
 
+// A clean exit returns nil.
+func TestRun_AllActorsExitCleanly(t *testing.T) {
+	t.Parallel()
+
+	testRunGroup := NewRunGroup()
+	for i := range 3 {
+		testRunGroup.Add(fmt.Sprintf("actor%d", i), func() error { return nil }, func(error) {})
+	}
+
+	require.NoError(t, testRunGroup.Run())
+}
+
+// Many actors can safely error at once; the winner of the race has their error bubble up.
+func TestRun_MultipleActorsError(t *testing.T) {
+	t.Parallel()
+
+	testRunGroup := NewRunGroup()
+	firstError := errors.New("test error from firstErroringActor")
+	secondError := errors.New("test error from secondErroringActor")
+	testRunGroup.Add("firstErroringActor", func() error { return firstError }, func(error) {})
+	testRunGroup.Add("secondErroringActor", func() error { return secondError }, func(error) {})
+
+	require.Contains(t, []error{firstError, secondError}, testRunGroup.Run())
+}
+
+// Test explicitly forces handling one actor erroring while RunGroup walks the actor list and runs the others.
+func TestRun_ActorErrorsDuringStartup(t *testing.T) {
+	t.Parallel()
+
+	testRunGroup := NewRunGroup()
+	actorCtx, releaseActors := context.WithCancel(t.Context())
+	defer releaseActors()
+
+	expectedError := errors.New("test error from interruptingActor")
+	testRunGroup.Add("interruptingActor", func() error { return expectedError }, func(error) {})
+
+	for i := range 3 {
+		testRunGroup.Add(fmt.Sprintf("actor%d", i), func() error {
+			<-actorCtx.Done()
+			return nil
+		}, func(error) {
+			releaseActors()
+		})
+	}
+
+	require.ErrorIs(t, testRunGroup.Run(), expectedError)
+}
+
+// Test explicitly forces one actor erroring only once every other actor's execute is already underway.
+func TestRun_ActorErrorsAfterStartup(t *testing.T) {
+	t.Parallel()
+
+	testRunGroup := NewRunGroup()
+	actorCtx, releaseActors := context.WithCancel(t.Context())
+	defer releaseActors()
+
+	var actorsStarted sync.WaitGroup
+	for i := range 3 {
+		actorsStarted.Add(1)
+		testRunGroup.Add(fmt.Sprintf("actor%d", i), func() error {
+			actorsStarted.Done()
+			<-actorCtx.Done()
+			return nil
+		}, func(error) {
+			releaseActors()
+		})
+	}
+
+	expectedError := errors.New("test error from interruptingActor")
+	testRunGroup.Add("interruptingActor", func() error {
+		actorsStarted.Wait()
+		time.Sleep(50 * time.Millisecond) // allow RunGroup.Run to park, waiting for an error
+		return expectedError
+	}, func(error) {})
+
+	require.ErrorIs(t, testRunGroup.Run(), expectedError)
+}
+
+// Panics in an interrupt should be handled.
+func TestRun_RecoversFromPanicInInterrupt(t *testing.T) {
+	t.Parallel()
+
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+
+	testRunGroup := NewRunGroup()
+	testRunGroup.SetSlogger(slogger)
+
+	expectedError := errors.New("test error from interruptingActor")
+	testRunGroup.Add("interruptingActor", func() error { return expectedError }, func(error) {})
+
+	actorCtx, releaseActor := context.WithCancel(t.Context())
+	defer releaseActor()
+
+	testRunGroup.Add("panickingActor", func() error {
+		<-actorCtx.Done()
+		return nil
+	}, func(error) {
+		releaseActor()
+		panic("test panic in rungroup interrupt") //nolint:forbidigo // Fine to use panic in tests
+	})
+
+	runCompleted := make(chan error, 1)
+	go func() { runCompleted <- testRunGroup.Run() }()
+
+	select {
+	case err := <-runCompleted:
+		require.ErrorIs(t, err, expectedError, "rungroup.Run didn't return interruptingActor's error")
+	case <-time.After(InterruptTimeout / 2):
+		t.Errorf("a panicking interrupt stalled shutdown. logs: %s", logBytes.String())
+		t.FailNow()
+	}
+
+	require.Contains(t, logBytes.String(), "panic occurred in goroutine")
+}
+
+// RunGroup should interrupt its actors on the first error, allow a slow actor to finish,
+// and interrupt every actor cleanly.
 func TestRun_MultipleActors(t *testing.T) {
 	t.Parallel()
 
+	ctx, cancel := context.WithTimeout(t.Context(), testTimeout)
+	defer cancel()
+
 	testRunGroup := NewRunGroup()
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
@@ -34,72 +163,62 @@ func TestRun_MultipleActors(t *testing.T) {
 	}))
 	testRunGroup.SetSlogger(slogger)
 
-	groupReceivedInterrupts := make(chan struct{}, 3)
+	var groupInterruptCount atomic.Int32
+	actorCtx, releaseActors := context.WithCancel(ctx)
 
-	// First actor waits for interrupt and alerts groupReceivedInterrupts when it's interrupted
-	firstActorInterrupt := make(chan struct{})
-	testRunGroup.Add("firstActor", func() error {
-		<-firstActorInterrupt
-		return nil
-	}, func(error) {
-		groupReceivedInterrupts <- struct{}{}
-		firstActorInterrupt <- struct{}{}
-	})
-
-	// Second actor returns error on `execute`, and then alerts groupReceivedInterrupts when it's interrupted
-	expectedRuntimeForRungroup := 1 * time.Second
-	expectedError := errors.New("test error from interruptingActor")
-	testRunGroup.Add("interruptingActor", func() error {
-		time.Sleep(expectedRuntimeForRungroup)
-		return expectedError
-	}, func(error) {
-		groupReceivedInterrupts <- struct{}{}
-	})
-
-	// Third actor waits for interrupt and alerts groupReceivedInterrupts when it's interrupted
-	anotherActorInterrupt := make(chan struct{})
-	testRunGroup.Add("anotherActor", func() error {
-		<-anotherActorInterrupt
-		return nil
-	}, func(error) {
-		groupReceivedInterrupts <- struct{}{}
-		anotherActorInterrupt <- struct{}{}
-	})
-
-	runCompleted := make(chan struct{})
-	go func() {
-		err := testRunGroup.Run()
-		runCompleted <- struct{}{}
-		require.Error(t, err, "run group expected to return interruptingActor's error, but did not")
-	}()
-
-	// Running until interrupt, waiting for interrupt, and waiting for execute return, plus a little buffer
-	runDuration := expectedRuntimeForRungroup + InterruptTimeout + executeReturnTimeout + 1*time.Second
-	interruptCheckTimer := time.NewTicker(runDuration)
-	defer interruptCheckTimer.Stop()
-
-	receivedInterrupts := 0
-	gotRunCompleted := false
-	for !gotRunCompleted {
-		select {
-		case <-groupReceivedInterrupts:
-			receivedInterrupts += 1
-		case <-runCompleted:
-			gotRunCompleted = true
-		case <-interruptCheckTimer.C:
-			t.Errorf("did not receive expected interrupts within reasonable time, got %d", receivedInterrupts)
-			t.FailNow()
-		}
+	// These actors are well-behaved: wait for interrupt, exit cleanly
+	for i := range 3 {
+		testRunGroup.Add(fmt.Sprintf("actor%d", i), func() error {
+			<-actorCtx.Done()
+			return nil
+		}, func(error) {
+			groupInterruptCount.Add(1)
+			releaseActors()
+		})
 	}
 
-	require.True(t, gotRunCompleted, "rungroup.Run did not terminate within time limit")
+	// This actor interrupts the group by erroring on exit
+	expectedError := errors.New("test error from interruptingActor")
+	testRunGroup.Add("interruptingActor", func() error {
+		return expectedError
+	}, func(error) {
+		groupInterruptCount.Add(1)
+	})
 
-	require.Equal(t, 3, receivedInterrupts, "unexpected number of interrupts: logs:", logBytes.String())
+	// This actor lags on its way out, and the group is expected to wait for it
+	var slowActorExited atomic.Bool
+	testRunGroup.Add("slowActor", func() error {
+		<-actorCtx.Done()
+		time.Sleep(time.Second) // well inside executeReturnTimeout
+		slowActorExited.Store(true)
+		return nil
+	}, func(error) {
+		groupInterruptCount.Add(1)
+		releaseActors()
+	})
+
+	runCompleted := make(chan error, 1)
+	go func() { runCompleted <- testRunGroup.Run() }()
+
+	select {
+	case err := <-runCompleted:
+		require.ErrorIs(t, err, expectedError, "rungroup.Run didn't return interruptingActor's error")
+	case <-ctx.Done():
+		t.Errorf("rungroup.Run did not return in time, got %d interrupts. logs: %s", groupInterruptCount.Load(), logBytes.String())
+		t.FailNow()
+	}
+
+	require.Truef(t, slowActorExited.Load(), "the slow actor was not allowed to exit cleanly: logs: %s", logBytes.String())
+	require.Equalf(t, int32(5), groupInterruptCount.Load(), "unexpected number of interrupts: logs: %s", logBytes.String())
 }
 
+// RunGroup should not wait forever on an actor's interrupt if it hangs.
 func TestRun_MultipleActors_InterruptTimeout(t *testing.T) {
 	t.Parallel()
 
+	ctx, cancel := context.WithTimeout(t.Context(), testTimeout)
+	defer cancel()
+
 	testRunGroup := NewRunGroup()
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
@@ -108,76 +227,56 @@ func TestRun_MultipleActors_InterruptTimeout(t *testing.T) {
 	}))
 	testRunGroup.SetSlogger(slogger)
 
-	groupReceivedInterrupts := make(chan struct{}, 3)
+	var groupInterruptCount atomic.Int32
+	firstCtx, releaseFirstActor := context.WithCancel(ctx)
 
-	// First actor waits for interrupt and alerts groupReceivedInterrupts when it's interrupted
-	firstActorInterrupt := make(chan struct{})
+	// This actor is well-behaved: waits for interrupt, exits cleanly
 	testRunGroup.Add("firstActor", func() error {
-		<-firstActorInterrupt
+		<-firstCtx.Done()
 		return nil
 	}, func(error) {
-		groupReceivedInterrupts <- struct{}{}
-		firstActorInterrupt <- struct{}{}
+		groupInterruptCount.Add(1)
+		releaseFirstActor()
 	})
 
-	// Second actor returns error on `execute`, and then alerts groupReceivedInterrupts when it's interrupted
+	// This actor interrupts the group by erroring on exit
 	expectedError := errors.New("test error from interruptingActor")
 	testRunGroup.Add("interruptingActor", func() error {
-		time.Sleep(1 * time.Second)
 		return expectedError
 	}, func(error) {
-		groupReceivedInterrupts <- struct{}{}
+		groupInterruptCount.Add(1)
 	})
 
-	// Third actor blocks in interrupt for longer than the interrupt timeout
-	blockingActorInterrupt := make(chan struct{})
+	// Poorly behaving actor whose interrupt never returns.
 	testRunGroup.Add("blockingActor", func() error {
-		<-blockingActorInterrupt
+		<-ctx.Done()
 		return nil
 	}, func(error) {
-		time.Sleep(4 * InterruptTimeout)
-		groupReceivedInterrupts <- struct{}{}
-		blockingActorInterrupt <- struct{}{}
+		<-ctx.Done()
 	})
 
-	runCompleted := make(chan struct{})
-	go func() {
-		err := testRunGroup.Run()
-		require.Error(t, err)
-		runCompleted <- struct{}{}
-	}()
+	runCompleted := make(chan error, 1)
+	go func() { runCompleted <- testRunGroup.Run() }()
 
-	// 1 second before interrupt, waiting for interrupt, and waiting for execute return, plus a little buffer
-	runDuration := 1*time.Second + InterruptTimeout + executeReturnTimeout + 1*time.Second
-	interruptCheckTimer := time.NewTicker(runDuration)
-	defer interruptCheckTimer.Stop()
-
-	receivedInterrupts := 0
-	gotRunCompleted := false
-	for !gotRunCompleted {
-		select {
-		case <-groupReceivedInterrupts:
-			receivedInterrupts += 1
-		case <-runCompleted:
-			gotRunCompleted = true
-		case <-interruptCheckTimer.C:
-			t.Errorf("did not receive expected interrupts within reasonable time, got %d", receivedInterrupts)
-			t.FailNow()
-		}
+	select {
+	case err := <-runCompleted:
+		require.ErrorIs(t, err, expectedError, "rungroup.Run didn't return interruptingActor's error")
+	case <-ctx.Done():
+		t.Errorf("rungroup.Run did not return before timeout, got %d interrupts. logs: %s", groupInterruptCount.Load(), logBytes.String())
+		t.FailNow()
 	}
 
-	require.True(t, gotRunCompleted, "rungroup.Run did not terminate within time limit")
-
-	// We only want two interrupts -- we should not be waiting on the blocking actor
-	require.Equal(t, 2, receivedInterrupts, "unexpected number of interrupts: logs:", logBytes.String())
-
-	// Wait for all goroutines to exit
-	time.Sleep(4 * InterruptTimeout)
+	// Other interrupts should fire.
+	require.Equalf(t, int32(2), groupInterruptCount.Load(), "unexpected number of interrupts: logs: %s", logBytes.String())
 }
 
+// RunGroup eventually abandons a RunGroup whose actor never returns.
 func TestRun_MultipleActors_ExecuteReturnTimeout(t *testing.T) {
 	t.Parallel()
 
+	ctx, cancel := context.WithTimeout(t.Context(), testTimeout)
+	defer cancel()
+
 	testRunGroup := NewRunGroup()
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
@@ -186,81 +285,59 @@ func TestRun_MultipleActors_ExecuteReturnTimeout(t *testing.T) {
 	}))
 	testRunGroup.SetSlogger(slogger)
 
-	groupReceivedInterrupts := make(chan struct{}, 3)
-	// Keep track of when `execute`s return so we give testRunGroup.Run enough time to do its thing
-	groupReceivedExecuteReturns := make(chan struct{}, 2)
+	var groupInterruptCount, groupExecuteReturnCount atomic.Int32
+	firstCtx, releaseFirstActor := context.WithCancel(ctx)
 
-	// First actor waits for interrupt and alerts groupReceivedInterrupts when it's interrupted
-	firstActorInterrupt := make(chan struct{})
+	// This actor is well-behaved: waits for interrupt, exits cleanly
 	testRunGroup.Add("firstActor", func() error {
-		<-firstActorInterrupt
-		groupReceivedExecuteReturns <- struct{}{}
+		defer groupExecuteReturnCount.Add(1)
+		<-firstCtx.Done()
 		return nil
 	}, func(error) {
-		groupReceivedInterrupts <- struct{}{}
-		firstActorInterrupt <- struct{}{}
+		groupInterruptCount.Add(1)
+		releaseFirstActor()
 	})
 
-	// Second actor returns error on `execute`, and then alerts groupReceivedInterrupts when it's interrupted
+	// This actor interrupts the group by erroring on exit
 	expectedError := errors.New("test error from interruptingActor")
 	testRunGroup.Add("interruptingActor", func() error {
-		time.Sleep(1 * time.Second)
-		groupReceivedExecuteReturns <- struct{}{}
+		defer groupExecuteReturnCount.Add(1)
 		return expectedError
 	}, func(error) {
-		groupReceivedInterrupts <- struct{}{}
+		groupInterruptCount.Add(1)
 	})
 
-	// Third actor never signals to `execute` to return
-	blockingActorInterrupt := make(chan struct{})
+	// This actor's execute never returns
 	testRunGroup.Add("blockingActor", func() error {
-		<-blockingActorInterrupt                  // will never happen
-		groupReceivedExecuteReturns <- struct{}{} // will never happen
+		defer groupExecuteReturnCount.Add(1)
+		<-ctx.Done()
 		return nil
 	}, func(error) {
-		groupReceivedInterrupts <- struct{}{}
+		groupInterruptCount.Add(1)
 	})
 
-	runCompleted := make(chan struct{})
-	go func() {
-		err := testRunGroup.Run()
-		runCompleted <- struct{}{}
-		require.Error(t, err)
-	}()
+	runCompleted := make(chan error, 1)
+	go func() { runCompleted <- testRunGroup.Run() }()
 
-	// 1 second before interrupt, waiting for interrupt, and waiting for execute return, plus a little buffer
-	runDuration := 1*time.Second + InterruptTimeout + executeReturnTimeout + 1*time.Second
-	interruptCheckTimer := time.NewTicker(runDuration)
-	defer interruptCheckTimer.Stop()
-
-	// Make sure all three actors are interrupted, and that two of them terminate their execute
-	receivedInterrupts := 0
-	receivedExecuteReturns := 0
-	gotRunCompleted := false
-	for !gotRunCompleted {
-		select {
-		case <-groupReceivedInterrupts:
-			receivedInterrupts += 1
-		case <-groupReceivedExecuteReturns:
-			receivedExecuteReturns += 1
-		case <-runCompleted:
-			gotRunCompleted = true
-		case <-interruptCheckTimer.C:
-			t.Errorf("did not receive expected interrupts within reasonable time, got %d", receivedInterrupts)
-			t.FailNow()
-		}
+	select {
+	case err := <-runCompleted:
+		require.ErrorIs(t, err, expectedError, "rungroup.Run didn't return interruptingActor's error")
+	case <-ctx.Done():
+		t.Errorf("rungroup.Run did not return before timeout, got %d execute returns. logs: %s", groupExecuteReturnCount.Load(), logBytes.String())
+		t.FailNow()
 	}
 
-	require.True(t, gotRunCompleted, "rungroup.Run did not terminate within time limit")
-	require.Equal(t, 3, receivedInterrupts, "unexpected number of interrupts: logs:", logBytes.String())
-	require.Equal(t, 2, receivedExecuteReturns)
-
-	// Clean up goroutine
-	blockingActorInterrupt <- struct{}{}
+	// All three are interrupted, but only the two that can return from execute do so
+	require.Equalf(t, int32(3), groupInterruptCount.Load(), "unexpected number of interrupts: logs: %s", logBytes.String())
+	require.Equalf(t, int32(2), groupExecuteReturnCount.Load(), "unexpected number of execute returns: logs: %s", logBytes.String())
 }
 
+// RunGroup should handle a panic, end the group, and bubble up the error.
 func TestRun_RecoversAndLogsPanic(t *testing.T) {
 	t.Parallel()
+
+	ctx, cancel := context.WithTimeout(t.Context(), testTimeout)
+	defer cancel()
 
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
@@ -272,36 +349,21 @@ func TestRun_RecoversAndLogsPanic(t *testing.T) {
 
 	// Actor that will panic in its execute function
 	testRunGroup.Add("panickingActor", func() error {
-		time.Sleep(1 * time.Second)
 		panic("test panic in rungroup actor") //nolint:forbidigo // Fine to use panic in tests
 	}, func(error) {})
 
-	runCompleted := make(chan struct{})
-	go func() {
-		err := testRunGroup.Run()
-		runCompleted <- struct{}{}
-		require.Error(t, err)
-	}()
-
-	// Give it a bit of time to return
-	runDuration := 1*time.Second + InterruptTimeout + executeReturnTimeout + 1*time.Second
-	interruptCheckTimer := time.NewTicker(runDuration)
-	defer interruptCheckTimer.Stop()
+	runCompleted := make(chan error, 1)
+	go func() { runCompleted <- testRunGroup.Run() }()
 
 	// Confirm that the rungroup exited without panicking (i.e. we recovered appropriately)
-	gotRunCompleted := false
-	for !gotRunCompleted {
-		select {
-		case <-runCompleted:
-			gotRunCompleted = true
-		case <-interruptCheckTimer.C:
-			fmt.Println(logBytes.String())
-			t.Error("did not interrupt within reasonable time")
-			t.FailNow()
-		}
+	select {
+	case err := <-runCompleted:
+		require.Error(t, err, "rungroup.Run didn't return the panicking actor's error")
+	case <-ctx.Done():
+		t.Errorf("rungroup.Run did not return after the actor panicked. logs: %s", logBytes.String())
+		t.FailNow()
 	}
-	require.True(t, gotRunCompleted, "rungroup.Run did not terminate within time limit")
 
 	// Confirm we have some sort of log about the panic
-	require.Contains(t, logBytes.String(), "panic")
+	require.Contains(t, logBytes.String(), "shutting down after actor panic")
 }
