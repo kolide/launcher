@@ -143,7 +143,7 @@ func WithOsqueryHistory(osqueryHistory types.OsqueryHistorian) TufAutoupdaterOpt
 
 func NewTufAutoupdater(ctx context.Context, k types.Knapsack, metadataHttpClient *http.Client, mirrorHttpClient *http.Client,
 	opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
-	ctx, span := observability.StartSpan(ctx)
+	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	startTime := time.Now()
@@ -218,7 +218,7 @@ func initMetadataClient(ctx context.Context, metadataDir, metadataBaseUrl string
 		return nil, fmt.Errorf("creating go-tuf/v2 config: %w", err)
 	}
 	// We set cfg.LocalMetadataDir because we want the updater to cache its TUF metadata
-	// on disk. Unfortunately, this config settting (cfg.DisableLocalCache) also applies
+	// on disk. Unfortunately, this config setting (cfg.DisableLocalCache) also applies
 	// to target downloads, which we currently handle separately.
 	cfg.LocalMetadataDir = metadataDir
 	cfg.LocalTargetsDir = DefaultLibraryDirectory(metadataDir)

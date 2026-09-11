@@ -208,13 +208,13 @@ func getAutoupdateConfigFromFile(configFilePath string) (*autoupdateConfig, erro
 // as its version.
 func CheckOutLatest(ctx context.Context, binary autoupdatableBinary, rootDirectory string,
 	updateDirectory string, pinnedVersion string, channel string, slogger *slog.Logger) (*BinaryUpdateInfo, error) {
-	return checkOutLatest(ctx, binary, rootDirectory, updateDirectory, pinnedVersion, channel, rootJson, slogger)
+	return checkOutLatestWithRootJson(ctx, binary, rootDirectory, updateDirectory, pinnedVersion, channel, rootJson, slogger)
 }
 
-// checkOutLatest allows for passing in `trustedRootJson` instead of using the package-level
+// checkOutLatestWithRootJson allows for passing in `trustedRootJson` instead of using the package-level
 // embedded root JSON. It should be directly invoked only by tests; production usage should go through
 // CheckOutLatest.
-func checkOutLatest(ctx context.Context, binary autoupdatableBinary, rootDirectory string,
+func checkOutLatestWithRootJson(ctx context.Context, binary autoupdatableBinary, rootDirectory string,
 	updateDirectory string, pinnedVersion string, channel string, trustedRootJson []byte, slogger *slog.Logger) (*BinaryUpdateInfo, error) {
 	ctx, span := observability.StartSpan(ctx, "binary", string(binary))
 	defer span.End()

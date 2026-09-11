@@ -73,7 +73,7 @@ func TestCheckOutLatest_withTufRepository(t *testing.T) {
 			}))
 
 			// Check it
-			latest, err := checkOutLatest(t.Context(), binary, rootDir, "", "", "nightly", testRootJson, slogger)
+			latest, err := checkOutLatestWithRootJson(t.Context(), binary, rootDir, "", "", "nightly", testRootJson, slogger)
 			require.NoError(t, err, "unexpected error on checking out latest", logBytes.String())
 			require.Equal(t, executablePath, latest.Path, "wrong path", logBytes.String())
 			require.Equal(t, executableVersion, latest.Version, "wrong version", logBytes.String())
@@ -119,7 +119,7 @@ func TestCheckOutLatest_withTufRepository_withPinnedVersion(t *testing.T) {
 			}))
 
 			// Check it
-			latest, err := checkOutLatest(t.Context(), binary, rootDir, "", pinnedVersion, "nightly", testRootJson, slogger)
+			latest, err := checkOutLatestWithRootJson(t.Context(), binary, rootDir, "", pinnedVersion, "nightly", testRootJson, slogger)
 			require.NoError(t, err, "unexpected error on checking out latest", logBytes.String())
 			require.Equal(t, executablePath, latest.Path, "wrong path", logBytes.String())
 			require.Equal(t, executableVersion, latest.Version, "wrong version", logBytes.String())
