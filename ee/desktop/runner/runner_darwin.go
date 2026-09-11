@@ -17,8 +17,8 @@ import (
 )
 
 // Starts the provided cmd and returns any errors from spawning the process. If the uid differs from the user
-// running the current process, runAsUser uses launchctl runas to start cmd in user context. Otherwise it runs the cmd
-// directly.
+// running the current process, runAsUser uses `launchctl runas` to start cmd in the user's context (required for
+// notifications to work). Otherwise it runs cmd directly.
 func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, uid string, cmd *allowedcmd.TracedCmd) error {
 	_, span := observability.StartSpan(ctx, "uid", uid)
 	defer span.End()
