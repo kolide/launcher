@@ -12,7 +12,7 @@ import (
 )
 
 // SeedLocalTufRepo creates a local TUF repo with a valid release under the given version `testTargetVersion`
-func SeedLocalTufRepo(t *testing.T, testTargetVersion string, testRootDir string) {
+func SeedLocalTufRepo(t *testing.T, testTargetVersion string, testRootDir string) []byte {
 	serverUrl, testRootJson := InitRemoteTufServer(t, testTargetVersion)
 
 	localTufDir := filepath.Join(testRootDir, "tuf")
@@ -36,4 +36,6 @@ func SeedLocalTufRepo(t *testing.T, testTargetVersion string, testRootDir string
 	for _, metadataFile := range metadataFiles {
 		require.NoError(t, os.Chmod(metadataFile, 0640))
 	}
+
+	return testRootJson
 }
