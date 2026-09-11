@@ -656,6 +656,10 @@ func (ta *TufAutoupdater) checkForUpdate(ctx context.Context, binariesToCheck []
 			continue
 		}
 
+		// Make sure that the call to `Refresh` didn't break permissions in case of rollback
+		// to an older version of go-tuf.
+		ta.makeMetadataFilePermissionsBackwardsCompatible()
+
 		successfulUpdate = true
 		targets = updater.GetTopLevelTargets()
 		break
@@ -759,6 +763,32 @@ func (ta *TufAutoupdater) checkForUpdate(ctx context.Context, binariesToCheck []
 	}
 
 	return nil
+}
+
+// makeMetadataFilePermissionsBackwardsCompatible adjusts the permissions for
+// files in the metadata directory. The old version of go-tuf expects permissions
+// at 0640 at most, but go-tuf/v2 creates metadata files at 0644. So, we re-chmod
+// any metadata files added by the call to `Refresh` in case we have to fall back
+// to the old version of go-tuf.
+func (ta *TufAutoupdater) makeMetadataFilePermissionsBackwardsCompatible() {
+	metadataFiles, err := filepath.Glob(filepath.Join(ta.metadataDir, "*.json"))
+	if err != nil {
+		ta.slogger.Log(context.TODO(), slog.LevelError,
+			"could not glob for metadata files",
+			"err", err,
+		)
+		return
+	}
+
+	for _, metadataFile := range metadataFiles {
+		if err := os.Chmod(metadataFile, 0640); err != nil {
+			ta.slogger.Log(context.TODO(), slog.LevelError,
+				"failed to fix permissions on metadata file",
+				"filepath", metadataFile,
+				"err", err,
+			)
+		}
+	}
 }
 
 // downloadUpdate will download a new release for the given binary, if available from TUF
