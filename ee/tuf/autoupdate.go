@@ -30,9 +30,9 @@ import (
 	"github.com/kolide/launcher/v2/ee/observability"
 	kolideatomic "github.com/kolide/launcher/v2/pkg/atomic"
 	"github.com/kolide/launcher/v2/pkg/osquery/runsimple"
-	client "github.com/theupdateframework/go-tuf/client"
-	filejsonstore "github.com/theupdateframework/go-tuf/client/filejsonstore"
-	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/v2/metadata"
+	"github.com/theupdateframework/go-tuf/v2/metadata/config"
+	"github.com/theupdateframework/go-tuf/v2/metadata/updater"
 )
 
 //go:embed assets/tuf/root.json
@@ -90,12 +90,14 @@ type (
 //mockery:structname: Mocklibrarian
 type librarian interface {
 	Available(binary autoupdatableBinary, targetFilename string) bool
-	AddToLibrary(binary autoupdatableBinary, currentVersion string, targetFilename string, targetMetadata data.TargetFileMeta) error
+	AddToLibrary(binary autoupdatableBinary, currentVersion string, targetFilename string, targetMetadata *metadata.TargetFiles) error
 	TidyLibrary(binary autoupdatableBinary, currentVersion string)
 }
 
 type TufAutoupdater struct {
-	metadataClient       *client.Client
+	trustedRootJson      []byte // should be the embedded package-level rootJson, but can be overridden for tests
+	metadataDir          string
+	metadataClient       *http.Client
 	libraryManager       librarian
 	osqueryTimeout       time.Duration
 	knapsack             types.Knapsack
@@ -146,6 +148,9 @@ func NewTufAutoupdater(ctx context.Context, k types.Knapsack, metadataHttpClient
 
 	startTime := time.Now()
 	ta := &TufAutoupdater{
+		trustedRootJson:   rootJson,
+		metadataDir:       LocalTufDirectory(k.RootDirectory()),
+		metadataClient:    metadataHttpClient,
 		knapsack:          k,
 		interrupt:         make(chan struct{}, 10), // We have a buffer so we don't block on sending to this channel
 		signalRestart:     make(chan error, 10),    // We have a buffer so we don't block on sending to this channel
@@ -175,10 +180,13 @@ func NewTufAutoupdater(ctx context.Context, k types.Knapsack, metadataHttpClient
 		opt(ta)
 	}
 
-	var err error
-	ta.metadataClient, err = initMetadataClient(ctx, k.RootDirectory(), k.TufServerURL(), metadataHttpClient)
-	if err != nil {
-		return nil, fmt.Errorf("could not init metadata client: %w", err)
+	if err := os.MkdirAll(ta.metadataDir, 0750); err != nil {
+		return nil, fmt.Errorf("could not make local TUF directory %s: %w", ta.metadataDir, err)
+	}
+	// Ensure that directory permissions are correct, otherwise TUF will fail to initialize.
+	// We cannot have permissions in excess of -rwxr-x---.
+	if err := os.Chmod(ta.metadataDir, 0750); err != nil {
+		return nil, fmt.Errorf("chmodding local TUF directory %s: %w", ta.metadataDir, err)
 	}
 
 	// If the update directory wasn't set by a flag, use the default location of <launcher root>/updates.
@@ -186,6 +194,7 @@ func NewTufAutoupdater(ctx context.Context, k types.Knapsack, metadataHttpClient
 	if updateDirectory == "" {
 		updateDirectory = DefaultLibraryDirectory(k.RootDirectory())
 	}
+	var err error
 	ta.libraryManager, err = newUpdateLibraryManager(k.MirrorServerURL(), mirrorHttpClient, updateDirectory, k.Slogger())
 	if err != nil {
 		return nil, fmt.Errorf("could not init update library manager: %w", err)
@@ -199,43 +208,31 @@ func NewTufAutoupdater(ctx context.Context, k types.Knapsack, metadataHttpClient
 
 // initMetadataClient sets up a TUF client with our validated root metadata, prepared to fetch updates
 // from our TUF server.
-func initMetadataClient(ctx context.Context, rootDirectory, metadataUrl string, metadataHttpClient *http.Client) (*client.Client, error) {
+func initMetadataClient(ctx context.Context, metadataDir, metadataBaseUrl string, metadataHttpClient *http.Client, trustedRootJson []byte) (*updater.Updater, error) {
 	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
-	// Set up the local TUF directory for our TUF client
-	localTufDirectory := LocalTufDirectory(rootDirectory)
-	if err := os.MkdirAll(localTufDirectory, 0750); err != nil {
-		return nil, fmt.Errorf("could not make local TUF directory %s: %w", localTufDirectory, err)
-	}
-
-	// Ensure that directory permissions are correct, otherwise TUF will fail to initialize. We cannot
-	// have permissions in excess of -rwxr-x---.
-	if err := os.Chmod(localTufDirectory, 0750); err != nil {
-		return nil, fmt.Errorf("chmodding local TUF directory %s: %w", localTufDirectory, err)
-	}
-
-	// Set up our local store i.e. point to the directory in our filesystem
-	localStore, err := filejsonstore.NewFileJSONStore(localTufDirectory)
+	metadataUrl := strings.TrimSuffix(metadataBaseUrl, "/") + "/repository"
+	cfg, err := config.New(metadataUrl, trustedRootJson)
 	if err != nil {
-		return nil, fmt.Errorf("could not initialize local TUF store: %w", err)
+		return nil, fmt.Errorf("creating go-tuf/v2 config: %w", err)
+	}
+	// We set cfg.LocalMetadataDir because we want the updater to cache its TUF metadata
+	// on disk. Unfortunately, this config settting (cfg.DisableLocalCache) also applies
+	// to target downloads, which we currently handle separately.
+	cfg.LocalMetadataDir = metadataDir
+	cfg.LocalTargetsDir = DefaultLibraryDirectory(metadataDir)
+
+	if err := cfg.SetDefaultFetcherHTTPClient(metadataHttpClient); err != nil {
+		return nil, fmt.Errorf("setting http client: %w", err)
 	}
 
-	// Set up our remote store i.e. tuf.kolide.com
-	remoteOpts := client.HTTPRemoteOptions{
-		MetadataPath: "/repository",
-	}
-	remoteStore, err := client.HTTPRemoteStore(metadataUrl, &remoteOpts, metadataHttpClient)
+	up, err := updater.New(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("could not initialize remote TUF store: %w", err)
+		return nil, fmt.Errorf("creating go-tuf/v2 updater: %w", err)
 	}
 
-	metadataClient := client.NewClient(localStore, remoteStore)
-	if err := metadataClient.Init(rootJson); err != nil {
-		return nil, fmt.Errorf("failed to initialize TUF client with root JSON: %w", err)
-	}
-
-	return metadataClient, nil
+	return up, nil
 }
 
 func LocalTufDirectory(rootDirectory string) string {
@@ -644,23 +641,30 @@ func (ta *TufAutoupdater) checkForUpdate(ctx context.Context, binariesToCheck []
 	errs := make([]error, 0)
 	successfulUpdate := false
 	updateTryCount := 3
+	var targets map[string]*metadata.TargetFiles
 	for i := 0; i < updateTryCount; i += 1 {
-		_, err := ta.metadataClient.Update()
-		if err == nil {
-			successfulUpdate = true
-			break
+		// go-tuf/v2 does not allow calling `Refresh` on an updater more than once
+		// (see https://github.com/theupdateframework/go-tuf/issues/593), so we
+		// have to re-initialize the metadata client on every single attempt.
+		updater, err := initMetadataClient(ctx, ta.metadataDir, ta.knapsack.TufServerURL(), ta.metadataClient, ta.trustedRootJson)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("initializing client for try %d: %w", i, err))
+			continue
+		}
+		if err := updater.Refresh(); err != nil {
+			errs = append(errs, fmt.Errorf("try %d: %w", i, err))
+			continue
 		}
 
-		errs = append(errs, fmt.Errorf("try %d: %w", i, err))
+		successfulUpdate = true
+		targets = updater.GetTopLevelTargets()
+		break
 	}
 	if !successfulUpdate {
 		return fmt.Errorf("could not update metadata after %d tries: %+v", updateTryCount, errs)
 	}
-
-	// Find the newest release for our channel
-	targets, err := ta.metadataClient.Targets()
-	if err != nil {
-		return fmt.Errorf("could not get complete list of targets: %w", err)
+	if len(targets) == 0 {
+		return errors.New("updater returned empty target map")
 	}
 
 	// Check for and download any new releases that are available
@@ -760,7 +764,7 @@ func (ta *TufAutoupdater) checkForUpdate(ctx context.Context, binariesToCheck []
 // downloadUpdate will download a new release for the given binary, if available from TUF
 // and not already downloaded. If allowDelay is true, the download may be delayed according to
 // the promotion time and the knapsack.AutoupdateDownloadSplay.
-func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets data.TargetFiles, allowDelay bool) (string, error) {
+func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets map[string]*metadata.TargetFiles, allowDelay bool) (string, error) {
 	target, targetMetadata, err := findTarget(context.Background(), binary, targets, ta.pinnedVersions[binary], ta.updateChannel, ta.slogger)
 	if err != nil {
 		return "", fmt.Errorf("could not find appropriate target: %w", err)
@@ -812,7 +816,7 @@ func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets dat
 
 // findTarget selects the appropriate target from `targets` for the given binary, using the pinned version (if set)
 // and otherwise selecting the correct release for the given channel.
-func findTarget(ctx context.Context, binary autoupdatableBinary, targets data.TargetFiles, pinnedVersion string, channel string, slogger *slog.Logger) (string, data.TargetFileMeta, error) {
+func findTarget(ctx context.Context, binary autoupdatableBinary, targets map[string]*metadata.TargetFiles, pinnedVersion string, channel string, slogger *slog.Logger) (string, *metadata.TargetFiles, error) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -836,72 +840,59 @@ func findTarget(ctx context.Context, binary autoupdatableBinary, targets data.Ta
 }
 
 // findTargetByVersion selects the appropriate target from `targets` for the given binary and version.
-func findTargetByVersion(ctx context.Context, binary autoupdatableBinary, targets data.TargetFiles, binaryVersion string) (string, data.TargetFileMeta, error) {
+func findTargetByVersion(ctx context.Context, binary autoupdatableBinary, targets map[string]*metadata.TargetFiles, binaryVersion string) (string, *metadata.TargetFiles, error) {
 	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	targetNameForVersion := path.Join(string(binary), runtime.GOOS, PlatformArch(), fmt.Sprintf("%s-%s.tar.gz", binary, binaryVersion))
-
-	for targetName, target := range targets {
-		if targetName != targetNameForVersion {
-			continue
-		}
-
-		return filepath.Base(targetName), target, nil
+	if target, targetFound := targets[targetNameForVersion]; targetFound {
+		return filepath.Base(target.Path), target, nil
 	}
-	return "", data.TargetFileMeta{}, fmt.Errorf("could not find metadata for binary %s and version %s", binary, binaryVersion)
+
+	return "", nil, fmt.Errorf("could not find metadata for binary %s and version %s", binary, binaryVersion)
 }
 
 // findRelease checks the latest data from TUF (in `targets`) to see whether a new release
 // has been published for the given channel. If it has, it returns the target for that release
 // and its associated metadata.
-func findRelease(ctx context.Context, binary autoupdatableBinary, targets data.TargetFiles, channel string) (string, data.TargetFileMeta, error) {
+func findRelease(ctx context.Context, binary autoupdatableBinary, targets map[string]*metadata.TargetFiles, channel string) (string, *metadata.TargetFiles, error) {
 	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	// First, find the target that the channel release file is pointing to
 	var releaseTarget string
 	targetReleaseFile := path.Join(string(binary), runtime.GOOS, PlatformArch(), channel, "release.json")
-	for targetName, target := range targets {
-		if targetName != targetReleaseFile {
-			continue
-		}
-
+	if target, targetFound := targets[targetReleaseFile]; targetFound {
 		// We found the release file that matches our OS and binary. Evaluate it
 		// to see if we're on this latest version.
 		if target.Custom == nil {
-			return "", data.TargetFileMeta{}, fmt.Errorf("release file for %s missing custom metadata", binary)
+			return "", nil, fmt.Errorf("release file for %s missing custom metadata", binary)
 		}
 		var custom ReleaseFileCustomMetadata
 		if err := json.Unmarshal(*target.Custom, &custom); err != nil {
-			return "", data.TargetFileMeta{}, fmt.Errorf("could not unmarshal release file custom metadata: %w", err)
+			return "", nil, fmt.Errorf("could not unmarshal release file custom metadata: %w", err)
 		}
 
 		releaseTarget = custom.Target
-		break
 	}
 
 	if releaseTarget == "" {
-		return "", data.TargetFileMeta{}, fmt.Errorf("expected release file %s for binary %s to be in targets but it was not", targetReleaseFile, binary)
+		return "", nil, fmt.Errorf("expected release file %s for binary %s to be in targets but it was not", targetReleaseFile, binary)
 	}
 
 	// Now, get the metadata for our release target
-	for targetName, target := range targets {
-		if targetName != releaseTarget {
-			continue
-		}
-
+	if target, targetFound := targets[releaseTarget]; targetFound {
 		return filepath.Base(releaseTarget), target, nil
 	}
 
-	return "", data.TargetFileMeta{}, fmt.Errorf("could not find metadata for release target %s for binary %s", releaseTarget, binary)
+	return "", nil, fmt.Errorf("could not find metadata for release target %s for binary %s", releaseTarget, binary)
 }
 
 // findReleasePromoteTime extracts the promotion timestamp from the release file metadata for a given binary and channel.
 // It searches the TUF targets for the appropriate release.json file based on the binary, OS, architecture, and channel,
 // then unmarshals the custom metadata to retrieve the PromoteTime field.
 // Returns the Unix timestamp of when the release was promoted, or 0 if the release file is not found or cannot be parsed.
-func findReleasePromoteTime(ctx context.Context, binary autoupdatableBinary, targets data.TargetFiles, channel string) int64 {
+func findReleasePromoteTime(ctx context.Context, binary autoupdatableBinary, targets map[string]*metadata.TargetFiles, channel string) int64 {
 	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -948,7 +939,7 @@ func ArchForPlatform(platform, arch string) string {
 // - the promotion happened longer ago than the configured splay duration
 // Otherwise, it uses a randomly selected delay offset within the splay window,
 // returning true if the current time is before the calculated delay cutoff.
-func (ta *TufAutoupdater) shouldDelayDownload(binary autoupdatableBinary, targets data.TargetFiles) bool {
+func (ta *TufAutoupdater) shouldDelayDownload(binary autoupdatableBinary, targets map[string]*metadata.TargetFiles) bool {
 	// if the splay is disabled, we should always download immediately
 	if ta.knapsack.AutoupdateDownloadSplay() == 0 {
 		return false
