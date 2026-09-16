@@ -15,9 +15,21 @@ import (
 	"github.com/kolide/systray"
 )
 
+// Starts the provided cmd and returns any errors from spawning the process. If the uid differs from the user
+// running the current process, runAsUser binds the cmd to the secure token of the target uid's explorer
+// process. Otherwise it runs cmd directly.
 func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, uid string, cmd *allowedcmd.TracedCmd) error {
 	ctx, span := observability.StartSpan(ctx, "uid", uid)
 	defer span.End()
+
+	// ERROR_PRIVILEGE_NOT_HELD returns from cmd.Start() if the current process or token handle hit the
+	// wrong row of a non-trivial privilege matrix: see CreateProcessAsUser docs.
+	// Trying to start is safer when this process is also the target user.
+	//
+	// NB: breaks non-graphical session spawning like tasks or over ssh.
+	if r.isCurrentUser(uid) {
+		return cmd.Start()
+	}
 
 	explorerProc, err := consoleuser.ExplorerProcess(ctx, uid)
 	if err != nil {
