@@ -656,14 +656,13 @@ func (ta *TufAutoupdater) checkForUpdate(ctx context.Context, binariesToCheck []
 			continue
 		}
 
-		// Make sure that the call to `Refresh` didn't break permissions in case of rollback
-		// to an older version of go-tuf.
-		ta.makeMetadataFilePermissionsBackwardsCompatible()
-
 		successfulUpdate = true
 		targets = updater.GetTopLevelTargets()
 		break
 	}
+	// Make sure that any calls to `Refresh` didn't break permissions in case of rollback
+	// to an older version of go-tuf.
+	ta.makeMetadataFilePermissionsBackwardsCompatible()
 	if !successfulUpdate {
 		return fmt.Errorf("could not update metadata after %d tries: %+v", updateTryCount, errs)
 	}
