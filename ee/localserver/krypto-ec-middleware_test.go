@@ -213,6 +213,9 @@ func TestKryptoEcMiddleware(t *testing.T) {
 
 					k := typesmocks.NewKnapsack(t)
 					k.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
+					authPostureInfoStore, err := storageci.NewStore(t, slogger, storage.AuthPostureInfoStore.String())
+					require.NoError(t, err)
+					k.On("AuthPostureInfoStore").Return(authPostureInfoStore)
 
 					// set up middlewares
 					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, k, localServerPrivateKey, remoteServerPrivateKey.PublicKey, mockPresenceDetector, "test-munemo")
@@ -358,6 +361,10 @@ func TestKryptoEcMiddlewareErrors(t *testing.T) {
 
 					k := typesmocks.NewKnapsack(t)
 					k.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
+					authPostureInfoStore, err := storageci.NewStore(t, slogger, storage.AuthPostureInfoStore.String())
+					require.NoError(t, err)
+					k.On("AuthPostureInfoStore").Return(authPostureInfoStore).Maybe()
+
 					// set up middlewares
 					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, k, localServerPrivateKey, remoteServerPrivateKey.PublicKey, mockPresenceDetector, "test-munemo")
 					if tt.middlewareOpt != nil {
@@ -494,6 +501,9 @@ func Test_AllowedOrigin(t *testing.T) {
 
 			k := typesmocks.NewKnapsack(t)
 			k.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
+			authPostureInfoStore, err := storageci.NewStore(t, slogger, storage.AuthPostureInfoStore.String())
+			require.NoError(t, err)
+			k.On("AuthPostureInfoStore").Return(authPostureInfoStore)
 
 			// set up middlewares
 			kryptoEcMiddleware := newKryptoEcMiddleware(slogger, k, mustGenEcdsaKey(t), counterpartyKey.PublicKey, mockPresenceDetector, "")
@@ -524,7 +534,7 @@ func Test_AllowedOrigin(t *testing.T) {
 			}
 
 			outerRespnse := mustUnmarshallOuterResponse(t, rr.Body.String())
-			_, err := outerRespnse.Open(privateEncryptionKey)
+			_, err = outerRespnse.Open(privateEncryptionKey)
 			require.NoError(t, err)
 		})
 	}
