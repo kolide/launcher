@@ -14,10 +14,19 @@ func NewRowDeleter(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *RowDeleter {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &RowDeleter{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -37,7 +46,7 @@ func (_m *RowDeleter) EXPECT() *RowDeleter_Expecter {
 
 // DeleteRows provides a mock function for the type RowDeleter
 func (_mock *RowDeleter) DeleteRows(rowids ...any) error {
-	var _ca []interface{}
+	var _ca []any
 	_ca = append(_ca, rowids...)
 	ret := _mock.Called(_ca...)
 
@@ -61,9 +70,9 @@ type RowDeleter_DeleteRows_Call struct {
 
 // DeleteRows is a helper method to define mock.On call
 //   - rowids ...any
-func (_e *RowDeleter_Expecter) DeleteRows(rowids ...interface{}) *RowDeleter_DeleteRows_Call {
+func (_e *RowDeleter_Expecter) DeleteRows(rowids ...any) *RowDeleter_DeleteRows_Call {
 	return &RowDeleter_DeleteRows_Call{Call: _e.mock.On("DeleteRows",
-		append([]interface{}{}, rowids...)...)}
+		append([]any{}, rowids...)...)}
 }
 
 func (_c *RowDeleter_DeleteRows_Call) Run(run func(rowids ...any)) *RowDeleter_DeleteRows_Call {
@@ -99,10 +108,19 @@ func NewTimestampedIterator(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *TimestampedIterator {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &TimestampedIterator{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -144,7 +162,7 @@ type TimestampedIterator_ForEach_Call struct {
 
 // ForEach is a helper method to define mock.On call
 //   - fn func(rowid int64, timestamp int64, v []byte) error
-func (_e *TimestampedIterator_Expecter) ForEach(fn interface{}) *TimestampedIterator_ForEach_Call {
+func (_e *TimestampedIterator_Expecter) ForEach(fn any) *TimestampedIterator_ForEach_Call {
 	return &TimestampedIterator_ForEach_Call{Call: _e.mock.On("ForEach", fn)}
 }
 
@@ -177,10 +195,19 @@ func NewTimestampedAppender(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *TimestampedAppender {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &TimestampedAppender{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -223,7 +250,7 @@ type TimestampedAppender_AppendValue_Call struct {
 // AppendValue is a helper method to define mock.On call
 //   - timestamp int64
 //   - value []byte
-func (_e *TimestampedAppender_Expecter) AppendValue(timestamp interface{}, value interface{}) *TimestampedAppender_AppendValue_Call {
+func (_e *TimestampedAppender_Expecter) AppendValue(timestamp any, value any) *TimestampedAppender_AppendValue_Call {
 	return &TimestampedAppender_AppendValue_Call{Call: _e.mock.On("AppendValue", timestamp, value)}
 }
 
@@ -261,10 +288,19 @@ func NewTimestampedIteratorDeleterAppenderCloser(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *TimestampedIteratorDeleterAppenderCloser {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &TimestampedIteratorDeleterAppenderCloser{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -307,7 +343,7 @@ type TimestampedIteratorDeleterAppenderCloser_AppendValue_Call struct {
 // AppendValue is a helper method to define mock.On call
 //   - timestamp int64
 //   - value []byte
-func (_e *TimestampedIteratorDeleterAppenderCloser_Expecter) AppendValue(timestamp interface{}, value interface{}) *TimestampedIteratorDeleterAppenderCloser_AppendValue_Call {
+func (_e *TimestampedIteratorDeleterAppenderCloser_Expecter) AppendValue(timestamp any, value any) *TimestampedIteratorDeleterAppenderCloser_AppendValue_Call {
 	return &TimestampedIteratorDeleterAppenderCloser_AppendValue_Call{Call: _e.mock.On("AppendValue", timestamp, value)}
 }
 
@@ -385,7 +421,7 @@ func (_c *TimestampedIteratorDeleterAppenderCloser_Close_Call) RunAndReturn(run 
 
 // DeleteRows provides a mock function for the type TimestampedIteratorDeleterAppenderCloser
 func (_mock *TimestampedIteratorDeleterAppenderCloser) DeleteRows(rowids ...any) error {
-	var _ca []interface{}
+	var _ca []any
 	_ca = append(_ca, rowids...)
 	ret := _mock.Called(_ca...)
 
@@ -409,9 +445,9 @@ type TimestampedIteratorDeleterAppenderCloser_DeleteRows_Call struct {
 
 // DeleteRows is a helper method to define mock.On call
 //   - rowids ...any
-func (_e *TimestampedIteratorDeleterAppenderCloser_Expecter) DeleteRows(rowids ...interface{}) *TimestampedIteratorDeleterAppenderCloser_DeleteRows_Call {
+func (_e *TimestampedIteratorDeleterAppenderCloser_Expecter) DeleteRows(rowids ...any) *TimestampedIteratorDeleterAppenderCloser_DeleteRows_Call {
 	return &TimestampedIteratorDeleterAppenderCloser_DeleteRows_Call{Call: _e.mock.On("DeleteRows",
-		append([]interface{}{}, rowids...)...)}
+		append([]any{}, rowids...)...)}
 }
 
 func (_c *TimestampedIteratorDeleterAppenderCloser_DeleteRows_Call) Run(run func(rowids ...any)) *TimestampedIteratorDeleterAppenderCloser_DeleteRows_Call {
@@ -465,7 +501,7 @@ type TimestampedIteratorDeleterAppenderCloser_ForEach_Call struct {
 
 // ForEach is a helper method to define mock.On call
 //   - fn func(rowid int64, timestamp int64, v []byte) error
-func (_e *TimestampedIteratorDeleterAppenderCloser_Expecter) ForEach(fn interface{}) *TimestampedIteratorDeleterAppenderCloser_ForEach_Call {
+func (_e *TimestampedIteratorDeleterAppenderCloser_Expecter) ForEach(fn any) *TimestampedIteratorDeleterAppenderCloser_ForEach_Call {
 	return &TimestampedIteratorDeleterAppenderCloser_ForEach_Call{Call: _e.mock.On("ForEach", fn)}
 }
 
@@ -498,10 +534,19 @@ func NewLogStore(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *LogStore {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &LogStore{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -544,7 +589,7 @@ type LogStore_AppendValue_Call struct {
 // AppendValue is a helper method to define mock.On call
 //   - timestamp int64
 //   - value []byte
-func (_e *LogStore_Expecter) AppendValue(timestamp interface{}, value interface{}) *LogStore_AppendValue_Call {
+func (_e *LogStore_Expecter) AppendValue(timestamp any, value any) *LogStore_AppendValue_Call {
 	return &LogStore_AppendValue_Call{Call: _e.mock.On("AppendValue", timestamp, value)}
 }
 
@@ -622,7 +667,7 @@ func (_c *LogStore_Close_Call) RunAndReturn(run func() error) *LogStore_Close_Ca
 
 // DeleteRows provides a mock function for the type LogStore
 func (_mock *LogStore) DeleteRows(rowids ...any) error {
-	var _ca []interface{}
+	var _ca []any
 	_ca = append(_ca, rowids...)
 	ret := _mock.Called(_ca...)
 
@@ -646,9 +691,9 @@ type LogStore_DeleteRows_Call struct {
 
 // DeleteRows is a helper method to define mock.On call
 //   - rowids ...any
-func (_e *LogStore_Expecter) DeleteRows(rowids ...interface{}) *LogStore_DeleteRows_Call {
+func (_e *LogStore_Expecter) DeleteRows(rowids ...any) *LogStore_DeleteRows_Call {
 	return &LogStore_DeleteRows_Call{Call: _e.mock.On("DeleteRows",
-		append([]interface{}{}, rowids...)...)}
+		append([]any{}, rowids...)...)}
 }
 
 func (_c *LogStore_DeleteRows_Call) Run(run func(rowids ...any)) *LogStore_DeleteRows_Call {
@@ -702,7 +747,7 @@ type LogStore_ForEach_Call struct {
 
 // ForEach is a helper method to define mock.On call
 //   - fn func(rowid int64, timestamp int64, v []byte) error
-func (_e *LogStore_Expecter) ForEach(fn interface{}) *LogStore_ForEach_Call {
+func (_e *LogStore_Expecter) ForEach(fn any) *LogStore_ForEach_Call {
 	return &LogStore_ForEach_Call{Call: _e.mock.On("ForEach", fn)}
 }
 

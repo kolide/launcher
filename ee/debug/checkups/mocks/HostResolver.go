@@ -16,10 +16,19 @@ func NewHostResolver(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *HostResolver {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &HostResolver{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -73,7 +82,7 @@ type HostResolver_LookupHost_Call struct {
 // LookupHost is a helper method to define mock.On call
 //   - ctx context.Context
 //   - host string
-func (_e *HostResolver_Expecter) LookupHost(ctx interface{}, host interface{}) *HostResolver_LookupHost_Call {
+func (_e *HostResolver_Expecter) LookupHost(ctx any, host any) *HostResolver_LookupHost_Call {
 	return &HostResolver_LookupHost_Call{Call: _e.mock.On("LookupHost", ctx, host)}
 }
 

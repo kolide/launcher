@@ -18,10 +18,19 @@ func NewFlarer(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *Flarer {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &Flarer{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -65,7 +74,7 @@ type Flarer_RunFlare_Call struct {
 //   - ctx context.Context
 //   - k types.Knapsack
 //   - flareStream io.WriteCloser
-func (_e *Flarer_Expecter) RunFlare(ctx interface{}, k interface{}, flareStream interface{}) *Flarer_RunFlare_Call {
+func (_e *Flarer_Expecter) RunFlare(ctx any, k any, flareStream any) *Flarer_RunFlare_Call {
 	return &Flarer_RunFlare_Call{Call: _e.mock.On("RunFlare", ctx, k, flareStream)}
 }
 

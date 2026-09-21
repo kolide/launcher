@@ -17,10 +17,19 @@ func NewSpanProcessor(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *SpanProcessor {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &SpanProcessor{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -62,7 +71,7 @@ type SpanProcessor_ForceFlush_Call struct {
 
 // ForceFlush is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *SpanProcessor_Expecter) ForceFlush(ctx interface{}) *SpanProcessor_ForceFlush_Call {
+func (_e *SpanProcessor_Expecter) ForceFlush(ctx any) *SpanProcessor_ForceFlush_Call {
 	return &SpanProcessor_ForceFlush_Call{Call: _e.mock.On("ForceFlush", ctx)}
 }
 
@@ -102,7 +111,7 @@ type SpanProcessor_OnEnd_Call struct {
 
 // OnEnd is a helper method to define mock.On call
 //   - s trace.ReadOnlySpan
-func (_e *SpanProcessor_Expecter) OnEnd(s interface{}) *SpanProcessor_OnEnd_Call {
+func (_e *SpanProcessor_Expecter) OnEnd(s any) *SpanProcessor_OnEnd_Call {
 	return &SpanProcessor_OnEnd_Call{Call: _e.mock.On("OnEnd", s)}
 }
 
@@ -143,7 +152,7 @@ type SpanProcessor_OnStart_Call struct {
 // OnStart is a helper method to define mock.On call
 //   - parent context.Context
 //   - s trace.ReadWriteSpan
-func (_e *SpanProcessor_Expecter) OnStart(parent interface{}, s interface{}) *SpanProcessor_OnStart_Call {
+func (_e *SpanProcessor_Expecter) OnStart(parent any, s any) *SpanProcessor_OnStart_Call {
 	return &SpanProcessor_OnStart_Call{Call: _e.mock.On("OnStart", parent, s)}
 }
 
@@ -199,7 +208,7 @@ type SpanProcessor_Shutdown_Call struct {
 
 // Shutdown is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *SpanProcessor_Expecter) Shutdown(ctx interface{}) *SpanProcessor_Shutdown_Call {
+func (_e *SpanProcessor_Expecter) Shutdown(ctx any) *SpanProcessor_Shutdown_Call {
 	return &SpanProcessor_Shutdown_Call{Call: _e.mock.On("Shutdown", ctx)}
 }
 

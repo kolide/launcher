@@ -16,10 +16,19 @@ func NewDetectorIface(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *DetectorIface {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &DetectorIface{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -71,7 +80,7 @@ type DetectorIface_Detect_Call struct {
 // Detect is a helper method to define mock.On call
 //   - reason string
 //   - timeout time.Duration
-func (_e *DetectorIface_Expecter) Detect(reason interface{}, timeout interface{}) *DetectorIface_Detect_Call {
+func (_e *DetectorIface_Expecter) Detect(reason any, timeout any) *DetectorIface_Detect_Call {
 	return &DetectorIface_Detect_Call{Call: _e.mock.On("Detect", reason, timeout)}
 }
 

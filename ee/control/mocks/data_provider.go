@@ -17,10 +17,19 @@ func NewDataProvider(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *DataProvider {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &DataProvider{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -73,7 +82,7 @@ type DataProvider_GetConfig_Call struct {
 
 // GetConfig is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *DataProvider_Expecter) GetConfig(ctx interface{}) *DataProvider_GetConfig_Call {
+func (_e *DataProvider_Expecter) GetConfig(ctx any) *DataProvider_GetConfig_Call {
 	return &DataProvider_GetConfig_Call{Call: _e.mock.On("GetConfig", ctx)}
 }
 
@@ -136,7 +145,7 @@ type DataProvider_GetSubsystemData_Call struct {
 // GetSubsystemData is a helper method to define mock.On call
 //   - ctx context.Context
 //   - hash string
-func (_e *DataProvider_Expecter) GetSubsystemData(ctx interface{}, hash interface{}) *DataProvider_GetSubsystemData_Call {
+func (_e *DataProvider_Expecter) GetSubsystemData(ctx any, hash any) *DataProvider_GetSubsystemData_Call {
 	return &DataProvider_GetSubsystemData_Call{Call: _e.mock.On("GetSubsystemData", ctx, hash)}
 }
 
@@ -194,7 +203,7 @@ type DataProvider_SendMessage_Call struct {
 //   - ctx context.Context
 //   - method string
 //   - params any
-func (_e *DataProvider_Expecter) SendMessage(ctx interface{}, method interface{}, params interface{}) *DataProvider_SendMessage_Call {
+func (_e *DataProvider_Expecter) SendMessage(ctx any, method any, params any) *DataProvider_SendMessage_Call {
 	return &DataProvider_SendMessage_Call{Call: _e.mock.On("SendMessage", ctx, method, params)}
 }
 
