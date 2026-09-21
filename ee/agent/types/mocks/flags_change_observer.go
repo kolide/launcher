@@ -17,10 +17,19 @@ func NewFlagsChangeObserver(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *FlagsChangeObserver {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &FlagsChangeObserver{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -41,11 +50,11 @@ func (_m *FlagsChangeObserver) EXPECT() *FlagsChangeObserver_Expecter {
 // FlagsChanged provides a mock function for the type FlagsChangeObserver
 func (_mock *FlagsChangeObserver) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
 	// keys.FlagKey
-	_va := make([]interface{}, len(flagKeys))
+	_va := make([]any, len(flagKeys))
 	for _i := range flagKeys {
 		_va[_i] = flagKeys[_i]
 	}
-	var _ca []interface{}
+	var _ca []any
 	_ca = append(_ca, ctx)
 	_ca = append(_ca, _va...)
 	_mock.Called(_ca...)
@@ -60,9 +69,9 @@ type FlagsChangeObserver_FlagsChanged_Call struct {
 // FlagsChanged is a helper method to define mock.On call
 //   - ctx context.Context
 //   - flagKeys ...keys.FlagKey
-func (_e *FlagsChangeObserver_Expecter) FlagsChanged(ctx interface{}, flagKeys ...interface{}) *FlagsChangeObserver_FlagsChanged_Call {
+func (_e *FlagsChangeObserver_Expecter) FlagsChanged(ctx any, flagKeys ...any) *FlagsChangeObserver_FlagsChanged_Call {
 	return &FlagsChangeObserver_FlagsChanged_Call{Call: _e.mock.On("FlagsChanged",
-		append([]interface{}{ctx}, flagKeys...)...)}
+		append([]any{ctx}, flagKeys...)...)}
 }
 
 func (_c *FlagsChangeObserver_FlagsChanged_Call) Run(run func(ctx context.Context, flagKeys ...keys.FlagKey)) *FlagsChangeObserver_FlagsChanged_Call {

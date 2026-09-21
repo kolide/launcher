@@ -17,10 +17,19 @@ func NewSecureEnclaveClient(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *SecureEnclaveClient {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &SecureEnclaveClient{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -74,7 +83,7 @@ type SecureEnclaveClient_CreateSecureEnclaveKey_Call struct {
 // CreateSecureEnclaveKey is a helper method to define mock.On call
 //   - ctx context.Context
 //   - uid string
-func (_e *SecureEnclaveClient_Expecter) CreateSecureEnclaveKey(ctx interface{}, uid interface{}) *SecureEnclaveClient_CreateSecureEnclaveKey_Call {
+func (_e *SecureEnclaveClient_Expecter) CreateSecureEnclaveKey(ctx any, uid any) *SecureEnclaveClient_CreateSecureEnclaveKey_Call {
 	return &SecureEnclaveClient_CreateSecureEnclaveKey_Call{Call: _e.mock.On("CreateSecureEnclaveKey", ctx, uid)}
 }
 
@@ -141,7 +150,7 @@ type SecureEnclaveClient_VerifySecureEnclaveKey_Call struct {
 //   - ctx context.Context
 //   - uid string
 //   - pubKey *ecdsa.PublicKey
-func (_e *SecureEnclaveClient_Expecter) VerifySecureEnclaveKey(ctx interface{}, uid interface{}, pubKey interface{}) *SecureEnclaveClient_VerifySecureEnclaveKey_Call {
+func (_e *SecureEnclaveClient_Expecter) VerifySecureEnclaveKey(ctx any, uid any, pubKey any) *SecureEnclaveClient_VerifySecureEnclaveKey_Call {
 	return &SecureEnclaveClient_VerifySecureEnclaveKey_Call{Call: _e.mock.On("VerifySecureEnclaveKey", ctx, uid, pubKey)}
 }
 

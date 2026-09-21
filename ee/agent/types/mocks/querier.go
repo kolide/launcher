@@ -14,10 +14,19 @@ func NewQuerier(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *Querier {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &Querier{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -70,7 +79,7 @@ type Querier_Query_Call struct {
 
 // Query is a helper method to define mock.On call
 //   - query string
-func (_e *Querier_Expecter) Query(query interface{}) *Querier_Query_Call {
+func (_e *Querier_Expecter) Query(query any) *Querier_Query_Call {
 	return &Querier_Query_Call{Call: _e.mock.On("Query", query)}
 }
 

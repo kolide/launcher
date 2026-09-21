@@ -16,10 +16,19 @@ func NewActor(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *Actor {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &Actor{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -61,7 +70,7 @@ type Actor_Do_Call struct {
 
 // Do is a helper method to define mock.On call
 //   - data io.Reader
-func (_e *Actor_Expecter) Do(data interface{}) *Actor_Do_Call {
+func (_e *Actor_Expecter) Do(data any) *Actor_Do_Call {
 	return &Actor_Do_Call{Call: _e.mock.On("Do", data)}
 }
 

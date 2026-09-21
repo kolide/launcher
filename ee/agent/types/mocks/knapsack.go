@@ -22,10 +22,19 @@ func NewKnapsack(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *Knapsack {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &Knapsack{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -46,11 +55,11 @@ func (_m *Knapsack) EXPECT() *Knapsack_Expecter {
 // AddSlogHandler provides a mock function for the type Knapsack
 func (_mock *Knapsack) AddSlogHandler(handler ...slog.Handler) {
 	// slog.Handler
-	_va := make([]interface{}, len(handler))
+	_va := make([]any, len(handler))
 	for _i := range handler {
 		_va[_i] = handler[_i]
 	}
-	var _ca []interface{}
+	var _ca []any
 	_ca = append(_ca, _va...)
 	_mock.Called(_ca...)
 	return
@@ -63,9 +72,9 @@ type Knapsack_AddSlogHandler_Call struct {
 
 // AddSlogHandler is a helper method to define mock.On call
 //   - handler ...slog.Handler
-func (_e *Knapsack_Expecter) AddSlogHandler(handler ...interface{}) *Knapsack_AddSlogHandler_Call {
+func (_e *Knapsack_Expecter) AddSlogHandler(handler ...any) *Knapsack_AddSlogHandler_Call {
 	return &Knapsack_AddSlogHandler_Call{Call: _e.mock.On("AddSlogHandler",
-		append([]interface{}{}, handler...)...)}
+		append([]any{}, handler...)...)}
 }
 
 func (_c *Knapsack_AddSlogHandler_Call) Run(run func(handler ...slog.Handler)) *Knapsack_AddSlogHandler_Call {
@@ -131,8 +140,8 @@ func (_c *Knapsack_AgentFlagsStore_Call) Run(run func()) *Knapsack_AgentFlagsSto
 	return _c
 }
 
-func (_c *Knapsack_AgentFlagsStore_Call) Return(v types.KVStore) *Knapsack_AgentFlagsStore_Call {
-	_c.Call.Return(v)
+func (_c *Knapsack_AgentFlagsStore_Call) Return(kVStore types.KVStore) *Knapsack_AgentFlagsStore_Call {
+	_c.Call.Return(kVStore)
 	return _c
 }
 
@@ -533,8 +542,8 @@ func (_c *Knapsack_ConfigStore_Call) Run(run func()) *Knapsack_ConfigStore_Call 
 	return _c
 }
 
-func (_c *Knapsack_ConfigStore_Call) Return(v types.KVStore) *Knapsack_ConfigStore_Call {
-	_c.Call.Return(v)
+func (_c *Knapsack_ConfigStore_Call) Return(kVStore types.KVStore) *Knapsack_ConfigStore_Call {
+	_c.Call.Return(kVStore)
 	return _c
 }
 
@@ -667,8 +676,8 @@ func (_c *Knapsack_ControlStore_Call) Run(run func()) *Knapsack_ControlStore_Cal
 	return _c
 }
 
-func (_c *Knapsack_ControlStore_Call) Return(v types.KVStore) *Knapsack_ControlStore_Call {
-	_c.Call.Return(v)
+func (_c *Knapsack_ControlStore_Call) Return(kVStore types.KVStore) *Knapsack_ControlStore_Call {
+	_c.Call.Return(kVStore)
 	return _c
 }
 
@@ -930,7 +939,7 @@ type Knapsack_DeleteEnrollment_Call struct {
 
 // DeleteEnrollment is a helper method to define mock.On call
 //   - enrollmentId string
-func (_e *Knapsack_Expecter) DeleteEnrollment(enrollmentId interface{}) *Knapsack_DeleteEnrollment_Call {
+func (_e *Knapsack_Expecter) DeleteEnrollment(enrollmentId any) *Knapsack_DeleteEnrollment_Call {
 	return &Knapsack_DeleteEnrollment_Call{Call: _e.mock.On("DeleteEnrollment", enrollmentId)}
 }
 
@@ -970,7 +979,7 @@ type Knapsack_DeregisterChangeObserver_Call struct {
 
 // DeregisterChangeObserver is a helper method to define mock.On call
 //   - observer types.FlagsChangeObserver
-func (_e *Knapsack_Expecter) DeregisterChangeObserver(observer interface{}) *Knapsack_DeregisterChangeObserver_Call {
+func (_e *Knapsack_Expecter) DeregisterChangeObserver(observer any) *Knapsack_DeregisterChangeObserver_Call {
 	return &Knapsack_DeregisterChangeObserver_Call{Call: _e.mock.On("DeregisterChangeObserver", observer)}
 }
 
@@ -1341,8 +1350,8 @@ func (_c *Knapsack_Dt4aInfoStore_Call) Run(run func()) *Knapsack_Dt4aInfoStore_C
 	return _c
 }
 
-func (_c *Knapsack_Dt4aInfoStore_Call) Return(v types.KVStore) *Knapsack_Dt4aInfoStore_Call {
-	_c.Call.Return(v)
+func (_c *Knapsack_Dt4aInfoStore_Call) Return(kVStore types.KVStore) *Knapsack_Dt4aInfoStore_Call {
+	_c.Call.Return(kVStore)
 	return _c
 }
 
@@ -1563,8 +1572,8 @@ func (_c *Knapsack_EnrollmentDetailsStore_Call) Run(run func()) *Knapsack_Enroll
 	return _c
 }
 
-func (_c *Knapsack_EnrollmentDetailsStore_Call) Return(v types.KVStore) *Knapsack_EnrollmentDetailsStore_Call {
-	_c.Call.Return(v)
+func (_c *Knapsack_EnrollmentDetailsStore_Call) Return(kVStore types.KVStore) *Knapsack_EnrollmentDetailsStore_Call {
+	_c.Call.Return(kVStore)
 	return _c
 }
 
@@ -1655,8 +1664,8 @@ func (_c *Knapsack_EnrollmentStore_Call) Run(run func()) *Knapsack_EnrollmentSto
 	return _c
 }
 
-func (_c *Knapsack_EnrollmentStore_Call) Return(v types.KVStore) *Knapsack_EnrollmentStore_Call {
-	_c.Call.Return(v)
+func (_c *Knapsack_EnrollmentStore_Call) Return(kVStore types.KVStore) *Knapsack_EnrollmentStore_Call {
+	_c.Call.Return(kVStore)
 	return _c
 }
 
@@ -1744,7 +1753,7 @@ type Knapsack_EnsureEnrollmentStored_Call struct {
 
 // EnsureEnrollmentStored is a helper method to define mock.On call
 //   - enrollmentId string
-func (_e *Knapsack_Expecter) EnsureEnrollmentStored(enrollmentId interface{}) *Knapsack_EnsureEnrollmentStored_Call {
+func (_e *Knapsack_Expecter) EnsureEnrollmentStored(enrollmentId any) *Knapsack_EnsureEnrollmentStored_Call {
 	return &Knapsack_EnsureEnrollmentStored_Call{Call: _e.mock.On("EnsureEnrollmentStored", enrollmentId)}
 }
 
@@ -1851,8 +1860,8 @@ func (_c *Knapsack_FilewalkConfigStore_Call) Run(run func()) *Knapsack_FilewalkC
 	return _c
 }
 
-func (_c *Knapsack_FilewalkConfigStore_Call) Return(v types.KVStore) *Knapsack_FilewalkConfigStore_Call {
-	_c.Call.Return(v)
+func (_c *Knapsack_FilewalkConfigStore_Call) Return(kVStore types.KVStore) *Knapsack_FilewalkConfigStore_Call {
+	_c.Call.Return(kVStore)
 	return _c
 }
 
@@ -1897,8 +1906,8 @@ func (_c *Knapsack_FilewalkResultsStore_Call) Run(run func()) *Knapsack_Filewalk
 	return _c
 }
 
-func (_c *Knapsack_FilewalkResultsStore_Call) Return(v types.KVStore) *Knapsack_FilewalkResultsStore_Call {
-	_c.Call.Return(v)
+func (_c *Knapsack_FilewalkResultsStore_Call) Return(kVStore types.KVStore) *Knapsack_FilewalkResultsStore_Call {
+	_c.Call.Return(kVStore)
 	return _c
 }
 
@@ -2207,8 +2216,8 @@ func (_c *Knapsack_InitialResultsStore_Call) Run(run func()) *Knapsack_InitialRe
 	return _c
 }
 
-func (_c *Knapsack_InitialResultsStore_Call) Return(v types.KVStore) *Knapsack_InitialResultsStore_Call {
-	_c.Call.Return(v)
+func (_c *Knapsack_InitialResultsStore_Call) Return(kVStore types.KVStore) *Knapsack_InitialResultsStore_Call {
+	_c.Call.Return(kVStore)
 	return _c
 }
 
@@ -2431,8 +2440,8 @@ func (_c *Knapsack_KatcConfigStore_Call) Run(run func()) *Knapsack_KatcConfigSto
 	return _c
 }
 
-func (_c *Knapsack_KatcConfigStore_Call) Return(v types.KVStore) *Knapsack_KatcConfigStore_Call {
-	_c.Call.Return(v)
+func (_c *Knapsack_KatcConfigStore_Call) Return(kVStore types.KVStore) *Knapsack_KatcConfigStore_Call {
+	_c.Call.Return(kVStore)
 	return _c
 }
 
@@ -2553,7 +2562,7 @@ type Knapsack_LatestOsquerydPath_Call struct {
 
 // LatestOsquerydPath is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *Knapsack_Expecter) LatestOsquerydPath(ctx interface{}) *Knapsack_LatestOsquerydPath_Call {
+func (_e *Knapsack_Expecter) LatestOsquerydPath(ctx any) *Knapsack_LatestOsquerydPath_Call {
 	return &Knapsack_LatestOsquerydPath_Call{Call: _e.mock.On("LatestOsquerydPath", ctx)}
 }
 
@@ -2660,8 +2669,8 @@ func (_c *Knapsack_LauncherHistoryStore_Call) Run(run func()) *Knapsack_Launcher
 	return _c
 }
 
-func (_c *Knapsack_LauncherHistoryStore_Call) Return(v types.KVStore) *Knapsack_LauncherHistoryStore_Call {
-	_c.Call.Return(v)
+func (_c *Knapsack_LauncherHistoryStore_Call) Return(kVStore types.KVStore) *Knapsack_LauncherHistoryStore_Call {
+	_c.Call.Return(kVStore)
 	return _c
 }
 
@@ -2838,8 +2847,8 @@ func (_c *Knapsack_LocalizationStore_Call) Run(run func()) *Knapsack_Localizatio
 	return _c
 }
 
-func (_c *Knapsack_LocalizationStore_Call) Return(v types.KVStore) *Knapsack_LocalizationStore_Call {
-	_c.Call.Return(v)
+func (_c *Knapsack_LocalizationStore_Call) Return(kVStore types.KVStore) *Knapsack_LocalizationStore_Call {
+	_c.Call.Return(kVStore)
 	return _c
 }
 
@@ -3101,7 +3110,7 @@ type Knapsack_NodeKey_Call struct {
 
 // NodeKey is a helper method to define mock.On call
 //   - enrollmentId string
-func (_e *Knapsack_Expecter) NodeKey(enrollmentId interface{}) *Knapsack_NodeKey_Call {
+func (_e *Knapsack_Expecter) NodeKey(enrollmentId any) *Knapsack_NodeKey_Call {
 	return &Knapsack_NodeKey_Call{Call: _e.mock.On("NodeKey", enrollmentId)}
 }
 
@@ -3300,8 +3309,8 @@ func (_c *Knapsack_OsqueryHistoryInstanceStore_Call) Run(run func()) *Knapsack_O
 	return _c
 }
 
-func (_c *Knapsack_OsqueryHistoryInstanceStore_Call) Return(v types.KVStore) *Knapsack_OsqueryHistoryInstanceStore_Call {
-	_c.Call.Return(v)
+func (_c *Knapsack_OsqueryHistoryInstanceStore_Call) Return(kVStore types.KVStore) *Knapsack_OsqueryHistoryInstanceStore_Call {
+	_c.Call.Return(kVStore)
 	return _c
 }
 
@@ -3577,8 +3586,8 @@ func (_c *Knapsack_PerformanceMonitoringEnabled_Call) RunAndReturn(run func() bo
 }
 
 // PersistAgentIngesterKeys provides a mock function for the type Knapsack
-func (_mock *Knapsack) PersistAgentIngesterKeys(ctx context.Context, token string, publicKey string, presharedKey string) {
-	_mock.Called(ctx, token, publicKey, presharedKey)
+func (_mock *Knapsack) PersistAgentIngesterKeys(ctx context.Context, authToken string, hpkePublicKey string, hpkePresharedKey string) {
+	_mock.Called(ctx, authToken, hpkePublicKey, hpkePresharedKey)
 	return
 }
 
@@ -3589,14 +3598,14 @@ type Knapsack_PersistAgentIngesterKeys_Call struct {
 
 // PersistAgentIngesterKeys is a helper method to define mock.On call
 //   - ctx context.Context
-//   - token string
-//   - publicKey string
-//   - presharedKey string
-func (_e *Knapsack_Expecter) PersistAgentIngesterKeys(ctx interface{}, token interface{}, publicKey interface{}, presharedKey interface{}) *Knapsack_PersistAgentIngesterKeys_Call {
-	return &Knapsack_PersistAgentIngesterKeys_Call{Call: _e.mock.On("PersistAgentIngesterKeys", ctx, token, publicKey, presharedKey)}
+//   - authToken string
+//   - hpkePublicKey string
+//   - hpkePresharedKey string
+func (_e *Knapsack_Expecter) PersistAgentIngesterKeys(ctx any, authToken any, hpkePublicKey any, hpkePresharedKey any) *Knapsack_PersistAgentIngesterKeys_Call {
+	return &Knapsack_PersistAgentIngesterKeys_Call{Call: _e.mock.On("PersistAgentIngesterKeys", ctx, authToken, hpkePublicKey, hpkePresharedKey)}
 }
 
-func (_c *Knapsack_PersistAgentIngesterKeys_Call) Run(run func(ctx context.Context, token string, publicKey string, presharedKey string)) *Knapsack_PersistAgentIngesterKeys_Call {
+func (_c *Knapsack_PersistAgentIngesterKeys_Call) Run(run func(ctx context.Context, authToken string, hpkePublicKey string, hpkePresharedKey string)) *Knapsack_PersistAgentIngesterKeys_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -3629,7 +3638,7 @@ func (_c *Knapsack_PersistAgentIngesterKeys_Call) Return() *Knapsack_PersistAgen
 	return _c
 }
 
-func (_c *Knapsack_PersistAgentIngesterKeys_Call) RunAndReturn(run func(ctx context.Context, token string, publicKey string, presharedKey string)) *Knapsack_PersistAgentIngesterKeys_Call {
+func (_c *Knapsack_PersistAgentIngesterKeys_Call) RunAndReturn(run func(ctx context.Context, authToken string, hpkePublicKey string, hpkePresharedKey string)) *Knapsack_PersistAgentIngesterKeys_Call {
 	_c.Run(run)
 	return _c
 }
@@ -3670,8 +3679,8 @@ func (_c *Knapsack_PersistentHostDataStore_Call) Run(run func()) *Knapsack_Persi
 	return _c
 }
 
-func (_c *Knapsack_PersistentHostDataStore_Call) Return(v types.KVStore) *Knapsack_PersistentHostDataStore_Call {
-	_c.Call.Return(v)
+func (_c *Knapsack_PersistentHostDataStore_Call) Return(kVStore types.KVStore) *Knapsack_PersistentHostDataStore_Call {
+	_c.Call.Return(kVStore)
 	return _c
 }
 
@@ -3824,11 +3833,11 @@ func (_c *Knapsack_ReadEnrollSecret_Call) RunAndReturn(run func() (string, error
 // RegisterChangeObserver provides a mock function for the type Knapsack
 func (_mock *Knapsack) RegisterChangeObserver(observer types.FlagsChangeObserver, flagKeys ...keys.FlagKey) {
 	// keys.FlagKey
-	_va := make([]interface{}, len(flagKeys))
+	_va := make([]any, len(flagKeys))
 	for _i := range flagKeys {
 		_va[_i] = flagKeys[_i]
 	}
-	var _ca []interface{}
+	var _ca []any
 	_ca = append(_ca, observer)
 	_ca = append(_ca, _va...)
 	_mock.Called(_ca...)
@@ -3843,9 +3852,9 @@ type Knapsack_RegisterChangeObserver_Call struct {
 // RegisterChangeObserver is a helper method to define mock.On call
 //   - observer types.FlagsChangeObserver
 //   - flagKeys ...keys.FlagKey
-func (_e *Knapsack_Expecter) RegisterChangeObserver(observer interface{}, flagKeys ...interface{}) *Knapsack_RegisterChangeObserver_Call {
+func (_e *Knapsack_Expecter) RegisterChangeObserver(observer any, flagKeys ...any) *Knapsack_RegisterChangeObserver_Call {
 	return &Knapsack_RegisterChangeObserver_Call{Call: _e.mock.On("RegisterChangeObserver",
-		append([]interface{}{observer}, flagKeys...)...)}
+		append([]any{observer}, flagKeys...)...)}
 }
 
 func (_c *Knapsack_RegisterChangeObserver_Call) Run(run func(observer types.FlagsChangeObserver, flagKeys ...keys.FlagKey)) *Knapsack_RegisterChangeObserver_Call {
@@ -3916,7 +3925,7 @@ type Knapsack_RequestProfile_Call struct {
 // RequestProfile is a helper method to define mock.On call
 //   - ctx context.Context
 //   - profileType string
-func (_e *Knapsack_Expecter) RequestProfile(ctx interface{}, profileType interface{}) *Knapsack_RequestProfile_Call {
+func (_e *Knapsack_Expecter) RequestProfile(ctx any, profileType any) *Knapsack_RequestProfile_Call {
 	return &Knapsack_RequestProfile_Call{Call: _e.mock.On("RequestProfile", ctx, profileType)}
 }
 
@@ -4028,8 +4037,8 @@ func (_c *Knapsack_ResultLogsStore_Call) Run(run func()) *Knapsack_ResultLogsSto
 	return _c
 }
 
-func (_c *Knapsack_ResultLogsStore_Call) Return(v types.KVStore) *Knapsack_ResultLogsStore_Call {
-	_c.Call.Return(v)
+func (_c *Knapsack_ResultLogsStore_Call) Return(kVStore types.KVStore) *Knapsack_ResultLogsStore_Call {
+	_c.Call.Return(kVStore)
 	return _c
 }
 
@@ -4153,7 +4162,7 @@ type Knapsack_SaveEnrollment_Call struct {
 //   - munemo string
 //   - nodeKey string
 //   - enrollmentSecret string
-func (_e *Knapsack_Expecter) SaveEnrollment(enrollmentId interface{}, munemo interface{}, nodeKey interface{}, enrollmentSecret interface{}) *Knapsack_SaveEnrollment_Call {
+func (_e *Knapsack_Expecter) SaveEnrollment(enrollmentId any, munemo any, nodeKey any, enrollmentSecret any) *Knapsack_SaveEnrollment_Call {
 	return &Knapsack_SaveEnrollment_Call{Call: _e.mock.On("SaveEnrollment", enrollmentId, munemo, nodeKey, enrollmentSecret)}
 }
 
@@ -4231,8 +4240,8 @@ func (_c *Knapsack_SentNotificationsStore_Call) Run(run func()) *Knapsack_SentNo
 	return _c
 }
 
-func (_c *Knapsack_SentNotificationsStore_Call) Return(v types.KVStore) *Knapsack_SentNotificationsStore_Call {
-	_c.Call.Return(v)
+func (_c *Knapsack_SentNotificationsStore_Call) Return(kVStore types.KVStore) *Knapsack_SentNotificationsStore_Call {
+	_c.Call.Return(kVStore)
 	return _c
 }
 
@@ -4277,8 +4286,8 @@ func (_c *Knapsack_ServerProvidedDataStore_Call) Run(run func()) *Knapsack_Serve
 	return _c
 }
 
-func (_c *Knapsack_ServerProvidedDataStore_Call) Return(v types.KVStore) *Knapsack_ServerProvidedDataStore_Call {
-	_c.Call.Return(v)
+func (_c *Knapsack_ServerProvidedDataStore_Call) Return(kVStore types.KVStore) *Knapsack_ServerProvidedDataStore_Call {
+	_c.Call.Return(kVStore)
 	return _c
 }
 
@@ -4323,8 +4332,8 @@ func (_c *Knapsack_ServerReleaseTrackerDataStore_Call) Run(run func()) *Knapsack
 	return _c
 }
 
-func (_c *Knapsack_ServerReleaseTrackerDataStore_Call) Return(v types.KVStore) *Knapsack_ServerReleaseTrackerDataStore_Call {
-	_c.Call.Return(v)
+func (_c *Knapsack_ServerReleaseTrackerDataStore_Call) Return(kVStore types.KVStore) *Knapsack_ServerReleaseTrackerDataStore_Call {
+	_c.Call.Return(kVStore)
 	return _c
 }
 
@@ -4357,7 +4366,7 @@ type Knapsack_SetAllowOverlyBroadDt4aAcceleration_Call struct {
 
 // SetAllowOverlyBroadDt4aAcceleration is a helper method to define mock.On call
 //   - enable bool
-func (_e *Knapsack_Expecter) SetAllowOverlyBroadDt4aAcceleration(enable interface{}) *Knapsack_SetAllowOverlyBroadDt4aAcceleration_Call {
+func (_e *Knapsack_Expecter) SetAllowOverlyBroadDt4aAcceleration(enable any) *Knapsack_SetAllowOverlyBroadDt4aAcceleration_Call {
 	return &Knapsack_SetAllowOverlyBroadDt4aAcceleration_Call{Call: _e.mock.On("SetAllowOverlyBroadDt4aAcceleration", enable)}
 }
 
@@ -4408,7 +4417,7 @@ type Knapsack_SetAutoupdate_Call struct {
 
 // SetAutoupdate is a helper method to define mock.On call
 //   - enabled bool
-func (_e *Knapsack_Expecter) SetAutoupdate(enabled interface{}) *Knapsack_SetAutoupdate_Call {
+func (_e *Knapsack_Expecter) SetAutoupdate(enabled any) *Knapsack_SetAutoupdate_Call {
 	return &Knapsack_SetAutoupdate_Call{Call: _e.mock.On("SetAutoupdate", enabled)}
 }
 
@@ -4459,7 +4468,7 @@ type Knapsack_SetAutoupdateDownloadSplay_Call struct {
 
 // SetAutoupdateDownloadSplay is a helper method to define mock.On call
 //   - val time.Duration
-func (_e *Knapsack_Expecter) SetAutoupdateDownloadSplay(val interface{}) *Knapsack_SetAutoupdateDownloadSplay_Call {
+func (_e *Knapsack_Expecter) SetAutoupdateDownloadSplay(val any) *Knapsack_SetAutoupdateDownloadSplay_Call {
 	return &Knapsack_SetAutoupdateDownloadSplay_Call{Call: _e.mock.On("SetAutoupdateDownloadSplay", val)}
 }
 
@@ -4510,7 +4519,7 @@ type Knapsack_SetAutoupdateInitialDelay_Call struct {
 
 // SetAutoupdateInitialDelay is a helper method to define mock.On call
 //   - delay time.Duration
-func (_e *Knapsack_Expecter) SetAutoupdateInitialDelay(delay interface{}) *Knapsack_SetAutoupdateInitialDelay_Call {
+func (_e *Knapsack_Expecter) SetAutoupdateInitialDelay(delay any) *Knapsack_SetAutoupdateInitialDelay_Call {
 	return &Knapsack_SetAutoupdateInitialDelay_Call{Call: _e.mock.On("SetAutoupdateInitialDelay", delay)}
 }
 
@@ -4551,7 +4560,7 @@ type Knapsack_SetAutoupdateInitialDelayOverride_Call struct {
 // SetAutoupdateInitialDelayOverride is a helper method to define mock.On call
 //   - value time.Duration
 //   - duration time.Duration
-func (_e *Knapsack_Expecter) SetAutoupdateInitialDelayOverride(value interface{}, duration interface{}) *Knapsack_SetAutoupdateInitialDelayOverride_Call {
+func (_e *Knapsack_Expecter) SetAutoupdateInitialDelayOverride(value any, duration any) *Knapsack_SetAutoupdateInitialDelayOverride_Call {
 	return &Knapsack_SetAutoupdateInitialDelayOverride_Call{Call: _e.mock.On("SetAutoupdateInitialDelayOverride", value, duration)}
 }
 
@@ -4607,7 +4616,7 @@ type Knapsack_SetAutoupdateInterval_Call struct {
 
 // SetAutoupdateInterval is a helper method to define mock.On call
 //   - interval time.Duration
-func (_e *Knapsack_Expecter) SetAutoupdateInterval(interval interface{}) *Knapsack_SetAutoupdateInterval_Call {
+func (_e *Knapsack_Expecter) SetAutoupdateInterval(interval any) *Knapsack_SetAutoupdateInterval_Call {
 	return &Knapsack_SetAutoupdateInterval_Call{Call: _e.mock.On("SetAutoupdateInterval", interval)}
 }
 
@@ -4648,7 +4657,7 @@ type Knapsack_SetAutoupdateIntervalOverride_Call struct {
 // SetAutoupdateIntervalOverride is a helper method to define mock.On call
 //   - value time.Duration
 //   - duration time.Duration
-func (_e *Knapsack_Expecter) SetAutoupdateIntervalOverride(value interface{}, duration interface{}) *Knapsack_SetAutoupdateIntervalOverride_Call {
+func (_e *Knapsack_Expecter) SetAutoupdateIntervalOverride(value any, duration any) *Knapsack_SetAutoupdateIntervalOverride_Call {
 	return &Knapsack_SetAutoupdateIntervalOverride_Call{Call: _e.mock.On("SetAutoupdateIntervalOverride", value, duration)}
 }
 
@@ -4704,7 +4713,7 @@ type Knapsack_SetCachedQueryResultsTTL_Call struct {
 
 // SetCachedQueryResultsTTL is a helper method to define mock.On call
 //   - ttl time.Duration
-func (_e *Knapsack_Expecter) SetCachedQueryResultsTTL(ttl interface{}) *Knapsack_SetCachedQueryResultsTTL_Call {
+func (_e *Knapsack_Expecter) SetCachedQueryResultsTTL(ttl any) *Knapsack_SetCachedQueryResultsTTL_Call {
 	return &Knapsack_SetCachedQueryResultsTTL_Call{Call: _e.mock.On("SetCachedQueryResultsTTL", ttl)}
 }
 
@@ -4755,7 +4764,7 @@ type Knapsack_SetControlRequestInterval_Call struct {
 
 // SetControlRequestInterval is a helper method to define mock.On call
 //   - interval time.Duration
-func (_e *Knapsack_Expecter) SetControlRequestInterval(interval interface{}) *Knapsack_SetControlRequestInterval_Call {
+func (_e *Knapsack_Expecter) SetControlRequestInterval(interval any) *Knapsack_SetControlRequestInterval_Call {
 	return &Knapsack_SetControlRequestInterval_Call{Call: _e.mock.On("SetControlRequestInterval", interval)}
 }
 
@@ -4796,7 +4805,7 @@ type Knapsack_SetControlRequestIntervalOverride_Call struct {
 // SetControlRequestIntervalOverride is a helper method to define mock.On call
 //   - value time.Duration
 //   - duration time.Duration
-func (_e *Knapsack_Expecter) SetControlRequestIntervalOverride(value interface{}, duration interface{}) *Knapsack_SetControlRequestIntervalOverride_Call {
+func (_e *Knapsack_Expecter) SetControlRequestIntervalOverride(value any, duration any) *Knapsack_SetControlRequestIntervalOverride_Call {
 	return &Knapsack_SetControlRequestIntervalOverride_Call{Call: _e.mock.On("SetControlRequestIntervalOverride", value, duration)}
 }
 
@@ -4852,7 +4861,7 @@ type Knapsack_SetControlServerURL_Call struct {
 
 // SetControlServerURL is a helper method to define mock.On call
 //   - url string
-func (_e *Knapsack_Expecter) SetControlServerURL(url interface{}) *Knapsack_SetControlServerURL_Call {
+func (_e *Knapsack_Expecter) SetControlServerURL(url any) *Knapsack_SetControlServerURL_Call {
 	return &Knapsack_SetControlServerURL_Call{Call: _e.mock.On("SetControlServerURL", url)}
 }
 
@@ -4903,7 +4912,7 @@ type Knapsack_SetCurrentRunningOsqueryVersion_Call struct {
 
 // SetCurrentRunningOsqueryVersion is a helper method to define mock.On call
 //   - version string
-func (_e *Knapsack_Expecter) SetCurrentRunningOsqueryVersion(version interface{}) *Knapsack_SetCurrentRunningOsqueryVersion_Call {
+func (_e *Knapsack_Expecter) SetCurrentRunningOsqueryVersion(version any) *Knapsack_SetCurrentRunningOsqueryVersion_Call {
 	return &Knapsack_SetCurrentRunningOsqueryVersion_Call{Call: _e.mock.On("SetCurrentRunningOsqueryVersion", version)}
 }
 
@@ -4954,7 +4963,7 @@ type Knapsack_SetDebug_Call struct {
 
 // SetDebug is a helper method to define mock.On call
 //   - debug bool
-func (_e *Knapsack_Expecter) SetDebug(debug interface{}) *Knapsack_SetDebug_Call {
+func (_e *Knapsack_Expecter) SetDebug(debug any) *Knapsack_SetDebug_Call {
 	return &Knapsack_SetDebug_Call{Call: _e.mock.On("SetDebug", debug)}
 }
 
@@ -5005,7 +5014,7 @@ type Knapsack_SetDebugServerData_Call struct {
 
 // SetDebugServerData is a helper method to define mock.On call
 //   - debug bool
-func (_e *Knapsack_Expecter) SetDebugServerData(debug interface{}) *Knapsack_SetDebugServerData_Call {
+func (_e *Knapsack_Expecter) SetDebugServerData(debug any) *Knapsack_SetDebugServerData_Call {
 	return &Knapsack_SetDebugServerData_Call{Call: _e.mock.On("SetDebugServerData", debug)}
 }
 
@@ -5056,7 +5065,7 @@ type Knapsack_SetDesktopEnabled_Call struct {
 
 // SetDesktopEnabled is a helper method to define mock.On call
 //   - enabled bool
-func (_e *Knapsack_Expecter) SetDesktopEnabled(enabled interface{}) *Knapsack_SetDesktopEnabled_Call {
+func (_e *Knapsack_Expecter) SetDesktopEnabled(enabled any) *Knapsack_SetDesktopEnabled_Call {
 	return &Knapsack_SetDesktopEnabled_Call{Call: _e.mock.On("SetDesktopEnabled", enabled)}
 }
 
@@ -5107,7 +5116,7 @@ type Knapsack_SetDesktopGoMaxProcs_Call struct {
 
 // SetDesktopGoMaxProcs is a helper method to define mock.On call
 //   - maxProcs int
-func (_e *Knapsack_Expecter) SetDesktopGoMaxProcs(maxProcs interface{}) *Knapsack_SetDesktopGoMaxProcs_Call {
+func (_e *Knapsack_Expecter) SetDesktopGoMaxProcs(maxProcs any) *Knapsack_SetDesktopGoMaxProcs_Call {
 	return &Knapsack_SetDesktopGoMaxProcs_Call{Call: _e.mock.On("SetDesktopGoMaxProcs", maxProcs)}
 }
 
@@ -5158,7 +5167,7 @@ type Knapsack_SetDesktopMenuRefreshInterval_Call struct {
 
 // SetDesktopMenuRefreshInterval is a helper method to define mock.On call
 //   - interval time.Duration
-func (_e *Knapsack_Expecter) SetDesktopMenuRefreshInterval(interval interface{}) *Knapsack_SetDesktopMenuRefreshInterval_Call {
+func (_e *Knapsack_Expecter) SetDesktopMenuRefreshInterval(interval any) *Knapsack_SetDesktopMenuRefreshInterval_Call {
 	return &Knapsack_SetDesktopMenuRefreshInterval_Call{Call: _e.mock.On("SetDesktopMenuRefreshInterval", interval)}
 }
 
@@ -5198,7 +5207,7 @@ type Knapsack_SetDesktopRunner_Call struct {
 
 // SetDesktopRunner is a helper method to define mock.On call
 //   - runner types.DesktopRunner
-func (_e *Knapsack_Expecter) SetDesktopRunner(runner interface{}) *Knapsack_SetDesktopRunner_Call {
+func (_e *Knapsack_Expecter) SetDesktopRunner(runner any) *Knapsack_SetDesktopRunner_Call {
 	return &Knapsack_SetDesktopRunner_Call{Call: _e.mock.On("SetDesktopRunner", runner)}
 }
 
@@ -5249,7 +5258,7 @@ type Knapsack_SetDesktopUpdateInterval_Call struct {
 
 // SetDesktopUpdateInterval is a helper method to define mock.On call
 //   - interval time.Duration
-func (_e *Knapsack_Expecter) SetDesktopUpdateInterval(interval interface{}) *Knapsack_SetDesktopUpdateInterval_Call {
+func (_e *Knapsack_Expecter) SetDesktopUpdateInterval(interval any) *Knapsack_SetDesktopUpdateInterval_Call {
 	return &Knapsack_SetDesktopUpdateInterval_Call{Call: _e.mock.On("SetDesktopUpdateInterval", interval)}
 }
 
@@ -5300,7 +5309,7 @@ type Knapsack_SetDisableControlTLS_Call struct {
 
 // SetDisableControlTLS is a helper method to define mock.On call
 //   - disabled bool
-func (_e *Knapsack_Expecter) SetDisableControlTLS(disabled interface{}) *Knapsack_SetDisableControlTLS_Call {
+func (_e *Knapsack_Expecter) SetDisableControlTLS(disabled any) *Knapsack_SetDisableControlTLS_Call {
 	return &Knapsack_SetDisableControlTLS_Call{Call: _e.mock.On("SetDisableControlTLS", disabled)}
 }
 
@@ -5351,7 +5360,7 @@ type Knapsack_SetDisableTraceIngestTLS_Call struct {
 
 // SetDisableTraceIngestTLS is a helper method to define mock.On call
 //   - enabled bool
-func (_e *Knapsack_Expecter) SetDisableTraceIngestTLS(enabled interface{}) *Knapsack_SetDisableTraceIngestTLS_Call {
+func (_e *Knapsack_Expecter) SetDisableTraceIngestTLS(enabled any) *Knapsack_SetDisableTraceIngestTLS_Call {
 	return &Knapsack_SetDisableTraceIngestTLS_Call{Call: _e.mock.On("SetDisableTraceIngestTLS", enabled)}
 }
 
@@ -5402,7 +5411,7 @@ type Knapsack_SetDistributedForwardingInterval_Call struct {
 
 // SetDistributedForwardingInterval is a helper method to define mock.On call
 //   - interval time.Duration
-func (_e *Knapsack_Expecter) SetDistributedForwardingInterval(interval interface{}) *Knapsack_SetDistributedForwardingInterval_Call {
+func (_e *Knapsack_Expecter) SetDistributedForwardingInterval(interval any) *Knapsack_SetDistributedForwardingInterval_Call {
 	return &Knapsack_SetDistributedForwardingInterval_Call{Call: _e.mock.On("SetDistributedForwardingInterval", interval)}
 }
 
@@ -5443,7 +5452,7 @@ type Knapsack_SetDistributedForwardingIntervalOverride_Call struct {
 // SetDistributedForwardingIntervalOverride is a helper method to define mock.On call
 //   - value time.Duration
 //   - duration time.Duration
-func (_e *Knapsack_Expecter) SetDistributedForwardingIntervalOverride(value interface{}, duration interface{}) *Knapsack_SetDistributedForwardingIntervalOverride_Call {
+func (_e *Knapsack_Expecter) SetDistributedForwardingIntervalOverride(value any, duration any) *Knapsack_SetDistributedForwardingIntervalOverride_Call {
 	return &Knapsack_SetDistributedForwardingIntervalOverride_Call{Call: _e.mock.On("SetDistributedForwardingIntervalOverride", value, duration)}
 }
 
@@ -5499,7 +5508,7 @@ type Knapsack_SetDuplicateLogWindow_Call struct {
 
 // SetDuplicateLogWindow is a helper method to define mock.On call
 //   - duration time.Duration
-func (_e *Knapsack_Expecter) SetDuplicateLogWindow(duration interface{}) *Knapsack_SetDuplicateLogWindow_Call {
+func (_e *Knapsack_Expecter) SetDuplicateLogWindow(duration any) *Knapsack_SetDuplicateLogWindow_Call {
 	return &Knapsack_SetDuplicateLogWindow_Call{Call: _e.mock.On("SetDuplicateLogWindow", duration)}
 }
 
@@ -5539,7 +5548,7 @@ type Knapsack_SetEnrollmentDetails_Call struct {
 
 // SetEnrollmentDetails is a helper method to define mock.On call
 //   - details types.EnrollmentDetails
-func (_e *Knapsack_Expecter) SetEnrollmentDetails(details interface{}) *Knapsack_SetEnrollmentDetails_Call {
+func (_e *Knapsack_Expecter) SetEnrollmentDetails(details any) *Knapsack_SetEnrollmentDetails_Call {
 	return &Knapsack_SetEnrollmentDetails_Call{Call: _e.mock.On("SetEnrollmentDetails", details)}
 }
 
@@ -5590,7 +5599,7 @@ type Knapsack_SetExportTraces_Call struct {
 
 // SetExportTraces is a helper method to define mock.On call
 //   - enabled bool
-func (_e *Knapsack_Expecter) SetExportTraces(enabled interface{}) *Knapsack_SetExportTraces_Call {
+func (_e *Knapsack_Expecter) SetExportTraces(enabled any) *Knapsack_SetExportTraces_Call {
 	return &Knapsack_SetExportTraces_Call{Call: _e.mock.On("SetExportTraces", enabled)}
 }
 
@@ -5631,7 +5640,7 @@ type Knapsack_SetExportTracesOverride_Call struct {
 // SetExportTracesOverride is a helper method to define mock.On call
 //   - value bool
 //   - duration time.Duration
-func (_e *Knapsack_Expecter) SetExportTracesOverride(value interface{}, duration interface{}) *Knapsack_SetExportTracesOverride_Call {
+func (_e *Knapsack_Expecter) SetExportTracesOverride(value any, duration any) *Knapsack_SetExportTracesOverride_Call {
 	return &Knapsack_SetExportTracesOverride_Call{Call: _e.mock.On("SetExportTracesOverride", value, duration)}
 }
 
@@ -5687,7 +5696,7 @@ type Knapsack_SetForceControlSubsystems_Call struct {
 
 // SetForceControlSubsystems is a helper method to define mock.On call
 //   - force bool
-func (_e *Knapsack_Expecter) SetForceControlSubsystems(force interface{}) *Knapsack_SetForceControlSubsystems_Call {
+func (_e *Knapsack_Expecter) SetForceControlSubsystems(force any) *Knapsack_SetForceControlSubsystems_Call {
 	return &Knapsack_SetForceControlSubsystems_Call{Call: _e.mock.On("SetForceControlSubsystems", force)}
 }
 
@@ -5738,7 +5747,7 @@ type Knapsack_SetInModernStandby_Call struct {
 
 // SetInModernStandby is a helper method to define mock.On call
 //   - enabled bool
-func (_e *Knapsack_Expecter) SetInModernStandby(enabled interface{}) *Knapsack_SetInModernStandby_Call {
+func (_e *Knapsack_Expecter) SetInModernStandby(enabled any) *Knapsack_SetInModernStandby_Call {
 	return &Knapsack_SetInModernStandby_Call{Call: _e.mock.On("SetInModernStandby", enabled)}
 }
 
@@ -5789,7 +5798,7 @@ type Knapsack_SetInsecureControlTLS_Call struct {
 
 // SetInsecureControlTLS is a helper method to define mock.On call
 //   - disabled bool
-func (_e *Knapsack_Expecter) SetInsecureControlTLS(disabled interface{}) *Knapsack_SetInsecureControlTLS_Call {
+func (_e *Knapsack_Expecter) SetInsecureControlTLS(disabled any) *Knapsack_SetInsecureControlTLS_Call {
 	return &Knapsack_SetInsecureControlTLS_Call{Call: _e.mock.On("SetInsecureControlTLS", disabled)}
 }
 
@@ -5840,7 +5849,7 @@ type Knapsack_SetInsecureTLS_Call struct {
 
 // SetInsecureTLS is a helper method to define mock.On call
 //   - insecure bool
-func (_e *Knapsack_Expecter) SetInsecureTLS(insecure interface{}) *Knapsack_SetInsecureTLS_Call {
+func (_e *Knapsack_Expecter) SetInsecureTLS(insecure any) *Knapsack_SetInsecureTLS_Call {
 	return &Knapsack_SetInsecureTLS_Call{Call: _e.mock.On("SetInsecureTLS", insecure)}
 }
 
@@ -5891,7 +5900,7 @@ type Knapsack_SetInsecureTransportTLS_Call struct {
 
 // SetInsecureTransportTLS is a helper method to define mock.On call
 //   - insecure bool
-func (_e *Knapsack_Expecter) SetInsecureTransportTLS(insecure interface{}) *Knapsack_SetInsecureTransportTLS_Call {
+func (_e *Knapsack_Expecter) SetInsecureTransportTLS(insecure any) *Knapsack_SetInsecureTransportTLS_Call {
 	return &Knapsack_SetInsecureTransportTLS_Call{Call: _e.mock.On("SetInsecureTransportTLS", insecure)}
 }
 
@@ -5931,7 +5940,7 @@ type Knapsack_SetInstanceQuerier_Call struct {
 
 // SetInstanceQuerier is a helper method to define mock.On call
 //   - q types.InstanceQuerier
-func (_e *Knapsack_Expecter) SetInstanceQuerier(q interface{}) *Knapsack_SetInstanceQuerier_Call {
+func (_e *Knapsack_Expecter) SetInstanceQuerier(q any) *Knapsack_SetInstanceQuerier_Call {
 	return &Knapsack_SetInstanceQuerier_Call{Call: _e.mock.On("SetInstanceQuerier", q)}
 }
 
@@ -5982,7 +5991,7 @@ type Knapsack_SetKolideServerURL_Call struct {
 
 // SetKolideServerURL is a helper method to define mock.On call
 //   - url string
-func (_e *Knapsack_Expecter) SetKolideServerURL(url interface{}) *Knapsack_SetKolideServerURL_Call {
+func (_e *Knapsack_Expecter) SetKolideServerURL(url any) *Knapsack_SetKolideServerURL_Call {
 	return &Knapsack_SetKolideServerURL_Call{Call: _e.mock.On("SetKolideServerURL", url)}
 }
 
@@ -6033,7 +6042,7 @@ type Knapsack_SetLauncherGoMaxProcs_Call struct {
 
 // SetLauncherGoMaxProcs is a helper method to define mock.On call
 //   - maxProcs int
-func (_e *Knapsack_Expecter) SetLauncherGoMaxProcs(maxProcs interface{}) *Knapsack_SetLauncherGoMaxProcs_Call {
+func (_e *Knapsack_Expecter) SetLauncherGoMaxProcs(maxProcs any) *Knapsack_SetLauncherGoMaxProcs_Call {
 	return &Knapsack_SetLauncherGoMaxProcs_Call{Call: _e.mock.On("SetLauncherGoMaxProcs", maxProcs)}
 }
 
@@ -6084,7 +6093,7 @@ type Knapsack_SetLauncherWatchdogDisabled_Call struct {
 
 // SetLauncherWatchdogDisabled is a helper method to define mock.On call
 //   - disabled bool
-func (_e *Knapsack_Expecter) SetLauncherWatchdogDisabled(disabled interface{}) *Knapsack_SetLauncherWatchdogDisabled_Call {
+func (_e *Knapsack_Expecter) SetLauncherWatchdogDisabled(disabled any) *Knapsack_SetLauncherWatchdogDisabled_Call {
 	return &Knapsack_SetLauncherWatchdogDisabled_Call{Call: _e.mock.On("SetLauncherWatchdogDisabled", disabled)}
 }
 
@@ -6124,7 +6133,7 @@ type Knapsack_SetLocalizer_Call struct {
 
 // SetLocalizer is a helper method to define mock.On call
 //   - localizer types.Localizer
-func (_e *Knapsack_Expecter) SetLocalizer(localizer interface{}) *Knapsack_SetLocalizer_Call {
+func (_e *Knapsack_Expecter) SetLocalizer(localizer any) *Knapsack_SetLocalizer_Call {
 	return &Knapsack_SetLocalizer_Call{Call: _e.mock.On("SetLocalizer", localizer)}
 }
 
@@ -6175,7 +6184,7 @@ type Knapsack_SetLogIngestServerURL_Call struct {
 
 // SetLogIngestServerURL is a helper method to define mock.On call
 //   - url string
-func (_e *Knapsack_Expecter) SetLogIngestServerURL(url interface{}) *Knapsack_SetLogIngestServerURL_Call {
+func (_e *Knapsack_Expecter) SetLogIngestServerURL(url any) *Knapsack_SetLogIngestServerURL_Call {
 	return &Knapsack_SetLogIngestServerURL_Call{Call: _e.mock.On("SetLogIngestServerURL", url)}
 }
 
@@ -6226,7 +6235,7 @@ type Knapsack_SetLogShippingLevel_Call struct {
 
 // SetLogShippingLevel is a helper method to define mock.On call
 //   - level string
-func (_e *Knapsack_Expecter) SetLogShippingLevel(level interface{}) *Knapsack_SetLogShippingLevel_Call {
+func (_e *Knapsack_Expecter) SetLogShippingLevel(level any) *Knapsack_SetLogShippingLevel_Call {
 	return &Knapsack_SetLogShippingLevel_Call{Call: _e.mock.On("SetLogShippingLevel", level)}
 }
 
@@ -6267,7 +6276,7 @@ type Knapsack_SetLogShippingLevelOverride_Call struct {
 // SetLogShippingLevelOverride is a helper method to define mock.On call
 //   - value string
 //   - duration time.Duration
-func (_e *Knapsack_Expecter) SetLogShippingLevelOverride(value interface{}, duration interface{}) *Knapsack_SetLogShippingLevelOverride_Call {
+func (_e *Knapsack_Expecter) SetLogShippingLevelOverride(value any, duration any) *Knapsack_SetLogShippingLevelOverride_Call {
 	return &Knapsack_SetLogShippingLevelOverride_Call{Call: _e.mock.On("SetLogShippingLevelOverride", value, duration)}
 }
 
@@ -6323,7 +6332,7 @@ type Knapsack_SetLoggingInterval_Call struct {
 
 // SetLoggingInterval is a helper method to define mock.On call
 //   - interval time.Duration
-func (_e *Knapsack_Expecter) SetLoggingInterval(interval interface{}) *Knapsack_SetLoggingInterval_Call {
+func (_e *Knapsack_Expecter) SetLoggingInterval(interval any) *Knapsack_SetLoggingInterval_Call {
 	return &Knapsack_SetLoggingInterval_Call{Call: _e.mock.On("SetLoggingInterval", interval)}
 }
 
@@ -6374,7 +6383,7 @@ type Knapsack_SetMirrorServerURL_Call struct {
 
 // SetMirrorServerURL is a helper method to define mock.On call
 //   - url string
-func (_e *Knapsack_Expecter) SetMirrorServerURL(url interface{}) *Knapsack_SetMirrorServerURL_Call {
+func (_e *Knapsack_Expecter) SetMirrorServerURL(url any) *Knapsack_SetMirrorServerURL_Call {
 	return &Knapsack_SetMirrorServerURL_Call{Call: _e.mock.On("SetMirrorServerURL", url)}
 }
 
@@ -6425,7 +6434,7 @@ type Knapsack_SetOsqueryHealthcheckStartupDelay_Call struct {
 
 // SetOsqueryHealthcheckStartupDelay is a helper method to define mock.On call
 //   - delay time.Duration
-func (_e *Knapsack_Expecter) SetOsqueryHealthcheckStartupDelay(delay interface{}) *Knapsack_SetOsqueryHealthcheckStartupDelay_Call {
+func (_e *Knapsack_Expecter) SetOsqueryHealthcheckStartupDelay(delay any) *Knapsack_SetOsqueryHealthcheckStartupDelay_Call {
 	return &Knapsack_SetOsqueryHealthcheckStartupDelay_Call{Call: _e.mock.On("SetOsqueryHealthcheckStartupDelay", delay)}
 }
 
@@ -6465,7 +6474,7 @@ type Knapsack_SetOsqueryHistory_Call struct {
 
 // SetOsqueryHistory is a helper method to define mock.On call
 //   - osqHistory types.OsqueryHistorian
-func (_e *Knapsack_Expecter) SetOsqueryHistory(osqHistory interface{}) *Knapsack_SetOsqueryHistory_Call {
+func (_e *Knapsack_Expecter) SetOsqueryHistory(osqHistory any) *Knapsack_SetOsqueryHistory_Call {
 	return &Knapsack_SetOsqueryHistory_Call{Call: _e.mock.On("SetOsqueryHistory", osqHistory)}
 }
 
@@ -6505,7 +6514,7 @@ type Knapsack_SetOsqueryPublisher_Call struct {
 
 // SetOsqueryPublisher is a helper method to define mock.On call
 //   - op types.OsqueryPublisher
-func (_e *Knapsack_Expecter) SetOsqueryPublisher(op interface{}) *Knapsack_SetOsqueryPublisher_Call {
+func (_e *Knapsack_Expecter) SetOsqueryPublisher(op any) *Knapsack_SetOsqueryPublisher_Call {
 	return &Knapsack_SetOsqueryPublisher_Call{Call: _e.mock.On("SetOsqueryPublisher", op)}
 }
 
@@ -6556,7 +6565,7 @@ type Knapsack_SetOsqueryPublisherPercentEnabled_Call struct {
 
 // SetOsqueryPublisherPercentEnabled is a helper method to define mock.On call
 //   - percent int
-func (_e *Knapsack_Expecter) SetOsqueryPublisherPercentEnabled(percent interface{}) *Knapsack_SetOsqueryPublisherPercentEnabled_Call {
+func (_e *Knapsack_Expecter) SetOsqueryPublisherPercentEnabled(percent any) *Knapsack_SetOsqueryPublisherPercentEnabled_Call {
 	return &Knapsack_SetOsqueryPublisherPercentEnabled_Call{Call: _e.mock.On("SetOsqueryPublisherPercentEnabled", percent)}
 }
 
@@ -6607,7 +6616,7 @@ type Knapsack_SetOsqueryPublisherURL_Call struct {
 
 // SetOsqueryPublisherURL is a helper method to define mock.On call
 //   - url string
-func (_e *Knapsack_Expecter) SetOsqueryPublisherURL(url interface{}) *Knapsack_SetOsqueryPublisherURL_Call {
+func (_e *Knapsack_Expecter) SetOsqueryPublisherURL(url any) *Knapsack_SetOsqueryPublisherURL_Call {
 	return &Knapsack_SetOsqueryPublisherURL_Call{Call: _e.mock.On("SetOsqueryPublisherURL", url)}
 }
 
@@ -6658,7 +6667,7 @@ type Knapsack_SetOsqueryVerbose_Call struct {
 
 // SetOsqueryVerbose is a helper method to define mock.On call
 //   - verbose bool
-func (_e *Knapsack_Expecter) SetOsqueryVerbose(verbose interface{}) *Knapsack_SetOsqueryVerbose_Call {
+func (_e *Knapsack_Expecter) SetOsqueryVerbose(verbose any) *Knapsack_SetOsqueryVerbose_Call {
 	return &Knapsack_SetOsqueryVerbose_Call{Call: _e.mock.On("SetOsqueryVerbose", verbose)}
 }
 
@@ -6709,7 +6718,7 @@ type Knapsack_SetPerformanceMonitoringEnabled_Call struct {
 
 // SetPerformanceMonitoringEnabled is a helper method to define mock.On call
 //   - enabled bool
-func (_e *Knapsack_Expecter) SetPerformanceMonitoringEnabled(enabled interface{}) *Knapsack_SetPerformanceMonitoringEnabled_Call {
+func (_e *Knapsack_Expecter) SetPerformanceMonitoringEnabled(enabled any) *Knapsack_SetPerformanceMonitoringEnabled_Call {
 	return &Knapsack_SetPerformanceMonitoringEnabled_Call{Call: _e.mock.On("SetPerformanceMonitoringEnabled", enabled)}
 }
 
@@ -6760,7 +6769,7 @@ type Knapsack_SetPinnedLauncherVersion_Call struct {
 
 // SetPinnedLauncherVersion is a helper method to define mock.On call
 //   - version string
-func (_e *Knapsack_Expecter) SetPinnedLauncherVersion(version interface{}) *Knapsack_SetPinnedLauncherVersion_Call {
+func (_e *Knapsack_Expecter) SetPinnedLauncherVersion(version any) *Knapsack_SetPinnedLauncherVersion_Call {
 	return &Knapsack_SetPinnedLauncherVersion_Call{Call: _e.mock.On("SetPinnedLauncherVersion", version)}
 }
 
@@ -6811,7 +6820,7 @@ type Knapsack_SetPinnedOsquerydVersion_Call struct {
 
 // SetPinnedOsquerydVersion is a helper method to define mock.On call
 //   - version string
-func (_e *Knapsack_Expecter) SetPinnedOsquerydVersion(version interface{}) *Knapsack_SetPinnedOsquerydVersion_Call {
+func (_e *Knapsack_Expecter) SetPinnedOsquerydVersion(version any) *Knapsack_SetPinnedOsquerydVersion_Call {
 	return &Knapsack_SetPinnedOsquerydVersion_Call{Call: _e.mock.On("SetPinnedOsquerydVersion", version)}
 }
 
@@ -6862,7 +6871,7 @@ type Knapsack_SetResetOnHardwareChangeEnabled_Call struct {
 
 // SetResetOnHardwareChangeEnabled is a helper method to define mock.On call
 //   - enabled bool
-func (_e *Knapsack_Expecter) SetResetOnHardwareChangeEnabled(enabled interface{}) *Knapsack_SetResetOnHardwareChangeEnabled_Call {
+func (_e *Knapsack_Expecter) SetResetOnHardwareChangeEnabled(enabled any) *Knapsack_SetResetOnHardwareChangeEnabled_Call {
 	return &Knapsack_SetResetOnHardwareChangeEnabled_Call{Call: _e.mock.On("SetResetOnHardwareChangeEnabled", enabled)}
 }
 
@@ -6913,7 +6922,7 @@ type Knapsack_SetSystrayRestartEnabled_Call struct {
 
 // SetSystrayRestartEnabled is a helper method to define mock.On call
 //   - enabled bool
-func (_e *Knapsack_Expecter) SetSystrayRestartEnabled(enabled interface{}) *Knapsack_SetSystrayRestartEnabled_Call {
+func (_e *Knapsack_Expecter) SetSystrayRestartEnabled(enabled any) *Knapsack_SetSystrayRestartEnabled_Call {
 	return &Knapsack_SetSystrayRestartEnabled_Call{Call: _e.mock.On("SetSystrayRestartEnabled", enabled)}
 }
 
@@ -6964,7 +6973,7 @@ type Knapsack_SetTableGenerateTimeout_Call struct {
 
 // SetTableGenerateTimeout is a helper method to define mock.On call
 //   - interval time.Duration
-func (_e *Knapsack_Expecter) SetTableGenerateTimeout(interval interface{}) *Knapsack_SetTableGenerateTimeout_Call {
+func (_e *Knapsack_Expecter) SetTableGenerateTimeout(interval any) *Knapsack_SetTableGenerateTimeout_Call {
 	return &Knapsack_SetTableGenerateTimeout_Call{Call: _e.mock.On("SetTableGenerateTimeout", interval)}
 }
 
@@ -7015,7 +7024,7 @@ type Knapsack_SetTraceBatchTimeout_Call struct {
 
 // SetTraceBatchTimeout is a helper method to define mock.On call
 //   - duration time.Duration
-func (_e *Knapsack_Expecter) SetTraceBatchTimeout(duration interface{}) *Knapsack_SetTraceBatchTimeout_Call {
+func (_e *Knapsack_Expecter) SetTraceBatchTimeout(duration any) *Knapsack_SetTraceBatchTimeout_Call {
 	return &Knapsack_SetTraceBatchTimeout_Call{Call: _e.mock.On("SetTraceBatchTimeout", duration)}
 }
 
@@ -7066,7 +7075,7 @@ type Knapsack_SetTraceIngestServerURL_Call struct {
 
 // SetTraceIngestServerURL is a helper method to define mock.On call
 //   - url string
-func (_e *Knapsack_Expecter) SetTraceIngestServerURL(url interface{}) *Knapsack_SetTraceIngestServerURL_Call {
+func (_e *Knapsack_Expecter) SetTraceIngestServerURL(url any) *Knapsack_SetTraceIngestServerURL_Call {
 	return &Knapsack_SetTraceIngestServerURL_Call{Call: _e.mock.On("SetTraceIngestServerURL", url)}
 }
 
@@ -7117,7 +7126,7 @@ type Knapsack_SetTraceSamplingRate_Call struct {
 
 // SetTraceSamplingRate is a helper method to define mock.On call
 //   - rate float64
-func (_e *Knapsack_Expecter) SetTraceSamplingRate(rate interface{}) *Knapsack_SetTraceSamplingRate_Call {
+func (_e *Knapsack_Expecter) SetTraceSamplingRate(rate any) *Knapsack_SetTraceSamplingRate_Call {
 	return &Knapsack_SetTraceSamplingRate_Call{Call: _e.mock.On("SetTraceSamplingRate", rate)}
 }
 
@@ -7158,7 +7167,7 @@ type Knapsack_SetTraceSamplingRateOverride_Call struct {
 // SetTraceSamplingRateOverride is a helper method to define mock.On call
 //   - value float64
 //   - duration time.Duration
-func (_e *Knapsack_Expecter) SetTraceSamplingRateOverride(value interface{}, duration interface{}) *Knapsack_SetTraceSamplingRateOverride_Call {
+func (_e *Knapsack_Expecter) SetTraceSamplingRateOverride(value any, duration any) *Knapsack_SetTraceSamplingRateOverride_Call {
 	return &Knapsack_SetTraceSamplingRateOverride_Call{Call: _e.mock.On("SetTraceSamplingRateOverride", value, duration)}
 }
 
@@ -7214,7 +7223,7 @@ type Knapsack_SetTufServerURL_Call struct {
 
 // SetTufServerURL is a helper method to define mock.On call
 //   - url string
-func (_e *Knapsack_Expecter) SetTufServerURL(url interface{}) *Knapsack_SetTufServerURL_Call {
+func (_e *Knapsack_Expecter) SetTufServerURL(url any) *Knapsack_SetTufServerURL_Call {
 	return &Knapsack_SetTufServerURL_Call{Call: _e.mock.On("SetTufServerURL", url)}
 }
 
@@ -7265,7 +7274,7 @@ type Knapsack_SetUpdateChannel_Call struct {
 
 // SetUpdateChannel is a helper method to define mock.On call
 //   - channel string
-func (_e *Knapsack_Expecter) SetUpdateChannel(channel interface{}) *Knapsack_SetUpdateChannel_Call {
+func (_e *Knapsack_Expecter) SetUpdateChannel(channel any) *Knapsack_SetUpdateChannel_Call {
 	return &Knapsack_SetUpdateChannel_Call{Call: _e.mock.On("SetUpdateChannel", channel)}
 }
 
@@ -7316,7 +7325,7 @@ type Knapsack_SetUpdateDirectory_Call struct {
 
 // SetUpdateDirectory is a helper method to define mock.On call
 //   - directory string
-func (_e *Knapsack_Expecter) SetUpdateDirectory(directory interface{}) *Knapsack_SetUpdateDirectory_Call {
+func (_e *Knapsack_Expecter) SetUpdateDirectory(directory any) *Knapsack_SetUpdateDirectory_Call {
 	return &Knapsack_SetUpdateDirectory_Call{Call: _e.mock.On("SetUpdateDirectory", directory)}
 }
 
@@ -7367,7 +7376,7 @@ type Knapsack_SetUseCachedDataForScheduledQueries_Call struct {
 
 // SetUseCachedDataForScheduledQueries is a helper method to define mock.On call
 //   - enabled bool
-func (_e *Knapsack_Expecter) SetUseCachedDataForScheduledQueries(enabled interface{}) *Knapsack_SetUseCachedDataForScheduledQueries_Call {
+func (_e *Knapsack_Expecter) SetUseCachedDataForScheduledQueries(enabled any) *Knapsack_SetUseCachedDataForScheduledQueries_Call {
 	return &Knapsack_SetUseCachedDataForScheduledQueries_Call{Call: _e.mock.On("SetUseCachedDataForScheduledQueries", enabled)}
 }
 
@@ -7418,7 +7427,7 @@ type Knapsack_SetWatchdogDelaySec_Call struct {
 
 // SetWatchdogDelaySec is a helper method to define mock.On call
 //   - sec int
-func (_e *Knapsack_Expecter) SetWatchdogDelaySec(sec interface{}) *Knapsack_SetWatchdogDelaySec_Call {
+func (_e *Knapsack_Expecter) SetWatchdogDelaySec(sec any) *Knapsack_SetWatchdogDelaySec_Call {
 	return &Knapsack_SetWatchdogDelaySec_Call{Call: _e.mock.On("SetWatchdogDelaySec", sec)}
 }
 
@@ -7469,7 +7478,7 @@ type Knapsack_SetWatchdogEnabled_Call struct {
 
 // SetWatchdogEnabled is a helper method to define mock.On call
 //   - enable bool
-func (_e *Knapsack_Expecter) SetWatchdogEnabled(enable interface{}) *Knapsack_SetWatchdogEnabled_Call {
+func (_e *Knapsack_Expecter) SetWatchdogEnabled(enable any) *Knapsack_SetWatchdogEnabled_Call {
 	return &Knapsack_SetWatchdogEnabled_Call{Call: _e.mock.On("SetWatchdogEnabled", enable)}
 }
 
@@ -7520,7 +7529,7 @@ type Knapsack_SetWatchdogMemoryLimitMB_Call struct {
 
 // SetWatchdogMemoryLimitMB is a helper method to define mock.On call
 //   - limit int
-func (_e *Knapsack_Expecter) SetWatchdogMemoryLimitMB(limit interface{}) *Knapsack_SetWatchdogMemoryLimitMB_Call {
+func (_e *Knapsack_Expecter) SetWatchdogMemoryLimitMB(limit any) *Knapsack_SetWatchdogMemoryLimitMB_Call {
 	return &Knapsack_SetWatchdogMemoryLimitMB_Call{Call: _e.mock.On("SetWatchdogMemoryLimitMB", limit)}
 }
 
@@ -7571,7 +7580,7 @@ type Knapsack_SetWatchdogUtilizationLimitPercent_Call struct {
 
 // SetWatchdogUtilizationLimitPercent is a helper method to define mock.On call
 //   - limit int
-func (_e *Knapsack_Expecter) SetWatchdogUtilizationLimitPercent(limit interface{}) *Knapsack_SetWatchdogUtilizationLimitPercent_Call {
+func (_e *Knapsack_Expecter) SetWatchdogUtilizationLimitPercent(limit any) *Knapsack_SetWatchdogUtilizationLimitPercent_Call {
 	return &Knapsack_SetWatchdogUtilizationLimitPercent_Call{Call: _e.mock.On("SetWatchdogUtilizationLimitPercent", limit)}
 }
 
@@ -7680,8 +7689,8 @@ func (_c *Knapsack_StatusLogsStore_Call) Run(run func()) *Knapsack_StatusLogsSto
 	return _c
 }
 
-func (_c *Knapsack_StatusLogsStore_Call) Return(v types.KVStore) *Knapsack_StatusLogsStore_Call {
-	_c.Call.Return(v)
+func (_c *Knapsack_StatusLogsStore_Call) Return(kVStore types.KVStore) *Knapsack_StatusLogsStore_Call {
+	_c.Call.Return(kVStore)
 	return _c
 }
 
@@ -7726,8 +7735,8 @@ func (_c *Knapsack_Stores_Call) Run(run func()) *Knapsack_Stores_Call {
 	return _c
 }
 
-func (_c *Knapsack_Stores_Call) Return(storeToV map[storage.Store]types.KVStore) *Knapsack_Stores_Call {
-	_c.Call.Return(storeToV)
+func (_c *Knapsack_Stores_Call) Return(storeToKVStore map[storage.Store]types.KVStore) *Knapsack_Stores_Call {
+	_c.Call.Return(storeToKVStore)
 	return _c
 }
 
@@ -7906,8 +7915,8 @@ func (_c *Knapsack_TokenStore_Call) Run(run func()) *Knapsack_TokenStore_Call {
 	return _c
 }
 
-func (_c *Knapsack_TokenStore_Call) Return(v types.KVStore) *Knapsack_TokenStore_Call {
-	_c.Call.Return(v)
+func (_c *Knapsack_TokenStore_Call) Return(kVStore types.KVStore) *Knapsack_TokenStore_Call {
+	_c.Call.Return(kVStore)
 	return _c
 }
 
@@ -8436,8 +8445,8 @@ func (_c *Knapsack_WindowsUpdatesCacheStore_Call) Run(run func()) *Knapsack_Wind
 	return _c
 }
 
-func (_c *Knapsack_WindowsUpdatesCacheStore_Call) Return(v types.KVStore) *Knapsack_WindowsUpdatesCacheStore_Call {
-	_c.Call.Return(v)
+func (_c *Knapsack_WindowsUpdatesCacheStore_Call) Return(kVStore types.KVStore) *Knapsack_WindowsUpdatesCacheStore_Call {
+	_c.Call.Return(kVStore)
 	return _c
 }
 

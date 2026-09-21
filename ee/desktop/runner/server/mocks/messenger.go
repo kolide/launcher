@@ -14,10 +14,19 @@ func NewMessenger(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *Messenger {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &Messenger{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -60,7 +69,7 @@ type Messenger_SendMessage_Call struct {
 // SendMessage is a helper method to define mock.On call
 //   - method string
 //   - params any
-func (_e *Messenger_Expecter) SendMessage(method interface{}, params interface{}) *Messenger_SendMessage_Call {
+func (_e *Messenger_Expecter) SendMessage(method any, params any) *Messenger_SendMessage_Call {
 	return &Messenger_SendMessage_Call{Call: _e.mock.On("SendMessage", method, params)}
 }
 

@@ -17,10 +17,19 @@ func NewFlagValueOverride(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *FlagValueOverride {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &FlagValueOverride{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -54,7 +63,7 @@ type FlagValueOverride_Start_Call struct {
 //   - value any
 //   - duration time.Duration
 //   - expiredCallback func(key keys.FlagKey)
-func (_e *FlagValueOverride_Expecter) Start(key interface{}, value interface{}, duration interface{}, expiredCallback interface{}) *FlagValueOverride_Start_Call {
+func (_e *FlagValueOverride_Expecter) Start(key any, value any, duration any, expiredCallback any) *FlagValueOverride_Start_Call {
 	return &FlagValueOverride_Start_Call{Call: _e.mock.On("Start", key, value, duration, expiredCallback)}
 }
 
@@ -132,8 +141,8 @@ func (_c *FlagValueOverride_Value_Call) Run(run func()) *FlagValueOverride_Value
 	return _c
 }
 
-func (_c *FlagValueOverride_Value_Call) Return(v any) *FlagValueOverride_Value_Call {
-	_c.Call.Return(v)
+func (_c *FlagValueOverride_Value_Call) Return(anyMoqParam any) *FlagValueOverride_Value_Call {
+	_c.Call.Return(anyMoqParam)
 	return _c
 }
 

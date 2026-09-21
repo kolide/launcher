@@ -18,10 +18,19 @@ func NewFlags(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *Flags {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &Flags{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -626,7 +635,7 @@ type Flags_DeregisterChangeObserver_Call struct {
 
 // DeregisterChangeObserver is a helper method to define mock.On call
 //   - observer types.FlagsChangeObserver
-func (_e *Flags_Expecter) DeregisterChangeObserver(observer interface{}) *Flags_DeregisterChangeObserver_Call {
+func (_e *Flags_Expecter) DeregisterChangeObserver(observer any) *Flags_DeregisterChangeObserver_Call {
 	return &Flags_DeregisterChangeObserver_Call{Call: _e.mock.On("DeregisterChangeObserver", observer)}
 }
 
@@ -2330,11 +2339,11 @@ func (_c *Flags_PinnedOsquerydVersion_Call) RunAndReturn(run func() string) *Fla
 // RegisterChangeObserver provides a mock function for the type Flags
 func (_mock *Flags) RegisterChangeObserver(observer types.FlagsChangeObserver, flagKeys ...keys.FlagKey) {
 	// keys.FlagKey
-	_va := make([]interface{}, len(flagKeys))
+	_va := make([]any, len(flagKeys))
 	for _i := range flagKeys {
 		_va[_i] = flagKeys[_i]
 	}
-	var _ca []interface{}
+	var _ca []any
 	_ca = append(_ca, observer)
 	_ca = append(_ca, _va...)
 	_mock.Called(_ca...)
@@ -2349,9 +2358,9 @@ type Flags_RegisterChangeObserver_Call struct {
 // RegisterChangeObserver is a helper method to define mock.On call
 //   - observer types.FlagsChangeObserver
 //   - flagKeys ...keys.FlagKey
-func (_e *Flags_Expecter) RegisterChangeObserver(observer interface{}, flagKeys ...interface{}) *Flags_RegisterChangeObserver_Call {
+func (_e *Flags_Expecter) RegisterChangeObserver(observer any, flagKeys ...any) *Flags_RegisterChangeObserver_Call {
 	return &Flags_RegisterChangeObserver_Call{Call: _e.mock.On("RegisterChangeObserver",
-		append([]interface{}{observer}, flagKeys...)...)}
+		append([]any{observer}, flagKeys...)...)}
 }
 
 func (_c *Flags_RegisterChangeObserver_Call) Run(run func(observer types.FlagsChangeObserver, flagKeys ...keys.FlagKey)) *Flags_RegisterChangeObserver_Call {
@@ -2542,7 +2551,7 @@ type Flags_SetAllowOverlyBroadDt4aAcceleration_Call struct {
 
 // SetAllowOverlyBroadDt4aAcceleration is a helper method to define mock.On call
 //   - enable bool
-func (_e *Flags_Expecter) SetAllowOverlyBroadDt4aAcceleration(enable interface{}) *Flags_SetAllowOverlyBroadDt4aAcceleration_Call {
+func (_e *Flags_Expecter) SetAllowOverlyBroadDt4aAcceleration(enable any) *Flags_SetAllowOverlyBroadDt4aAcceleration_Call {
 	return &Flags_SetAllowOverlyBroadDt4aAcceleration_Call{Call: _e.mock.On("SetAllowOverlyBroadDt4aAcceleration", enable)}
 }
 
@@ -2593,7 +2602,7 @@ type Flags_SetAutoupdate_Call struct {
 
 // SetAutoupdate is a helper method to define mock.On call
 //   - enabled bool
-func (_e *Flags_Expecter) SetAutoupdate(enabled interface{}) *Flags_SetAutoupdate_Call {
+func (_e *Flags_Expecter) SetAutoupdate(enabled any) *Flags_SetAutoupdate_Call {
 	return &Flags_SetAutoupdate_Call{Call: _e.mock.On("SetAutoupdate", enabled)}
 }
 
@@ -2644,7 +2653,7 @@ type Flags_SetAutoupdateDownloadSplay_Call struct {
 
 // SetAutoupdateDownloadSplay is a helper method to define mock.On call
 //   - val time.Duration
-func (_e *Flags_Expecter) SetAutoupdateDownloadSplay(val interface{}) *Flags_SetAutoupdateDownloadSplay_Call {
+func (_e *Flags_Expecter) SetAutoupdateDownloadSplay(val any) *Flags_SetAutoupdateDownloadSplay_Call {
 	return &Flags_SetAutoupdateDownloadSplay_Call{Call: _e.mock.On("SetAutoupdateDownloadSplay", val)}
 }
 
@@ -2695,7 +2704,7 @@ type Flags_SetAutoupdateInitialDelay_Call struct {
 
 // SetAutoupdateInitialDelay is a helper method to define mock.On call
 //   - delay time.Duration
-func (_e *Flags_Expecter) SetAutoupdateInitialDelay(delay interface{}) *Flags_SetAutoupdateInitialDelay_Call {
+func (_e *Flags_Expecter) SetAutoupdateInitialDelay(delay any) *Flags_SetAutoupdateInitialDelay_Call {
 	return &Flags_SetAutoupdateInitialDelay_Call{Call: _e.mock.On("SetAutoupdateInitialDelay", delay)}
 }
 
@@ -2736,7 +2745,7 @@ type Flags_SetAutoupdateInitialDelayOverride_Call struct {
 // SetAutoupdateInitialDelayOverride is a helper method to define mock.On call
 //   - value time.Duration
 //   - duration time.Duration
-func (_e *Flags_Expecter) SetAutoupdateInitialDelayOverride(value interface{}, duration interface{}) *Flags_SetAutoupdateInitialDelayOverride_Call {
+func (_e *Flags_Expecter) SetAutoupdateInitialDelayOverride(value any, duration any) *Flags_SetAutoupdateInitialDelayOverride_Call {
 	return &Flags_SetAutoupdateInitialDelayOverride_Call{Call: _e.mock.On("SetAutoupdateInitialDelayOverride", value, duration)}
 }
 
@@ -2792,7 +2801,7 @@ type Flags_SetAutoupdateInterval_Call struct {
 
 // SetAutoupdateInterval is a helper method to define mock.On call
 //   - interval time.Duration
-func (_e *Flags_Expecter) SetAutoupdateInterval(interval interface{}) *Flags_SetAutoupdateInterval_Call {
+func (_e *Flags_Expecter) SetAutoupdateInterval(interval any) *Flags_SetAutoupdateInterval_Call {
 	return &Flags_SetAutoupdateInterval_Call{Call: _e.mock.On("SetAutoupdateInterval", interval)}
 }
 
@@ -2833,7 +2842,7 @@ type Flags_SetAutoupdateIntervalOverride_Call struct {
 // SetAutoupdateIntervalOverride is a helper method to define mock.On call
 //   - value time.Duration
 //   - duration time.Duration
-func (_e *Flags_Expecter) SetAutoupdateIntervalOverride(value interface{}, duration interface{}) *Flags_SetAutoupdateIntervalOverride_Call {
+func (_e *Flags_Expecter) SetAutoupdateIntervalOverride(value any, duration any) *Flags_SetAutoupdateIntervalOverride_Call {
 	return &Flags_SetAutoupdateIntervalOverride_Call{Call: _e.mock.On("SetAutoupdateIntervalOverride", value, duration)}
 }
 
@@ -2889,7 +2898,7 @@ type Flags_SetCachedQueryResultsTTL_Call struct {
 
 // SetCachedQueryResultsTTL is a helper method to define mock.On call
 //   - ttl time.Duration
-func (_e *Flags_Expecter) SetCachedQueryResultsTTL(ttl interface{}) *Flags_SetCachedQueryResultsTTL_Call {
+func (_e *Flags_Expecter) SetCachedQueryResultsTTL(ttl any) *Flags_SetCachedQueryResultsTTL_Call {
 	return &Flags_SetCachedQueryResultsTTL_Call{Call: _e.mock.On("SetCachedQueryResultsTTL", ttl)}
 }
 
@@ -2940,7 +2949,7 @@ type Flags_SetControlRequestInterval_Call struct {
 
 // SetControlRequestInterval is a helper method to define mock.On call
 //   - interval time.Duration
-func (_e *Flags_Expecter) SetControlRequestInterval(interval interface{}) *Flags_SetControlRequestInterval_Call {
+func (_e *Flags_Expecter) SetControlRequestInterval(interval any) *Flags_SetControlRequestInterval_Call {
 	return &Flags_SetControlRequestInterval_Call{Call: _e.mock.On("SetControlRequestInterval", interval)}
 }
 
@@ -2981,7 +2990,7 @@ type Flags_SetControlRequestIntervalOverride_Call struct {
 // SetControlRequestIntervalOverride is a helper method to define mock.On call
 //   - value time.Duration
 //   - duration time.Duration
-func (_e *Flags_Expecter) SetControlRequestIntervalOverride(value interface{}, duration interface{}) *Flags_SetControlRequestIntervalOverride_Call {
+func (_e *Flags_Expecter) SetControlRequestIntervalOverride(value any, duration any) *Flags_SetControlRequestIntervalOverride_Call {
 	return &Flags_SetControlRequestIntervalOverride_Call{Call: _e.mock.On("SetControlRequestIntervalOverride", value, duration)}
 }
 
@@ -3037,7 +3046,7 @@ type Flags_SetControlServerURL_Call struct {
 
 // SetControlServerURL is a helper method to define mock.On call
 //   - url string
-func (_e *Flags_Expecter) SetControlServerURL(url interface{}) *Flags_SetControlServerURL_Call {
+func (_e *Flags_Expecter) SetControlServerURL(url any) *Flags_SetControlServerURL_Call {
 	return &Flags_SetControlServerURL_Call{Call: _e.mock.On("SetControlServerURL", url)}
 }
 
@@ -3088,7 +3097,7 @@ type Flags_SetCurrentRunningOsqueryVersion_Call struct {
 
 // SetCurrentRunningOsqueryVersion is a helper method to define mock.On call
 //   - version string
-func (_e *Flags_Expecter) SetCurrentRunningOsqueryVersion(version interface{}) *Flags_SetCurrentRunningOsqueryVersion_Call {
+func (_e *Flags_Expecter) SetCurrentRunningOsqueryVersion(version any) *Flags_SetCurrentRunningOsqueryVersion_Call {
 	return &Flags_SetCurrentRunningOsqueryVersion_Call{Call: _e.mock.On("SetCurrentRunningOsqueryVersion", version)}
 }
 
@@ -3139,7 +3148,7 @@ type Flags_SetDebug_Call struct {
 
 // SetDebug is a helper method to define mock.On call
 //   - debug bool
-func (_e *Flags_Expecter) SetDebug(debug interface{}) *Flags_SetDebug_Call {
+func (_e *Flags_Expecter) SetDebug(debug any) *Flags_SetDebug_Call {
 	return &Flags_SetDebug_Call{Call: _e.mock.On("SetDebug", debug)}
 }
 
@@ -3190,7 +3199,7 @@ type Flags_SetDebugServerData_Call struct {
 
 // SetDebugServerData is a helper method to define mock.On call
 //   - debug bool
-func (_e *Flags_Expecter) SetDebugServerData(debug interface{}) *Flags_SetDebugServerData_Call {
+func (_e *Flags_Expecter) SetDebugServerData(debug any) *Flags_SetDebugServerData_Call {
 	return &Flags_SetDebugServerData_Call{Call: _e.mock.On("SetDebugServerData", debug)}
 }
 
@@ -3241,7 +3250,7 @@ type Flags_SetDesktopEnabled_Call struct {
 
 // SetDesktopEnabled is a helper method to define mock.On call
 //   - enabled bool
-func (_e *Flags_Expecter) SetDesktopEnabled(enabled interface{}) *Flags_SetDesktopEnabled_Call {
+func (_e *Flags_Expecter) SetDesktopEnabled(enabled any) *Flags_SetDesktopEnabled_Call {
 	return &Flags_SetDesktopEnabled_Call{Call: _e.mock.On("SetDesktopEnabled", enabled)}
 }
 
@@ -3292,7 +3301,7 @@ type Flags_SetDesktopGoMaxProcs_Call struct {
 
 // SetDesktopGoMaxProcs is a helper method to define mock.On call
 //   - maxProcs int
-func (_e *Flags_Expecter) SetDesktopGoMaxProcs(maxProcs interface{}) *Flags_SetDesktopGoMaxProcs_Call {
+func (_e *Flags_Expecter) SetDesktopGoMaxProcs(maxProcs any) *Flags_SetDesktopGoMaxProcs_Call {
 	return &Flags_SetDesktopGoMaxProcs_Call{Call: _e.mock.On("SetDesktopGoMaxProcs", maxProcs)}
 }
 
@@ -3343,7 +3352,7 @@ type Flags_SetDesktopMenuRefreshInterval_Call struct {
 
 // SetDesktopMenuRefreshInterval is a helper method to define mock.On call
 //   - interval time.Duration
-func (_e *Flags_Expecter) SetDesktopMenuRefreshInterval(interval interface{}) *Flags_SetDesktopMenuRefreshInterval_Call {
+func (_e *Flags_Expecter) SetDesktopMenuRefreshInterval(interval any) *Flags_SetDesktopMenuRefreshInterval_Call {
 	return &Flags_SetDesktopMenuRefreshInterval_Call{Call: _e.mock.On("SetDesktopMenuRefreshInterval", interval)}
 }
 
@@ -3394,7 +3403,7 @@ type Flags_SetDesktopUpdateInterval_Call struct {
 
 // SetDesktopUpdateInterval is a helper method to define mock.On call
 //   - interval time.Duration
-func (_e *Flags_Expecter) SetDesktopUpdateInterval(interval interface{}) *Flags_SetDesktopUpdateInterval_Call {
+func (_e *Flags_Expecter) SetDesktopUpdateInterval(interval any) *Flags_SetDesktopUpdateInterval_Call {
 	return &Flags_SetDesktopUpdateInterval_Call{Call: _e.mock.On("SetDesktopUpdateInterval", interval)}
 }
 
@@ -3445,7 +3454,7 @@ type Flags_SetDisableControlTLS_Call struct {
 
 // SetDisableControlTLS is a helper method to define mock.On call
 //   - disabled bool
-func (_e *Flags_Expecter) SetDisableControlTLS(disabled interface{}) *Flags_SetDisableControlTLS_Call {
+func (_e *Flags_Expecter) SetDisableControlTLS(disabled any) *Flags_SetDisableControlTLS_Call {
 	return &Flags_SetDisableControlTLS_Call{Call: _e.mock.On("SetDisableControlTLS", disabled)}
 }
 
@@ -3496,7 +3505,7 @@ type Flags_SetDisableTraceIngestTLS_Call struct {
 
 // SetDisableTraceIngestTLS is a helper method to define mock.On call
 //   - enabled bool
-func (_e *Flags_Expecter) SetDisableTraceIngestTLS(enabled interface{}) *Flags_SetDisableTraceIngestTLS_Call {
+func (_e *Flags_Expecter) SetDisableTraceIngestTLS(enabled any) *Flags_SetDisableTraceIngestTLS_Call {
 	return &Flags_SetDisableTraceIngestTLS_Call{Call: _e.mock.On("SetDisableTraceIngestTLS", enabled)}
 }
 
@@ -3547,7 +3556,7 @@ type Flags_SetDistributedForwardingInterval_Call struct {
 
 // SetDistributedForwardingInterval is a helper method to define mock.On call
 //   - interval time.Duration
-func (_e *Flags_Expecter) SetDistributedForwardingInterval(interval interface{}) *Flags_SetDistributedForwardingInterval_Call {
+func (_e *Flags_Expecter) SetDistributedForwardingInterval(interval any) *Flags_SetDistributedForwardingInterval_Call {
 	return &Flags_SetDistributedForwardingInterval_Call{Call: _e.mock.On("SetDistributedForwardingInterval", interval)}
 }
 
@@ -3588,7 +3597,7 @@ type Flags_SetDistributedForwardingIntervalOverride_Call struct {
 // SetDistributedForwardingIntervalOverride is a helper method to define mock.On call
 //   - value time.Duration
 //   - duration time.Duration
-func (_e *Flags_Expecter) SetDistributedForwardingIntervalOverride(value interface{}, duration interface{}) *Flags_SetDistributedForwardingIntervalOverride_Call {
+func (_e *Flags_Expecter) SetDistributedForwardingIntervalOverride(value any, duration any) *Flags_SetDistributedForwardingIntervalOverride_Call {
 	return &Flags_SetDistributedForwardingIntervalOverride_Call{Call: _e.mock.On("SetDistributedForwardingIntervalOverride", value, duration)}
 }
 
@@ -3644,7 +3653,7 @@ type Flags_SetDuplicateLogWindow_Call struct {
 
 // SetDuplicateLogWindow is a helper method to define mock.On call
 //   - duration time.Duration
-func (_e *Flags_Expecter) SetDuplicateLogWindow(duration interface{}) *Flags_SetDuplicateLogWindow_Call {
+func (_e *Flags_Expecter) SetDuplicateLogWindow(duration any) *Flags_SetDuplicateLogWindow_Call {
 	return &Flags_SetDuplicateLogWindow_Call{Call: _e.mock.On("SetDuplicateLogWindow", duration)}
 }
 
@@ -3695,7 +3704,7 @@ type Flags_SetExportTraces_Call struct {
 
 // SetExportTraces is a helper method to define mock.On call
 //   - enabled bool
-func (_e *Flags_Expecter) SetExportTraces(enabled interface{}) *Flags_SetExportTraces_Call {
+func (_e *Flags_Expecter) SetExportTraces(enabled any) *Flags_SetExportTraces_Call {
 	return &Flags_SetExportTraces_Call{Call: _e.mock.On("SetExportTraces", enabled)}
 }
 
@@ -3736,7 +3745,7 @@ type Flags_SetExportTracesOverride_Call struct {
 // SetExportTracesOverride is a helper method to define mock.On call
 //   - value bool
 //   - duration time.Duration
-func (_e *Flags_Expecter) SetExportTracesOverride(value interface{}, duration interface{}) *Flags_SetExportTracesOverride_Call {
+func (_e *Flags_Expecter) SetExportTracesOverride(value any, duration any) *Flags_SetExportTracesOverride_Call {
 	return &Flags_SetExportTracesOverride_Call{Call: _e.mock.On("SetExportTracesOverride", value, duration)}
 }
 
@@ -3792,7 +3801,7 @@ type Flags_SetForceControlSubsystems_Call struct {
 
 // SetForceControlSubsystems is a helper method to define mock.On call
 //   - force bool
-func (_e *Flags_Expecter) SetForceControlSubsystems(force interface{}) *Flags_SetForceControlSubsystems_Call {
+func (_e *Flags_Expecter) SetForceControlSubsystems(force any) *Flags_SetForceControlSubsystems_Call {
 	return &Flags_SetForceControlSubsystems_Call{Call: _e.mock.On("SetForceControlSubsystems", force)}
 }
 
@@ -3843,7 +3852,7 @@ type Flags_SetInModernStandby_Call struct {
 
 // SetInModernStandby is a helper method to define mock.On call
 //   - enabled bool
-func (_e *Flags_Expecter) SetInModernStandby(enabled interface{}) *Flags_SetInModernStandby_Call {
+func (_e *Flags_Expecter) SetInModernStandby(enabled any) *Flags_SetInModernStandby_Call {
 	return &Flags_SetInModernStandby_Call{Call: _e.mock.On("SetInModernStandby", enabled)}
 }
 
@@ -3894,7 +3903,7 @@ type Flags_SetInsecureControlTLS_Call struct {
 
 // SetInsecureControlTLS is a helper method to define mock.On call
 //   - disabled bool
-func (_e *Flags_Expecter) SetInsecureControlTLS(disabled interface{}) *Flags_SetInsecureControlTLS_Call {
+func (_e *Flags_Expecter) SetInsecureControlTLS(disabled any) *Flags_SetInsecureControlTLS_Call {
 	return &Flags_SetInsecureControlTLS_Call{Call: _e.mock.On("SetInsecureControlTLS", disabled)}
 }
 
@@ -3945,7 +3954,7 @@ type Flags_SetInsecureTLS_Call struct {
 
 // SetInsecureTLS is a helper method to define mock.On call
 //   - insecure bool
-func (_e *Flags_Expecter) SetInsecureTLS(insecure interface{}) *Flags_SetInsecureTLS_Call {
+func (_e *Flags_Expecter) SetInsecureTLS(insecure any) *Flags_SetInsecureTLS_Call {
 	return &Flags_SetInsecureTLS_Call{Call: _e.mock.On("SetInsecureTLS", insecure)}
 }
 
@@ -3996,7 +4005,7 @@ type Flags_SetInsecureTransportTLS_Call struct {
 
 // SetInsecureTransportTLS is a helper method to define mock.On call
 //   - insecure bool
-func (_e *Flags_Expecter) SetInsecureTransportTLS(insecure interface{}) *Flags_SetInsecureTransportTLS_Call {
+func (_e *Flags_Expecter) SetInsecureTransportTLS(insecure any) *Flags_SetInsecureTransportTLS_Call {
 	return &Flags_SetInsecureTransportTLS_Call{Call: _e.mock.On("SetInsecureTransportTLS", insecure)}
 }
 
@@ -4047,7 +4056,7 @@ type Flags_SetKolideServerURL_Call struct {
 
 // SetKolideServerURL is a helper method to define mock.On call
 //   - url string
-func (_e *Flags_Expecter) SetKolideServerURL(url interface{}) *Flags_SetKolideServerURL_Call {
+func (_e *Flags_Expecter) SetKolideServerURL(url any) *Flags_SetKolideServerURL_Call {
 	return &Flags_SetKolideServerURL_Call{Call: _e.mock.On("SetKolideServerURL", url)}
 }
 
@@ -4098,7 +4107,7 @@ type Flags_SetLauncherGoMaxProcs_Call struct {
 
 // SetLauncherGoMaxProcs is a helper method to define mock.On call
 //   - maxProcs int
-func (_e *Flags_Expecter) SetLauncherGoMaxProcs(maxProcs interface{}) *Flags_SetLauncherGoMaxProcs_Call {
+func (_e *Flags_Expecter) SetLauncherGoMaxProcs(maxProcs any) *Flags_SetLauncherGoMaxProcs_Call {
 	return &Flags_SetLauncherGoMaxProcs_Call{Call: _e.mock.On("SetLauncherGoMaxProcs", maxProcs)}
 }
 
@@ -4149,7 +4158,7 @@ type Flags_SetLauncherWatchdogDisabled_Call struct {
 
 // SetLauncherWatchdogDisabled is a helper method to define mock.On call
 //   - disabled bool
-func (_e *Flags_Expecter) SetLauncherWatchdogDisabled(disabled interface{}) *Flags_SetLauncherWatchdogDisabled_Call {
+func (_e *Flags_Expecter) SetLauncherWatchdogDisabled(disabled any) *Flags_SetLauncherWatchdogDisabled_Call {
 	return &Flags_SetLauncherWatchdogDisabled_Call{Call: _e.mock.On("SetLauncherWatchdogDisabled", disabled)}
 }
 
@@ -4200,7 +4209,7 @@ type Flags_SetLogIngestServerURL_Call struct {
 
 // SetLogIngestServerURL is a helper method to define mock.On call
 //   - url string
-func (_e *Flags_Expecter) SetLogIngestServerURL(url interface{}) *Flags_SetLogIngestServerURL_Call {
+func (_e *Flags_Expecter) SetLogIngestServerURL(url any) *Flags_SetLogIngestServerURL_Call {
 	return &Flags_SetLogIngestServerURL_Call{Call: _e.mock.On("SetLogIngestServerURL", url)}
 }
 
@@ -4251,7 +4260,7 @@ type Flags_SetLogShippingLevel_Call struct {
 
 // SetLogShippingLevel is a helper method to define mock.On call
 //   - level string
-func (_e *Flags_Expecter) SetLogShippingLevel(level interface{}) *Flags_SetLogShippingLevel_Call {
+func (_e *Flags_Expecter) SetLogShippingLevel(level any) *Flags_SetLogShippingLevel_Call {
 	return &Flags_SetLogShippingLevel_Call{Call: _e.mock.On("SetLogShippingLevel", level)}
 }
 
@@ -4292,7 +4301,7 @@ type Flags_SetLogShippingLevelOverride_Call struct {
 // SetLogShippingLevelOverride is a helper method to define mock.On call
 //   - value string
 //   - duration time.Duration
-func (_e *Flags_Expecter) SetLogShippingLevelOverride(value interface{}, duration interface{}) *Flags_SetLogShippingLevelOverride_Call {
+func (_e *Flags_Expecter) SetLogShippingLevelOverride(value any, duration any) *Flags_SetLogShippingLevelOverride_Call {
 	return &Flags_SetLogShippingLevelOverride_Call{Call: _e.mock.On("SetLogShippingLevelOverride", value, duration)}
 }
 
@@ -4348,7 +4357,7 @@ type Flags_SetLoggingInterval_Call struct {
 
 // SetLoggingInterval is a helper method to define mock.On call
 //   - interval time.Duration
-func (_e *Flags_Expecter) SetLoggingInterval(interval interface{}) *Flags_SetLoggingInterval_Call {
+func (_e *Flags_Expecter) SetLoggingInterval(interval any) *Flags_SetLoggingInterval_Call {
 	return &Flags_SetLoggingInterval_Call{Call: _e.mock.On("SetLoggingInterval", interval)}
 }
 
@@ -4399,7 +4408,7 @@ type Flags_SetMirrorServerURL_Call struct {
 
 // SetMirrorServerURL is a helper method to define mock.On call
 //   - url string
-func (_e *Flags_Expecter) SetMirrorServerURL(url interface{}) *Flags_SetMirrorServerURL_Call {
+func (_e *Flags_Expecter) SetMirrorServerURL(url any) *Flags_SetMirrorServerURL_Call {
 	return &Flags_SetMirrorServerURL_Call{Call: _e.mock.On("SetMirrorServerURL", url)}
 }
 
@@ -4450,7 +4459,7 @@ type Flags_SetOsqueryHealthcheckStartupDelay_Call struct {
 
 // SetOsqueryHealthcheckStartupDelay is a helper method to define mock.On call
 //   - delay time.Duration
-func (_e *Flags_Expecter) SetOsqueryHealthcheckStartupDelay(delay interface{}) *Flags_SetOsqueryHealthcheckStartupDelay_Call {
+func (_e *Flags_Expecter) SetOsqueryHealthcheckStartupDelay(delay any) *Flags_SetOsqueryHealthcheckStartupDelay_Call {
 	return &Flags_SetOsqueryHealthcheckStartupDelay_Call{Call: _e.mock.On("SetOsqueryHealthcheckStartupDelay", delay)}
 }
 
@@ -4501,7 +4510,7 @@ type Flags_SetOsqueryPublisherPercentEnabled_Call struct {
 
 // SetOsqueryPublisherPercentEnabled is a helper method to define mock.On call
 //   - percent int
-func (_e *Flags_Expecter) SetOsqueryPublisherPercentEnabled(percent interface{}) *Flags_SetOsqueryPublisherPercentEnabled_Call {
+func (_e *Flags_Expecter) SetOsqueryPublisherPercentEnabled(percent any) *Flags_SetOsqueryPublisherPercentEnabled_Call {
 	return &Flags_SetOsqueryPublisherPercentEnabled_Call{Call: _e.mock.On("SetOsqueryPublisherPercentEnabled", percent)}
 }
 
@@ -4552,7 +4561,7 @@ type Flags_SetOsqueryPublisherURL_Call struct {
 
 // SetOsqueryPublisherURL is a helper method to define mock.On call
 //   - url string
-func (_e *Flags_Expecter) SetOsqueryPublisherURL(url interface{}) *Flags_SetOsqueryPublisherURL_Call {
+func (_e *Flags_Expecter) SetOsqueryPublisherURL(url any) *Flags_SetOsqueryPublisherURL_Call {
 	return &Flags_SetOsqueryPublisherURL_Call{Call: _e.mock.On("SetOsqueryPublisherURL", url)}
 }
 
@@ -4603,7 +4612,7 @@ type Flags_SetOsqueryVerbose_Call struct {
 
 // SetOsqueryVerbose is a helper method to define mock.On call
 //   - verbose bool
-func (_e *Flags_Expecter) SetOsqueryVerbose(verbose interface{}) *Flags_SetOsqueryVerbose_Call {
+func (_e *Flags_Expecter) SetOsqueryVerbose(verbose any) *Flags_SetOsqueryVerbose_Call {
 	return &Flags_SetOsqueryVerbose_Call{Call: _e.mock.On("SetOsqueryVerbose", verbose)}
 }
 
@@ -4654,7 +4663,7 @@ type Flags_SetPerformanceMonitoringEnabled_Call struct {
 
 // SetPerformanceMonitoringEnabled is a helper method to define mock.On call
 //   - enabled bool
-func (_e *Flags_Expecter) SetPerformanceMonitoringEnabled(enabled interface{}) *Flags_SetPerformanceMonitoringEnabled_Call {
+func (_e *Flags_Expecter) SetPerformanceMonitoringEnabled(enabled any) *Flags_SetPerformanceMonitoringEnabled_Call {
 	return &Flags_SetPerformanceMonitoringEnabled_Call{Call: _e.mock.On("SetPerformanceMonitoringEnabled", enabled)}
 }
 
@@ -4705,7 +4714,7 @@ type Flags_SetPinnedLauncherVersion_Call struct {
 
 // SetPinnedLauncherVersion is a helper method to define mock.On call
 //   - version string
-func (_e *Flags_Expecter) SetPinnedLauncherVersion(version interface{}) *Flags_SetPinnedLauncherVersion_Call {
+func (_e *Flags_Expecter) SetPinnedLauncherVersion(version any) *Flags_SetPinnedLauncherVersion_Call {
 	return &Flags_SetPinnedLauncherVersion_Call{Call: _e.mock.On("SetPinnedLauncherVersion", version)}
 }
 
@@ -4756,7 +4765,7 @@ type Flags_SetPinnedOsquerydVersion_Call struct {
 
 // SetPinnedOsquerydVersion is a helper method to define mock.On call
 //   - version string
-func (_e *Flags_Expecter) SetPinnedOsquerydVersion(version interface{}) *Flags_SetPinnedOsquerydVersion_Call {
+func (_e *Flags_Expecter) SetPinnedOsquerydVersion(version any) *Flags_SetPinnedOsquerydVersion_Call {
 	return &Flags_SetPinnedOsquerydVersion_Call{Call: _e.mock.On("SetPinnedOsquerydVersion", version)}
 }
 
@@ -4807,7 +4816,7 @@ type Flags_SetResetOnHardwareChangeEnabled_Call struct {
 
 // SetResetOnHardwareChangeEnabled is a helper method to define mock.On call
 //   - enabled bool
-func (_e *Flags_Expecter) SetResetOnHardwareChangeEnabled(enabled interface{}) *Flags_SetResetOnHardwareChangeEnabled_Call {
+func (_e *Flags_Expecter) SetResetOnHardwareChangeEnabled(enabled any) *Flags_SetResetOnHardwareChangeEnabled_Call {
 	return &Flags_SetResetOnHardwareChangeEnabled_Call{Call: _e.mock.On("SetResetOnHardwareChangeEnabled", enabled)}
 }
 
@@ -4858,7 +4867,7 @@ type Flags_SetSystrayRestartEnabled_Call struct {
 
 // SetSystrayRestartEnabled is a helper method to define mock.On call
 //   - enabled bool
-func (_e *Flags_Expecter) SetSystrayRestartEnabled(enabled interface{}) *Flags_SetSystrayRestartEnabled_Call {
+func (_e *Flags_Expecter) SetSystrayRestartEnabled(enabled any) *Flags_SetSystrayRestartEnabled_Call {
 	return &Flags_SetSystrayRestartEnabled_Call{Call: _e.mock.On("SetSystrayRestartEnabled", enabled)}
 }
 
@@ -4909,7 +4918,7 @@ type Flags_SetTableGenerateTimeout_Call struct {
 
 // SetTableGenerateTimeout is a helper method to define mock.On call
 //   - interval time.Duration
-func (_e *Flags_Expecter) SetTableGenerateTimeout(interval interface{}) *Flags_SetTableGenerateTimeout_Call {
+func (_e *Flags_Expecter) SetTableGenerateTimeout(interval any) *Flags_SetTableGenerateTimeout_Call {
 	return &Flags_SetTableGenerateTimeout_Call{Call: _e.mock.On("SetTableGenerateTimeout", interval)}
 }
 
@@ -4960,7 +4969,7 @@ type Flags_SetTraceBatchTimeout_Call struct {
 
 // SetTraceBatchTimeout is a helper method to define mock.On call
 //   - duration time.Duration
-func (_e *Flags_Expecter) SetTraceBatchTimeout(duration interface{}) *Flags_SetTraceBatchTimeout_Call {
+func (_e *Flags_Expecter) SetTraceBatchTimeout(duration any) *Flags_SetTraceBatchTimeout_Call {
 	return &Flags_SetTraceBatchTimeout_Call{Call: _e.mock.On("SetTraceBatchTimeout", duration)}
 }
 
@@ -5011,7 +5020,7 @@ type Flags_SetTraceIngestServerURL_Call struct {
 
 // SetTraceIngestServerURL is a helper method to define mock.On call
 //   - url string
-func (_e *Flags_Expecter) SetTraceIngestServerURL(url interface{}) *Flags_SetTraceIngestServerURL_Call {
+func (_e *Flags_Expecter) SetTraceIngestServerURL(url any) *Flags_SetTraceIngestServerURL_Call {
 	return &Flags_SetTraceIngestServerURL_Call{Call: _e.mock.On("SetTraceIngestServerURL", url)}
 }
 
@@ -5062,7 +5071,7 @@ type Flags_SetTraceSamplingRate_Call struct {
 
 // SetTraceSamplingRate is a helper method to define mock.On call
 //   - rate float64
-func (_e *Flags_Expecter) SetTraceSamplingRate(rate interface{}) *Flags_SetTraceSamplingRate_Call {
+func (_e *Flags_Expecter) SetTraceSamplingRate(rate any) *Flags_SetTraceSamplingRate_Call {
 	return &Flags_SetTraceSamplingRate_Call{Call: _e.mock.On("SetTraceSamplingRate", rate)}
 }
 
@@ -5103,7 +5112,7 @@ type Flags_SetTraceSamplingRateOverride_Call struct {
 // SetTraceSamplingRateOverride is a helper method to define mock.On call
 //   - value float64
 //   - duration time.Duration
-func (_e *Flags_Expecter) SetTraceSamplingRateOverride(value interface{}, duration interface{}) *Flags_SetTraceSamplingRateOverride_Call {
+func (_e *Flags_Expecter) SetTraceSamplingRateOverride(value any, duration any) *Flags_SetTraceSamplingRateOverride_Call {
 	return &Flags_SetTraceSamplingRateOverride_Call{Call: _e.mock.On("SetTraceSamplingRateOverride", value, duration)}
 }
 
@@ -5159,7 +5168,7 @@ type Flags_SetTufServerURL_Call struct {
 
 // SetTufServerURL is a helper method to define mock.On call
 //   - url string
-func (_e *Flags_Expecter) SetTufServerURL(url interface{}) *Flags_SetTufServerURL_Call {
+func (_e *Flags_Expecter) SetTufServerURL(url any) *Flags_SetTufServerURL_Call {
 	return &Flags_SetTufServerURL_Call{Call: _e.mock.On("SetTufServerURL", url)}
 }
 
@@ -5210,7 +5219,7 @@ type Flags_SetUpdateChannel_Call struct {
 
 // SetUpdateChannel is a helper method to define mock.On call
 //   - channel string
-func (_e *Flags_Expecter) SetUpdateChannel(channel interface{}) *Flags_SetUpdateChannel_Call {
+func (_e *Flags_Expecter) SetUpdateChannel(channel any) *Flags_SetUpdateChannel_Call {
 	return &Flags_SetUpdateChannel_Call{Call: _e.mock.On("SetUpdateChannel", channel)}
 }
 
@@ -5261,7 +5270,7 @@ type Flags_SetUpdateDirectory_Call struct {
 
 // SetUpdateDirectory is a helper method to define mock.On call
 //   - directory string
-func (_e *Flags_Expecter) SetUpdateDirectory(directory interface{}) *Flags_SetUpdateDirectory_Call {
+func (_e *Flags_Expecter) SetUpdateDirectory(directory any) *Flags_SetUpdateDirectory_Call {
 	return &Flags_SetUpdateDirectory_Call{Call: _e.mock.On("SetUpdateDirectory", directory)}
 }
 
@@ -5312,7 +5321,7 @@ type Flags_SetUseCachedDataForScheduledQueries_Call struct {
 
 // SetUseCachedDataForScheduledQueries is a helper method to define mock.On call
 //   - enabled bool
-func (_e *Flags_Expecter) SetUseCachedDataForScheduledQueries(enabled interface{}) *Flags_SetUseCachedDataForScheduledQueries_Call {
+func (_e *Flags_Expecter) SetUseCachedDataForScheduledQueries(enabled any) *Flags_SetUseCachedDataForScheduledQueries_Call {
 	return &Flags_SetUseCachedDataForScheduledQueries_Call{Call: _e.mock.On("SetUseCachedDataForScheduledQueries", enabled)}
 }
 
@@ -5363,7 +5372,7 @@ type Flags_SetWatchdogDelaySec_Call struct {
 
 // SetWatchdogDelaySec is a helper method to define mock.On call
 //   - sec int
-func (_e *Flags_Expecter) SetWatchdogDelaySec(sec interface{}) *Flags_SetWatchdogDelaySec_Call {
+func (_e *Flags_Expecter) SetWatchdogDelaySec(sec any) *Flags_SetWatchdogDelaySec_Call {
 	return &Flags_SetWatchdogDelaySec_Call{Call: _e.mock.On("SetWatchdogDelaySec", sec)}
 }
 
@@ -5414,7 +5423,7 @@ type Flags_SetWatchdogEnabled_Call struct {
 
 // SetWatchdogEnabled is a helper method to define mock.On call
 //   - enable bool
-func (_e *Flags_Expecter) SetWatchdogEnabled(enable interface{}) *Flags_SetWatchdogEnabled_Call {
+func (_e *Flags_Expecter) SetWatchdogEnabled(enable any) *Flags_SetWatchdogEnabled_Call {
 	return &Flags_SetWatchdogEnabled_Call{Call: _e.mock.On("SetWatchdogEnabled", enable)}
 }
 
@@ -5465,7 +5474,7 @@ type Flags_SetWatchdogMemoryLimitMB_Call struct {
 
 // SetWatchdogMemoryLimitMB is a helper method to define mock.On call
 //   - limit int
-func (_e *Flags_Expecter) SetWatchdogMemoryLimitMB(limit interface{}) *Flags_SetWatchdogMemoryLimitMB_Call {
+func (_e *Flags_Expecter) SetWatchdogMemoryLimitMB(limit any) *Flags_SetWatchdogMemoryLimitMB_Call {
 	return &Flags_SetWatchdogMemoryLimitMB_Call{Call: _e.mock.On("SetWatchdogMemoryLimitMB", limit)}
 }
 
@@ -5516,7 +5525,7 @@ type Flags_SetWatchdogUtilizationLimitPercent_Call struct {
 
 // SetWatchdogUtilizationLimitPercent is a helper method to define mock.On call
 //   - limit int
-func (_e *Flags_Expecter) SetWatchdogUtilizationLimitPercent(limit interface{}) *Flags_SetWatchdogUtilizationLimitPercent_Call {
+func (_e *Flags_Expecter) SetWatchdogUtilizationLimitPercent(limit any) *Flags_SetWatchdogUtilizationLimitPercent_Call {
 	return &Flags_SetWatchdogUtilizationLimitPercent_Call{Call: _e.mock.On("SetWatchdogUtilizationLimitPercent", limit)}
 }
 

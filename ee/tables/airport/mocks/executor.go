@@ -14,10 +14,19 @@ func NewExecutor(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *Executor {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &Executor{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -70,7 +79,7 @@ type Executor_Exec_Call struct {
 
 // Exec is a helper method to define mock.On call
 //   - s string
-func (_e *Executor_Expecter) Exec(s interface{}) *Executor_Exec_Call {
+func (_e *Executor_Expecter) Exec(s any) *Executor_Exec_Call {
 	return &Executor_Exec_Call{Call: _e.mock.On("Exec", s)}
 }
 

@@ -14,10 +14,19 @@ func NewGetter(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *Getter {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &Getter{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -70,7 +79,7 @@ type Getter_Get_Call struct {
 
 // Get is a helper method to define mock.On call
 //   - key []byte
-func (_e *Getter_Expecter) Get(key interface{}) *Getter_Get_Call {
+func (_e *Getter_Expecter) Get(key any) *Getter_Get_Call {
 	return &Getter_Get_Call{Call: _e.mock.On("Get", key)}
 }
 
@@ -103,10 +112,19 @@ func NewSetter(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *Setter {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &Setter{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -149,7 +167,7 @@ type Setter_Set_Call struct {
 // Set is a helper method to define mock.On call
 //   - key []byte
 //   - value []byte
-func (_e *Setter_Expecter) Set(key interface{}, value interface{}) *Setter_Set_Call {
+func (_e *Setter_Expecter) Set(key any, value any) *Setter_Set_Call {
 	return &Setter_Set_Call{Call: _e.mock.On("Set", key, value)}
 }
 
@@ -187,10 +205,19 @@ func NewDeleter(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *Deleter {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &Deleter{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -211,11 +238,11 @@ func (_m *Deleter) EXPECT() *Deleter_Expecter {
 // Delete provides a mock function for the type Deleter
 func (_mock *Deleter) Delete(keys ...[]byte) error {
 	// []byte
-	_va := make([]interface{}, len(keys))
+	_va := make([]any, len(keys))
 	for _i := range keys {
 		_va[_i] = keys[_i]
 	}
-	var _ca []interface{}
+	var _ca []any
 	_ca = append(_ca, _va...)
 	ret := _mock.Called(_ca...)
 
@@ -239,9 +266,9 @@ type Deleter_Delete_Call struct {
 
 // Delete is a helper method to define mock.On call
 //   - keys ...[]byte
-func (_e *Deleter_Expecter) Delete(keys ...interface{}) *Deleter_Delete_Call {
+func (_e *Deleter_Expecter) Delete(keys ...any) *Deleter_Delete_Call {
 	return &Deleter_Delete_Call{Call: _e.mock.On("Delete",
-		append([]interface{}{}, keys...)...)}
+		append([]any{}, keys...)...)}
 }
 
 func (_c *Deleter_Delete_Call) Run(run func(keys ...[]byte)) *Deleter_Delete_Call {
@@ -321,10 +348,19 @@ func NewIterator(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *Iterator {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &Iterator{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -366,7 +402,7 @@ type Iterator_ForEach_Call struct {
 
 // ForEach is a helper method to define mock.On call
 //   - fn func(k []byte, v []byte) error
-func (_e *Iterator_Expecter) ForEach(fn interface{}) *Iterator_ForEach_Call {
+func (_e *Iterator_Expecter) ForEach(fn any) *Iterator_ForEach_Call {
 	return &Iterator_ForEach_Call{Call: _e.mock.On("ForEach", fn)}
 }
 
@@ -399,10 +435,19 @@ func NewUpdater(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *Updater {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &Updater{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -455,7 +500,7 @@ type Updater_Update_Call struct {
 
 // Update is a helper method to define mock.On call
 //   - kvPairs map[string]string
-func (_e *Updater_Expecter) Update(kvPairs interface{}) *Updater_Update_Call {
+func (_e *Updater_Expecter) Update(kvPairs any) *Updater_Update_Call {
 	return &Updater_Update_Call{Call: _e.mock.On("Update", kvPairs)}
 }
 
@@ -488,10 +533,19 @@ func NewCounter(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *Counter {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &Counter{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -568,10 +622,19 @@ func NewAppender(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *Appender {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &Appender{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -592,11 +655,11 @@ func (_m *Appender) EXPECT() *Appender_Expecter {
 // AppendValues provides a mock function for the type Appender
 func (_mock *Appender) AppendValues(values ...[]byte) error {
 	// []byte
-	_va := make([]interface{}, len(values))
+	_va := make([]any, len(values))
 	for _i := range values {
 		_va[_i] = values[_i]
 	}
-	var _ca []interface{}
+	var _ca []any
 	_ca = append(_ca, _va...)
 	ret := _mock.Called(_ca...)
 
@@ -620,9 +683,9 @@ type Appender_AppendValues_Call struct {
 
 // AppendValues is a helper method to define mock.On call
 //   - values ...[]byte
-func (_e *Appender_Expecter) AppendValues(values ...interface{}) *Appender_AppendValues_Call {
+func (_e *Appender_Expecter) AppendValues(values ...any) *Appender_AppendValues_Call {
 	return &Appender_AppendValues_Call{Call: _e.mock.On("AppendValues",
-		append([]interface{}{}, values...)...)}
+		append([]any{}, values...)...)}
 }
 
 func (_c *Appender_AppendValues_Call) Run(run func(values ...[]byte)) *Appender_AppendValues_Call {
@@ -658,10 +721,19 @@ func NewGetterSetter(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *GetterSetter {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &GetterSetter{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -714,7 +786,7 @@ type GetterSetter_Get_Call struct {
 
 // Get is a helper method to define mock.On call
 //   - key []byte
-func (_e *GetterSetter_Expecter) Get(key interface{}) *GetterSetter_Get_Call {
+func (_e *GetterSetter_Expecter) Get(key any) *GetterSetter_Get_Call {
 	return &GetterSetter_Get_Call{Call: _e.mock.On("Get", key)}
 }
 
@@ -766,7 +838,7 @@ type GetterSetter_Set_Call struct {
 // Set is a helper method to define mock.On call
 //   - key []byte
 //   - value []byte
-func (_e *GetterSetter_Expecter) Set(key interface{}, value interface{}) *GetterSetter_Set_Call {
+func (_e *GetterSetter_Expecter) Set(key any, value any) *GetterSetter_Set_Call {
 	return &GetterSetter_Set_Call{Call: _e.mock.On("Set", key, value)}
 }
 
@@ -804,10 +876,19 @@ func NewCloser(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *Closer {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &Closer{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -875,10 +956,19 @@ func NewGetterCloser(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *GetterCloser {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &GetterCloser{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -975,7 +1065,7 @@ type GetterCloser_Get_Call struct {
 
 // Get is a helper method to define mock.On call
 //   - key []byte
-func (_e *GetterCloser_Expecter) Get(key interface{}) *GetterCloser_Get_Call {
+func (_e *GetterCloser_Expecter) Get(key any) *GetterCloser_Get_Call {
 	return &GetterCloser_Get_Call{Call: _e.mock.On("Get", key)}
 }
 
@@ -1008,10 +1098,19 @@ func NewGetterUpdaterCloser(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *GetterUpdaterCloser {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &GetterUpdaterCloser{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -1108,7 +1207,7 @@ type GetterUpdaterCloser_Get_Call struct {
 
 // Get is a helper method to define mock.On call
 //   - key []byte
-func (_e *GetterUpdaterCloser_Expecter) Get(key interface{}) *GetterUpdaterCloser_Get_Call {
+func (_e *GetterUpdaterCloser_Expecter) Get(key any) *GetterUpdaterCloser_Get_Call {
 	return &GetterUpdaterCloser_Get_Call{Call: _e.mock.On("Get", key)}
 }
 
@@ -1170,7 +1269,7 @@ type GetterUpdaterCloser_Update_Call struct {
 
 // Update is a helper method to define mock.On call
 //   - kvPairs map[string]string
-func (_e *GetterUpdaterCloser_Expecter) Update(kvPairs interface{}) *GetterUpdaterCloser_Update_Call {
+func (_e *GetterUpdaterCloser_Expecter) Update(kvPairs any) *GetterUpdaterCloser_Update_Call {
 	return &GetterUpdaterCloser_Update_Call{Call: _e.mock.On("Update", kvPairs)}
 }
 
@@ -1203,10 +1302,19 @@ func NewGetterSetterDeleter(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *GetterSetterDeleter {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &GetterSetterDeleter{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -1227,11 +1335,11 @@ func (_m *GetterSetterDeleter) EXPECT() *GetterSetterDeleter_Expecter {
 // Delete provides a mock function for the type GetterSetterDeleter
 func (_mock *GetterSetterDeleter) Delete(keys ...[]byte) error {
 	// []byte
-	_va := make([]interface{}, len(keys))
+	_va := make([]any, len(keys))
 	for _i := range keys {
 		_va[_i] = keys[_i]
 	}
-	var _ca []interface{}
+	var _ca []any
 	_ca = append(_ca, _va...)
 	ret := _mock.Called(_ca...)
 
@@ -1255,9 +1363,9 @@ type GetterSetterDeleter_Delete_Call struct {
 
 // Delete is a helper method to define mock.On call
 //   - keys ...[]byte
-func (_e *GetterSetterDeleter_Expecter) Delete(keys ...interface{}) *GetterSetterDeleter_Delete_Call {
+func (_e *GetterSetterDeleter_Expecter) Delete(keys ...any) *GetterSetterDeleter_Delete_Call {
 	return &GetterSetterDeleter_Delete_Call{Call: _e.mock.On("Delete",
-		append([]interface{}{}, keys...)...)}
+		append([]any{}, keys...)...)}
 }
 
 func (_c *GetterSetterDeleter_Delete_Call) Run(run func(keys ...[]byte)) *GetterSetterDeleter_Delete_Call {
@@ -1366,7 +1474,7 @@ type GetterSetterDeleter_Get_Call struct {
 
 // Get is a helper method to define mock.On call
 //   - key []byte
-func (_e *GetterSetterDeleter_Expecter) Get(key interface{}) *GetterSetterDeleter_Get_Call {
+func (_e *GetterSetterDeleter_Expecter) Get(key any) *GetterSetterDeleter_Get_Call {
 	return &GetterSetterDeleter_Get_Call{Call: _e.mock.On("Get", key)}
 }
 
@@ -1418,7 +1526,7 @@ type GetterSetterDeleter_Set_Call struct {
 // Set is a helper method to define mock.On call
 //   - key []byte
 //   - value []byte
-func (_e *GetterSetterDeleter_Expecter) Set(key interface{}, value interface{}) *GetterSetterDeleter_Set_Call {
+func (_e *GetterSetterDeleter_Expecter) Set(key any, value any) *GetterSetterDeleter_Set_Call {
 	return &GetterSetterDeleter_Set_Call{Call: _e.mock.On("Set", key, value)}
 }
 
@@ -1456,10 +1564,19 @@ func NewGetterSetterDeleterIterator(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *GetterSetterDeleterIterator {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &GetterSetterDeleterIterator{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -1480,11 +1597,11 @@ func (_m *GetterSetterDeleterIterator) EXPECT() *GetterSetterDeleterIterator_Exp
 // Delete provides a mock function for the type GetterSetterDeleterIterator
 func (_mock *GetterSetterDeleterIterator) Delete(keys ...[]byte) error {
 	// []byte
-	_va := make([]interface{}, len(keys))
+	_va := make([]any, len(keys))
 	for _i := range keys {
 		_va[_i] = keys[_i]
 	}
-	var _ca []interface{}
+	var _ca []any
 	_ca = append(_ca, _va...)
 	ret := _mock.Called(_ca...)
 
@@ -1508,9 +1625,9 @@ type GetterSetterDeleterIterator_Delete_Call struct {
 
 // Delete is a helper method to define mock.On call
 //   - keys ...[]byte
-func (_e *GetterSetterDeleterIterator_Expecter) Delete(keys ...interface{}) *GetterSetterDeleterIterator_Delete_Call {
+func (_e *GetterSetterDeleterIterator_Expecter) Delete(keys ...any) *GetterSetterDeleterIterator_Delete_Call {
 	return &GetterSetterDeleterIterator_Delete_Call{Call: _e.mock.On("Delete",
-		append([]interface{}{}, keys...)...)}
+		append([]any{}, keys...)...)}
 }
 
 func (_c *GetterSetterDeleterIterator_Delete_Call) Run(run func(keys ...[]byte)) *GetterSetterDeleterIterator_Delete_Call {
@@ -1608,7 +1725,7 @@ type GetterSetterDeleterIterator_ForEach_Call struct {
 
 // ForEach is a helper method to define mock.On call
 //   - fn func(k []byte, v []byte) error
-func (_e *GetterSetterDeleterIterator_Expecter) ForEach(fn interface{}) *GetterSetterDeleterIterator_ForEach_Call {
+func (_e *GetterSetterDeleterIterator_Expecter) ForEach(fn any) *GetterSetterDeleterIterator_ForEach_Call {
 	return &GetterSetterDeleterIterator_ForEach_Call{Call: _e.mock.On("ForEach", fn)}
 }
 
@@ -1670,7 +1787,7 @@ type GetterSetterDeleterIterator_Get_Call struct {
 
 // Get is a helper method to define mock.On call
 //   - key []byte
-func (_e *GetterSetterDeleterIterator_Expecter) Get(key interface{}) *GetterSetterDeleterIterator_Get_Call {
+func (_e *GetterSetterDeleterIterator_Expecter) Get(key any) *GetterSetterDeleterIterator_Get_Call {
 	return &GetterSetterDeleterIterator_Get_Call{Call: _e.mock.On("Get", key)}
 }
 
@@ -1722,7 +1839,7 @@ type GetterSetterDeleterIterator_Set_Call struct {
 // Set is a helper method to define mock.On call
 //   - key []byte
 //   - value []byte
-func (_e *GetterSetterDeleterIterator_Expecter) Set(key interface{}, value interface{}) *GetterSetterDeleterIterator_Set_Call {
+func (_e *GetterSetterDeleterIterator_Expecter) Set(key any, value any) *GetterSetterDeleterIterator_Set_Call {
 	return &GetterSetterDeleterIterator_Set_Call{Call: _e.mock.On("Set", key, value)}
 }
 
@@ -1760,10 +1877,19 @@ func NewGetterSetterDeleterIteratorUpdaterCounterAppender(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *GetterSetterDeleterIteratorUpdaterCounterAppender {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &GetterSetterDeleterIteratorUpdaterCounterAppender{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -1784,11 +1910,11 @@ func (_m *GetterSetterDeleterIteratorUpdaterCounterAppender) EXPECT() *GetterSet
 // AppendValues provides a mock function for the type GetterSetterDeleterIteratorUpdaterCounterAppender
 func (_mock *GetterSetterDeleterIteratorUpdaterCounterAppender) AppendValues(values ...[]byte) error {
 	// []byte
-	_va := make([]interface{}, len(values))
+	_va := make([]any, len(values))
 	for _i := range values {
 		_va[_i] = values[_i]
 	}
-	var _ca []interface{}
+	var _ca []any
 	_ca = append(_ca, _va...)
 	ret := _mock.Called(_ca...)
 
@@ -1812,9 +1938,9 @@ type GetterSetterDeleterIteratorUpdaterCounterAppender_AppendValues_Call struct 
 
 // AppendValues is a helper method to define mock.On call
 //   - values ...[]byte
-func (_e *GetterSetterDeleterIteratorUpdaterCounterAppender_Expecter) AppendValues(values ...interface{}) *GetterSetterDeleterIteratorUpdaterCounterAppender_AppendValues_Call {
+func (_e *GetterSetterDeleterIteratorUpdaterCounterAppender_Expecter) AppendValues(values ...any) *GetterSetterDeleterIteratorUpdaterCounterAppender_AppendValues_Call {
 	return &GetterSetterDeleterIteratorUpdaterCounterAppender_AppendValues_Call{Call: _e.mock.On("AppendValues",
-		append([]interface{}{}, values...)...)}
+		append([]any{}, values...)...)}
 }
 
 func (_c *GetterSetterDeleterIteratorUpdaterCounterAppender_AppendValues_Call) Run(run func(values ...[]byte)) *GetterSetterDeleterIteratorUpdaterCounterAppender_AppendValues_Call {
@@ -1900,11 +2026,11 @@ func (_c *GetterSetterDeleterIteratorUpdaterCounterAppender_Count_Call) RunAndRe
 // Delete provides a mock function for the type GetterSetterDeleterIteratorUpdaterCounterAppender
 func (_mock *GetterSetterDeleterIteratorUpdaterCounterAppender) Delete(keys ...[]byte) error {
 	// []byte
-	_va := make([]interface{}, len(keys))
+	_va := make([]any, len(keys))
 	for _i := range keys {
 		_va[_i] = keys[_i]
 	}
-	var _ca []interface{}
+	var _ca []any
 	_ca = append(_ca, _va...)
 	ret := _mock.Called(_ca...)
 
@@ -1928,9 +2054,9 @@ type GetterSetterDeleterIteratorUpdaterCounterAppender_Delete_Call struct {
 
 // Delete is a helper method to define mock.On call
 //   - keys ...[]byte
-func (_e *GetterSetterDeleterIteratorUpdaterCounterAppender_Expecter) Delete(keys ...interface{}) *GetterSetterDeleterIteratorUpdaterCounterAppender_Delete_Call {
+func (_e *GetterSetterDeleterIteratorUpdaterCounterAppender_Expecter) Delete(keys ...any) *GetterSetterDeleterIteratorUpdaterCounterAppender_Delete_Call {
 	return &GetterSetterDeleterIteratorUpdaterCounterAppender_Delete_Call{Call: _e.mock.On("Delete",
-		append([]interface{}{}, keys...)...)}
+		append([]any{}, keys...)...)}
 }
 
 func (_c *GetterSetterDeleterIteratorUpdaterCounterAppender_Delete_Call) Run(run func(keys ...[]byte)) *GetterSetterDeleterIteratorUpdaterCounterAppender_Delete_Call {
@@ -2028,7 +2154,7 @@ type GetterSetterDeleterIteratorUpdaterCounterAppender_ForEach_Call struct {
 
 // ForEach is a helper method to define mock.On call
 //   - fn func(k []byte, v []byte) error
-func (_e *GetterSetterDeleterIteratorUpdaterCounterAppender_Expecter) ForEach(fn interface{}) *GetterSetterDeleterIteratorUpdaterCounterAppender_ForEach_Call {
+func (_e *GetterSetterDeleterIteratorUpdaterCounterAppender_Expecter) ForEach(fn any) *GetterSetterDeleterIteratorUpdaterCounterAppender_ForEach_Call {
 	return &GetterSetterDeleterIteratorUpdaterCounterAppender_ForEach_Call{Call: _e.mock.On("ForEach", fn)}
 }
 
@@ -2090,7 +2216,7 @@ type GetterSetterDeleterIteratorUpdaterCounterAppender_Get_Call struct {
 
 // Get is a helper method to define mock.On call
 //   - key []byte
-func (_e *GetterSetterDeleterIteratorUpdaterCounterAppender_Expecter) Get(key interface{}) *GetterSetterDeleterIteratorUpdaterCounterAppender_Get_Call {
+func (_e *GetterSetterDeleterIteratorUpdaterCounterAppender_Expecter) Get(key any) *GetterSetterDeleterIteratorUpdaterCounterAppender_Get_Call {
 	return &GetterSetterDeleterIteratorUpdaterCounterAppender_Get_Call{Call: _e.mock.On("Get", key)}
 }
 
@@ -2142,7 +2268,7 @@ type GetterSetterDeleterIteratorUpdaterCounterAppender_Set_Call struct {
 // Set is a helper method to define mock.On call
 //   - key []byte
 //   - value []byte
-func (_e *GetterSetterDeleterIteratorUpdaterCounterAppender_Expecter) Set(key interface{}, value interface{}) *GetterSetterDeleterIteratorUpdaterCounterAppender_Set_Call {
+func (_e *GetterSetterDeleterIteratorUpdaterCounterAppender_Expecter) Set(key any, value any) *GetterSetterDeleterIteratorUpdaterCounterAppender_Set_Call {
 	return &GetterSetterDeleterIteratorUpdaterCounterAppender_Set_Call{Call: _e.mock.On("Set", key, value)}
 }
 
@@ -2209,7 +2335,7 @@ type GetterSetterDeleterIteratorUpdaterCounterAppender_Update_Call struct {
 
 // Update is a helper method to define mock.On call
 //   - kvPairs map[string]string
-func (_e *GetterSetterDeleterIteratorUpdaterCounterAppender_Expecter) Update(kvPairs interface{}) *GetterSetterDeleterIteratorUpdaterCounterAppender_Update_Call {
+func (_e *GetterSetterDeleterIteratorUpdaterCounterAppender_Expecter) Update(kvPairs any) *GetterSetterDeleterIteratorUpdaterCounterAppender_Update_Call {
 	return &GetterSetterDeleterIteratorUpdaterCounterAppender_Update_Call{Call: _e.mock.On("Update", kvPairs)}
 }
 
@@ -2242,10 +2368,19 @@ func NewKVStore(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *KVStore {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &KVStore{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -2266,11 +2401,11 @@ func (_m *KVStore) EXPECT() *KVStore_Expecter {
 // AppendValues provides a mock function for the type KVStore
 func (_mock *KVStore) AppendValues(values ...[]byte) error {
 	// []byte
-	_va := make([]interface{}, len(values))
+	_va := make([]any, len(values))
 	for _i := range values {
 		_va[_i] = values[_i]
 	}
-	var _ca []interface{}
+	var _ca []any
 	_ca = append(_ca, _va...)
 	ret := _mock.Called(_ca...)
 
@@ -2294,9 +2429,9 @@ type KVStore_AppendValues_Call struct {
 
 // AppendValues is a helper method to define mock.On call
 //   - values ...[]byte
-func (_e *KVStore_Expecter) AppendValues(values ...interface{}) *KVStore_AppendValues_Call {
+func (_e *KVStore_Expecter) AppendValues(values ...any) *KVStore_AppendValues_Call {
 	return &KVStore_AppendValues_Call{Call: _e.mock.On("AppendValues",
-		append([]interface{}{}, values...)...)}
+		append([]any{}, values...)...)}
 }
 
 func (_c *KVStore_AppendValues_Call) Run(run func(values ...[]byte)) *KVStore_AppendValues_Call {
@@ -2382,11 +2517,11 @@ func (_c *KVStore_Count_Call) RunAndReturn(run func() (int, error)) *KVStore_Cou
 // Delete provides a mock function for the type KVStore
 func (_mock *KVStore) Delete(keys ...[]byte) error {
 	// []byte
-	_va := make([]interface{}, len(keys))
+	_va := make([]any, len(keys))
 	for _i := range keys {
 		_va[_i] = keys[_i]
 	}
-	var _ca []interface{}
+	var _ca []any
 	_ca = append(_ca, _va...)
 	ret := _mock.Called(_ca...)
 
@@ -2410,9 +2545,9 @@ type KVStore_Delete_Call struct {
 
 // Delete is a helper method to define mock.On call
 //   - keys ...[]byte
-func (_e *KVStore_Expecter) Delete(keys ...interface{}) *KVStore_Delete_Call {
+func (_e *KVStore_Expecter) Delete(keys ...any) *KVStore_Delete_Call {
 	return &KVStore_Delete_Call{Call: _e.mock.On("Delete",
-		append([]interface{}{}, keys...)...)}
+		append([]any{}, keys...)...)}
 }
 
 func (_c *KVStore_Delete_Call) Run(run func(keys ...[]byte)) *KVStore_Delete_Call {
@@ -2510,7 +2645,7 @@ type KVStore_ForEach_Call struct {
 
 // ForEach is a helper method to define mock.On call
 //   - fn func(k []byte, v []byte) error
-func (_e *KVStore_Expecter) ForEach(fn interface{}) *KVStore_ForEach_Call {
+func (_e *KVStore_Expecter) ForEach(fn any) *KVStore_ForEach_Call {
 	return &KVStore_ForEach_Call{Call: _e.mock.On("ForEach", fn)}
 }
 
@@ -2572,7 +2707,7 @@ type KVStore_Get_Call struct {
 
 // Get is a helper method to define mock.On call
 //   - key []byte
-func (_e *KVStore_Expecter) Get(key interface{}) *KVStore_Get_Call {
+func (_e *KVStore_Expecter) Get(key any) *KVStore_Get_Call {
 	return &KVStore_Get_Call{Call: _e.mock.On("Get", key)}
 }
 
@@ -2624,7 +2759,7 @@ type KVStore_Set_Call struct {
 // Set is a helper method to define mock.On call
 //   - key []byte
 //   - value []byte
-func (_e *KVStore_Expecter) Set(key interface{}, value interface{}) *KVStore_Set_Call {
+func (_e *KVStore_Expecter) Set(key any, value any) *KVStore_Set_Call {
 	return &KVStore_Set_Call{Call: _e.mock.On("Set", key, value)}
 }
 
@@ -2691,7 +2826,7 @@ type KVStore_Update_Call struct {
 
 // Update is a helper method to define mock.On call
 //   - kvPairs map[string]string
-func (_e *KVStore_Expecter) Update(kvPairs interface{}) *KVStore_Update_Call {
+func (_e *KVStore_Expecter) Update(kvPairs any) *KVStore_Update_Call {
 	return &KVStore_Update_Call{Call: _e.mock.On("Update", kvPairs)}
 }
 
