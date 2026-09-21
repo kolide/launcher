@@ -15,10 +15,19 @@ func NewMocklibrarian(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *Mocklibrarian {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &Mocklibrarian{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -63,7 +72,7 @@ type Mocklibrarian_AddToLibrary_Call struct {
 //   - currentVersion string
 //   - targetFilename string
 //   - targetMetadata data.TargetFileMeta
-func (_e *Mocklibrarian_Expecter) AddToLibrary(binary interface{}, currentVersion interface{}, targetFilename interface{}, targetMetadata interface{}) *Mocklibrarian_AddToLibrary_Call {
+func (_e *Mocklibrarian_Expecter) AddToLibrary(binary any, currentVersion any, targetFilename any, targetMetadata any) *Mocklibrarian_AddToLibrary_Call {
 	return &Mocklibrarian_AddToLibrary_Call{Call: _e.mock.On("AddToLibrary", binary, currentVersion, targetFilename, targetMetadata)}
 }
 
@@ -130,7 +139,7 @@ type Mocklibrarian_Available_Call struct {
 // Available is a helper method to define mock.On call
 //   - binary autoupdatableBinary
 //   - targetFilename string
-func (_e *Mocklibrarian_Expecter) Available(binary interface{}, targetFilename interface{}) *Mocklibrarian_Available_Call {
+func (_e *Mocklibrarian_Expecter) Available(binary any, targetFilename any) *Mocklibrarian_Available_Call {
 	return &Mocklibrarian_Available_Call{Call: _e.mock.On("Available", binary, targetFilename)}
 }
 
@@ -176,7 +185,7 @@ type Mocklibrarian_TidyLibrary_Call struct {
 // TidyLibrary is a helper method to define mock.On call
 //   - binary autoupdatableBinary
 //   - currentVersion string
-func (_e *Mocklibrarian_Expecter) TidyLibrary(binary interface{}, currentVersion interface{}) *Mocklibrarian_TidyLibrary_Call {
+func (_e *Mocklibrarian_Expecter) TidyLibrary(binary any, currentVersion any) *Mocklibrarian_TidyLibrary_Call {
 	return &Mocklibrarian_TidyLibrary_Call{Call: _e.mock.On("TidyLibrary", binary, currentVersion)}
 }
 

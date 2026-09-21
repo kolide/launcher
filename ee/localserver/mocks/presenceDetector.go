@@ -16,10 +16,19 @@ func NewPresenceDetector(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *PresenceDetector {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &PresenceDetector{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -71,7 +80,7 @@ type PresenceDetector_DetectPresence_Call struct {
 // DetectPresence is a helper method to define mock.On call
 //   - reason string
 //   - interval time.Duration
-func (_e *PresenceDetector_Expecter) DetectPresence(reason interface{}, interval interface{}) *PresenceDetector_DetectPresence_Call {
+func (_e *PresenceDetector_Expecter) DetectPresence(reason any, interval any) *PresenceDetector_DetectPresence_Call {
 	return &PresenceDetector_DetectPresence_Call{Call: _e.mock.On("DetectPresence", reason, interval)}
 }
 
