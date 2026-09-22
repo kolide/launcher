@@ -1182,6 +1182,50 @@ func (_c *Knapsack_DesktopUpdateInterval_Call) RunAndReturn(run func() time.Dura
 	return _c
 }
 
+// DeviceTrustRebrand provides a mock function for the type Knapsack
+func (_mock *Knapsack) DeviceTrustRebrand() bool {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeviceTrustRebrand")
+	}
+
+	var r0 bool
+	if returnFunc, ok := ret.Get(0).(func() bool); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	return r0
+}
+
+// Knapsack_DeviceTrustRebrand_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeviceTrustRebrand'
+type Knapsack_DeviceTrustRebrand_Call struct {
+	*mock.Call
+}
+
+// DeviceTrustRebrand is a helper method to define mock.On call
+func (_e *Knapsack_Expecter) DeviceTrustRebrand() *Knapsack_DeviceTrustRebrand_Call {
+	return &Knapsack_DeviceTrustRebrand_Call{Call: _e.mock.On("DeviceTrustRebrand")}
+}
+
+func (_c *Knapsack_DeviceTrustRebrand_Call) Run(run func()) *Knapsack_DeviceTrustRebrand_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Knapsack_DeviceTrustRebrand_Call) Return(b bool) *Knapsack_DeviceTrustRebrand_Call {
+	_c.Call.Return(b)
+	return _c
+}
+
+func (_c *Knapsack_DeviceTrustRebrand_Call) RunAndReturn(run func() bool) *Knapsack_DeviceTrustRebrand_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DisableControlTLS provides a mock function for the type Knapsack
 func (_mock *Knapsack) DisableControlTLS() bool {
 	ret := _mock.Called()
@@ -5281,6 +5325,57 @@ func (_c *Knapsack_SetDesktopUpdateInterval_Call) Return(err error) *Knapsack_Se
 }
 
 func (_c *Knapsack_SetDesktopUpdateInterval_Call) RunAndReturn(run func(interval time.Duration) error) *Knapsack_SetDesktopUpdateInterval_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SetDeviceTrustRebrand provides a mock function for the type Knapsack
+func (_mock *Knapsack) SetDeviceTrustRebrand(enabled bool) error {
+	ret := _mock.Called(enabled)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetDeviceTrustRebrand")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(bool) error); ok {
+		r0 = returnFunc(enabled)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Knapsack_SetDeviceTrustRebrand_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetDeviceTrustRebrand'
+type Knapsack_SetDeviceTrustRebrand_Call struct {
+	*mock.Call
+}
+
+// SetDeviceTrustRebrand is a helper method to define mock.On call
+//   - enabled bool
+func (_e *Knapsack_Expecter) SetDeviceTrustRebrand(enabled any) *Knapsack_SetDeviceTrustRebrand_Call {
+	return &Knapsack_SetDeviceTrustRebrand_Call{Call: _e.mock.On("SetDeviceTrustRebrand", enabled)}
+}
+
+func (_c *Knapsack_SetDeviceTrustRebrand_Call) Run(run func(enabled bool)) *Knapsack_SetDeviceTrustRebrand_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 bool
+		if args[0] != nil {
+			arg0 = args[0].(bool)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *Knapsack_SetDeviceTrustRebrand_Call) Return(err error) *Knapsack_SetDeviceTrustRebrand_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Knapsack_SetDeviceTrustRebrand_Call) RunAndReturn(run func(enabled bool) error) *Knapsack_SetDeviceTrustRebrand_Call {
 	_c.Call.Return(run)
 	return _c
 }
