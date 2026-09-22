@@ -1,12 +1,10 @@
 package main
 
 import (
-	"context"
 	_ "embed"
 	"errors"
 	"flag"
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,8 +12,8 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/logutil"
-	"github.com/theupdateframework/go-tuf/client"
-	filejsonstore "github.com/theupdateframework/go-tuf/client/filejsonstore"
+	"github.com/theupdateframework/go-tuf/v2/metadata/config"
+	"github.com/theupdateframework/go-tuf/v2/metadata/updater"
 )
 
 // initialRootJSON contains the trusted first version of root.json
@@ -58,15 +56,13 @@ func main() {
 		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit outside of launcher proper
 	}
 
-	ctx := context.Background()
-
-	if err := updateTUFMetadata(ctx, logger, *flTufURL, *flMetadataPath, *flOutputDirs); err != nil {
+	if err := updateTUFMetadata(logger, *flTufURL, *flMetadataPath, *flOutputDirs); err != nil {
 		level.Error(logger).Log("msg", "error updating TUF metadata", "err", err)
 		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit outside of launcher proper
 	}
 }
 
-func updateTUFMetadata(ctx context.Context, logger log.Logger, tufURL, metadataPath, outputDirsStr string) error {
+func updateTUFMetadata(logger log.Logger, tufURL, metadataPath, outputDirsStr string) error {
 	level.Info(logger).Log("msg", "Starting TUF metadata update", "url", tufURL)
 
 	// Create a temporary directory to store TUF metadata
@@ -78,50 +74,41 @@ func updateTUFMetadata(ctx context.Context, logger log.Logger, tufURL, metadataP
 
 	level.Debug(logger).Log("msg", "Created temporary directory", "path", tempDir)
 
-	// Set up the local store
-	localStore, err := filejsonstore.NewFileJSONStore(tempDir)
-	if err != nil {
-		return fmt.Errorf("initializing local TUF store: %w", err)
-	}
-
-	// Set up the remote store
-	remoteOpts := client.HTTPRemoteOptions{
-		MetadataPath: metadataPath,
-	}
-
+	metadataUrl := strings.TrimSuffix(tufURL, "/") + metadataPath
 	level.Debug(logger).Log(
 		"msg", "Configuring remote TUF store",
-		"url", tufURL,
-		"metadata_path", metadataPath,
+		"metadata_url", metadataUrl,
 	)
 
-	remoteStore, err := client.HTTPRemoteStore(tufURL, &remoteOpts, http.DefaultClient)
+	// Initialize the TUF client with our initial root
+	cfg, err := config.New(metadataUrl, initialRootJSON)
 	if err != nil {
-		return fmt.Errorf("initializing remote TUF store: %w", err)
+		return fmt.Errorf("creating TUF config: %w", err)
 	}
 
-	// Initialize the TUF client with our initial root
-	tufClient := client.NewClient(localStore, remoteStore)
-	level.Debug(logger).Log("msg", "Initializing TUF client with initial root")
+	// In-memory only -- we will write root.json to the output directories directly
+	cfg.DisableLocalCache = true
+	cfg.LocalMetadataDir = ""
+	cfg.LocalTargetsDir = ""
+	cfg.PrefixTargetsWithHash = false
 
-	if err := tufClient.Init(initialRootJSON); err != nil {
-		return fmt.Errorf("initializing TUF client: %w", err)
+	up, err := updater.New(cfg)
+	if err != nil {
+		return fmt.Errorf("creating TUF updater: %w", err)
 	}
 
 	// Update the root metadata to the latest version
 	level.Info(logger).Log("msg", "Updating TUF metadata to latest version")
-
-	_, err = tufClient.Update()
-	if err != nil {
-		return fmt.Errorf("updating TUF metadata: %w", err)
+	if err := up.Refresh(); err != nil {
+		return fmt.Errorf("refreshing TUF metadata: %w", err)
 	}
 
 	// Get the latest root.json
-	metadata, err := localStore.GetMeta()
+	trustedMetadata := up.GetTrustedMetadataSet()
+	latestRoot, err := trustedMetadata.Root.MarshalJSON()
 	if err != nil {
-		return fmt.Errorf("reading updated metadata from local store: %w", err)
+		return fmt.Errorf("marshalling latest root: %w", err)
 	}
-	latestRoot := metadata["root.json"]
 
 	level.Debug(logger).Log("msg", "Read updated root.json", "size_bytes", len(latestRoot))
 
