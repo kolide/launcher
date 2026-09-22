@@ -65,15 +65,6 @@ func main() {
 func updateTUFMetadata(logger log.Logger, tufURL, metadataPath, outputDirsStr string) error {
 	level.Info(logger).Log("msg", "Starting TUF metadata update", "url", tufURL)
 
-	// Create a temporary directory to store TUF metadata
-	tempDir, err := os.MkdirTemp("", "tuf-update")
-	if err != nil {
-		return fmt.Errorf("creating temp directory: %w", err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	level.Debug(logger).Log("msg", "Created temporary directory", "path", tempDir)
-
 	metadataUrl := strings.TrimSuffix(tufURL, "/") + metadataPath
 	level.Debug(logger).Log(
 		"msg", "Configuring remote TUF store",
