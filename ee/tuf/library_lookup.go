@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 
 	"github.com/kolide/launcher/v2/ee/agent/flags/keys"
@@ -297,8 +296,13 @@ func targetsFromLocalTufMetadata(tufRepositoryLocation string, trustedRootJson [
 	if err != nil {
 		return nil, fmt.Errorf("reading %s: %w", rootData, err)
 	}
+	newRoot, err := metadata.Root().FromBytes(rootData)
+	if err != nil {
+		return nil, fmt.Errorf("loading root metadata: %w", err)
+	}
+
 	// Only need to update if the data on disk is a newer version
-	if !slices.Equal(trustedRootJson, rootData) {
+	if loadedMetadata.Root.Signed.Version < newRoot.Signed.Version {
 		if _, err := loadedMetadata.UpdateRoot(rootData); err != nil {
 			return nil, fmt.Errorf("updating root: %w", err)
 		}
