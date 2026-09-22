@@ -898,3 +898,12 @@ func (fc *FlagController) OsqueryPublisherPercentEnabled() int {
 func (fc *FlagController) SetOsqueryPublisherPercentEnabled(percent int) error {
 	return fc.setControlServerValue(keys.OsqueryPublisherPercentEnabled, intToBytes(percent))
 }
+
+func (fc *FlagController) SetDeviceTrustRebrand(enabled bool) error {
+	return fc.setControlServerValue(keys.DeviceTrustRebrand, boolToBytes(enabled))
+}
+func (fc *FlagController) DeviceTrustRebrand() bool {
+	return NewBoolFlagValue(
+		WithDefaultBool(false),
+	).get(fc.getControlServerValue(keys.DeviceTrustRebrand))
+}
