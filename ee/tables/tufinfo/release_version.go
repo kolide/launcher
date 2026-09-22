@@ -5,13 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"os"
 	"path"
 	"path/filepath"
 	"strings"
 
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/v2/metadata"
 
 	"github.com/kolide/launcher/v2/ee/agent/types"
 	"github.com/kolide/launcher/v2/ee/observability"
@@ -44,24 +43,13 @@ func generateTufReleaseVersionTable(flags types.Flags) table.GenerateFunc {
 
 		for _, binary := range []string{"launcher", "osqueryd"} {
 			tufTargetsFile := filepath.Join(tuf.LocalTufDirectory(flags.RootDirectory()), "targets.json")
-
-			targetFileBytes, err := os.ReadFile(tufTargetsFile)
+			targets, err := metadata.Targets().FromFile(tufTargetsFile)
 			if err != nil {
-				return nil, fmt.Errorf("cannot read file %s: %w", tufTargetsFile, err)
-			}
-
-			var signedTargetFile data.Signed
-			if err := json.Unmarshal(targetFileBytes, &signedTargetFile); err != nil {
-				return nil, fmt.Errorf("cannot unmarshal target file %s: %w", tufTargetsFile, err)
-			}
-
-			var targets data.Targets
-			if err := json.Unmarshal(signedTargetFile.Signed, &targets); err != nil {
-				return nil, fmt.Errorf("cannot unmarshal signed targets from target file %s: %w", tufTargetsFile, err)
+				return nil, fmt.Errorf("reading target metadata from %s: %w", tufTargetsFile, err)
 			}
 
 			targetsToCheck := expectedReleaseTargets(binary)
-			for targetFileName, targetFileMetadata := range targets.Targets {
+			for targetFileName, targetFileMetadata := range targets.Signed.Targets {
 				if _, ok := targetsToCheck[targetFileName]; !ok {
 					continue
 				}
