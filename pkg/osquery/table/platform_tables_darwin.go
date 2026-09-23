@@ -27,6 +27,7 @@ import (
 	"github.com/kolide/launcher/v2/ee/tables/macos_software_update"
 	"github.com/kolide/launcher/v2/ee/tables/mdmclient"
 	"github.com/kolide/launcher/v2/ee/tables/munki"
+	"github.com/kolide/launcher/v2/ee/tables/network_time"
 	nix_env_upgradeable "github.com/kolide/launcher/v2/ee/tables/nix_env/upgradeable"
 	"github.com/kolide/launcher/v2/ee/tables/osquery_user_exec_table"
 	"github.com/kolide/launcher/v2/ee/tables/pkgutil"
@@ -110,6 +111,7 @@ func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsque
 		airport.TablePlugin(k, slogger),
 		kextpolicy.TablePlugin(k, slogger),
 		filevault.TablePlugin(k, slogger),
+		network_time.TablePlugin(k, slogger),
 		find_my.FindMyDevice(k, slogger),
 		mdmclient.TablePlugin(k, slogger),
 		apple_silicon_security_policy.TablePlugin(k, slogger),
