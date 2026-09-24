@@ -192,20 +192,17 @@ func (f *filewalker) Filewalk(ctx context.Context) {
 					return nil
 				}
 
-				// If our config restricts file type, check that first as it is the cheapest filter (checking a single bit for dir or filemode)
+				// Prune skipped directories before any other filter, so that we don't descend unnecessarily
+				if d.IsDir() && f.shouldSkipDir(path) {
+					return fs.SkipDir
+				}
+
 				if f.fileTypeFilter != nil && !f.fileTypeFilter.matches(d.Type()) {
 					return nil
 				}
 
-				// Now check for the file name regex. We do this check next even if it might be filtered
-				// by skipDirs later because it is a single regex match that, vs the current avg of ~20 skipDirs
 				if f.fileNameRegex != nil && !f.fileNameRegex.MatchString(filepath.Base(path)) {
 					return nil
-				}
-
-				// Finally, check to see if we're in a directory that should be skipped
-				if f.shouldSkip(path) {
-					return fs.SkipDir
 				}
 
 				// Add this file to our results
@@ -270,7 +267,7 @@ func LastWalkTimeKey(filewalkName string) []byte {
 	return fmt.Appendf(nil, "%s_last_walk", filewalkName)
 }
 
-func (f *filewalker) shouldSkip(dir string) bool {
+func (f *filewalker) shouldSkipDir(dir string) bool {
 	for _, skipDirRegex := range f.skipDirs {
 		if skipDirRegex.MatchString(dir) {
 			return true
