@@ -418,6 +418,10 @@ func (k *knapsack) Dt4aInfoStore() types.KVStore {
 	return k.getKVStore(storage.Dt4aInfoStore)
 }
 
+func (k *knapsack) AuthPostureInfoStore() types.KVStore {
+	return k.getKVStore(storage.AuthPostureInfoStore)
+}
+
 func (k *knapsack) WindowsUpdatesCacheStore() types.KVStore {
 	return k.getKVStore(storage.WindowsUpdatesCacheStore)
 }
