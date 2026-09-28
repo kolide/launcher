@@ -2,6 +2,7 @@ package flags
 
 import (
 	"context"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"testing/synctest"
@@ -505,4 +506,67 @@ func TestObserverDeadlock(t *testing.T) {
 		fc.observersMutex.RUnlock()
 		require.True(t, observerForKeyFound, "new observer not successfully registered")
 	})
+}
+
+// Parallel calls which access overrides should be safe.
+func TestOverrideConcurrentAccess(t *testing.T) {
+	t.Parallel()
+
+	const d = time.Millisecond
+	overridableAccessors := map[keys.FlagKey]struct {
+		setOverride func(fc *FlagController)
+		get         func(fc *FlagController)
+	}{
+		keys.ControlRequestInterval: {
+			setOverride: func(fc *FlagController) { fc.SetControlRequestIntervalOverride(10*time.Second, d) },
+			get:         func(fc *FlagController) { fc.ControlRequestInterval() },
+		},
+		keys.DistributedForwardingInterval: {
+			setOverride: func(fc *FlagController) { fc.SetDistributedForwardingIntervalOverride(10*time.Second, d) },
+			get:         func(fc *FlagController) { fc.DistributedForwardingInterval() },
+		},
+		keys.AutoupdateInterval: {
+			setOverride: func(fc *FlagController) { fc.SetAutoupdateIntervalOverride(10*time.Minute, d) },
+			get:         func(fc *FlagController) { fc.AutoupdateInterval() },
+		},
+		keys.AutoupdateInitialDelay: {
+			setOverride: func(fc *FlagController) { fc.SetAutoupdateInitialDelayOverride(10*time.Second, d) },
+			get:         func(fc *FlagController) { fc.AutoupdateInitialDelay() },
+		},
+		keys.ExportTraces: {
+			setOverride: func(fc *FlagController) { fc.SetExportTracesOverride(true, d) },
+			get:         func(fc *FlagController) { fc.ExportTraces() },
+		},
+		keys.TraceSamplingRate: {
+			setOverride: func(fc *FlagController) { fc.SetTraceSamplingRateOverride(0.5, d) },
+			get:         func(fc *FlagController) { fc.TraceSamplingRate() },
+		},
+		keys.LogShippingLevel: {
+			setOverride: func(fc *FlagController) { fc.SetLogShippingLevelOverride("debug", d) },
+			get:         func(fc *FlagController) { fc.LogShippingLevel() },
+		},
+	}
+
+	for key, accessor := range overridableAccessors { //nolint:paralleltest
+		t.Run(key.String(), func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AgentFlagsStore.String())
+				require.NoError(t, err)
+				fc := NewFlagController(multislogger.NewNopLogger(), store)
+
+				var wg sync.WaitGroup
+				wg.Go(func() { accessor.setOverride(fc) })
+				for range 1000 {
+					accessor.get(fc)
+				}
+				wg.Wait()
+
+				time.Sleep(2 * d)
+				accessor.get(fc)
+				fc.overrideMutex.RLock()
+				defer fc.overrideMutex.RUnlock()
+				require.Empty(t, fc.overrides)
+			})
+		})
+	}
 }
