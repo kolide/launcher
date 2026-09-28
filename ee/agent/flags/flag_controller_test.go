@@ -377,6 +377,58 @@ func TestControllerOverride(t *testing.T) {
 	}
 }
 
+func TestOverrideReplacesExistingOverride(t *testing.T) {
+	t.Parallel()
+
+	synctest.Test(t, func(t *testing.T) {
+		store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AgentFlagsStore.String())
+		require.NoError(t, err)
+		fc := NewFlagController(multislogger.NewNopLogger(), store)
+		require.NoError(t, fc.SetControlRequestInterval(8*time.Second))
+
+		fc.SetControlRequestIntervalOverride(6*time.Second, 100*time.Millisecond)
+		fc.SetControlRequestIntervalOverride(7*time.Second, 100*time.Millisecond)
+
+		assert.Equal(t, 7*time.Second, fc.ControlRequestInterval())
+	})
+}
+
+func TestOverrideOutlivesSupersededOverride(t *testing.T) {
+	t.Parallel()
+
+	synctest.Test(t, func(t *testing.T) {
+		store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AgentFlagsStore.String())
+		require.NoError(t, err)
+		fc := NewFlagController(multislogger.NewNopLogger(), store)
+		require.NoError(t, fc.SetControlRequestInterval(8*time.Second))
+
+		fc.SetControlRequestIntervalOverride(6*time.Second, 100*time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
+		fc.SetControlRequestIntervalOverride(7*time.Second, 100*time.Millisecond)
+		time.Sleep(75 * time.Millisecond)
+
+		assert.Equal(t, 7*time.Second, fc.ControlRequestInterval())
+	})
+}
+
+func TestOverrideExpiryRestoresOriginalValue(t *testing.T) {
+	t.Parallel()
+
+	synctest.Test(t, func(t *testing.T) {
+		store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AgentFlagsStore.String())
+		require.NoError(t, err)
+		fc := NewFlagController(multislogger.NewNopLogger(), store)
+		require.NoError(t, fc.SetControlRequestInterval(8*time.Second))
+
+		fc.SetControlRequestIntervalOverride(6*time.Second, 100*time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
+		fc.SetControlRequestIntervalOverride(7*time.Second, 100*time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
+
+		assert.Equal(t, 8*time.Second, fc.ControlRequestInterval())
+	})
+}
+
 func TestDeregisterChangeObserver(t *testing.T) {
 	t.Parallel()
 
