@@ -188,7 +188,22 @@ func (fc *FlagController) overrideFlag(ctx context.Context, key keys.FlagKey, du
 		fc.overrides[key] = override
 	}
 
-	overrideExpired := func(key keys.FlagKey) {
+	// Stop existing timer, if necessary
+	if override.timer != nil {
+		// To ensure the channel is empty after a call to Stop, check the
+		// return value and drain the channel.
+		if !override.timer.Stop() {
+			// fix(billy): when the timer expires as we set a new override, this blocks forever
+			<-override.timer.C
+		}
+	}
+
+	// Update the key value (if key already exists, it shouldn't change)
+	override.key = key
+	override.value = value
+
+	// Invoke the expiration callback after duration has passed
+	override.timer = time.AfterFunc(duration, func() {
 		ctx, span := observability.StartSpan(context.TODO(), "key", key.String())
 		defer span.End()
 
@@ -206,10 +221,7 @@ func (fc *FlagController) overrideFlag(ctx context.Context, key keys.FlagKey, du
 
 		// Deleting the override implictly allows the next value to take precedence
 		delete(fc.overrides, key)
-	}
-
-	// Start a new override, or re-start an existing one with a new value, duration, and expiration
-	fc.overrides[key].Start(key, value, duration, overrideExpired)
+	})
 }
 
 func (fc *FlagController) getOverride(key keys.FlagKey) *Override {

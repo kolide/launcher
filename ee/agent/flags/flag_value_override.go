@@ -14,12 +14,9 @@ import (
 type FlagValueOverride interface {
 	// Value gets the override value.
 	Value() any
-	// Start begins or resets the duration for which the override is active. The expiredCallback
-	// func will be invoked when the override expires.
-	Start(key keys.FlagKey, value any, duration time.Duration, expiredCallback func(key keys.FlagKey))
 }
 
-// Override represents a key-value override and manages the duration for which it is active.
+// Override represents a key-value override and holds the timer for its expiration
 type Override struct {
 	key   keys.FlagKey
 	value any
@@ -33,28 +30,4 @@ func (o *Override) Value() any {
 	}
 
 	return o.value
-}
-
-func (o *Override) Start(key keys.FlagKey, value any, duration time.Duration, expiredCallback func(key keys.FlagKey)) {
-	if o == nil {
-		return
-	}
-
-	// Stop existing timer, if necessary
-	if o.timer != nil {
-		// To ensure the channel is empty after a call to Stop, check the
-		// return value and drain the channel.
-		if !o.timer.Stop() {
-			<-o.timer.C
-		}
-	}
-
-	// Update the key value (if key already exists, it shouldn't change)
-	o.key = key
-	o.value = value
-
-	// Invoke the expiration callback after duration has passed
-	o.timer = time.AfterFunc(duration, func() {
-		expiredCallback(o.key)
-	})
 }
