@@ -181,26 +181,17 @@ func (fc *FlagController) overrideFlag(ctx context.Context, key keys.FlagKey, du
 		"duration", duration,
 	)
 
-	override, ok := fc.overrides[key]
-	if !ok || override.Value() == nil {
-		// Creating the override implicitly causes future flag value retrievals to use the override until expiration
-		override = &Override{}
-		fc.overrides[key] = override
+	// timer returns false if it's already fired, so this goroutine won the lock race on overrideMutex
+	if override, ok := fc.overrides[key]; ok && !override.timer.Stop() {
+		fc.slogger.Log(ctx, slog.LevelWarn,
+			"override creation raced with previous override expiration",
+			"flag", key,
+		)
 	}
 
-	// Stop existing timer, if necessary
-	if override.timer != nil {
-		// To ensure the channel is empty after a call to Stop, check the
-		// return value and drain the channel.
-		if !override.timer.Stop() {
-			// fix(billy): when the timer expires as we set a new override, this blocks forever
-			<-override.timer.C
-		}
+	override := &Override{
+		value: value,
 	}
-
-	// Update the key value (if key already exists, it shouldn't change)
-	override.key = key
-	override.value = value
 
 	// Invoke the expiration callback after duration has passed
 	override.timer = time.AfterFunc(duration, func() {
@@ -222,6 +213,8 @@ func (fc *FlagController) overrideFlag(ctx context.Context, key keys.FlagKey, du
 		// Deleting the override implictly allows the next value to take precedence
 		delete(fc.overrides, key)
 	})
+
+	fc.overrides[key] = override
 }
 
 func (fc *FlagController) getOverride(key keys.FlagKey) *Override {

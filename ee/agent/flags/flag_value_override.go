@@ -2,8 +2,6 @@ package flags
 
 import (
 	"time"
-
-	"github.com/kolide/launcher/v2/ee/agent/flags/keys"
 )
 
 // FlagValueOverride is an interface for an override which can be active for a duration of
@@ -16,9 +14,8 @@ type FlagValueOverride interface {
 	Value() any
 }
 
-// Override represents a key-value override and holds the timer for its expiration
+// Override represents a key-value override and holds the value and timer for its expiration
 type Override struct {
-	key   keys.FlagKey
 	value any
 	timer *time.Timer
 }
