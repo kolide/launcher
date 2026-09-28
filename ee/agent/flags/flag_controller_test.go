@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"slices"
@@ -348,27 +349,29 @@ func TestControllerOverride(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AgentFlagsStore.String())
-			require.NoError(t, err)
-			fc := NewFlagController(multislogger.NewNopLogger(), store)
-			assert.NotNil(t, fc)
+			synctest.Test(t, func(t *testing.T) {
+				store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AgentFlagsStore.String())
+				require.NoError(t, err)
+				fc := NewFlagController(multislogger.NewNopLogger(), store)
+				assert.NotNil(t, fc)
 
-			mockObserver := mocks.NewFlagsChangeObserver(t)
-			mockObserver.On("FlagsChanged", mock.Anything, keys.ControlRequestInterval)
+				mockObserver := mocks.NewFlagsChangeObserver(t)
+				mockObserver.On("FlagsChanged", mock.Anything, keys.ControlRequestInterval)
 
-			fc.RegisterChangeObserver(mockObserver, keys.ControlRequestInterval)
+				fc.RegisterChangeObserver(mockObserver, keys.ControlRequestInterval)
 
-			err = fc.SetControlRequestInterval(tt.valueToSet)
-			require.NoError(t, err)
+				err = fc.SetControlRequestInterval(tt.valueToSet)
+				require.NoError(t, err)
 
-			value := fc.ControlRequestInterval()
-			assert.Equal(t, tt.valueToSet, value)
+				value := fc.ControlRequestInterval()
+				assert.Equal(t, tt.valueToSet, value)
 
-			fc.SetControlRequestIntervalOverride(tt.interval, tt.duration)
-			assert.Equal(t, tt.interval, fc.ControlRequestInterval())
+				fc.SetControlRequestIntervalOverride(tt.interval, tt.duration)
+				assert.Equal(t, tt.interval, fc.ControlRequestInterval())
 
-			time.Sleep(tt.duration * 2)
-			assert.Equal(t, tt.valueToSet, fc.ControlRequestInterval())
+				time.Sleep(tt.duration * 2)
+				assert.Equal(t, tt.valueToSet, fc.ControlRequestInterval())
+			})
 		})
 	}
 }
@@ -451,53 +454,55 @@ func (d *deadlockedObserver) FlagsChanged(ctx context.Context, flagKeys ...keys.
 func TestObserverDeadlock(t *testing.T) {
 	t.Parallel()
 
-	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AgentFlagsStore.String())
-	require.NoError(t, err)
-	fc := NewFlagController(multislogger.NewNopLogger(), store)
-	assert.NotNil(t, fc)
+	synctest.Test(t, func(t *testing.T) {
+		store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AgentFlagsStore.String())
+		require.NoError(t, err)
+		fc := NewFlagController(multislogger.NewNopLogger(), store)
+		assert.NotNil(t, fc)
 
-	// Set up an observer that will observe changes to one key (ControlRequestInterval)
-	// and on change to that interval, will set up a new observer for a different key.
-	newObserverKey := keys.TableGenerateTimeout
-	d := newDeadlockedObserver(fc, newObserverKey)
-	fc.RegisterChangeObserver(d, keys.ControlRequestInterval)
+		// Set up an observer that will observe changes to one key (ControlRequestInterval)
+		// and on change to that interval, will set up a new observer for a different key.
+		newObserverKey := keys.TableGenerateTimeout
+		d := newDeadlockedObserver(fc, newObserverKey)
+		fc.RegisterChangeObserver(d, keys.ControlRequestInterval)
 
-	// Now, set up an override
-	overrideDuration := 30 * time.Second
-	setOverrideReturned := make(chan struct{})
+		// Now, set up an override
+		overrideDuration := 30 * time.Second
+		setOverrideReturned := make(chan struct{})
 
-	go func() {
-		fc.SetControlRequestIntervalOverride(3*time.Second, overrideDuration)
-		setOverrideReturned <- struct{}{}
-	}()
+		go func() {
+			fc.SetControlRequestIntervalOverride(3*time.Second, overrideDuration)
+			setOverrideReturned <- struct{}{}
+		}()
 
-	select {
-	case <-setOverrideReturned:
-	case <-time.After(30 * time.Second):
-		t.Error("could not set control request override within 30 seconds")
-		t.FailNow()
-	}
-
-	// Wait for the override to expire
-	time.Sleep(2 * overrideDuration)
-
-	// See whether override expired
-	fc.overrideMutex.RLock()
-	require.Equal(t, 0, len(fc.overrides), "override not removed")
-	fc.overrideMutex.RUnlock()
-
-	// Make sure that FlagsChanged was not held open by the observersMutex
-	require.True(t, d.flagsChangedCalled.Load(), "FlagsChanged not called")
-	require.True(t, d.flagsChangedReturned.Load(), "FlagsChanged did not return")
-
-	// Make sure that there's an observer registered for d.observerKey
-	fc.observersMutex.RLock()
-	observerForKeyFound := false
-	for _, keys := range fc.observers {
-		if slices.Contains(keys, newObserverKey) {
-			observerForKeyFound = true
+		select {
+		case <-setOverrideReturned:
+		case <-time.After(30 * time.Second):
+			t.Error("could not set control request override within 30 seconds")
+			t.FailNow()
 		}
-	}
-	fc.observersMutex.RUnlock()
-	require.True(t, observerForKeyFound, "new observer not successfully registered")
+
+		// Wait for the override to expire
+		time.Sleep(2 * overrideDuration)
+
+		// See whether override expired
+		fc.overrideMutex.RLock()
+		require.Equal(t, 0, len(fc.overrides), "override not removed")
+		fc.overrideMutex.RUnlock()
+
+		// Make sure that FlagsChanged was not held open by the observersMutex
+		require.True(t, d.flagsChangedCalled.Load(), "FlagsChanged not called")
+		require.True(t, d.flagsChangedReturned.Load(), "FlagsChanged did not return")
+
+		// Make sure that there's an observer registered for d.observerKey
+		fc.observersMutex.RLock()
+		observerForKeyFound := false
+		for _, keys := range fc.observers {
+			if slices.Contains(keys, newObserverKey) {
+				observerForKeyFound = true
+			}
+		}
+		fc.observersMutex.RUnlock()
+		require.True(t, observerForKeyFound, "new observer not successfully registered")
+	})
 }
