@@ -429,6 +429,38 @@ func TestOverrideExpiryRestoresOriginalValue(t *testing.T) {
 	})
 }
 
+// Well-timed/rapid override calls could historically lock the flag controller:
+// setting overrides and fetching flag values hang.
+//
+// Callers expect that back-to-back overrides should never hang.
+func TestOverrideRapidConcurrentReoverride(t *testing.T) {
+	t.Parallel()
+
+	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AgentFlagsStore.String())
+	require.NoError(t, err)
+	fc := NewFlagController(multislogger.NewNopLogger(), store)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		var wg sync.WaitGroup
+		for range 8 {
+			wg.Go(func() {
+				for range 200 {
+					fc.SetControlRequestIntervalOverride(6*time.Second, time.Microsecond)
+				}
+			})
+		}
+		wg.Wait()
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("overrides did not complete")
+	}
+}
+
 func TestDeregisterChangeObserver(t *testing.T) {
 	t.Parallel()
 
