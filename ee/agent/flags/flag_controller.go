@@ -210,8 +210,11 @@ func (fc *FlagController) overrideFlag(ctx context.Context, key keys.FlagKey, du
 			span.AddEvent("override_lock_released")
 		}()
 
-		// Deleting the override implictly allows the next value to take precedence
-		delete(fc.overrides, key)
+		// remove the override to allow the original flag value to apply unless a
+		// new override (ptr equality check) has been set
+		if currentOverride, ok := fc.overrides[key]; ok && currentOverride == override {
+			delete(fc.overrides, key)
+		}
 	})
 
 	fc.overrides[key] = override
