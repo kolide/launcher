@@ -461,6 +461,24 @@ func TestOverrideRapidConcurrentReoverride(t *testing.T) {
 	}
 }
 
+// A well-timed override historically could race with a previous expiration of the same key and remove both.
+// The expiration of an override should only remove the override that expired.
+func TestOverrideExpiryDoesNotClobberNewerOverride(t *testing.T) {
+	t.Parallel()
+
+	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AgentFlagsStore.String())
+	require.NoError(t, err)
+	fc := NewFlagController(multislogger.NewNopLogger(), store)
+	require.NoError(t, fc.SetControlRequestInterval(8*time.Second))
+
+	for range 20 {
+		fc.SetControlRequestIntervalOverride(6*time.Second, time.Microsecond)
+		fc.SetControlRequestIntervalOverride(7*time.Second, time.Hour)
+		time.Sleep(time.Millisecond)
+		require.Equal(t, 7*time.Second, fc.ControlRequestInterval())
+	}
+}
+
 func TestDeregisterChangeObserver(t *testing.T) {
 	t.Parallel()
 
