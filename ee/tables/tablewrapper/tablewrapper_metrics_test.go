@@ -33,11 +33,7 @@ func TestCall_recordsTableHealthMetrics(t *testing.T) { //nolint:paralleltest
 		require.NoError(t, mp.Shutdown(context.Background()))
 	})
 
-	mockFlags := typesmocks.NewFlags(t)
-	mockFlags.On("TableGenerateTimeout").Return(4 * time.Minute)
-	mockFlags.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return()
-
-	for _, tt := range []struct {
+	testCases := []struct {
 		name          string
 		gen           table.GenerateFunc
 		expectedQuery int64
@@ -75,20 +71,27 @@ func TestCall_recordsTableHealthMetrics(t *testing.T) { //nolint:paralleltest
 			expectedQuery: 1,
 			expectedError: 1,
 		},
-	} {
-		tableName := "test_metrics_" + tt.name
-		w := New(mockFlags, multislogger.NewNopLogger(), tableName, nil, tt.gen)
-		w.Call(t.Context(), map[string]string{"action": "generate", "context": "{}"})
-
-		var rm metricdata.ResourceMetrics
-		require.NoError(t, reader.Collect(t.Context(), &rm))
-
-		require.Equal(t, tt.expectedQuery, counterValueForTable(t, &rm, "launcher.tablewrapper.query", tableName), "query counter for %s", tt.name)
-		require.Equal(t, tt.expectedError, counterValueForTable(t, &rm, "launcher.tablewrapper.error", tableName), "error counter for %s", tt.name)
-		require.Equal(t, tt.expectedEmpty, counterValueForTable(t, &rm, "launcher.tablewrapper.empty", tableName), "empty counter for %s", tt.name)
 	}
 
-	mockFlags.AssertExpectations(t)
+	// Each subtest uses its own table name, so its data points don't mix with other subtests'.
+	for _, tt := range testCases { //nolint:paralleltest // subtests share the global meter provider
+		t.Run(tt.name, func(t *testing.T) {
+			mockFlags := typesmocks.NewFlags(t)
+			mockFlags.On("TableGenerateTimeout").Return(4 * time.Minute)
+			mockFlags.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return()
+
+			tableName := "test_metrics_" + tt.name
+			w := New(mockFlags, multislogger.NewNopLogger(), tableName, nil, tt.gen)
+			w.Call(t.Context(), map[string]string{"action": "generate", "context": "{}"})
+
+			var rm metricdata.ResourceMetrics
+			require.NoError(t, reader.Collect(t.Context(), &rm))
+
+			require.Equal(t, tt.expectedQuery, counterValueForTable(t, &rm, "launcher.tablewrapper.query", tableName), "query counter")
+			require.Equal(t, tt.expectedError, counterValueForTable(t, &rm, "launcher.tablewrapper.error", tableName), "error counter")
+			require.Equal(t, tt.expectedEmpty, counterValueForTable(t, &rm, "launcher.tablewrapper.empty", tableName), "empty counter")
+		})
+	}
 }
 
 // counterValueForTable returns the value of the data point with the given table_name
