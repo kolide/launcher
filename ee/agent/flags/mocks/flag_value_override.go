@@ -5,9 +5,6 @@
 package mocks
 
 import (
-	"time"
-
-	"github.com/kolide/launcher/v2/ee/agent/flags/keys"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -45,64 +42,6 @@ type FlagValueOverride_Expecter struct {
 
 func (_m *FlagValueOverride) EXPECT() *FlagValueOverride_Expecter {
 	return &FlagValueOverride_Expecter{mock: &_m.Mock}
-}
-
-// Start provides a mock function for the type FlagValueOverride
-func (_mock *FlagValueOverride) Start(key keys.FlagKey, value any, duration time.Duration, expiredCallback func(key keys.FlagKey)) {
-	_mock.Called(key, value, duration, expiredCallback)
-	return
-}
-
-// FlagValueOverride_Start_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Start'
-type FlagValueOverride_Start_Call struct {
-	*mock.Call
-}
-
-// Start is a helper method to define mock.On call
-//   - key keys.FlagKey
-//   - value any
-//   - duration time.Duration
-//   - expiredCallback func(key keys.FlagKey)
-func (_e *FlagValueOverride_Expecter) Start(key any, value any, duration any, expiredCallback any) *FlagValueOverride_Start_Call {
-	return &FlagValueOverride_Start_Call{Call: _e.mock.On("Start", key, value, duration, expiredCallback)}
-}
-
-func (_c *FlagValueOverride_Start_Call) Run(run func(key keys.FlagKey, value any, duration time.Duration, expiredCallback func(key keys.FlagKey))) *FlagValueOverride_Start_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 keys.FlagKey
-		if args[0] != nil {
-			arg0 = args[0].(keys.FlagKey)
-		}
-		var arg1 any
-		if args[1] != nil {
-			arg1 = args[1].(any)
-		}
-		var arg2 time.Duration
-		if args[2] != nil {
-			arg2 = args[2].(time.Duration)
-		}
-		var arg3 func(key keys.FlagKey)
-		if args[3] != nil {
-			arg3 = args[3].(func(key keys.FlagKey))
-		}
-		run(
-			arg0,
-			arg1,
-			arg2,
-			arg3,
-		)
-	})
-	return _c
-}
-
-func (_c *FlagValueOverride_Start_Call) Return() *FlagValueOverride_Start_Call {
-	_c.Call.Return()
-	return _c
-}
-
-func (_c *FlagValueOverride_Start_Call) RunAndReturn(run func(key keys.FlagKey, value any, duration time.Duration, expiredCallback func(key keys.FlagKey))) *FlagValueOverride_Start_Call {
-	_c.Run(run)
-	return _c
 }
 
 // Value provides a mock function for the type FlagValueOverride
