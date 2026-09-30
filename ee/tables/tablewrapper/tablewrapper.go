@@ -14,6 +14,8 @@ import (
 	"github.com/kolide/launcher/v2/ee/gowrapper"
 	"github.com/kolide/launcher/v2/ee/observability"
 	"github.com/osquery/osquery-go/plugin/table"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -31,6 +33,7 @@ type wrappedTable struct {
 	genTimeoutLock  *sync.Mutex
 	workers         *semaphore.Weighted
 	tableOpts       []table.TableOpt
+	metricAttrs     metric.MeasurementOption
 }
 
 type TablePluginOption func(*wrappedTable)
@@ -87,6 +90,9 @@ func newWrappedTable(flags types.Flags, slogger *slog.Logger, name string, gen t
 		genTimeout:      flags.TableGenerateTimeout(),
 		genTimeoutLock:  &sync.Mutex{},
 		workers:         semaphore.NewWeighted(numWorkers),
+		// Building the attribute set on every counter increment is slower and allocates
+		// more than reusing it, so construct it once here.
+		metricAttrs: metric.WithAttributeSet(attribute.NewSet(attribute.String("table_name", name))),
 	}
 
 	for _, opt := range opts {
@@ -183,8 +189,15 @@ func (wt *wrappedTable) generate(ctx context.Context, queryContext table.QueryCo
 	// Wait for results up until the timeout
 	select {
 	case result := <-resultChan:
+		observability.TablewrapperQueryCounter.Add(ctx, 1, wt.metricAttrs)
+		if result.err != nil {
+			observability.TablewrapperErrorCounter.Add(ctx, 1, wt.metricAttrs)
+		} else if len(result.rows) == 0 {
+			observability.TablewrapperEmptyCounter.Add(ctx, 1, wt.metricAttrs)
+		}
 		return result.rows, result.err
 	case <-ctx.Done():
+		observability.TablewrapperQueryCounter.Add(ctx, 1, wt.metricAttrs)
 		queriedColumns := columnsFromConstraints(queryContext)
 		wt.slogger.Log(ctx, slog.LevelWarn,
 			"query timed out",
@@ -192,7 +205,7 @@ func (wt *wrappedTable) generate(ctx context.Context, queryContext table.QueryCo
 			"query_start_time", queryStartTime.String(),
 			"query_timeout", genTimeout.String(),
 		)
-		observability.TablewrapperTimeoutCounter.Add(ctx, 1)
+		observability.TablewrapperTimeoutCounter.Add(ctx, 1, wt.metricAttrs)
 		span.AddEvent("generate_timed_out")
 		err := fmt.Errorf("querying %s timed out after %s (queried columns: %v)", wt.name, genTimeout.String(), queriedColumns)
 		observability.SetError(span, err)
