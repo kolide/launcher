@@ -1,9 +1,13 @@
 package filewalker
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/kolide/launcher/v2/ee/agent/storage"
@@ -158,6 +162,98 @@ func TestUpdateConfig(t *testing.T) {
 		require.Equal(t, tt.expectedSkipDirs, testFw.skipDirs)
 		require.Nil(t, testFw.fileTypeFilter)
 	}
+}
+
+// Regression test. We once allowed walking a dir which failed other checks,
+// but would have matched a skipdir regex.
+//
+// SkipDir should prevent walking matching folders.
+func TestFilewalk_SkipDirs(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		testCaseName  string
+		fileNameRegex *regexp.Regexp
+		fileType      string
+	}{
+		{testCaseName: "no filters"},
+		{testCaseName: "file type filter", fileType: fileTypeFile},
+		{testCaseName: "file name regex", fileNameRegex: regexp.MustCompile(`^\.env$`)},
+	} {
+		t.Run(tt.testCaseName, func(t *testing.T) {
+			t.Parallel()
+
+			fwt := newFilewalkerTest(t)
+			fwt.fileType = tt.fileType
+			fwt.fileNameRegex = tt.fileNameRegex
+			fwt.skipDirs = []*regexp.Regexp{regexp.MustCompile(`node_modules$`)}
+
+			results := fwt.run(t, fstest.MapFS{
+				"home/kiwi/.env":                  {},
+				"home/kiwi/node_modules/pkg/.env": {},
+			})
+
+			require.Contains(t, results, "home/kiwi/.env")
+			for _, result := range results {
+				require.NotContains(t, result, "node_modules")
+			}
+		})
+	}
+}
+
+// Wraps configuring a filewalker in a temp directory and grabbing its results.
+type filewalkerTest struct {
+	name    string
+	rootDir string
+
+	fileType      string
+	fileNameRegex *regexp.Regexp
+	skipDirs      []*regexp.Regexp
+}
+
+func newFilewalkerTest(t *testing.T) *filewalkerTest {
+	return &filewalkerTest{
+		name:    t.Name(),
+		rootDir: t.TempDir(),
+	}
+}
+
+// Runs a file walk with the provided configuration, returning the results stored.
+func (fwt *filewalkerTest) run(t *testing.T, fsys fstest.MapFS) []string {
+	require.NoError(t, os.CopyFS(fwt.rootDir, fsys))
+
+	cfg := filewalkConfig{
+		WalkInterval: duration(1 * time.Minute),
+		filewalkDefinition: filewalkDefinition{
+			RootDirs:      &[]string{fwt.rootDir},
+			FileNameRegex: fwt.fileNameRegex,
+			SkipDirs:      &fwt.skipDirs,
+		},
+	}
+	if fwt.fileType != "" {
+		rawFileType, err := json.Marshal(fwt.fileType)
+		require.NoError(t, err)
+		cfg.FileTypeFilter = &fileTypeFilter{}
+		require.NoError(t, json.Unmarshal(rawFileType, cfg.FileTypeFilter))
+	}
+
+	slogger := multislogger.NewNopLogger()
+	store, err := storageci.NewStore(t, slogger, storage.FilewalkResultsStore.String())
+	require.NoError(t, err)
+	newFilewalker(fwt.name, cfg, store, slogger).Filewalk(t.Context())
+
+	rawResults, err := store.Get([]byte(fwt.name))
+	require.NoError(t, err)
+	var walked []string
+	require.NoError(t, json.Unmarshal(rawResults, &walked))
+
+	results := make([]string, 0, len(walked))
+	for _, path := range walked {
+		relPath, err := filepath.Rel(fwt.rootDir, path)
+		require.NoError(t, err)
+		results = append(results, filepath.ToSlash(relPath))
+	}
+	return results
 }
 
 func BenchmarkFilewalk(b *testing.B) {
