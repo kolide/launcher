@@ -34,6 +34,6 @@ jobs:
           if printf '%s' "$PR_BODY" | grep -qE '\b(KOL|KS)-[0-9]+\b'; then
             echo "Found a Jira ticket reference."
           else
-            echo "::error::Add a Jira ticket (e.g. KOL-1234 or https://1password.atlassian.net/browse/KOL-1234) to the PR description."
+            echo "::error::Add a Jira ticket (e.g. KOL-dddd or https://1password.atlassian.net/browse/KOL-dddd) to the PR description."
             exit 1
           fi
