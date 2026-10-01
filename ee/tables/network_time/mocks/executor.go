@@ -45,8 +45,8 @@ func (_m *Executor) EXPECT() *Executor_Expecter {
 }
 
 // ExecNetworkTime provides a mock function for the type Executor
-func (_mock *Executor) ExecNetworkTime(args []string) ([]byte, error) {
-	ret := _mock.Called(args)
+func (_mock *Executor) ExecNetworkTime() ([]byte, error) {
+	ret := _mock.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for ExecNetworkTime")
@@ -54,18 +54,18 @@ func (_mock *Executor) ExecNetworkTime(args []string) ([]byte, error) {
 
 	var r0 []byte
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func([]string) ([]byte, error)); ok {
-		return returnFunc(args)
+	if returnFunc, ok := ret.Get(0).(func() ([]byte, error)); ok {
+		return returnFunc()
 	}
-	if returnFunc, ok := ret.Get(0).(func([]string) []byte); ok {
-		r0 = returnFunc(args)
+	if returnFunc, ok := ret.Get(0).(func() []byte); ok {
+		r0 = returnFunc()
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func([]string) error); ok {
-		r1 = returnFunc(args)
+	if returnFunc, ok := ret.Get(1).(func() error); ok {
+		r1 = returnFunc()
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -78,20 +78,13 @@ type Executor_ExecNetworkTime_Call struct {
 }
 
 // ExecNetworkTime is a helper method to define mock.On call
-//   - args []string
-func (_e *Executor_Expecter) ExecNetworkTime(args any) *Executor_ExecNetworkTime_Call {
-	return &Executor_ExecNetworkTime_Call{Call: _e.mock.On("ExecNetworkTime", args)}
+func (_e *Executor_Expecter) ExecNetworkTime() *Executor_ExecNetworkTime_Call {
+	return &Executor_ExecNetworkTime_Call{Call: _e.mock.On("ExecNetworkTime")}
 }
 
-func (_c *Executor_ExecNetworkTime_Call) Run(run func(args []string)) *Executor_ExecNetworkTime_Call {
+func (_c *Executor_ExecNetworkTime_Call) Run(run func()) *Executor_ExecNetworkTime_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 []string
-		if args[0] != nil {
-			arg0 = args[0].([]string)
-		}
-		run(
-			arg0,
-		)
+		run()
 	})
 	return _c
 }
@@ -101,7 +94,7 @@ func (_c *Executor_ExecNetworkTime_Call) Return(bytes []byte, err error) *Execut
 	return _c
 }
 
-func (_c *Executor_ExecNetworkTime_Call) RunAndReturn(run func(args []string) ([]byte, error)) *Executor_ExecNetworkTime_Call {
+func (_c *Executor_ExecNetworkTime_Call) RunAndReturn(run func() ([]byte, error)) *Executor_ExecNetworkTime_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -28,18 +28,22 @@ func TestGenerateNetworkTimeData(t *testing.T) {
 		{
 			name:           "network time on",
 			execReturnFile: "on.output",
-			want: []map[string]string{{
-				"using_network_time":  "1",
-				"network_time_server": "time.apple.com",
-			}},
+			want: []map[string]string{
+				{
+					"using_network_time":  "1",
+					"network_time_server": "time.apple.com",
+				},
+			},
 		},
 		{
 			name:           "network time off",
 			execReturnFile: "off.output",
-			want: []map[string]string{{
-				"using_network_time":  "0",
-				"network_time_server": "time.apple.com",
-			}},
+			want: []map[string]string{
+				{
+					"using_network_time":  "0",
+					"network_time_server": "time.apple.com",
+				},
+			},
 		},
 	}
 
@@ -48,15 +52,14 @@ func TestGenerateNetworkTimeData(t *testing.T) {
 			t.Parallel()
 
 			execReturn, err := os.ReadFile(filepath.Join("testdata", tt.execReturnFile))
-			require.NoError(t, err, "could not read test data")
+			require.NoError(t, err, "read exec return file")
 
-			systemsetupExec := mocks.NewExecutor(t)
-			systemsetupExec.On("ExecNetworkTime", []string{"-getusingnetworktime", "-getnetworktimeserver"}).Return(execReturn, nil)
+			executor := mocks.NewExecutor(t)
+			executor.On("ExecNetworkTime").Return(execReturn, nil).Once()
 
-			rows, err := generateNetworkTimeData(t.Context(), systemsetupExec, multislogger.NewNopLogger())
-
+			got, err := generateNetworkTimeData(t.Context(), executor, multislogger.NewNopLogger())
 			require.NoError(t, err)
-			require.Equal(t, tt.want, rows)
+			require.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -103,7 +106,7 @@ func TestParseSystemsetupOutput(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			require.Equal(t, tt.want, parseSystemsetupOutput(tt.output))
+			require.Equal(t, tt.want, parseSystemsetupOutput([]byte(tt.output)))
 		})
 	}
 }

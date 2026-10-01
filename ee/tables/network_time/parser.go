@@ -3,14 +3,19 @@
 package network_time
 
 import (
+	"bufio"
+	"bytes"
 	"strings"
 )
 
-func parseSystemsetupOutput(output string) map[string]string {
-	result := make(map[string]string, len(settings))
+// parseSystemsetupOutput parses the output of `systemsetup -getX`, mapping each
+// column name to the value systemsetup printed for it.
+func parseSystemsetupOutput(output []byte) map[string]string {
+	result := make(map[string]string)
 
-	for line := range strings.Lines(output) {
-		line = strings.TrimSpace(line)
+	scanner := bufio.NewScanner(bytes.NewReader(output))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
 
 		for _, s := range settings {
 			if !strings.HasPrefix(line, s.outputPrefix) {

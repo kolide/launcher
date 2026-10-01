@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"os"
 
 	"github.com/kolide/launcher/v2/ee/agent/types"
 	"github.com/kolide/launcher/v2/ee/allowedcmd"
@@ -46,14 +45,9 @@ type NetworkTime struct {
 }
 
 func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
-	columns := make([]table.ColumnDefinition, 0, len(settings))
-	for _, s := range settings {
-		if s.isState {
-			columns = append(columns, table.IntegerColumn(s.columnName))
-			continue
-		}
-
-		columns = append(columns, table.TextColumn(s.columnName))
+	columns := []table.ColumnDefinition{
+		table.IntegerColumn("using_network_time"),
+		table.TextColumn("network_time_server"),
 	}
 
 	networkTimeTable := &NetworkTime{
@@ -70,7 +64,12 @@ type systemsetupExecutor struct {
 	slogger *slog.Logger
 }
 
-func (s *systemsetupExecutor) ExecNetworkTime(args []string) ([]byte, error) {
+func (s *systemsetupExecutor) ExecNetworkTime() ([]byte, error) {
+	args := make([]string, 0, len(settings))
+	for _, setting := range settings {
+		args = append(args, setting.arg)
+	}
+
 	return tablehelpers.RunSimple(s.ctx, s.slogger, 10, allowedcmd.Systemsetup, args)
 }
 
@@ -78,7 +77,7 @@ func (s *systemsetupExecutor) ExecNetworkTime(args []string) ([]byte, error) {
 //mockery:filename: executor.go
 //mockery:structname: Executor
 type executor interface {
-	ExecNetworkTime(args []string) ([]byte, error)
+	ExecNetworkTime() ([]byte, error)
 }
 
 func (t *NetworkTime) generateNetworkTime(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
@@ -99,15 +98,10 @@ func generateNetworkTimeData(ctx context.Context, systemsetupExec executor, slog
 
 	results := make([]map[string]string, 0)
 
-	args := make([]string, 0, len(settings))
-	for _, s := range settings {
-		args = append(args, s.arg)
-	}
-
-	output, err := systemsetupExec.ExecNetworkTime(args)
+	output, err := systemsetupExec.ExecNetworkTime()
 	if err != nil {
 		// log that the binary doesn't exist, but don't return an error
-		if errors.Is(err, allowedcmd.ErrCommandNotFound) || errors.Is(err, os.ErrNotExist) {
+		if errors.Is(err, allowedcmd.ErrCommandNotFound) {
 			slogger.Log(ctx, slog.LevelWarn,
 				"systemsetup binary not found",
 				"err", err,
@@ -122,7 +116,7 @@ func generateNetworkTimeData(ctx context.Context, systemsetupExec executor, slog
 		return results, nil
 	}
 
-	parsed := parseSystemsetupOutput(string(output))
+	parsed := parseSystemsetupOutput(output)
 
 	if len(parsed) == 0 {
 		slogger.Log(ctx, slog.LevelWarn,
@@ -146,5 +140,7 @@ func generateNetworkTimeData(ctx context.Context, systemsetupExec executor, slog
 		row[s.columnName] = value
 	}
 
-	return append(results, row), nil
+	results = append(results, row)
+
+	return results, nil
 }
