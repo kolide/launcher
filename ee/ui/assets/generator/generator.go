@@ -177,13 +177,17 @@ func generateIco(ctx context.Context, logger log.Logger, name string) error {
 	}
 
 	// First, we need to generate all the sizes
+	sizedIcos := make([]string, 0, len(icoSizes))
 	for _, size := range icoSizes {
+		sizedIco := fmt.Sprintf("%s/%s-%s.ico", tmpDir, name, size)
+		sizedIcos = append(sizedIcos, sizedIco)
+
 		cmd := exec.CommandContext( //nolint:forbidigo // Fine to use exec.CommandContext since it's not in launcher proper
 			ctx,
 			"convert",
 			"-resize", fmt.Sprintf("%sx%s", size, size),
 			input,
-			fmt.Sprintf("%s/%s-%s.ico", tmpDir, name, size),
+			sizedIco,
 		)
 		level.Debug(logger).Log("msg", "Resizing with", "cmd", cmd.String())
 		if err := cmd.Run(); err != nil {
@@ -191,8 +195,9 @@ func generateIco(ctx context.Context, logger log.Logger, name string) error {
 		}
 	}
 
-	// Now that we have the intermediary sizes, we can stich them into a single ico
-	cmd := exec.CommandContext(ctx, "convert", fmt.Sprintf("%s/%s-*.ico", tmpDir, name), output) //nolint:forbidigo // Fine to use exec.CommandContext since it's not in launcher proper
+	// Now that we have the intermediary sizes, we can stich them into a single ico. List them explicitly,
+	// since a glob on the name would also match other icons sharing the prefix (e.g. kolide-debug for kolide).
+	cmd := exec.CommandContext(ctx, "convert", append(sizedIcos, output)...) //nolint:forbidigo // Fine to use exec.CommandContext since it's not in launcher proper
 	level.Debug(logger).Log("msg", "Consolodating ico with", "cmd", cmd.String())
 
 	if err := cmd.Run(); err != nil {

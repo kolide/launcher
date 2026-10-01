@@ -31,16 +31,22 @@ type notificationSender interface {
 // UserServer provides IPC for the root desktop runner to communicate with the user desktop processes.
 // It allows the runner process to send notficaitons and commands to the desktop processes.
 type UserServer struct {
-	slogger             *slog.Logger
-	server              *http.Server
-	listener            net.Listener
-	shutdownChan        chan<- struct{}
-	authToken           string
-	socketPath          string
-	notifier            notificationSender
-	refreshListeners    []func()
-	presenceDetector    presencedetection.PresenceDetector
-	showDesktopOnceFunc func()
+	slogger                     *slog.Logger
+	server                      *http.Server
+	listener                    net.Listener
+	shutdownChan                chan<- struct{}
+	authToken                   string
+	socketPath                  string
+	notifier                    notificationSender
+	refreshListeners            []func()
+	deviceTrustRebrandListeners []func(enabled bool)
+	presenceDetector            presencedetection.PresenceDetector
+	showDesktopOnceFunc         func()
+}
+
+// DeviceTrustRebrandRequest is sent by the desktop runner when the DeviceTrustRebrand flag changes
+type DeviceTrustRebrandRequest struct {
+	Enabled bool `json:"enabled"`
 }
 
 func New(slogger *slog.Logger,
@@ -68,6 +74,7 @@ func New(slogger *slog.Logger,
 	authedMux.HandleFunc("/ping", userServer.pingHandler)
 	authedMux.HandleFunc("/notification", userServer.notificationHandler)
 	authedMux.HandleFunc("/refresh", userServer.refreshHandler)
+	authedMux.HandleFunc("POST /device_trust_rebrand", userServer.deviceTrustRebrandHandler)
 	authedMux.HandleFunc("/show", userServer.showDesktop)
 	authedMux.HandleFunc("/detect_presence", userServer.detectPresence)
 	authedMux.HandleFunc("POST /secure_enclave_key", userServer.createSecureEnclaveKey)
@@ -253,6 +260,37 @@ func (s *UserServer) notifyRefreshListeners() {
 	for _, listener := range s.refreshListeners {
 		listener()
 	}
+}
+
+func (s *UserServer) deviceTrustRebrandHandler(w http.ResponseWriter, req *http.Request) {
+	defer req.Body.Close()
+
+	var rebrandRequest DeviceTrustRebrandRequest
+	if err := json.NewDecoder(req.Body).Decode(&rebrandRequest); err != nil {
+		s.slogger.Log(req.Context(), slog.LevelError,
+			"could not decode device trust rebrand request",
+			"err", err,
+		)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	s.slogger.Log(req.Context(), slog.LevelInfo,
+		"received device trust rebrand update",
+		"device_trust_rebrand", rebrandRequest.Enabled,
+	)
+
+	for _, listener := range s.deviceTrustRebrandListeners {
+		listener(rebrandRequest.Enabled)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+}
+
+// RegisterDeviceTrustRebrandListener registers a listener to be notified when the DeviceTrustRebrand flag changes
+func (s *UserServer) RegisterDeviceTrustRebrandListener(f func(enabled bool)) {
+	s.deviceTrustRebrandListeners = append(s.deviceTrustRebrandListeners, f)
 }
 
 type ProfileResponse struct {

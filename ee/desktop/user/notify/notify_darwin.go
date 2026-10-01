@@ -63,6 +63,9 @@ func (m *macNotifier) Listen() {
 	C.runNotificationListenerApp(learnMoreCStr)
 }
 
+// SetIconFilepath is a no-op on macOS, where the notification icon comes from the app bundle
+func (m *macNotifier) SetIconFilepath(_ string) {}
+
 func (m *macNotifier) SendNotification(n Notification) error {
 	// Check if we're running inside a bundle -- if we aren't, we should not attempt to send
 	// a notification because it will cause a panic.

@@ -6,6 +6,103 @@ import (
 	_ "embed"
 )
 
+
+//go:embed device-trust.ico
+var DeviceTrustIco []byte
+
+//go:embed device-trust-menubar-circle-dot-darkmode.ico
+var DeviceTrustMenubarCircleDotDarkmodeIco []byte
+
+//go:embed device-trust-menubar-circle-dot-darkmode.png
+var DeviceTrustMenubarCircleDotDarkmodePng []byte
+
+//go:embed device-trust-menubar-circle-dot-lightmode.ico
+var DeviceTrustMenubarCircleDotLightmodeIco []byte
+
+//go:embed device-trust-menubar-circle-dot-lightmode.png
+var DeviceTrustMenubarCircleDotLightmodePng []byte
+
+//go:embed device-trust-menubar-circle-dot-lightmode-shadow.ico
+var DeviceTrustMenubarCircleDotLightmodeShadowIco []byte
+
+//go:embed device-trust-menubar-circle-dot-lightmode-shadow.png
+var DeviceTrustMenubarCircleDotLightmodeShadowPng []byte
+
+//go:embed device-trust-menubar-circle-x-darkmode.ico
+var DeviceTrustMenubarCircleXDarkmodeIco []byte
+
+//go:embed device-trust-menubar-circle-x-darkmode.png
+var DeviceTrustMenubarCircleXDarkmodePng []byte
+
+//go:embed device-trust-menubar-circle-x-lightmode.ico
+var DeviceTrustMenubarCircleXLightmodeIco []byte
+
+//go:embed device-trust-menubar-circle-x-lightmode.png
+var DeviceTrustMenubarCircleXLightmodePng []byte
+
+//go:embed device-trust-menubar-circle-x-lightmode-shadow.ico
+var DeviceTrustMenubarCircleXLightmodeShadowIco []byte
+
+//go:embed device-trust-menubar-circle-x-lightmode-shadow.png
+var DeviceTrustMenubarCircleXLightmodeShadowPng []byte
+
+//go:embed device-trust-menubar-default-darkmode.ico
+var DeviceTrustMenubarDefaultDarkmodeIco []byte
+
+//go:embed device-trust-menubar-default-darkmode.png
+var DeviceTrustMenubarDefaultDarkmodePng []byte
+
+//go:embed device-trust-menubar-default-lightmode.ico
+var DeviceTrustMenubarDefaultLightmodeIco []byte
+
+//go:embed device-trust-menubar-default-lightmode.png
+var DeviceTrustMenubarDefaultLightmodePng []byte
+
+//go:embed device-trust-menubar-default-lightmode-shadow.ico
+var DeviceTrustMenubarDefaultLightmodeShadowIco []byte
+
+//go:embed device-trust-menubar-default-lightmode-shadow.png
+var DeviceTrustMenubarDefaultLightmodeShadowPng []byte
+
+//go:embed device-trust-menubar-translucent-darkmode.ico
+var DeviceTrustMenubarTranslucentDarkmodeIco []byte
+
+//go:embed device-trust-menubar-translucent-darkmode.png
+var DeviceTrustMenubarTranslucentDarkmodePng []byte
+
+//go:embed device-trust-menubar-translucent-lightmode.ico
+var DeviceTrustMenubarTranslucentLightmodeIco []byte
+
+//go:embed device-trust-menubar-translucent-lightmode.png
+var DeviceTrustMenubarTranslucentLightmodePng []byte
+
+//go:embed device-trust-menubar-translucent-lightmode-shadow.ico
+var DeviceTrustMenubarTranslucentLightmodeShadowIco []byte
+
+//go:embed device-trust-menubar-translucent-lightmode-shadow.png
+var DeviceTrustMenubarTranslucentLightmodeShadowPng []byte
+
+//go:embed device-trust-menubar-triangle-exclamation-darkmode.ico
+var DeviceTrustMenubarTriangleExclamationDarkmodeIco []byte
+
+//go:embed device-trust-menubar-triangle-exclamation-darkmode.png
+var DeviceTrustMenubarTriangleExclamationDarkmodePng []byte
+
+//go:embed device-trust-menubar-triangle-exclamation-lightmode.ico
+var DeviceTrustMenubarTriangleExclamationLightmodeIco []byte
+
+//go:embed device-trust-menubar-triangle-exclamation-lightmode.png
+var DeviceTrustMenubarTriangleExclamationLightmodePng []byte
+
+//go:embed device-trust-menubar-triangle-exclamation-lightmode-shadow.ico
+var DeviceTrustMenubarTriangleExclamationLightmodeShadowIco []byte
+
+//go:embed device-trust-menubar-triangle-exclamation-lightmode-shadow.png
+var DeviceTrustMenubarTriangleExclamationLightmodeShadowPng []byte
+
+//go:embed device-trust.png
+var DeviceTrustPng []byte
+
 //go:embed kolide-debug.ico
 var KolideDebugIco []byte
 
@@ -137,3 +234,4 @@ var MenubarTriangleExclamationMonochromeIco []byte
 
 //go:embed menubar-triangle-exclamation-monochrome.png
 var MenubarTriangleExclamationMonochromePng []byte
+

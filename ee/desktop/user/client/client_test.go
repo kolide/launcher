@@ -86,6 +86,54 @@ func TestClient_GetAndShutdown(t *testing.T) {
 	}
 }
 
+func TestClient_SetDeviceTrustRebrand(t *testing.T) {
+	t.Parallel()
+
+	const validAuthToken = "test-auth-header"
+	tests := []struct {
+		name    string
+		enabled bool
+	}{
+		{
+			name:    "enabled",
+			enabled: true,
+		},
+		{
+			name:    "disabled",
+			enabled: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			socketPath := testSocketPath(t)
+			server, err := server.New(multislogger.NewNopLogger(), validAuthToken, socketPath, make(chan struct{}), make(chan<- struct{}), nil)
+			require.NoError(t, err)
+
+			received := make(chan bool, 2)
+			server.RegisterDeviceTrustRebrandListener(func(enabled bool) {
+				received <- enabled
+			})
+
+			go func() {
+				server.Serve()
+			}()
+
+			client := New(validAuthToken, socketPath)
+			require.NoError(t, client.SetDeviceTrustRebrand(t.Context(), tt.enabled))
+			require.Len(t, received, 1)
+			require.Equal(t, tt.enabled, <-received)
+
+			// The endpoint only accepts POST requests with a valid body
+			require.Error(t, client.get("device_trust_rebrand"))
+			require.Empty(t, received)
+
+			require.NoError(t, server.Shutdown(t.Context()))
+		})
+	}
+}
+
 func testSocketPath(t *testing.T) string {
 	socketFileName := strings.ReplaceAll(t.Name(), "/", "_")
 
