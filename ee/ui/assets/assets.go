@@ -28,6 +28,18 @@ var DeviceTrustMenubarCircleDotLightmodeShadowIco []byte
 //go:embed device-trust-menubar-circle-dot-lightmode-shadow.png
 var DeviceTrustMenubarCircleDotLightmodeShadowPng []byte
 
+//go:embed device-trust-menubar-circle-dot-monochrome-darkmode.ico
+var DeviceTrustMenubarCircleDotMonochromeDarkmodeIco []byte
+
+//go:embed device-trust-menubar-circle-dot-monochrome-darkmode.png
+var DeviceTrustMenubarCircleDotMonochromeDarkmodePng []byte
+
+//go:embed device-trust-menubar-circle-dot-monochrome-lightmode.ico
+var DeviceTrustMenubarCircleDotMonochromeLightmodeIco []byte
+
+//go:embed device-trust-menubar-circle-dot-monochrome-lightmode.png
+var DeviceTrustMenubarCircleDotMonochromeLightmodePng []byte
+
 //go:embed device-trust-menubar-circle-x-darkmode.ico
 var DeviceTrustMenubarCircleXDarkmodeIco []byte
 
@@ -45,6 +57,18 @@ var DeviceTrustMenubarCircleXLightmodeShadowIco []byte
 
 //go:embed device-trust-menubar-circle-x-lightmode-shadow.png
 var DeviceTrustMenubarCircleXLightmodeShadowPng []byte
+
+//go:embed device-trust-menubar-circle-x-monochrome-darkmode.ico
+var DeviceTrustMenubarCircleXMonochromeDarkmodeIco []byte
+
+//go:embed device-trust-menubar-circle-x-monochrome-darkmode.png
+var DeviceTrustMenubarCircleXMonochromeDarkmodePng []byte
+
+//go:embed device-trust-menubar-circle-x-monochrome-lightmode.ico
+var DeviceTrustMenubarCircleXMonochromeLightmodeIco []byte
+
+//go:embed device-trust-menubar-circle-x-monochrome-lightmode.png
+var DeviceTrustMenubarCircleXMonochromeLightmodePng []byte
 
 //go:embed device-trust-menubar-default-darkmode.ico
 var DeviceTrustMenubarDefaultDarkmodeIco []byte
@@ -64,6 +88,18 @@ var DeviceTrustMenubarDefaultLightmodeShadowIco []byte
 //go:embed device-trust-menubar-default-lightmode-shadow.png
 var DeviceTrustMenubarDefaultLightmodeShadowPng []byte
 
+//go:embed device-trust-menubar-default-monochrome-darkmode.ico
+var DeviceTrustMenubarDefaultMonochromeDarkmodeIco []byte
+
+//go:embed device-trust-menubar-default-monochrome-darkmode.png
+var DeviceTrustMenubarDefaultMonochromeDarkmodePng []byte
+
+//go:embed device-trust-menubar-default-monochrome-lightmode.ico
+var DeviceTrustMenubarDefaultMonochromeLightmodeIco []byte
+
+//go:embed device-trust-menubar-default-monochrome-lightmode.png
+var DeviceTrustMenubarDefaultMonochromeLightmodePng []byte
+
 //go:embed device-trust-menubar-translucent-darkmode.ico
 var DeviceTrustMenubarTranslucentDarkmodeIco []byte
 
@@ -82,6 +118,18 @@ var DeviceTrustMenubarTranslucentLightmodeShadowIco []byte
 //go:embed device-trust-menubar-translucent-lightmode-shadow.png
 var DeviceTrustMenubarTranslucentLightmodeShadowPng []byte
 
+//go:embed device-trust-menubar-translucent-monochrome-darkmode.ico
+var DeviceTrustMenubarTranslucentMonochromeDarkmodeIco []byte
+
+//go:embed device-trust-menubar-translucent-monochrome-darkmode.png
+var DeviceTrustMenubarTranslucentMonochromeDarkmodePng []byte
+
+//go:embed device-trust-menubar-translucent-monochrome-lightmode.ico
+var DeviceTrustMenubarTranslucentMonochromeLightmodeIco []byte
+
+//go:embed device-trust-menubar-translucent-monochrome-lightmode.png
+var DeviceTrustMenubarTranslucentMonochromeLightmodePng []byte
+
 //go:embed device-trust-menubar-triangle-exclamation-darkmode.ico
 var DeviceTrustMenubarTriangleExclamationDarkmodeIco []byte
 
@@ -99,6 +147,18 @@ var DeviceTrustMenubarTriangleExclamationLightmodeShadowIco []byte
 
 //go:embed device-trust-menubar-triangle-exclamation-lightmode-shadow.png
 var DeviceTrustMenubarTriangleExclamationLightmodeShadowPng []byte
+
+//go:embed device-trust-menubar-triangle-exclamation-monochrome-darkmode.ico
+var DeviceTrustMenubarTriangleExclamationMonochromeDarkmodeIco []byte
+
+//go:embed device-trust-menubar-triangle-exclamation-monochrome-darkmode.png
+var DeviceTrustMenubarTriangleExclamationMonochromeDarkmodePng []byte
+
+//go:embed device-trust-menubar-triangle-exclamation-monochrome-lightmode.ico
+var DeviceTrustMenubarTriangleExclamationMonochromeLightmodeIco []byte
+
+//go:embed device-trust-menubar-triangle-exclamation-monochrome-lightmode.png
+var DeviceTrustMenubarTriangleExclamationMonochromeLightmodePng []byte
 
 //go:embed device-trust.png
 var DeviceTrustPng []byte
