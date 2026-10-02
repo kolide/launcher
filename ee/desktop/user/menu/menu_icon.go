@@ -6,104 +6,135 @@ import (
 	"github.com/kolide/launcher/v2/ee/ui/assets"
 )
 
-// getIcon returns the appropriate embedded asset for the requested menu icon type,
-// using the Device Trust icons when deviceTrustRebrand is enabled and the Kolide icons otherwise
-func getIcon(icon menuIcon, deviceTrustRebrand bool) []byte {
-	if deviceTrustRebrand {
-		return getDeviceTrustIcon(icon)
-	}
-	return getKolideIcon(icon)
-}
-
-// getKolideIcon returns the legacy Kolide-branded asset for the requested menu icon type
-func getKolideIcon(icon menuIcon) []byte {
+// getIcon returns the appropriate embedded asset for the requested menu icon type
+func getIcon(icon menuIcon) []byte {
 	switch icon {
 	case TranslucentIcon:
 		return chooseIcon(
+			assets.MenubarTranslucentDarkmodeIco,
 			assets.MenubarTranslucentDarkmodePng,
+			assets.MenubarTranslucentLightmodeIco,
 			assets.MenubarTranslucentLightmodePng,
 			assets.MenubarTranslucentLightmodeShadowIco,
 			assets.MenubarTranslucentLightmodeShadowPng,
+			assets.MenubarTranslucentMonochromeIco,
+			assets.MenubarTranslucentMonochromePng,
 		)
 	case TriangleExclamationIcon:
 		return chooseIcon(
+			assets.MenubarTriangleExclamationDarkmodeIco,
 			assets.MenubarTriangleExclamationDarkmodePng,
+			assets.MenubarTriangleExclamationLightmodeIco,
 			assets.MenubarTriangleExclamationLightmodePng,
 			assets.MenubarTriangleExclamationLightmodeShadowIco,
 			assets.MenubarTriangleExclamationLightmodeShadowPng,
+			assets.MenubarTriangleExclamationMonochromeIco,
+			assets.MenubarTriangleExclamationMonochromePng,
 		)
 	case CircleXIcon:
 		return chooseIcon(
+			assets.MenubarCircleXDarkmodeIco,
 			assets.MenubarCircleXDarkmodePng,
+			assets.MenubarCircleXLightmodeIco,
 			assets.MenubarCircleXLightmodePng,
 			assets.MenubarCircleXLightmodeShadowIco,
 			assets.MenubarCircleXLightmodeShadowPng,
+			assets.MenubarCircleXMonochromeIco,
+			assets.MenubarCircleXMonochromePng,
 		)
 	case CircleDotIcon:
 		return chooseIcon(
+			assets.MenubarCircleDotDarkmodeIco,
 			assets.MenubarCircleDotDarkmodePng,
+			assets.MenubarCircleDotLightmodeIco,
 			assets.MenubarCircleDotLightmodePng,
 			assets.MenubarCircleDotLightmodeShadowIco,
 			assets.MenubarCircleDotLightmodeShadowPng,
+			assets.MenubarCircleDotMonochromeIco,
+			assets.MenubarCircleDotMonochromePng,
 		)
 	case DefaultIcon:
 		fallthrough
 	default:
 		return chooseIcon(
+			assets.MenubarDefaultDarkmodeIco,
 			assets.MenubarDefaultDarkmodePng,
+			assets.MenubarDefaultLightmodeIco,
 			assets.MenubarDefaultLightmodePng,
 			assets.MenubarDefaultLightmodeShadowIco,
 			assets.MenubarDefaultLightmodeShadowPng,
+			assets.MenubarDefaultMonochromeIco,
+			assets.MenubarDefaultMonochromePng,
 		)
 	}
 }
 
-// getDeviceTrustIcon returns the Device Trust-branded asset for the requested menu icon type
+// getDeviceTrustIcon returns the appropriate embedded Device Trust asset for the requested menu icon type
 func getDeviceTrustIcon(icon menuIcon) []byte {
 	switch icon {
 	case TranslucentIcon:
 		return chooseIcon(
+			assets.DeviceTrustMenubarTranslucentDarkmodeIco,
 			assets.DeviceTrustMenubarTranslucentDarkmodePng,
+			assets.DeviceTrustMenubarTranslucentLightmodeIco,
 			assets.DeviceTrustMenubarTranslucentLightmodePng,
 			assets.DeviceTrustMenubarTranslucentLightmodeShadowIco,
 			assets.DeviceTrustMenubarTranslucentLightmodeShadowPng,
+			assets.DeviceTrustMenubarTranslucentMonochromeLightmodeIco,
+			assets.DeviceTrustMenubarTranslucentMonochromeLightmodePng,
 		)
 	case TriangleExclamationIcon:
 		return chooseIcon(
+			assets.DeviceTrustMenubarTriangleExclamationDarkmodeIco,
 			assets.DeviceTrustMenubarTriangleExclamationDarkmodePng,
+			assets.DeviceTrustMenubarTriangleExclamationLightmodeIco,
 			assets.DeviceTrustMenubarTriangleExclamationLightmodePng,
 			assets.DeviceTrustMenubarTriangleExclamationLightmodeShadowIco,
 			assets.DeviceTrustMenubarTriangleExclamationLightmodeShadowPng,
+			assets.DeviceTrustMenubarTriangleExclamationMonochromeLightmodeIco,
+			assets.DeviceTrustMenubarTriangleExclamationMonochromeLightmodePng,
 		)
 	case CircleXIcon:
 		return chooseIcon(
+			assets.DeviceTrustMenubarCircleXDarkmodeIco,
 			assets.DeviceTrustMenubarCircleXDarkmodePng,
+			assets.DeviceTrustMenubarCircleXLightmodeIco,
 			assets.DeviceTrustMenubarCircleXLightmodePng,
 			assets.DeviceTrustMenubarCircleXLightmodeShadowIco,
 			assets.DeviceTrustMenubarCircleXLightmodeShadowPng,
+			assets.DeviceTrustMenubarCircleXMonochromeLightmodeIco,
+			assets.DeviceTrustMenubarCircleXMonochromeLightmodePng,
 		)
 	case CircleDotIcon:
 		return chooseIcon(
+			assets.DeviceTrustMenubarCircleDotDarkmodeIco,
 			assets.DeviceTrustMenubarCircleDotDarkmodePng,
+			assets.DeviceTrustMenubarCircleDotLightmodeIco,
 			assets.DeviceTrustMenubarCircleDotLightmodePng,
 			assets.DeviceTrustMenubarCircleDotLightmodeShadowIco,
 			assets.DeviceTrustMenubarCircleDotLightmodeShadowPng,
+			assets.DeviceTrustMenubarCircleDotMonochromeLightmodeIco,
+			assets.DeviceTrustMenubarCircleDotMonochromeLightmodePng,
 		)
 	case DefaultIcon:
 		fallthrough
 	default:
 		return chooseIcon(
+			assets.DeviceTrustMenubarDefaultDarkmodeIco,
 			assets.DeviceTrustMenubarDefaultDarkmodePng,
+			assets.DeviceTrustMenubarDefaultLightmodeIco,
 			assets.DeviceTrustMenubarDefaultLightmodePng,
 			assets.DeviceTrustMenubarDefaultLightmodeShadowIco,
 			assets.DeviceTrustMenubarDefaultLightmodeShadowPng,
+			assets.DeviceTrustMenubarDefaultMonochromeLightmodeIco,
+			assets.DeviceTrustMenubarDefaultMonochromeLightmodePng,
 		)
 	}
 }
 
 // chooseIcon chooses the appropriate icon data for the OS
-func chooseIcon(darkPng, lightPng, shadowIco, shadowPng []byte) []byte {
-	// Windows and Linux don't observe dark/light modes and use the colored icons with shadows
+func chooseIcon(darkIco, darkPng, lightIco, lightPng, shadowIco, shadowPng, monochromeIco, monochromePng []byte) []byte {
+	// Windows and Linux don't observe dark/light modes and use the purple Kolide icons with shadows
 	if runtime.GOOS == "windows" {
 		return shadowIco
 	}

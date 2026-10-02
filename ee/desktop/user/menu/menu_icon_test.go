@@ -3,7 +3,7 @@ package menu
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
 )
 
 func Test_getIcon(t *testing.T) {
@@ -42,13 +42,12 @@ func Test_getIcon(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			kolideIcon := getIcon(tt.icon, false)
-			require.NotEmpty(t, kolideIcon)
+			icon := getIcon(tt.icon)
+			assert.NotNil(t, icon)
 
-			deviceTrustIcon := getIcon(tt.icon, true)
-			require.NotEmpty(t, deviceTrustIcon)
-
-			require.NotEqual(t, kolideIcon, deviceTrustIcon, "device trust rebrand should select a different icon")
+			deviceTrustIcon := getDeviceTrustIcon(tt.icon)
+			assert.NotNil(t, deviceTrustIcon)
+			assert.NotEqual(t, icon, deviceTrustIcon, "device trust icon should differ from the kolide icon")
 		})
 	}
 }
