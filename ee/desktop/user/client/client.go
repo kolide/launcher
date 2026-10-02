@@ -92,6 +92,35 @@ func (c *client) ShowDesktop() error {
 	return c.getWithContext(ctx, "show")
 }
 
+// SetDeviceTrustRebrand tells the desktop process whether to use the Device Trust or the legacy Kolide icons
+func (c *client) SetDeviceTrustRebrand(ctx context.Context, enabled bool) error {
+	ctx, span := observability.StartSpan(ctx, "enabled", enabled)
+	defer span.End()
+
+	bodyBytes, err := json.Marshal(server.DeviceTrustRebrandRequest{Enabled: enabled})
+	if err != nil {
+		return fmt.Errorf("marshalling device trust rebrand request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://unix/device_trust_rebrand", bytes.NewReader(bodyBytes))
+	if err != nil {
+		return fmt.Errorf("creating device trust rebrand request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.base.Do(req)
+	if err != nil {
+		return fmt.Errorf("sending device trust rebrand request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
 func (c *client) DetectPresence(reason string, interval time.Duration) (time.Duration, error) {
 	encodedReason := url.QueryEscape(reason)
 	encodedInterval := url.QueryEscape(interval.String())

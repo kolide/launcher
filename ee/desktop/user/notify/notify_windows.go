@@ -9,12 +9,13 @@ import (
 	"strings"
 	"sync/atomic"
 
+	kolideatomic "github.com/kolide/launcher/v2/pkg/atomic"
 	"github.com/kolide/toast"
 )
 
 type windowsNotifier struct {
 	slogger          *slog.Logger
-	iconFilepath     string
+	iconFilepath     *kolideatomic.String
 	localizationPath string
 	interrupt        chan struct{}
 	interrupted      atomic.Bool
@@ -23,7 +24,7 @@ type windowsNotifier struct {
 func NewDesktopNotifier(slogger *slog.Logger, iconFilepath string, localizationPath string) *windowsNotifier {
 	return &windowsNotifier{
 		slogger:          slogger.With("component", "desktop_notifier"),
-		iconFilepath:     iconFilepath,
+		iconFilepath:     kolideatomic.NewString(iconFilepath),
 		localizationPath: localizationPath,
 		interrupt:        make(chan struct{}),
 	}
@@ -38,6 +39,11 @@ func (w *windowsNotifier) Execute() error {
 
 // just make compiler happy, this is only needed on darwin
 func (w *windowsNotifier) Listen() {}
+
+// SetIconFilepath updates the icon used for subsequent notifications
+func (w *windowsNotifier) SetIconFilepath(iconFilepath string) {
+	w.iconFilepath.Store(iconFilepath)
+}
 
 func (w *windowsNotifier) Interrupt(err error) {
 	if w.interrupted.Swap(true) {
@@ -54,8 +60,8 @@ func (w *windowsNotifier) SendNotification(n Notification) error {
 		Message: n.Body,
 	}
 
-	if w.iconFilepath != "" {
-		notification.Icon = w.iconFilepath
+	if iconFilepath := w.iconFilepath.Load(); iconFilepath != "" {
+		notification.Icon = iconFilepath
 	}
 
 	if n.ActionUri != "" {

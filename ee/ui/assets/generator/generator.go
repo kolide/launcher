@@ -1,12 +1,14 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"flag"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"text/template"
 
@@ -114,6 +116,11 @@ func main() {
 
 }
 
+type embed struct {
+	Constant string
+	Filename string
+}
+
 func generateAssetGo(ctx context.Context, logger log.Logger) error {
 	output, err := os.Create(fmt.Sprintf("%s/assets.go", outDir))
 	if err != nil {
@@ -121,11 +128,20 @@ func generateAssetGo(ctx context.Context, logger log.Logger) error {
 	}
 	defer output.Close()
 
-	embeds := make(map[string]string, len(embeddedFiles))
+	// Sort by icon name, then extension, so each icon's variants stay grouped together.
+	slices.SortFunc(embeddedFiles, func(a, b string) int {
+		aExt, bExt := filepath.Ext(a), filepath.Ext(b)
+		return cmp.Or(
+			strings.Compare(strings.TrimSuffix(a, aExt), strings.TrimSuffix(b, bExt)),
+			strings.Compare(aExt, bExt),
+		)
+	})
+
+	embeds := make([]embed, 0, len(embeddedFiles))
 	for _, filename := range embeddedFiles {
 		// embeds don't support a directory path. Everything is just in the outDir.
 		filename = filepath.Base(filename)
-		embeds[constName(filename)] = filename
+		embeds = append(embeds, embed{Constant: constName(filename), Filename: filename})
 	}
 
 	tmpl, err := template.ParseFiles("generator/assets.go.tmpl")
@@ -177,13 +193,17 @@ func generateIco(ctx context.Context, logger log.Logger, name string) error {
 	}
 
 	// First, we need to generate all the sizes
+	sizedIcos := make([]string, 0, len(icoSizes))
 	for _, size := range icoSizes {
+		sizedIco := fmt.Sprintf("%s/%s-%s.ico", tmpDir, name, size)
+		sizedIcos = append(sizedIcos, sizedIco)
+
 		cmd := exec.CommandContext( //nolint:forbidigo // Fine to use exec.CommandContext since it's not in launcher proper
 			ctx,
 			"convert",
 			"-resize", fmt.Sprintf("%sx%s", size, size),
 			input,
-			fmt.Sprintf("%s/%s-%s.ico", tmpDir, name, size),
+			sizedIco,
 		)
 		level.Debug(logger).Log("msg", "Resizing with", "cmd", cmd.String())
 		if err := cmd.Run(); err != nil {
@@ -191,8 +211,9 @@ func generateIco(ctx context.Context, logger log.Logger, name string) error {
 		}
 	}
 
-	// Now that we have the intermediary sizes, we can stich them into a single ico
-	cmd := exec.CommandContext(ctx, "convert", fmt.Sprintf("%s/%s-*.ico", tmpDir, name), output) //nolint:forbidigo // Fine to use exec.CommandContext since it's not in launcher proper
+	// Now that we have the intermediary sizes, we can stich them into a single ico. List them explicitly,
+	// since a glob on the name would also match other icons sharing the prefix (e.g. kolide-debug for kolide).
+	cmd := exec.CommandContext(ctx, "convert", append(sizedIcos, output)...) //nolint:forbidigo // Fine to use exec.CommandContext since it's not in launcher proper
 	level.Debug(logger).Log("msg", "Consolodating ico with", "cmd", cmd.String())
 
 	if err := cmd.Run(); err != nil {

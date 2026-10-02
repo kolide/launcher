@@ -12,10 +12,11 @@ import (
 
 	"github.com/godbus/dbus/v5"
 	"github.com/kolide/launcher/v2/ee/allowedcmd"
+	kolideatomic "github.com/kolide/launcher/v2/pkg/atomic"
 )
 
 type dbusNotifier struct {
-	iconFilepath        string
+	iconFilepath        *kolideatomic.String
 	localizationPath    string
 	slogger             *slog.Logger
 	conn                *dbus.Conn
@@ -49,7 +50,7 @@ func NewDesktopNotifier(slogger *slog.Logger, iconFilepath string, localizationP
 	}
 
 	return &dbusNotifier{
-		iconFilepath:        iconFilepath,
+		iconFilepath:        kolideatomic.NewString(iconFilepath),
 		localizationPath:    localizationPath,
 		slogger:             slogger.With("component", "desktop_notifier"),
 		conn:                conn,
@@ -183,6 +184,11 @@ func (d *dbusNotifier) Interrupt(err error) {
 // just make compiler happy, this is only needed on darwin
 func (d *dbusNotifier) Listen() {}
 
+// SetIconFilepath updates the icon used for subsequent notifications
+func (d *dbusNotifier) SetIconFilepath(iconFilepath string) {
+	d.iconFilepath.Store(iconFilepath)
+}
+
 func (d *dbusNotifier) SendNotification(n Notification) error {
 	if err := d.sendNotificationViaDbus(n); err == nil {
 		return nil
@@ -209,13 +215,13 @@ func (d *dbusNotifier) sendNotificationViaDbus(n Notification) error {
 
 	notificationsService := conn.Object(notificationServiceInterface, notificationServiceObj)
 	call := notificationsService.Call("org.freedesktop.Notifications.Notify",
-		0,              // no flags
-		"Kolide",       // app_name
-		uint32(0),      // replaces_id -- 0 means this notification won't replace any existing notifications
-		d.iconFilepath, // app_icon
-		n.Title,        // summary
-		n.Body,         // body
-		actions,        // actions
+		0,                     // no flags
+		"Kolide",              // app_name
+		uint32(0),             // replaces_id -- 0 means this notification won't replace any existing notifications
+		d.iconFilepath.Load(), // app_icon
+		n.Title,               // summary
+		n.Body,                // body
+		actions,               // actions
 		map[string]dbus.Variant{
 			"urgency": dbus.MakeVariant(uint8(2)), // Without an urgency of "critical", the notification auto-closes extremely quickly
 		}, // hints
@@ -255,8 +261,8 @@ func (d *dbusNotifier) sendNotificationViaNotifySend(n Notification) error {
 
 	// We set an urgency of "critical" so that the notification does not auto-close quickly.
 	args := []string{n.Title, n.Body, "-u", "critical"}
-	if d.iconFilepath != "" {
-		args = append(args, "-i", d.iconFilepath)
+	if iconFilepath := d.iconFilepath.Load(); iconFilepath != "" {
+		args = append(args, "-i", iconFilepath)
 	}
 
 	cmd, err := allowedcmd.NotifySend.Cmd(context.TODO(), args...)

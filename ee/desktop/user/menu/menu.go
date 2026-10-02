@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"sync/atomic"
 
 	"github.com/kolide/kit/version"
 )
@@ -60,6 +61,8 @@ type menu struct {
 	slogger  *slog.Logger
 	filePath string
 	urlInput chan string
+	// deviceTrustRebrand determines whether the Device Trust or the legacy Kolide menu bar icons are used
+	deviceTrustRebrand atomic.Bool
 }
 
 func New(slogger *slog.Logger, filePath string, urlInput chan string) *menu {
