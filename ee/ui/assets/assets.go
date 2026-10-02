@@ -6,9 +6,11 @@ import (
 	_ "embed"
 )
 
-
 //go:embed device-trust.ico
 var DeviceTrustIco []byte
+
+//go:embed device-trust.png
+var DeviceTrustPng []byte
 
 //go:embed device-trust-menubar-circle-dot-darkmode.ico
 var DeviceTrustMenubarCircleDotDarkmodeIco []byte
@@ -160,20 +162,17 @@ var DeviceTrustMenubarTriangleExclamationMonochromeLightmodeIco []byte
 //go:embed device-trust-menubar-triangle-exclamation-monochrome-lightmode.png
 var DeviceTrustMenubarTriangleExclamationMonochromeLightmodePng []byte
 
-//go:embed device-trust.png
-var DeviceTrustPng []byte
+//go:embed kolide.ico
+var KolideIco []byte
+
+//go:embed kolide.png
+var KolidePng []byte
 
 //go:embed kolide-debug.ico
 var KolideDebugIco []byte
 
 //go:embed kolide-debug.png
 var KolideDebugPng []byte
-
-//go:embed kolide.ico
-var KolideIco []byte
-
-//go:embed kolide.png
-var KolidePng []byte
 
 //go:embed menubar-circle-dot-darkmode.ico
 var MenubarCircleDotDarkmodeIco []byte
@@ -294,4 +293,3 @@ var MenubarTriangleExclamationMonochromeIco []byte
 
 //go:embed menubar-triangle-exclamation-monochrome.png
 var MenubarTriangleExclamationMonochromePng []byte
-

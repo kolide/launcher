@@ -14,6 +14,7 @@ import (
 	"os"
 	"runtime"
 	"runtime/pprof"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -31,17 +32,19 @@ type notificationSender interface {
 // UserServer provides IPC for the root desktop runner to communicate with the user desktop processes.
 // It allows the runner process to send notficaitons and commands to the desktop processes.
 type UserServer struct {
-	slogger                     *slog.Logger
-	server                      *http.Server
-	listener                    net.Listener
-	shutdownChan                chan<- struct{}
-	authToken                   string
-	socketPath                  string
-	notifier                    notificationSender
-	refreshListeners            []func()
-	deviceTrustRebrandListeners []func(enabled bool)
-	presenceDetector            presencedetection.PresenceDetector
-	showDesktopOnceFunc         func()
+	slogger             *slog.Logger
+	server              *http.Server
+	listener            net.Listener
+	shutdownChan        chan<- struct{}
+	authToken           string
+	socketPath          string
+	notifier            notificationSender
+	refreshListeners    []func()
+	presenceDetector    presencedetection.PresenceDetector
+	showDesktopOnceFunc func()
+
+	deviceTrustRebrandListeners     []func(enabled bool)
+	deviceTrustRebrandListenersLock sync.RWMutex
 }
 
 // DeviceTrustRebrandRequest is sent by the desktop runner when the DeviceTrustRebrand flag changes
@@ -280,7 +283,11 @@ func (s *UserServer) deviceTrustRebrandHandler(w http.ResponseWriter, req *http.
 		"device_trust_rebrand", rebrandRequest.Enabled,
 	)
 
-	for _, listener := range s.deviceTrustRebrandListeners {
+	s.deviceTrustRebrandListenersLock.RLock()
+	listeners := slices.Clone(s.deviceTrustRebrandListeners)
+	s.deviceTrustRebrandListenersLock.RUnlock()
+
+	for _, listener := range listeners {
 		listener(rebrandRequest.Enabled)
 	}
 
@@ -290,6 +297,8 @@ func (s *UserServer) deviceTrustRebrandHandler(w http.ResponseWriter, req *http.
 
 // RegisterDeviceTrustRebrandListener registers a listener to be notified when the DeviceTrustRebrand flag changes
 func (s *UserServer) RegisterDeviceTrustRebrandListener(f func(enabled bool)) {
+	s.deviceTrustRebrandListenersLock.Lock()
+	defer s.deviceTrustRebrandListenersLock.Unlock()
 	s.deviceTrustRebrandListeners = append(s.deviceTrustRebrandListeners, f)
 }
 

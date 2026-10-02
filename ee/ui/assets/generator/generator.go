@@ -1,12 +1,14 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"flag"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"text/template"
 
@@ -114,6 +116,11 @@ func main() {
 
 }
 
+type embed struct {
+	Constant string
+	Filename string
+}
+
 func generateAssetGo(ctx context.Context, logger log.Logger) error {
 	output, err := os.Create(fmt.Sprintf("%s/assets.go", outDir))
 	if err != nil {
@@ -121,11 +128,20 @@ func generateAssetGo(ctx context.Context, logger log.Logger) error {
 	}
 	defer output.Close()
 
-	embeds := make(map[string]string, len(embeddedFiles))
+	// Sort by icon name, then extension, so each icon's variants stay grouped together.
+	slices.SortFunc(embeddedFiles, func(a, b string) int {
+		aExt, bExt := filepath.Ext(a), filepath.Ext(b)
+		return cmp.Or(
+			strings.Compare(strings.TrimSuffix(a, aExt), strings.TrimSuffix(b, bExt)),
+			strings.Compare(aExt, bExt),
+		)
+	})
+
+	embeds := make([]embed, 0, len(embeddedFiles))
 	for _, filename := range embeddedFiles {
 		// embeds don't support a directory path. Everything is just in the outDir.
 		filename = filepath.Base(filename)
-		embeds[constName(filename)] = filename
+		embeds = append(embeds, embed{Constant: constName(filename), Filename: filename})
 	}
 
 	tmpl, err := template.ParseFiles("generator/assets.go.tmpl")
