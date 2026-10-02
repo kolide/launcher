@@ -278,9 +278,14 @@ func (s *UserServer) deviceTrustRebrandHandler(w http.ResponseWriter, req *http.
 		return
 	}
 
+	rebrandStatus := "disabled"
+	if rebrandRequest.Enabled {
+		rebrandStatus = "enabled"
+	}
+
 	s.slogger.Log(req.Context(), slog.LevelInfo,
 		"received device trust rebrand update",
-		"device_trust_rebrand", rebrandRequest.Enabled,
+		"device_trust_rebrand", rebrandStatus,
 	)
 
 	s.deviceTrustRebrandListenersLock.RLock()
