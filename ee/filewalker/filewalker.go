@@ -167,7 +167,9 @@ func (f *filewalker) Filewalk(ctx context.Context) {
 
 	span.AddEvent("walk_lock_acquired")
 
+	walkStart := time.Now()
 	fileNames := make([]string, 0)
+	errorCounts := make(map[string]int)
 
 	for _, rootDir := range f.rootDirs {
 		// rootDir may be a directory, or a glob for a directory.
@@ -183,12 +185,16 @@ func (f *filewalker) Filewalk(ctx context.Context) {
 		for _, match := range matches {
 			if err := filepath.WalkDir(match, func(path string, d fs.DirEntry, err error) error {
 				if err != nil {
-					f.slogger.Log(ctx, slog.LevelWarn,
-						"error while filewalking",
-						"start_dir", match,
-						"path", path,
-						"err", err,
-					)
+					key, expected := classifyWalkError(err)
+					errorCounts[key]++
+					if !expected {
+						f.slogger.Log(ctx, slog.LevelWarn,
+							"error while filewalking",
+							"start_dir", match,
+							"path", path,
+							"err", err,
+						)
+					}
 					return nil
 				}
 
@@ -257,8 +263,10 @@ func (f *filewalker) Filewalk(ctx context.Context) {
 
 	span.AddEvent("walk_time_stored")
 
-	f.slogger.Log(ctx, slog.LevelDebug,
+	f.slogger.Log(ctx, slog.LevelInfo,
 		"completed filewalk",
+		"walk_duration", time.Since(walkStart).String(),
+		"error_counts", errorCounts,
 	)
 }
 
