@@ -1,0 +1,107 @@
+# Downloads TUF-verified launcher artifacts and attaches them to GitHub releases.
+# Runs hourly to catch releases missing artifacts, and can be triggered manually
+# for a specific version.
+name: Attach TUF Launcher Artifacts
+
+on:
+  schedule:
+    - cron: "28 * * * *"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g. 1.2.3). Leave empty for latest."
+        required: false
+        type: string
+      force_overwrite:
+        description: "Overwrite existing release assets"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  attach-tuf-artifacts:
+    name: Attach TUF artifacts to release
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Determine version
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            LATEST=$(gh release list --repo "${{ github.repository }}" --limit 1 --json tagName -q '.[0].tagName')
+            VERSION="${LATEST#v}"
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+            echo "Checking latest release: $LATEST (version: $VERSION)"
+          fi
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: "./go.mod"
+          check-latest: true
+
+      - name: Build launcher
+        run: make deps && make build
+
+      - name: Download and attach TUF artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LAUNCHER_SKIP_UPDATES: "1"
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          FORCE="${{ github.event.inputs.force_overwrite }}"
+          LAUNCHER=./build/launcher
+
+          mkdir -p tuf-cache artifacts
+
+          # Collect existing asset names once to avoid repeated API calls
+          EXISTING_ASSETS=$(gh release view "v${VERSION}" --repo "${{ github.repository }}" --json assets -q '.assets[].name' 2>/dev/null || true)
+
+          COMBOS=(
+            "linux:amd64"
+            "linux:arm64"
+            "darwin:universal"
+            "windows:amd64"
+            "windows:arm64"
+          )
+
+          for combo in "${COMBOS[@]}"; do
+            PLATFORM="${combo%%:*}"
+            ARCH="${combo##*:}"
+            ASSET_NAME="launcher-${PLATFORM}-${ARCH}-v${VERSION}.tar.gz"
+
+            if [ "$FORCE" != "true" ] && echo "$EXISTING_ASSETS" | grep -qx "$ASSET_NAME"; then
+              echo "Asset $ASSET_NAME already exists, skipping"
+              continue
+            fi
+
+            echo "Downloading launcher for ${PLATFORM}/${ARCH}..."
+            $LAUNCHER download \
+              --target launcher \
+              --raw \
+              --channel "${VERSION}" \
+              --platform "${PLATFORM}" \
+              --arch "${ARCH}" \
+              --directory artifacts \
+              --tuf-store tuf-cache \
+              --debug
+
+            mv "artifacts/launcher.tar.gz" "artifacts/${ASSET_NAME}"
+
+            UPLOAD_FLAGS=""
+            if [ "$FORCE" = "true" ]; then
+              UPLOAD_FLAGS="--clobber"
+            fi
+
+            echo "Uploading ${ASSET_NAME}..."
+            gh release upload "v${VERSION}" "artifacts/${ASSET_NAME}" $UPLOAD_FLAGS --repo "${{ github.repository }}"
+          done
