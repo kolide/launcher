@@ -126,21 +126,7 @@ func generateNetworkTimeData(ctx context.Context, systemsetupExec executor, slog
 		return results, nil
 	}
 
-	row := make(map[string]string, len(settings))
-	for _, s := range settings {
-		value, found := parsed[s.columnName]
-		if !found {
-			continue
-		}
-
-		if s.isState {
-			value = sanitizeState(value)
-		}
-
-		row[s.columnName] = value
-	}
-
-	results = append(results, row)
+	results = append(results, parsed)
 
 	return results, nil
 }

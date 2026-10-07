@@ -22,7 +22,12 @@ func parseSystemsetupOutput(output []byte) map[string]string {
 				continue
 			}
 
-			result[s.columnName] = strings.TrimSpace(strings.TrimPrefix(line, s.outputPrefix))
+			value := strings.TrimSpace(strings.TrimPrefix(line, s.outputPrefix))
+			if s.isState {
+				value = sanitizeState(value)
+			}
+
+			result[s.columnName] = value
 			break
 		}
 	}

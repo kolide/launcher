@@ -76,7 +76,7 @@ func TestParseSystemsetupOutput(t *testing.T) {
 			name:   "all settings",
 			output: "Network Time: On\nNetwork Time Server: time.apple.com\n",
 			want: map[string]string{
-				"using_network_time":  "On",
+				"using_network_time":  "1",
 				"network_time_server": "time.apple.com",
 			},
 		},
@@ -88,12 +88,12 @@ func TestParseSystemsetupOutput(t *testing.T) {
 		{
 			name:   "no trailing newline",
 			output: "Network Time: On",
-			want:   map[string]string{"using_network_time": "On"},
+			want:   map[string]string{"using_network_time": "1"},
 		},
 		{
 			name:   "unknown settings are skipped",
 			output: "Wake On Modem: On\n\nNetwork Time: Off\n",
-			want:   map[string]string{"using_network_time": "Off"},
+			want:   map[string]string{"using_network_time": "0"},
 		},
 		{
 			name:   "empty output",
