@@ -170,6 +170,7 @@ func (f *filewalker) Filewalk(ctx context.Context) {
 	walkStart := time.Now()
 	fileNames := make([]string, 0)
 	errorCounts := make(map[string]int)
+	var pathsWalked, dirsSkipped int
 
 	for _, rootDir := range f.rootDirs {
 		// rootDir may be a directory, or a glob for a directory.
@@ -198,8 +199,11 @@ func (f *filewalker) Filewalk(ctx context.Context) {
 					return nil
 				}
 
+				pathsWalked++
+
 				// Prune skipped directories before any other filter, so that we don't descend unnecessarily
 				if d.IsDir() && f.shouldSkipDir(path) {
+					dirsSkipped++
 					return fs.SkipDir
 				}
 
@@ -267,6 +271,9 @@ func (f *filewalker) Filewalk(ctx context.Context) {
 		"completed filewalk",
 		"walk_duration", time.Since(walkStart).String(),
 		"error_counts", errorCounts,
+		"paths_walked", pathsWalked,
+		"dirs_skipped", dirsSkipped,
+		"files_matched", len(fileNames),
 	)
 }
 
