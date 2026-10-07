@@ -19,7 +19,7 @@ func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m)
 }
 
-func TestGenerateNetworkTimeData(t *testing.T) {
+func TestGenerateNetworkTime(t *testing.T) {
 	t.Parallel()
 
 	var tests = []struct {

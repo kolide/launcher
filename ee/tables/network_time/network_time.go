@@ -76,27 +76,20 @@ func (t *NetworkTime) generateNetworkTime(ctx context.Context, queryContext tabl
 	ctx, span := observability.StartSpan(ctx, "table_name", tableName)
 	defer span.End()
 
-	return generateNetworkTimeData(ctx, t.execFunction, t.slogger)
-}
-
-func generateNetworkTimeData(ctx context.Context, execFunction networkTimeExecer, slogger *slog.Logger) ([]map[string]string, error) {
-	ctx, span := observability.StartSpan(ctx)
-	defer span.End()
-
 	results := make([]map[string]string, 0)
 
-	output, err := execFunction(ctx, slogger)
+	output, err := t.execFunction(ctx, t.slogger)
 	if err != nil {
 		// log that the binary doesn't exist, but don't return an error
 		if errors.Is(err, allowedcmd.ErrCommandNotFound) {
-			slogger.Log(ctx, slog.LevelWarn,
+			t.slogger.Log(ctx, slog.LevelWarn,
 				"systemsetup binary not found",
 				"err", err,
 			)
 			return nil, nil
 		}
 
-		slogger.Log(ctx, slog.LevelError,
+		t.slogger.Log(ctx, slog.LevelError,
 			"systemsetup failed",
 			"err", err,
 		)
@@ -106,7 +99,7 @@ func generateNetworkTimeData(ctx context.Context, execFunction networkTimeExecer
 	parsed := parseSystemsetupOutput(output)
 
 	if len(parsed) == 0 {
-		slogger.Log(ctx, slog.LevelWarn,
+		t.slogger.Log(ctx, slog.LevelWarn,
 			"no settings in systemsetup output",
 			"output", string(output),
 		)
