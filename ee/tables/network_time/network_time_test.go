@@ -3,11 +3,13 @@
 package network_time
 
 import (
+	"context"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/kolide/launcher/v2/ee/tables/network_time/mocks"
+	"github.com/kolide/launcher/v2/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
@@ -54,10 +56,14 @@ func TestGenerateNetworkTimeData(t *testing.T) {
 			execReturn, err := os.ReadFile(filepath.Join("testdata", tt.execReturnFile))
 			require.NoError(t, err, "read exec return file")
 
-			executor := mocks.NewExecutor(t)
-			executor.On("ExecNetworkTime").Return(execReturn, nil).Once()
+			networkTimeTable := &NetworkTime{
+				slogger: multislogger.NewNopLogger(),
+				execFunction: func(ctx context.Context, slogger *slog.Logger) ([]byte, error) {
+					return execReturn, nil
+				},
+			}
 
-			got, err := generateNetworkTimeData(t.Context(), executor, multislogger.NewNopLogger())
+			got, err := networkTimeTable.generateNetworkTime(t.Context(), tablehelpers.MockQueryContext(nil))
 			require.NoError(t, err)
 			require.Equal(t, tt.want, got)
 		})

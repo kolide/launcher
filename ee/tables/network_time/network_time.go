@@ -40,8 +40,11 @@ var settings = []setting{
 	},
 }
 
+type networkTimeExecer func(ctx context.Context, slogger *slog.Logger) ([]byte, error)
+
 type NetworkTime struct {
-	slogger *slog.Logger
+	slogger      *slog.Logger
+	execFunction networkTimeExecer
 }
 
 func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
@@ -51,7 +54,8 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	}
 
 	networkTimeTable := &NetworkTime{
-		slogger: slogger.With("table", tableName),
+		slogger:      slogger.With("table", tableName),
+		execFunction: networkTimeExec,
 	}
 
 	return tablewrapper.New(flags, slogger, tableName, columns, networkTimeTable.generateNetworkTime,
@@ -59,46 +63,29 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	)
 }
 
-type systemsetupExecutor struct {
-	ctx     context.Context // nolint:containedctx
-	slogger *slog.Logger
-}
-
-func (s *systemsetupExecutor) ExecNetworkTime() ([]byte, error) {
+func networkTimeExec(ctx context.Context, slogger *slog.Logger) ([]byte, error) {
 	args := make([]string, 0, len(settings))
 	for _, setting := range settings {
 		args = append(args, setting.arg)
 	}
 
-	return tablehelpers.RunSimple(s.ctx, s.slogger, 10, allowedcmd.Systemsetup, args)
-}
-
-//mockery:generate: true
-//mockery:filename: executor.go
-//mockery:structname: Executor
-type executor interface {
-	ExecNetworkTime() ([]byte, error)
+	return tablehelpers.RunSimple(ctx, slogger, 10, allowedcmd.Systemsetup, args)
 }
 
 func (t *NetworkTime) generateNetworkTime(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	ctx, span := observability.StartSpan(ctx, "table_name", tableName)
 	defer span.End()
 
-	systemsetupExec := &systemsetupExecutor{
-		ctx:     ctx,
-		slogger: t.slogger,
-	}
-
-	return generateNetworkTimeData(ctx, systemsetupExec, t.slogger)
+	return generateNetworkTimeData(ctx, t.execFunction, t.slogger)
 }
 
-func generateNetworkTimeData(ctx context.Context, systemsetupExec executor, slogger *slog.Logger) ([]map[string]string, error) {
+func generateNetworkTimeData(ctx context.Context, execFunction networkTimeExecer, slogger *slog.Logger) ([]map[string]string, error) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	results := make([]map[string]string, 0)
 
-	output, err := systemsetupExec.ExecNetworkTime()
+	output, err := execFunction(ctx, slogger)
 	if err != nil {
 		// log that the binary doesn't exist, but don't return an error
 		if errors.Is(err, allowedcmd.ErrCommandNotFound) {
