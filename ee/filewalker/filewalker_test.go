@@ -244,7 +244,7 @@ func (fwt *filewalkerTest) run(t *testing.T, fsys fstest.MapFS) []string {
 }
 
 func newTestFilewalker(tb testing.TB, name string, cfg filewalkConfig, store types.GetterSetterDeleter, slogger *slog.Logger) *filewalker {
-	return newFilewalker(name, cfg, store, slogger)
+	return newFilewalker(resolve(tb.Context(), slogger, map[string]filewalkConfig{name: cfg}, runtime.GOOS), store, slogger)
 }
 
 func BenchmarkFilewalk(b *testing.B) {

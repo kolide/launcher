@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"maps"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -127,7 +128,8 @@ func (fm *FilewalkManager) walkConfigs(ctx context.Context, cfgs map[string]file
 			)
 			continue
 		}
-		newFilewalker(name, cfg, fm.resultsStore, fm.slogger).Filewalk(ctx)
+		spec := resolve(ctx, fm.slogger, map[string]filewalkConfig{name: cfg}, runtime.GOOS)
+		newFilewalker(spec, fm.resultsStore, fm.slogger).Filewalk(ctx)
 	}
 }
 
