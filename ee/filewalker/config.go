@@ -1,10 +1,17 @@
 package filewalker
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"log/slog"
+	"maps"
+	"path/filepath"
 	"regexp"
+	"runtime"
+	"slices"
+	"strings"
 	"time"
 )
 
@@ -103,3 +110,111 @@ type (
 		FileTypeFilter *fileTypeFilter   `json:"file_type_filter,omitempty"`
 	}
 )
+
+type (
+	// lines up with a single filewalkConfig by name
+	matcher struct {
+		name     string           // the server's filewalkConfig.name
+		skipDirs []*regexp.Regexp // directories excluded from walk
+		fileName *regexp.Regexp   // filenames included in results
+		fileType *fileTypeFilter  // file types excluded
+	}
+
+	// specification for a single walk run
+	walkSpec struct {
+		roots    []string              // the unique, top-level absolute paths to walk
+		activate map[string][]*matcher // uppermost path => all new matchers applicable
+		matchers []*matcher
+	}
+)
+
+// resolve realizes all passed server filewalkConfigs into a walkSpec that associates
+// which filtered results belong to which filewalkConfig by name.
+//
+// resolve uses the filesystem to evaluate the root paths globs, then deduplicates
+// paths among the matchers which share them.
+func resolve(ctx context.Context, slogger *slog.Logger, cfgs map[string]filewalkConfig, goos string) walkSpec {
+	spec := walkSpec{activate: make(map[string][]*matcher)}
+	pathsToWalk := make(map[string]string)
+	var canonicalRoots []string
+
+	for _, name := range slices.Sorted(maps.Keys(cfgs)) {
+		cfg := cfgs[name]
+		matcher := &matcher{name: name}
+		var rootDirs []string
+
+		// simple shortcut for overlay application
+		apply := func(def filewalkDefinition) {
+			if def.RootDirs != nil {
+				rootDirs = *def.RootDirs
+			}
+			if def.FileNameRegex != nil {
+				matcher.fileName = def.FileNameRegex
+			}
+			if def.SkipDirs != nil {
+				matcher.skipDirs = *def.SkipDirs
+			}
+			if def.FileTypeFilter != nil {
+				matcher.fileType = def.FileTypeFilter
+			}
+		}
+
+		apply(cfg.filewalkDefinition)
+		for _, overlay := range cfg.Overlays {
+			if overlayFiltersMatch(overlay.Filters, goos) {
+				apply(overlay.filewalkDefinition)
+			}
+		}
+
+		spec.matchers = append(spec.matchers, matcher)
+
+		for _, rootDir := range rootDirs {
+			globbedPaths, err := filepath.Glob(rootDir)
+			if err != nil {
+				slogger.Log(ctx, slog.LevelWarn,
+					"error globbing for directories",
+					"filewalker_name", name,
+					"root_dir", rootDir,
+					"err", err,
+				)
+				continue
+			}
+
+			for _, path := range globbedPaths {
+				canonicalRoot := canonicalize(path)
+				if !slices.Contains(spec.activate[canonicalRoot], matcher) {
+					spec.activate[canonicalRoot] = append(spec.activate[canonicalRoot], matcher)
+				}
+				if _, ok := pathsToWalk[canonicalRoot]; !ok {
+					pathsToWalk[canonicalRoot] = path
+				}
+			}
+		}
+	}
+
+	// Parent paths sort before their longer children, which allows deduping
+	// our dense map of pathsToWalk.
+	//
+	// NB: there are clever ways to remove this. Don't. This is hard enough to
+	// track as-is.
+	for _, root := range slices.Sorted(maps.Keys(pathsToWalk)) {
+		if !slices.ContainsFunc(canonicalRoots, func(otherRoot string) bool { return strings.HasPrefix(root, otherRoot) }) {
+			canonicalRoots = append(canonicalRoots, root)
+			spec.roots = append(spec.roots, pathsToWalk[root])
+		}
+	}
+
+	return spec
+}
+
+const pathSep = string(filepath.Separator)
+
+// canonicalize a path so they match when walked and configured.
+// As a side effect, if a root is a file we store it with a slash on the end.
+func canonicalize(path string) string {
+	path = filepath.Clean(path)
+	if runtime.GOOS == "windows" {
+		path = strings.ToLower(path)
+	}
+	return strings.TrimSuffix(path, pathSep) + pathSep
+}
