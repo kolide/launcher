@@ -9,8 +9,6 @@ import (
 	"io/fs"
 	"log/slog"
 	"path/filepath"
-	"regexp"
-	"runtime"
 	"sync"
 	"time"
 
@@ -21,12 +19,9 @@ import (
 // filewalker performs filewalks at the configured interval, storing results in its resultsStore.
 type filewalker struct {
 	// Configuration
-	name           string
-	walkInterval   time.Duration
-	rootDirs       []string
-	fileNameRegex  *regexp.Regexp
-	fileTypeFilter *fileTypeFilter
-	skipDirs       []*regexp.Regexp
+	name         string
+	walkInterval time.Duration
+	spec         walkSpec
 
 	// Internals
 	slogger      *slog.Logger
@@ -38,10 +33,10 @@ type filewalker struct {
 	interrupt chan struct{}
 }
 
-func newFilewalker(name string, cfg filewalkConfig, resultsStore types.GetterSetterDeleter, slogger *slog.Logger) *filewalker {
+func newFilewalker(name string, walkInterval time.Duration, spec walkSpec, resultsStore types.GetterSetterDeleter, slogger *slog.Logger) *filewalker {
 	fw := &filewalker{
 		name:         name,
-		walkInterval: time.Duration(cfg.WalkInterval),
+		walkInterval: walkInterval,
 		slogger:      slogger.With("filewalker_name", name),
 		walkLock:     &sync.Mutex{},
 		resultsStore: resultsStore,
@@ -49,7 +44,7 @@ func newFilewalker(name string, cfg filewalkConfig, resultsStore types.GetterSet
 	}
 
 	// Set config options from cfg
-	fw.UpdateConfig(cfg)
+	fw.UpdateConfig(walkInterval, spec)
 
 	return fw
 }
@@ -98,63 +93,26 @@ func (f *filewalker) Stop() {
 	f.interrupt <- struct{}{}
 }
 
-func (f *filewalker) UpdateConfig(newCfg filewalkConfig) {
+func (f *filewalker) UpdateConfig(walkInterval time.Duration, spec walkSpec) {
 	f.walkLock.Lock()
 	defer f.walkLock.Unlock()
 
 	// Update walk interval first, updating ticker if it exists
-	if time.Duration(newCfg.WalkInterval) != f.walkInterval && f.ticker != nil {
-		f.ticker.Reset(time.Duration(newCfg.WalkInterval))
+	if walkInterval != f.walkInterval && f.ticker != nil {
+		f.ticker.Reset(walkInterval)
 	}
-	f.walkInterval = time.Duration(newCfg.WalkInterval)
+	f.walkInterval = walkInterval
+	f.spec = spec
 
-	// Extract root dirs and filename regex from cfg -- applying base options first, and then overlays
-	if newCfg.RootDirs != nil {
-		f.rootDirs = *newCfg.RootDirs
-	}
-	if newCfg.FileNameRegex != nil {
-		f.fileNameRegex = newCfg.FileNameRegex
-	}
-	if newCfg.SkipDirs != nil {
-		f.skipDirs = *newCfg.SkipDirs
-	}
-	if newCfg.FileTypeFilter != nil {
-		f.fileTypeFilter = newCfg.FileTypeFilter
-	}
-	for _, overlay := range newCfg.Overlays {
-		if !overlayFiltersMatch(overlay.Filters, runtime.GOOS) {
-			continue
-		}
-		if overlay.RootDirs != nil {
-			f.rootDirs = *overlay.RootDirs
-		}
-		if overlay.FileNameRegex != nil {
-			f.fileNameRegex = overlay.FileNameRegex
-		}
-		if overlay.SkipDirs != nil {
-			f.skipDirs = *overlay.SkipDirs
-		}
-		if overlay.FileTypeFilter != nil {
-			f.fileTypeFilter = overlay.FileTypeFilter
-		}
-	}
-
+	m := f.spec.matchers[0]
 	f.slogger.Log(context.TODO(), slog.LevelInfo,
 		"set filewalker config",
 		"walk_interval", f.walkInterval.String(),
-		"root_dirs", f.rootDirs,
-		"file_name_regex", f.fileNameRegex,
-		"file_type_filter", f.fileTypeFilter.String(),
-		"skip_dirs", f.skipDirs,
+		"root_dirs", f.spec.roots,
+		"file_name_regex", m.fileName,
+		"file_type_filter", m.fileType.String(),
+		"skip_dirs", m.skipDirs,
 	)
-}
-
-func overlayFiltersMatch(overlayFilters map[string]string, goos string) bool {
-	// Currently, the only filter we expect is for OS.
-	if filterGoos, goosFound := overlayFilters["goos"]; goosFound {
-		return filterGoos == goos
-	}
-	return false
 }
 
 // Filewalk executes a filewalk with the configured settings, and then stores the results and walk time.
@@ -172,60 +130,49 @@ func (f *filewalker) Filewalk(ctx context.Context) {
 	errorCounts := make(map[string]int)
 	var pathsWalked, dirsSkipped int
 
-	for _, rootDir := range f.rootDirs {
-		// rootDir may be a directory, or a glob for a directory.
-		matches, err := filepath.Glob(rootDir)
-		if err != nil {
-			f.slogger.Log(ctx, slog.LevelWarn,
-				"error globbing for directories",
-				"root_dir", rootDir,
+	m := f.spec.matchers[0]
+	for _, match := range f.spec.roots {
+		if err := filepath.WalkDir(match, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				key, expected := classifyWalkError(err)
+				errorCounts[key]++
+				if !expected {
+					f.slogger.Log(ctx, slog.LevelWarn,
+						"error while filewalking",
+						"start_dir", match,
+						"path", path,
+						"err", err,
+					)
+				}
+				return nil
+			}
+
+			pathsWalked++
+
+			// Prune skipped directories before any other filter, so that we don't descend unnecessarily
+			if d.IsDir() && f.shouldSkipDir(path) {
+				dirsSkipped++
+				return fs.SkipDir
+			}
+
+			if m.fileType != nil && !m.fileType.matches(d.Type()) {
+				return nil
+			}
+
+			if m.fileName != nil && !m.fileName.MatchString(filepath.Base(path)) {
+				return nil
+			}
+
+			// Add this file to our results
+			fileNames = append(fileNames, path)
+			return nil
+		}); err != nil {
+			// Log error, but continue on to process other root dirs
+			f.slogger.Log(ctx, slog.LevelError,
+				"could not complete filewalk in directory",
+				"start_dir", match,
 				"err", err,
 			)
-			continue
-		}
-		for _, match := range matches {
-			if err := filepath.WalkDir(match, func(path string, d fs.DirEntry, err error) error {
-				if err != nil {
-					key, expected := classifyWalkError(err)
-					errorCounts[key]++
-					if !expected {
-						f.slogger.Log(ctx, slog.LevelWarn,
-							"error while filewalking",
-							"start_dir", match,
-							"path", path,
-							"err", err,
-						)
-					}
-					return nil
-				}
-
-				pathsWalked++
-
-				// Prune skipped directories before any other filter, so that we don't descend unnecessarily
-				if d.IsDir() && f.shouldSkipDir(path) {
-					dirsSkipped++
-					return fs.SkipDir
-				}
-
-				if f.fileTypeFilter != nil && !f.fileTypeFilter.matches(d.Type()) {
-					return nil
-				}
-
-				if f.fileNameRegex != nil && !f.fileNameRegex.MatchString(filepath.Base(path)) {
-					return nil
-				}
-
-				// Add this file to our results
-				fileNames = append(fileNames, path)
-				return nil
-			}); err != nil {
-				// Log error, but continue on to process other root dirs
-				f.slogger.Log(ctx, slog.LevelError,
-					"could not complete filewalk in directory",
-					"start_dir", match,
-					"err", err,
-				)
-			}
 		}
 	}
 
@@ -283,7 +230,7 @@ func LastWalkTimeKey(filewalkName string) []byte {
 }
 
 func (f *filewalker) shouldSkipDir(dir string) bool {
-	for _, skipDirRegex := range f.skipDirs {
+	for _, skipDirRegex := range f.spec.matchers[0].skipDirs {
 		if skipDirRegex.MatchString(dir) {
 			return true
 		}

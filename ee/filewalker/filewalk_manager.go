@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"runtime"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/kolide/launcher/v2/ee/agent/types"
 	"github.com/kolide/launcher/v2/ee/gowrapper"
@@ -64,7 +66,7 @@ func (fm *FilewalkManager) Execute() error {
 	}
 	fm.filewalkersLock.Lock()
 	for filewalkerName, cfg := range cfgs {
-		fm.filewalkers[filewalkerName] = newFilewalker(filewalkerName, cfg, fm.k.FilewalkResultsStore(), fm.slogger)
+		fm.filewalkers[filewalkerName] = newFilewalker(filewalkerName, time.Duration(cfg.WalkInterval), fm.resolveOne(filewalkerName, cfg), fm.k.FilewalkResultsStore(), fm.slogger)
 		gowrapper.Go(context.TODO(), fm.slogger, fm.filewalkers[filewalkerName].Work)
 	}
 	fm.slogger.Log(context.TODO(), slog.LevelDebug,
@@ -113,6 +115,10 @@ func (fm *FilewalkManager) pullConfigs() (map[string]filewalkConfig, error) {
 	return cfgs, nil
 }
 
+func (fm *FilewalkManager) resolveOne(name string, cfg filewalkConfig) walkSpec {
+	return resolve(context.TODO(), fm.slogger, map[string]filewalkConfig{name: cfg}, runtime.GOOS)
+}
+
 // Ping satisfies the control.subscriber interface -- the manager subscribes to changes to
 // the filewalk_config subsystem.
 func (fm *FilewalkManager) Ping() {
@@ -136,12 +142,12 @@ func (fm *FilewalkManager) Ping() {
 	// Check for filewalkers to add or update
 	for filewalkerName, cfg := range cfgs {
 		if fw, alreadyExists := fm.filewalkers[filewalkerName]; alreadyExists {
-			fw.UpdateConfig(cfg)
+			fw.UpdateConfig(time.Duration(cfg.WalkInterval), fm.resolveOne(filewalkerName, cfg))
 			// Kick off a new filewalk in the background, to populate results with the updated config
 			gowrapper.Go(context.TODO(), fm.slogger, func() { fw.Filewalk(context.TODO()) })
 		} else {
 			// Add the new filewalker
-			fm.filewalkers[filewalkerName] = newFilewalker(filewalkerName, cfg, fm.k.FilewalkResultsStore(), fm.slogger)
+			fm.filewalkers[filewalkerName] = newFilewalker(filewalkerName, time.Duration(cfg.WalkInterval), fm.resolveOne(filewalkerName, cfg), fm.k.FilewalkResultsStore(), fm.slogger)
 			gowrapper.Go(context.TODO(), fm.slogger, fm.filewalkers[filewalkerName].Work)
 		}
 	}
