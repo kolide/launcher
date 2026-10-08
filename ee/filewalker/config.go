@@ -207,6 +207,14 @@ func resolve(ctx context.Context, slogger *slog.Logger, cfgs map[string]filewalk
 	return spec
 }
 
+func overlayFiltersMatch(overlayFilters map[string]string, goos string) bool {
+	// Currently, the only filter we expect is for OS.
+	if filterGoos, goosFound := overlayFilters["goos"]; goosFound {
+		return filterGoos == goos
+	}
+	return false
+}
+
 const pathSep = string(filepath.Separator)
 
 // canonicalize a path so they match when walked and configured.
