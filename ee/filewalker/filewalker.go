@@ -70,16 +70,12 @@ func (f *filewalker) Filewalk(ctx context.Context) {
 			pathsWalked++
 
 			// Prune skipped directories before any other filter, so that we don't descend unnecessarily
-			if d.IsDir() && f.shouldSkipDir(path) {
+			if d.IsDir() && m.shouldSkipDir(path) {
 				dirsSkipped++
 				return fs.SkipDir
 			}
 
-			if m.fileType != nil && !m.fileType.matches(d.Type()) {
-				return nil
-			}
-
-			if m.fileName != nil && !m.fileName.MatchString(filepath.Base(path)) {
+			if !m.matches(path, d) {
 				return nil
 			}
 
@@ -152,11 +148,23 @@ func LastWalkTimeKey(filewalkName string) []byte {
 	return fmt.Appendf(nil, "%s_last_walk", filewalkName)
 }
 
-func (f *filewalker) shouldSkipDir(dir string) bool {
-	for _, skipDirRegex := range f.spec.matchers[0].skipDirs {
+func (m *matcher) shouldSkipDir(dir string) bool {
+	for _, skipDirRegex := range m.skipDirs {
 		if skipDirRegex.MatchString(dir) {
 			return true
 		}
 	}
 	return false
+}
+
+func (m *matcher) matches(path string, d fs.DirEntry) bool {
+	if m.fileType != nil && !m.fileType.matches(d.Type()) {
+		return false
+	}
+
+	if m.fileName != nil && !m.fileName.MatchString(filepath.Base(path)) {
+		return false
+	}
+
+	return true
 }
