@@ -11,6 +11,7 @@ import (
 	"maps"
 	"runtime"
 	"slices"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -36,7 +37,7 @@ type FilewalkManager struct {
 	// Internals
 	k            types.Knapsack
 	cfgStore     types.Iterator
-	resultsStore types.GetterSetterDeleter
+	resultsStore types.GetterSetterDeleterIterator
 	slogger      *slog.Logger
 
 	dirty *atomic.Bool
@@ -102,12 +103,13 @@ func (fm *FilewalkManager) run(ctx context.Context) {
 	for {
 		extraNames := requested
 		requested = nil
-		if cfgs, err := fm.pullConfigs(); err != nil {
+		if cfgs, present, err := fm.pullConfigs(); err != nil {
 			fm.slogger.Log(ctx, slog.LevelError,
 				"could not pull filewalk configs from store",
 				"err", err,
 			)
 		} else {
+			fm.deleteRemovedResults(ctx, present)
 			names := due(time.Now(), cfgs, fm.lastWalkTimes(cfgs))
 			if fm.dirty.Swap(false) {
 				names = slices.Collect(maps.Keys(cfgs))
@@ -184,21 +186,74 @@ func due(now time.Time, cfgs map[string]filewalkConfig, lastWalks map[string]tim
 }
 
 // pullConfigs gets the filewalk configs from the config store.
-func (fm *FilewalkManager) pullConfigs() (map[string]filewalkConfig, error) {
-	cfgs := make(map[string]filewalkConfig, 0)
+// First return is valid configs, second are those that failed to parse. Error is only returned when neither can be read.
+func (fm *FilewalkManager) pullConfigs() (map[string]filewalkConfig, map[string]struct{}, error) {
+	cfgs := make(map[string]filewalkConfig)
+	present := make(map[string]struct{})
 	if err := fm.cfgStore.ForEach(func(k, v []byte) error {
+		present[string(k)] = struct{}{}
+
 		var currentCfg filewalkConfig
 		if err := json.Unmarshal(v, &currentCfg); err != nil {
-			return fmt.Errorf("unmarshalling filewalk config for %s: %w", string(k), err)
+			fm.slogger.Log(context.TODO(), slog.LevelWarn,
+				"could not unmarshal filewalk config, skipping",
+				"filewalker_name", string(k),
+				"err", err,
+			)
+			return nil
 		}
 
 		cfgs[string(k)] = currentCfg
 		return nil
 	}); err != nil {
-		return nil, fmt.Errorf("getting filewalk configs from store: %w", err)
+		return nil, nil, fmt.Errorf("getting filewalk configs from store: %w", err)
 	}
 
-	return cfgs, nil
+	return cfgs, present, nil
+}
+
+// deleteRemovedResults deletes results and last walk times for configs no longer in the config store.
+func (fm *FilewalkManager) deleteRemovedResults(ctx context.Context, present map[string]struct{}) {
+	lastWalkSuffix := string(LastWalkTimeKey(""))
+	isPresent := func(name string) bool {
+		_, ok := present[name]
+		return ok
+	}
+
+	var removed [][]byte
+	if err := fm.resultsStore.ForEach(func(k, _ []byte) error {
+		key := string(k)
+		// Check the whole key first: a config may itself be named "x_last_walk".
+		if isPresent(key) {
+			return nil
+		}
+		if name, isLastWalk := strings.CutSuffix(key, lastWalkSuffix); isLastWalk && isPresent(name) {
+			return nil
+		}
+		removed = append(removed, k)
+		return nil
+	}); err != nil {
+		fm.slogger.Log(ctx, slog.LevelError,
+			"could not iterate filewalk results",
+			"err", err,
+		)
+		return
+	}
+	if len(removed) == 0 {
+		return
+	}
+
+	if err := fm.resultsStore.Delete(removed...); err != nil {
+		fm.slogger.Log(ctx, slog.LevelWarn,
+			"could not delete results for removed filewalk configs",
+			"err", err,
+		)
+		return
+	}
+	fm.slogger.Log(ctx, slog.LevelInfo,
+		"deleted results for removed filewalk configs",
+		"deleted_keys", len(removed),
+	)
 }
 
 // Ping satisfies the control.subscriber interface -- the manager subscribes to changes to
@@ -208,7 +263,6 @@ func (fm *FilewalkManager) Ping() {
 		"processing updated filewalk configs",
 	)
 
-	// TODO: removed configs keep their stored results until cleanup lands.
 	fm.dirty.Store(true)
 }
 
