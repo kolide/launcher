@@ -26,7 +26,7 @@ func TestFilewalk_ExpectedErrorsRolledUp(t *testing.T) {
 	var records []slog.Record
 	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.FilewalkResultsStore.String())
 	require.NoError(t, err)
-	fw := newFilewalker(t.Name(), filewalkConfig{
+	fw := newTestFilewalker(t, t.Name(), filewalkConfig{
 		WalkInterval: duration(1 * time.Minute),
 		filewalkDefinition: filewalkDefinition{
 			RootDirs: &[]string{root},

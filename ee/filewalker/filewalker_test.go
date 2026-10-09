@@ -2,6 +2,7 @@ package filewalker
 
 import (
 	"encoding/json"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/kolide/launcher/v2/ee/agent/storage"
 	storageci "github.com/kolide/launcher/v2/ee/agent/storage/ci"
+	"github.com/kolide/launcher/v2/ee/agent/types"
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 )
@@ -225,7 +227,7 @@ func (fwt *filewalkerTest) run(t *testing.T, fsys fstest.MapFS) []string {
 	slogger := multislogger.NewNopLogger()
 	store, err := storageci.NewStore(t, slogger, storage.FilewalkResultsStore.String())
 	require.NoError(t, err)
-	newFilewalker(fwt.name, cfg, store, slogger).Filewalk(t.Context())
+	newTestFilewalker(t, fwt.name, cfg, store, slogger).Filewalk(t.Context())
 
 	rawResults, err := store.Get([]byte(fwt.name))
 	require.NoError(t, err)
@@ -239,6 +241,10 @@ func (fwt *filewalkerTest) run(t *testing.T, fsys fstest.MapFS) []string {
 		results = append(results, filepath.ToSlash(relPath))
 	}
 	return results
+}
+
+func newTestFilewalker(tb testing.TB, name string, cfg filewalkConfig, store types.GetterSetterDeleter, slogger *slog.Logger) *filewalker {
+	return newFilewalker(resolve(tb.Context(), slogger, map[string]filewalkConfig{name: cfg}, runtime.GOOS), store, slogger)
 }
 
 func BenchmarkFilewalk(b *testing.B) {
@@ -256,7 +262,7 @@ func BenchmarkFilewalk(b *testing.B) {
 	store, err := storageci.NewStore(b, multislogger.NewNopLogger(), storage.FilewalkResultsStore.String())
 	require.NoError(b, err)
 
-	testFilewalker := newFilewalker("benchtest", filewalkConfig{
+	testFilewalker := newTestFilewalker(b, "benchtest", filewalkConfig{
 		WalkInterval: duration(1 * time.Minute),
 		filewalkDefinition: filewalkDefinition{
 			RootDirs:      &[]string{testDir},
