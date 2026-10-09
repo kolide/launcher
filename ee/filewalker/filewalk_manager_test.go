@@ -1,417 +1,408 @@
 package filewalker
 
 import (
-	"bytes"
 	"encoding/binary"
 	"encoding/json"
-	"errors"
-	"fmt"
-	"log/slog"
 	"os"
-	"path/filepath"
-	"regexp"
 	"strings"
+	"sync"
 	"testing"
+	"testing/fstest"
+	"testing/synctest"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/kolide/launcher/v2/ee/agent/storage"
 	storageci "github.com/kolide/launcher/v2/ee/agent/storage/ci"
+	"github.com/kolide/launcher/v2/ee/agent/types"
 	typesmocks "github.com/kolide/launcher/v2/ee/agent/types/mocks"
-	"github.com/kolide/launcher/v2/pkg/threadsafebuffer"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 )
 
-func TestExecute(t *testing.T) {
+const (
+	dotenvCfg   = `{"walk_interval": "2h", "root_dirs": ["$ROOT/home/*"], "file_name_regex": "^\\.env$", "file_type_filter": "file"}`
+	hostKeysCfg = `{"walk_interval": "4h", "root_dirs": ["$ROOT/etc/ssh"], "file_name_regex": "^ssh_host_.+_key$", "file_type_filter": "file"}`
+)
+
+func TestManager_WalksNeverWalkedAtStartup(t *testing.T) {
 	t.Parallel()
+	runManagerTest(t, func(h *managerHarness) {
+		h.setConfig("dotenv", dotenvCfg)
+		h.setConfig("host_keys", hostKeysCfg)
 
-	// Set up dependencies
-	var logBytes threadsafebuffer.ThreadSafeBuffer
-	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
-		Level: slog.LevelDebug,
-	}))
-	mockKnapsack := typesmocks.NewKnapsack(t)
-	cfgStore, err := storageci.NewStore(t, slogger, storage.FilewalkConfigStore.String())
-	require.NoError(t, err)
-	mockKnapsack.On("FilewalkConfigStore").Return(cfgStore)
-	resultsStore, err := storageci.NewStore(t, slogger, storage.FilewalkResultsStore.String())
-	require.NoError(t, err)
-	mockKnapsack.On("FilewalkResultsStore").Return(resultsStore)
+		h.start()
 
-	// Set up our filewalk config in the store
-	cfg := generateCfgWithSeeding(t, 500*time.Millisecond, 2, nil, 1)
-	cfgRaw, err := json.Marshal(cfg)
-	require.NoError(t, err)
-	testTableName := "TestExecute_tbl"
-	cfgStore.Set([]byte(testTableName), cfgRaw)
-
-	// Init filewalk manager
-	filewalkManager := New(mockKnapsack, slogger)
-
-	// Run the manager and let it spin up filewalkers
-	walkStart := time.Now().Unix()
-	go filewalkManager.Execute()
-	time.Sleep(time.Duration(3 * cfg.WalkInterval))
-
-	// Confirm we have one filewalker
-	filewalkManager.filewalkersLock.Lock()
-	require.Equal(t, 1, len(filewalkManager.filewalkers))
-	require.Contains(t, filewalkManager.filewalkers, testTableName)
-	filewalkManager.filewalkersLock.Unlock()
-
-	// Confirm we have results
-	rawResults, err := resultsStore.Get([]byte(testTableName))
-	require.NoError(t, err)
-	results := make([]string, 0)
-	require.NoError(t, json.Unmarshal(rawResults, &results))
-	require.Equal(t, 4, len(results)) // 2 directories, 1 file per directory -- 4 total results, 2 for the directories and 2 for the files
-	lastWalkTimeRaw, err := resultsStore.Get(LastWalkTimeKey(testTableName))
-	require.NoError(t, err)
-	lastWalkTime := int64(binary.NativeEndian.Uint64(lastWalkTimeRaw))
-	require.LessOrEqual(t, walkStart, lastWalkTime)
-
-	// Shut down
-	filewalkManager.Interrupt(nil)
+		require.Equal(t, time.Now().Unix(), h.lastWalk("dotenv"))
+		require.Equal(t, time.Now().Unix(), h.lastWalk("host_keys"))
+		require.Equal(t, []string{"home/kiwi/.env"}, h.results("dotenv"))
+		require.Equal(t, []string{"etc/ssh/ssh_host_ed25519_key"}, h.results("host_keys"))
+	})
 }
 
-func TestPing(t *testing.T) {
+// A config walked recently before startup should wait until it is due, then walk within one tick.
+func TestManager_WaitsUntilDueAfterStartup(t *testing.T) {
 	t.Parallel()
+	runManagerTest(t, func(h *managerHarness) {
+		h.setConfig("host_keys", hostKeysCfg)
+		seeded := h.seedLastWalk("host_keys", 4*time.Hour-30*time.Minute)
 
-	// Set up dependencies
-	var logBytes threadsafebuffer.ThreadSafeBuffer
-	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
-		Level: slog.LevelDebug,
-	}))
-	mockKnapsack := typesmocks.NewKnapsack(t)
-	cfgStore, err := storageci.NewStore(t, slogger, storage.FilewalkConfigStore.String())
-	require.NoError(t, err)
-	mockKnapsack.On("FilewalkConfigStore").Return(cfgStore)
-	resultsStore, err := storageci.NewStore(t, slogger, storage.FilewalkResultsStore.String())
-	require.NoError(t, err)
-	mockKnapsack.On("FilewalkResultsStore").Return(resultsStore)
+		h.start()
+		h.advance(25 * time.Minute)
+		require.Equal(t, seeded, h.lastWalk("host_keys"))
 
-	// Set up our filewalk config in the store
-	cfg := generateCfgWithSeeding(t, 500*time.Millisecond, 1, nil, 3)
-	cfgRaw, err := json.Marshal(cfg)
-	require.NoError(t, err)
-	firstTestTableName := "TestPing_tbl"
-	cfgStore.Set([]byte(firstTestTableName), cfgRaw)
-
-	// Init filewalk manager
-	filewalkManager := New(mockKnapsack, slogger)
-
-	// Run the manager and let it spin up filewalkers
-	go filewalkManager.Execute()
-	time.Sleep(time.Duration(3 * cfg.WalkInterval))
-
-	// Confirm we have one filewalker
-	filewalkManager.filewalkersLock.Lock()
-	require.Equal(t, 1, len(filewalkManager.filewalkers))
-	require.Contains(t, filewalkManager.filewalkers, firstTestTableName)
-	filewalkManager.filewalkersLock.Unlock()
-
-	// Confirm we have results
-	rawResults, err := resultsStore.Get([]byte(firstTestTableName))
-	require.NoError(t, err)
-	results := make([]string, 0)
-	require.NoError(t, json.Unmarshal(rawResults, &results))
-	require.Equal(t, 4, len(results)) // 1 directory, 3 files per directory -- 4 total results, 1 for the directory and 3 for the files
-
-	// Prepare an update: update the config for the existing filewalker with a much longer interval
-	testRegexp := regexp.MustCompile(`.*\.doc`)
-	newCfg := generateCfgWithSeeding(t, 1*time.Minute, 2, testRegexp, 3)
-	newCfgRaw, err := json.Marshal(newCfg)
-	require.NoError(t, err)
-	cfgStore.Set([]byte(firstTestTableName), newCfgRaw)
-
-	// Call Ping
-	filewalkManager.Ping()
-
-	// Sleep less than our new, longer walk interval of one minute
-	time.Sleep(1 * time.Second)
-
-	// Confirm we still have one filewalker
-	filewalkManager.filewalkersLock.Lock()
-	require.Equal(t, 1, len(filewalkManager.filewalkers))
-	require.Contains(t, filewalkManager.filewalkers, firstTestTableName)
-	filewalkManager.filewalkersLock.Unlock()
-
-	// Confirm we have results for that filewalker
-	updatedRawResults, err := resultsStore.Get([]byte(firstTestTableName))
-	require.NoError(t, err)
-	updatedResults := make([]string, 0)
-	require.NoError(t, json.Unmarshal(updatedRawResults, &updatedResults))
-	require.Equal(t, 6, len(updatedResults)) // 2 directories, 3 files per directory -- 6 results (directories don't count because they don't match the regex)
-
-	// Prepare an update: add a new filewalker
-	secondFilewalkerCfg := generateCfgWithSeeding(t, 500*time.Millisecond, 2, nil, 2)
-	secondCfgRaw, err := json.Marshal(secondFilewalkerCfg)
-	require.NoError(t, err)
-	secondTestTableName := "TestPing2_tbl"
-	cfgStore.Set([]byte(secondTestTableName), secondCfgRaw)
-
-	// Call Ping
-	filewalkManager.Ping()
-	time.Sleep(time.Duration(3 * cfg.WalkInterval))
-
-	// Confirm we now have two filewalkers
-	filewalkManager.filewalkersLock.Lock()
-	require.Equal(t, 2, len(filewalkManager.filewalkers))
-	require.Contains(t, filewalkManager.filewalkers, firstTestTableName)
-	require.Contains(t, filewalkManager.filewalkers, secondTestTableName)
-	filewalkManager.filewalkersLock.Unlock()
-
-	// Confirm we have results for the new filewalker
-	secondTableRawResults, err := resultsStore.Get([]byte(secondTestTableName))
-	require.NoError(t, err)
-	secondTableResults := make([]string, 0)
-	require.NoError(t, json.Unmarshal(secondTableRawResults, &secondTableResults))
-	require.Equal(t, 6, len(secondTableResults)) // 2 directories, 2 files per directory -- 6 total results, 2 for the directories and 4 for the files
-
-	// Prepare an update: delete the new filewalker
-	require.NoError(t, cfgStore.Delete([]byte(secondTestTableName)))
-
-	// Call Ping
-	filewalkManager.Ping()
-	time.Sleep(time.Duration(3 * cfg.WalkInterval))
-
-	// Confirm we're back to one filewalker
-	filewalkManager.filewalkersLock.Lock()
-	require.Equal(t, 1, len(filewalkManager.filewalkers))
-	require.Contains(t, filewalkManager.filewalkers, firstTestTableName)
-	require.NotContains(t, filewalkManager.filewalkers, secondTestTableName)
-	filewalkManager.filewalkersLock.Unlock()
-
-	// Shut down
-	filewalkManager.Interrupt(nil)
+		h.advance(walkCheckInterval)
+		require.Equal(t, time.Now().Unix(), h.lastWalk("host_keys"))
+	})
 }
 
-func TestDo(t *testing.T) {
+func TestManager_WalksOnSchedule(t *testing.T) {
 	t.Parallel()
+	runManagerTest(t, func(h *managerHarness) {
+		h.setConfig("dotenv", dotenvCfg)
+		h.setConfig("host_keys", hostKeysCfg)
 
-	for _, tt := range []struct {
-		testCaseName         string
-		managedFilewalks     []string
-		filewalksRequested   []string
-		filewalksExpected    []string
-		filewalksNotExpected []string
-	}{
-		{
-			testCaseName: "one filewalk specified",
-			managedFilewalks: []string{
-				"TestDo_1a",
-				"TestDo_1b",
-			},
-			filewalksRequested: []string{
-				"TestDo_1a",
-			},
-			filewalksExpected: []string{
-				"TestDo_1a",
-			},
-			filewalksNotExpected: []string{
-				"TestDo_1b",
-			},
-		},
-		{
-			testCaseName: "no filewalks specified",
-			managedFilewalks: []string{
-				"TestDo_2a",
-				"TestDo_2b",
-			},
-			filewalksRequested: []string{},
-			filewalksExpected: []string{
-				"TestDo_2a",
-				"TestDo_2b",
-			},
-			filewalksNotExpected: []string{},
-		},
-		{
-			testCaseName: "includes invalid filewalk",
-			managedFilewalks: []string{
-				"TestDo_3a",
-			},
-			filewalksRequested: []string{
-				"TestDo_invalid",
-				"TestDo_3a",
-			},
-			filewalksExpected: []string{
-				"TestDo_3a",
-			},
-			filewalksNotExpected: []string{},
-		},
-	} {
-		t.Run(tt.testCaseName, func(t *testing.T) {
-			t.Parallel()
+		h.start()
 
-			// Set up dependencies
-			var logBytes threadsafebuffer.ThreadSafeBuffer
-			slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
-				Level: slog.LevelDebug,
-			}))
-			mockKnapsack := typesmocks.NewKnapsack(t)
-			cfgStore, err := storageci.NewStore(t, slogger, storage.FilewalkConfigStore.String())
-			require.NoError(t, err)
-			mockKnapsack.On("FilewalkConfigStore").Return(cfgStore)
-			resultsStore, err := storageci.NewStore(t, slogger, storage.FilewalkResultsStore.String())
-			require.NoError(t, err)
-			mockKnapsack.On("FilewalkResultsStore").Return(resultsStore)
-
-			// Set up our filewalk config in the store. Set a very long filewalk interval.
-			for _, fwName := range tt.managedFilewalks {
-				cfg := generateCfgWithSeeding(t, 500*time.Minute, 1, nil, 1)
-				cfgRaw, err := json.Marshal(cfg)
-				require.NoError(t, err)
-				cfgStore.Set([]byte(fwName), cfgRaw)
+		walks := map[string]int{}
+		previous := map[string]int64{"dotenv": h.lastWalk("dotenv"), "host_keys": h.lastWalk("host_keys")}
+		for range int(8 * time.Hour / walkCheckInterval) {
+			h.advance(walkCheckInterval)
+			for name, last := range previous {
+				if current := h.lastWalk(name); current != last {
+					walks[name]++
+					previous[name] = current
+				}
 			}
-
-			// Init filewalk manager
-			filewalkManager := New(mockKnapsack, slogger)
-
-			// Run the manager and let it spin up filewalkers
-			go filewalkManager.Execute()
-
-			// Wait for filewalks to complete
-			time.Sleep(5 * time.Second)
-
-			// Get walk timestamp for each table
-			firstWalkTimestamps := make(map[string]int64)
-			for _, fwName := range tt.managedFilewalks {
-				lastWalkTimeRaw, err := resultsStore.Get(LastWalkTimeKey(fwName))
-				require.NoError(t, err)
-				require.NotNil(t, lastWalkTimeRaw)
-				firstWalkTimestamps[fwName] = int64(binary.NativeEndian.Uint64(lastWalkTimeRaw))
-			}
-
-			// Call Ping
-			req := controlServerFilewalkRequest{
-				FilewalkNames: tt.filewalksRequested,
-			}
-			rawReq, err := json.Marshal(req)
-			require.NoError(t, err)
-			require.NoError(t, filewalkManager.Do(bytes.NewReader(rawReq)))
-
-			// Wait a little bit for the filewalk to go through
-			time.Sleep(5 * time.Second)
-
-			// Get updated timestamp for each table
-			updatedWalkTimestamps := make(map[string]int64)
-			for _, fwName := range tt.managedFilewalks {
-				lastWalkTimeRaw, err := resultsStore.Get(LastWalkTimeKey(fwName))
-				require.NoError(t, err)
-				updatedWalkTimestamps[fwName] = int64(binary.NativeEndian.Uint64(lastWalkTimeRaw))
-			}
-
-			// Check that we did not perform filewalks we did not ask for
-			for _, fwName := range tt.filewalksNotExpected {
-				require.Equal(t, firstWalkTimestamps[fwName], updatedWalkTimestamps[fwName])
-			}
-
-			// Check that we performed the filewalks we expected to
-			for _, fwName := range tt.filewalksExpected {
-				require.Less(t, firstWalkTimestamps[fwName], updatedWalkTimestamps[fwName])
-			}
-
-			// Shut down
-			filewalkManager.Interrupt(nil)
-		})
-	}
-}
-
-func TestInterrupt_Multiple(t *testing.T) {
-	t.Parallel()
-
-	// Set up dependencies
-	var logBytes threadsafebuffer.ThreadSafeBuffer
-	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
-		Level: slog.LevelDebug,
-	}))
-	mockKnapsack := typesmocks.NewKnapsack(t)
-	cfgStore, err := storageci.NewStore(t, slogger, storage.FilewalkConfigStore.String())
-	require.NoError(t, err)
-	mockKnapsack.On("FilewalkConfigStore").Return(cfgStore)
-
-	// Init filewalk manager
-	filewalkManager := New(mockKnapsack, slogger)
-
-	// Let the filewalk manager run for a bit
-	go filewalkManager.Execute()
-	time.Sleep(3 * time.Second)
-	interruptStart := time.Now()
-	filewalkManager.Interrupt(errors.New("test error"))
-
-	// Confirm we can call Interrupt multiple times without blocking
-	interruptComplete := make(chan struct{})
-	expectedInterrupts := 3
-	for i := 0; i < expectedInterrupts; i += 1 {
-		go func() {
-			filewalkManager.Interrupt(nil)
-			interruptComplete <- struct{}{}
-		}()
-	}
-
-	receivedInterrupts := 0
-	for receivedInterrupts < expectedInterrupts {
-		select {
-		case <-interruptComplete:
-			receivedInterrupts += 1
-			continue
-		case <-time.After(5 * time.Second):
-			t.Errorf("could not call interrupt multiple times and return within 5 seconds -- interrupted at %s, received %d interrupts before timeout; logs: \n%s\n", interruptStart.String(), receivedInterrupts, logBytes.String())
-			t.FailNow()
-		}
-	}
-
-	require.Equal(t, expectedInterrupts, receivedInterrupts)
-}
-
-// generateCfgWithSeeding creates a filewalkConfig with the given parameters, and creates temporary directories
-// with files in them for a filewalker to read. The filenameRegex must be simple -- construct it with a single
-// `.*` to be replaced with a random string. The function will fail if it is unable to generate a matching filename.
-func generateCfgWithSeeding(t *testing.T, walkInterval time.Duration, numDirs int, filenameRegex *regexp.Regexp, numFilesPerDir int) filewalkConfig {
-	rootDirs := make([]string, numDirs)
-	skipDirs := make([]*regexp.Regexp, numDirs)
-
-	for i := range rootDirs {
-		currentRootDir := t.TempDir()
-		rootDirs[i] = currentRootDir
-
-		for j := range numFilesPerDir {
-			newFilename := fmt.Sprintf("temp-%d.txt", j)
-			if filenameRegex != nil {
-				// Try to generate a filename that will match
-				newFilename = strings.ReplaceAll(filenameRegex.String(), `\`, "")     // Remove escape characters
-				newFilename = strings.ReplaceAll(newFilename, ".*", uuid.NewString()) // Replace wildcard
-				require.True(t, filenameRegex.MatchString(newFilename), "could not generate matching filename")
-			}
-
-			expectedFile := filepath.Join(currentRootDir, newFilename)
-			require.NoError(t, os.WriteFile(expectedFile, []byte("test"), 0755))
 		}
 
-		skipDir := filepath.Join(currentRootDir, uuid.NewString())
-		require.NoError(t, os.Mkdir(skipDir, 0755))
-		skipDirRegexStr := strings.ReplaceAll(skipDir, `\`, `\\`) // Escape for Windows
-		skipDirRegexStr = strings.ReplaceAll(skipDirRegexStr, `/`, `\/`)
-		skipDirRegexp := regexp.MustCompile(skipDirRegexStr)
-		require.True(t, skipDirRegexp.MatchString(skipDir))
-		skipFileName := "skipme.txt"
-		if filenameRegex != nil {
-			// Try to generate a filename that will match (so we can confirm the directory is skipped due to skipDirs and not to a regex mismatch)
-			skipFileName = strings.ReplaceAll(filenameRegex.String(), `\`, "")      // Remove escape characters
-			skipFileName = strings.ReplaceAll(skipFileName, ".*", uuid.NewString()) // Replace wildcard
-			require.True(t, filenameRegex.MatchString(skipFileName), "could not generate matching filename")
+		require.Equal(t, map[string]int{"dotenv": 4, "host_keys": 2}, walks)
+	})
+}
+
+// Ping should walk every config on the next tick, even those not due; ticks without a Ping should not.
+func TestManager_PingWalksAllOnNextTick(t *testing.T) {
+	t.Parallel()
+	runManagerTest(t, func(h *managerHarness) {
+		h.setConfig("dotenv", dotenvCfg)
+		h.setConfig("host_keys", hostKeysCfg)
+		h.start()
+		bootWalk := time.Now().Unix()
+
+		h.advance(walkCheckInterval)
+		require.Equal(t, bootWalk, h.lastWalk("dotenv"))
+		require.Equal(t, bootWalk, h.lastWalk("host_keys"))
+
+		h.fm.Ping()
+		h.advance(walkCheckInterval)
+		require.Equal(t, time.Now().Unix(), h.lastWalk("dotenv"))
+		require.Equal(t, time.Now().Unix(), h.lastWalk("host_keys"))
+	})
+}
+
+// Several Pings before a tick should produce a single full walk.
+func TestManager_PingsCoalesce(t *testing.T) {
+	t.Parallel()
+	runManagerTest(t, func(h *managerHarness) {
+		h.setConfig("dotenv", dotenvCfg)
+		h.start()
+
+		h.fm.Ping()
+		h.fm.Ping()
+		h.fm.Ping()
+		h.advance(walkCheckInterval)
+		pingWalk := time.Now().Unix()
+		require.Equal(t, pingWalk, h.lastWalk("dotenv"))
+
+		h.advance(walkCheckInterval)
+		require.Equal(t, pingWalk, h.lastWalk("dotenv"))
+	})
+}
+
+func TestManager_DoWalksNamedImmediately(t *testing.T) {
+	t.Parallel()
+	runManagerTest(t, func(h *managerHarness) {
+		h.setConfig("dotenv", dotenvCfg)
+		h.setConfig("host_keys", hostKeysCfg)
+		h.start()
+		bootWalk := time.Now().Unix()
+
+		h.advance(time.Minute)
+		require.NoError(t, h.do(`{"filewalks": ["host_keys"]}`))
+		synctest.Wait()
+
+		require.Equal(t, time.Now().Unix(), h.lastWalk("host_keys"))
+		require.Equal(t, bootWalk, h.lastWalk("dotenv"))
+	})
+}
+
+func TestManager_DoEmptyWalksAll(t *testing.T) {
+	t.Parallel()
+	runManagerTest(t, func(h *managerHarness) {
+		h.setConfig("dotenv", dotenvCfg)
+		h.setConfig("host_keys", hostKeysCfg)
+		h.start()
+
+		h.advance(time.Minute)
+		require.NoError(t, h.do(`{"filewalks": []}`))
+		synctest.Wait()
+
+		require.Equal(t, time.Now().Unix(), h.lastWalk("dotenv"))
+		require.Equal(t, time.Now().Unix(), h.lastWalk("host_keys"))
+	})
+}
+
+func TestManager_DoIgnoresUnknownNames(t *testing.T) {
+	t.Parallel()
+	runManagerTest(t, func(h *managerHarness) {
+		h.setConfig("host_keys", hostKeysCfg)
+		h.start()
+
+		h.advance(time.Minute)
+		require.NoError(t, h.do(`{"filewalks": ["missing", "host_keys"]}`))
+		synctest.Wait()
+
+		require.Equal(t, time.Now().Unix(), h.lastWalk("host_keys"))
+		require.Zero(t, h.lastWalk("missing"))
+	})
+}
+
+// Do may reject a request while another is queued; retried requests, as the actionqueue does, should all walk.
+func TestManager_DoRetriedUntilAccepted(t *testing.T) {
+	t.Parallel()
+	runManagerTest(t, func(h *managerHarness) {
+		h.setConfig("dotenv", dotenvCfg)
+		h.setConfig("host_keys", hostKeysCfg)
+		h.start()
+
+		for _, req := range []string{
+			`{"filewalks": ["dotenv"]}`,
+			`{"filewalks": ["host_keys"]}`,
+			`{"filewalks": ["dotenv", "host_keys"]}`,
+			`{"filewalks": ["host_keys"]}`,
+		} {
+			h.advance(time.Minute)
+			for h.do(req) != nil {
+				synctest.Wait()
+			}
+			synctest.Wait()
+
+			for _, name := range []string{"dotenv", "host_keys"} {
+				if strings.Contains(req, name) {
+					require.Equal(t, time.Now().Unix(), h.lastWalk(name), req)
+				}
+			}
 		}
-		skipFile := filepath.Join(skipDir, skipFileName)
-		require.NoError(t, os.WriteFile(skipFile, []byte("test"), 0755))
-		skipDirs[i] = skipDirRegexp
+	})
+}
+
+func TestManager_WalksAddedConfig(t *testing.T) {
+	t.Parallel()
+	runManagerTest(t, func(h *managerHarness) {
+		h.setConfig("dotenv", dotenvCfg)
+		h.start()
+
+		h.setConfig("host_keys", hostKeysCfg)
+		h.advance(walkCheckInterval)
+
+		require.Equal(t, time.Now().Unix(), h.lastWalk("host_keys"))
+		require.Equal(t, []string{"etc/ssh/ssh_host_ed25519_key"}, h.results("host_keys"))
+	})
+}
+
+// A removed config's results and last walk time should be deleted, and stay deleted.
+func TestManager_PurgesRemovedConfig(t *testing.T) {
+	t.Parallel()
+	runManagerTest(t, func(h *managerHarness) {
+		h.setConfig("dotenv", dotenvCfg)
+		h.setConfig("host_keys", hostKeysCfg)
+		h.start()
+
+		require.NoError(t, h.cfgStore.Delete([]byte("host_keys")))
+		h.advance(walkCheckInterval)
+		require.False(t, h.stored("host_keys"))
+		require.False(t, h.stored(string(LastWalkTimeKey("host_keys"))))
+
+		h.advance(8 * time.Hour)
+		require.False(t, h.stored("host_keys"))
+		require.False(t, h.stored(string(LastWalkTimeKey("host_keys"))))
+		require.True(t, h.stored("dotenv"))
+	})
+}
+
+// A config that no longer parses should keep its previous results while other configs keep walking.
+func TestManager_KeepsBrokenConfigResults(t *testing.T) {
+	t.Parallel()
+	runManagerTest(t, func(h *managerHarness) {
+		h.setConfig("dotenv", dotenvCfg)
+		h.setConfig("host_keys", hostKeysCfg)
+		h.start()
+		bootWalk := time.Now().Unix()
+
+		h.setConfig("host_keys", `{not json`)
+		h.fm.Ping()
+		h.advance(walkCheckInterval)
+
+		require.Equal(t, time.Now().Unix(), h.lastWalk("dotenv"))
+		require.Equal(t, bootWalk, h.lastWalk("host_keys"))
+		require.Equal(t, []string{"etc/ssh/ssh_host_ed25519_key"}, h.results("host_keys"))
+	})
+}
+
+func TestManager_InterruptMultipleDoesNotBlock(t *testing.T) {
+	t.Parallel()
+	runManagerTest(t, func(h *managerHarness) {
+		h.setConfig("dotenv", dotenvCfg)
+		h.start()
+
+		var wg sync.WaitGroup
+		for range 4 {
+			wg.Go(func() { h.fm.Interrupt(nil) })
+		}
+		wg.Wait()
+		synctest.Wait()
+
+		require.True(t, h.stopped())
+	})
+}
+
+func TestManager_InterruptBeforeExecute(t *testing.T) {
+	t.Parallel()
+	runManagerTest(t, func(h *managerHarness) {
+		h.setConfig("dotenv", dotenvCfg)
+		h.fm.Interrupt(nil)
+
+		h.start()
+
+		require.True(t, h.stopped())
+	})
+}
+
+func Test_due(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1_000_000, 0)
+	cfgs := map[string]filewalkConfig{
+		"never_walked": {WalkInterval: duration(time.Hour)},
+		"future":       {WalkInterval: duration(time.Hour)},
+		"not_due":      {WalkInterval: duration(time.Hour)},
+		"elapsed":      {WalkInterval: duration(time.Hour)},
+	}
+	lastWalks := map[string]time.Time{
+		"future":  now.Add(24 * time.Hour), // clock moved back
+		"not_due": now.Add(-59 * time.Minute),
+		"elapsed": now.Add(-time.Hour),
 	}
 
-	return filewalkConfig{
-		WalkInterval: duration(walkInterval),
-		filewalkDefinition: filewalkDefinition{
-			RootDirs:      &rootDirs,
-			FileNameRegex: filenameRegex,
-			SkipDirs:      &skipDirs,
-		},
+	require.Equal(t, []string{"elapsed", "future", "never_walked"}, due(now, cfgs, lastWalks))
+}
+
+type managerHarness struct {
+	t            *testing.T
+	root         string
+	cfgStore     types.KVStore
+	resultsStore types.KVStore
+	fm           *FilewalkManager
+	done         chan struct{}
+}
+
+// runManagerTest runs body in a synctest bubble with a fresh manager; time only advances while every goroutine is blocked.
+func runManagerTest(t *testing.T, body func(h *managerHarness)) {
+	synctest.Test(t, func(t *testing.T) {
+		slogger := multislogger.NewNopLogger()
+		root := t.TempDir()
+		require.NoError(t, os.CopyFS(root, fstest.MapFS{
+			"etc/ssh/ssh_host_ed25519_key":     {},
+			"etc/ssh/ssh_host_ed25519_key.pub": {},
+			"home/kiwi/.env":                   {},
+			"home/kiwi/notes.txt":              {},
+		}))
+		cfgStore, err := storageci.NewStore(t, slogger, storage.FilewalkConfigStore.String())
+		require.NoError(t, err)
+		resultsStore, err := storageci.NewStore(t, slogger, storage.FilewalkResultsStore.String())
+		require.NoError(t, err)
+		k := typesmocks.NewKnapsack(t)
+		k.On("FilewalkConfigStore").Return(cfgStore)
+		k.On("FilewalkResultsStore").Return(resultsStore)
+
+		h := &managerHarness{
+			t:            t,
+			root:         root,
+			cfgStore:     cfgStore,
+			resultsStore: resultsStore,
+			fm:           New(k, slogger),
+		}
+		defer h.stop()
+		body(h)
+	})
+}
+
+func (h *managerHarness) setConfig(name, cfg string) {
+	escapedRoot, err := json.Marshal(h.root)
+	require.NoError(h.t, err)
+	cfg = strings.ReplaceAll(cfg, "$ROOT", strings.Trim(string(escapedRoot), `"`))
+	require.NoError(h.t, h.cfgStore.Set([]byte(name), []byte(cfg)))
+}
+
+func (h *managerHarness) seedLastWalk(name string, ago time.Duration) int64 {
+	ts := time.Now().Add(-ago).Unix()
+	require.NoError(h.t, h.resultsStore.Set(LastWalkTimeKey(name), binary.NativeEndian.AppendUint64(nil, uint64(ts))))
+	return ts
+}
+
+func (h *managerHarness) start() {
+	h.done = make(chan struct{})
+	go func() {
+		h.fm.Execute()
+		close(h.done)
+	}()
+	synctest.Wait()
+}
+
+func (h *managerHarness) stop() {
+	if h.done == nil {
+		return
 	}
+	h.fm.Interrupt(nil)
+	<-h.done
+}
+
+func (h *managerHarness) stopped() bool {
+	select {
+	case <-h.done:
+		return true
+	default:
+		return false
+	}
+}
+
+func (h *managerHarness) advance(d time.Duration) {
+	time.Sleep(d)
+	synctest.Wait()
+}
+
+func (h *managerHarness) do(req string) error {
+	return h.fm.Do(strings.NewReader(req))
+}
+
+func (h *managerHarness) stored(key string) bool {
+	raw, err := h.resultsStore.Get([]byte(key))
+	require.NoError(h.t, err)
+	return raw != nil
+}
+
+func (h *managerHarness) lastWalk(name string) int64 {
+	raw, err := h.resultsStore.Get(LastWalkTimeKey(name))
+	require.NoError(h.t, err)
+	if raw == nil {
+		return 0
+	}
+	return int64(binary.NativeEndian.Uint64(raw))
+}
+
+func (h *managerHarness) results(name string) []string {
+	raw, err := h.resultsStore.Get([]byte(name))
+	require.NoError(h.t, err)
+	var paths []string
+	require.NoError(h.t, json.Unmarshal(raw, &paths))
+	return relPaths(h.t, h.root, paths)
 }
