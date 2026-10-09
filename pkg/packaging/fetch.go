@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"path"
 	"path/filepath"
@@ -15,9 +13,13 @@ import (
 
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fsutil"
+	"github.com/kolide/launcher/v2/ee/tuf"
+	"github.com/kolide/launcher/v2/ee/tuf/simpleclient"
 	"github.com/kolide/launcher/v2/pkg/contexts/ctxlog"
-	"github.com/theupdateframework/go-tuf/client"
-	filejsonstore "github.com/theupdateframework/go-tuf/client/filejsonstore"
+	"github.com/kolide/launcher/v2/pkg/launcher"
+	"github.com/kolide/launcher/v2/pkg/log/multislogger"
+	"github.com/theupdateframework/go-tuf/v2/metadata/config"
+	"github.com/theupdateframework/go-tuf/v2/metadata/updater"
 )
 
 // FetchBinary will synchronously download a binary as per the
@@ -52,37 +54,9 @@ func FetchBinary(ctx context.Context, localCacheDir, name, binaryName, channelOr
 		return localBinaryPath, nil
 	}
 
-	// First, create download URI. The download mirror stores binaries by their name, without a file extension,
-	// so strip that off first.
-	baseName := strings.TrimSuffix(name, filepath.Ext(name))
-	downloadPath, err := dlTarPath(baseName, channelOrVersion, string(target.Platform), string(target.Arch), localCacheDir)
+	tarGzBytes, err := simpleclient.Download(ctx, multislogger.NewNopLogger(), name, string(target.Platform), string(target.Arch), channelOrVersion, nil)
 	if err != nil {
-		return "", fmt.Errorf("could not get download path: %w", err)
-	}
-	url := fmt.Sprintf("https://dl.kolide.co/%s", downloadPath)
-
-	level.Debug(logger).Log(
-		"msg", "starting download",
-		"url", url,
-	)
-
-	// Download the package
-	downloadReq, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return "", fmt.Errorf("new request: %w", err)
-	}
-	downloadReq = downloadReq.WithContext(ctx)
-
-	httpClient := &http.Client{}
-	defer httpClient.CloseIdleConnections()
-	response, err := httpClient.Do(downloadReq)
-	if err != nil {
-		return "", fmt.Errorf("couldn't download binary archive: %w", err)
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode != 200 {
-		return "", fmt.Errorf("failed download, got http status %s", response.Status)
+		return "", fmt.Errorf("error fetching %s: %w", name, err)
 	}
 
 	// Store it in cache
@@ -92,9 +66,8 @@ func FetchBinary(ctx context.Context, localCacheDir, name, binaryName, channelOr
 	}
 	defer writeHandle.Close()
 
-	_, err = io.Copy(writeHandle, response.Body)
-	if err != nil {
-		return "", fmt.Errorf("couldn't copy HTTP response body to file: %w", err)
+	if _, err := writeHandle.Write(tarGzBytes); err != nil {
+		return "", fmt.Errorf("couldn't copy response to file: %w", err)
 	}
 
 	// explicitly close the write handle before untaring the archive
@@ -125,28 +98,6 @@ func isChannel(channelOrVersion string) bool {
 	return channelOrVersion == "stable" || channelOrVersion == "beta" || channelOrVersion == "nightly" || channelOrVersion == "alpha"
 }
 
-func dlTarPath(name, channelOrVersion, platform, arch, cacheDir string) (string, error) {
-	// Figure out if we're downloading a specific version or a channel
-	if !isChannel(channelOrVersion) {
-		// We're requesting a version, not a channel, so we already know where the download lives.
-		return dlTarPathFromVersion(name, channelOrVersion, platform, arch), nil
-	}
-
-	version, err := getReleaseVersionFromTufRepo(name, channelOrVersion, platform, arch, cacheDir)
-	if err != nil {
-		return "", fmt.Errorf("could not find release version for channel %s: %w", channelOrVersion, err)
-	}
-
-	return dlTarPathFromVersion(name, version, platform, arch), nil
-}
-
-func dlTarPathFromVersion(name, version, platform, arch string) string {
-	return path.Join("kolide", name, platform, arch, fmt.Sprintf("%s-%s.tar.gz", name, version))
-}
-
-//go:embed assets/tuf/root.json
-var rootJson []byte
-
 func getReleaseVersionFromTufRepo(binaryName, channel, platform, arch, cacheDir string) (string, error) {
 	tufCacheDir := filepath.Join(cacheDir, "tuf")
 	// Make the directory if it doesn't already exist.
@@ -156,44 +107,46 @@ func getReleaseVersionFromTufRepo(binaryName, channel, platform, arch, cacheDir 
 		return "", fmt.Errorf("creating TUF directory inside cache dir: %w", err)
 	}
 
-	// Set up our local store i.e. point to the directory in our filesystem
-	localStore, err := filejsonstore.NewFileJSONStore(tufCacheDir)
+	metadataUrl := strings.TrimSuffix(launcher.DefaultTufServer, "/") + "/repository"
+	cfg, err := config.New(metadataUrl, tuf.RootJSON())
 	if err != nil {
-		return "", fmt.Errorf("could not initialize local TUF store: %w", err)
+		return "", fmt.Errorf("creating go-tuf/v2 config: %w", err)
+	}
+	cfg.LocalMetadataDir = tufCacheDir
+	cfg.LocalTargetsDir = cacheDir
+	cfg.UnsafeLocalMode = true
+
+	up, err := updater.New(cfg)
+	if err != nil {
+		return "", fmt.Errorf("creating local go-tuf/v2 updater: %w", err)
 	}
 
-	// Set up our remote store i.e. tuf.kolide.com
-	remoteStore, err := client.HTTPRemoteStore("https://tuf.kolide.com", &client.HTTPRemoteOptions{
-		MetadataPath: "/repository",
-	}, http.DefaultClient)
-	if err != nil {
-		return "", fmt.Errorf("could not initialize remote TUF store: %w", err)
-	}
-
-	metadataClient := client.NewClient(localStore, remoteStore)
-	if err := metadataClient.Init(rootJson); err != nil {
-		return "", fmt.Errorf("failed to initialize TUF client with root JSON: %w", err)
-	}
-
-	// Try to find our target before fetching from remote TUF, in case we already have TUF metadata
-	targetToFind := path.Join(binaryName, platform, arch, channel, "release.json")
-	foundTarget, err := metadataClient.Target(targetToFind)
-	if err != nil {
-		// Fetch TUF data from our remote store
-		if _, err := metadataClient.Update(); err != nil {
-			return "", fmt.Errorf("failed to update metadata: %w", err)
+	if err := up.Refresh(); err != nil {
+		// Couldn't get targets using cached data -- make a new updater that will
+		// fetch from the server instead.
+		cfg.UnsafeLocalMode = false
+		var newUpdaterErr error
+		up, newUpdaterErr = updater.New(cfg)
+		if newUpdaterErr != nil {
+			return "", fmt.Errorf("creating non-local updater after local update failed with `%s`: %w", err.Error(), newUpdaterErr)
 		}
-		// Try again
-		foundTarget, err = metadataClient.Target(targetToFind)
-		if err != nil {
-			return "", fmt.Errorf("finding target metadata %s after update: %w", targetToFind, err)
+		if newRefreshErr := up.Refresh(); newRefreshErr != nil {
+			return "", fmt.Errorf("refreshing non-local updater after local update failed with `%s`: %w", err.Error(), newRefreshErr)
 		}
+	}
+
+	targets := up.GetTopLevelTargets()
+
+	releaseTargetName := path.Join(binaryName, platform, arch, channel, "release.json")
+	releaseTarget, releaseTargetFound := targets[releaseTargetName]
+	if !releaseTargetFound {
+		return "", fmt.Errorf("finding target metadata %s after update: %w", releaseTargetName, err)
 	}
 
 	var custom struct {
 		Target string `json:"target"`
 	}
-	if err := json.Unmarshal(*foundTarget.Custom, &custom); err != nil {
+	if err := json.Unmarshal(*releaseTarget.Custom, &custom); err != nil {
 		return "", fmt.Errorf("could not unmarshal release file custom metadata: %w", err)
 	}
 
