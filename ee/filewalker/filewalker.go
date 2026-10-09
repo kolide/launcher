@@ -42,7 +42,8 @@ func newFilewalker(spec walkSpec, resultsStore types.GetterSetterDeleter, slogge
 	}
 }
 
-// Filewalk executes the configured walkSpec once and stores the results in resultStore.
+// Filewalk executes the configured walkSpec once and stores the results in resultStore. Context
+// is respected and interrupts walks and result storage.
 func (f *filewalker) Filewalk(ctx context.Context) {
 	ctx, span := observability.StartSpan(ctx, "filewalk_name", f.name)
 	defer span.End()
@@ -75,6 +76,10 @@ func (f *filewalker) Filewalk(ctx context.Context) {
 				}
 				return newMatcherSet(), nil
 			}
+			if ctx.Err() != nil {
+				f.slogger.Log(ctx, slog.LevelDebug, "file walk interrupted by context error")
+				return matcherSet{}, filepath.SkipAll
+			}
 
 			pathsWalked++
 
@@ -106,6 +111,9 @@ func (f *filewalker) Filewalk(ctx context.Context) {
 				"start_dir", match,
 				"err", err,
 			)
+		}
+		if ctx.Err() != nil {
+			return
 		}
 	}
 
