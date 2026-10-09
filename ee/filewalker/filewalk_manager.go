@@ -130,22 +130,23 @@ func (fm *FilewalkManager) run(ctx context.Context) {
 }
 
 func (fm *FilewalkManager) walkConfigs(ctx context.Context, cfgs map[string]filewalkConfig, names []string) {
-	slices.Sort(names)
-	for _, name := range slices.Compact(names) {
-		if ctx.Err() != nil {
-			return
-		}
-		cfg, ok := cfgs[name]
-		if !ok {
+	toWalk := make(map[string]filewalkConfig, len(names))
+	for _, name := range names {
+		if cfg, ok := cfgs[name]; ok {
+			toWalk[name] = cfg
+		} else {
 			fm.slogger.Log(ctx, slog.LevelWarn,
 				"filewalk request from control server contained unknown filewalk name",
 				"filewalk_name", name,
 			)
-			continue
 		}
-		spec := resolve(ctx, fm.slogger, map[string]filewalkConfig{name: cfg}, runtime.GOOS)
-		newFilewalker(spec, fm.resultsStore, fm.slogger).Filewalk(ctx)
 	}
+	if len(toWalk) == 0 {
+		return
+	}
+
+	spec := resolve(ctx, fm.slogger, toWalk, runtime.GOOS)
+	newFilewalker(spec, fm.resultsStore, fm.slogger).Filewalk(ctx)
 }
 
 // lastWalkTimes returns the map of filewalkConfig name to the last time the config was walked
