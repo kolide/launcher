@@ -157,6 +157,12 @@ jobs:
         with:
           egress-policy: audit # Audit network and disk activity
 
+      - name: Install build dependencies
+        run: |
+          apt-get -y update
+          apt-get -y install build-essential ca-certificates openssl git zstd curl
+          update-ca-certificates
+
       - name: Setup Cloudsmith CLI # Exports CLOUDSMITH_API_KEY
         uses: step-security/cloudsmith-cli-action@c8efdacddbb86cc95fcc18e06ac2597a9f449828 # v3.1.0
         # For now, we only use Cloudsmith on builds we're going to distribute: refs/head/main for nightly builds, and 'tag' for stable builds
@@ -177,12 +183,6 @@ jobs:
           goproxy="https://token:${CLOUDSMITH_API_KEY}@go.pkg.1infra.dev/op-golang/"
           echo "::add-mask::$goproxy"
           echo "GOPROXY=$goproxy" >> "$GITHUB_ENV"
-
-      - name: Install build dependencies
-        run: |
-          apt-get -y update
-          apt-get -y install build-essential ca-certificates openssl git zstd
-          update-ca-certificates
 
       - name: Check out code
         id: checkout
