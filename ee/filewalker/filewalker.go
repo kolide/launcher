@@ -167,7 +167,10 @@ func (f *filewalker) Filewalk(ctx context.Context) {
 
 	span.AddEvent("walk_lock_acquired")
 
+	walkStart := time.Now()
 	fileNames := make([]string, 0)
+	errorCounts := make(map[string]int)
+	var pathsWalked, dirsSkipped int
 
 	for _, rootDir := range f.rootDirs {
 		// rootDir may be a directory, or a glob for a directory.
@@ -183,29 +186,33 @@ func (f *filewalker) Filewalk(ctx context.Context) {
 		for _, match := range matches {
 			if err := filepath.WalkDir(match, func(path string, d fs.DirEntry, err error) error {
 				if err != nil {
-					f.slogger.Log(ctx, slog.LevelWarn,
-						"error while filewalking",
-						"start_dir", match,
-						"path", path,
-						"err", err,
-					)
+					key, expected := classifyWalkError(err)
+					errorCounts[key]++
+					if !expected {
+						f.slogger.Log(ctx, slog.LevelWarn,
+							"error while filewalking",
+							"start_dir", match,
+							"path", path,
+							"err", err,
+						)
+					}
 					return nil
 				}
 
-				// If our config restricts file type, check that first as it is the cheapest filter (checking a single bit for dir or filemode)
+				pathsWalked++
+
+				// Prune skipped directories before any other filter, so that we don't descend unnecessarily
+				if d.IsDir() && f.shouldSkipDir(path) {
+					dirsSkipped++
+					return fs.SkipDir
+				}
+
 				if f.fileTypeFilter != nil && !f.fileTypeFilter.matches(d.Type()) {
 					return nil
 				}
 
-				// Now check for the file name regex. We do this check next even if it might be filtered
-				// by skipDirs later because it is a single regex match that, vs the current avg of ~20 skipDirs
 				if f.fileNameRegex != nil && !f.fileNameRegex.MatchString(filepath.Base(path)) {
 					return nil
-				}
-
-				// Finally, check to see if we're in a directory that should be skipped
-				if f.shouldSkip(path) {
-					return fs.SkipDir
 				}
 
 				// Add this file to our results
@@ -260,8 +267,13 @@ func (f *filewalker) Filewalk(ctx context.Context) {
 
 	span.AddEvent("walk_time_stored")
 
-	f.slogger.Log(ctx, slog.LevelDebug,
+	f.slogger.Log(ctx, slog.LevelInfo,
 		"completed filewalk",
+		"walk_duration", time.Since(walkStart).String(),
+		"error_counts", errorCounts,
+		"paths_walked", pathsWalked,
+		"dirs_skipped", dirsSkipped,
+		"files_matched", len(fileNames),
 	)
 }
 
@@ -270,7 +282,7 @@ func LastWalkTimeKey(filewalkName string) []byte {
 	return fmt.Appendf(nil, "%s_last_walk", filewalkName)
 }
 
-func (f *filewalker) shouldSkip(dir string) bool {
+func (f *filewalker) shouldSkipDir(dir string) bool {
 	for _, skipDirRegex := range f.skipDirs {
 		if skipDirRegex.MatchString(dir) {
 			return true

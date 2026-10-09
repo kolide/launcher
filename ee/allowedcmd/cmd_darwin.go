@@ -66,6 +66,8 @@ var Softwareupdate = newAllowedCommand("/usr/sbin/softwareupdate")
 
 var SystemProfiler = newAllowedCommand("/usr/sbin/system_profiler")
 
+var Systemsetup = newAllowedCommand("/usr/sbin/systemsetup")
+
 var Tmutil = newAllowedCommand("/usr/bin/tmutil")
 
 var Xattr = newAllowedCommand("/usr/bin/xattr")

@@ -32,12 +32,12 @@ jobs:
       CACHE_KEY_PREFIX: '' # Deliberately empty -- only set to distinguish our second build (for reproducibility testing) from this main build
     steps: &non_container_build_steps
       - name: Harden runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit # Audit network and disk activity
 
       - name: Setup Cloudsmith CLI # Exports CLOUDSMITH_API_KEY
-        uses: step-security/cloudsmith-cli-action@dd1da513017145043c2d29a38b3b85c2b609b5ad # v2.0.3
+        uses: step-security/cloudsmith-cli-action@c8efdacddbb86cc95fcc18e06ac2597a9f449828 # v3.1.0
         # For now, we only use Cloudsmith on builds we're going to distribute: refs/head/main for nightly builds, and 'tag' for stable builds
         if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
         with:
@@ -153,12 +153,12 @@ jobs:
     steps: &container_build_steps
       # zstd is needed so we can restore cache later -- see https://github.com/actions/cache/issues/1455#issuecomment-2328358604
       - name: Harden runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit # Audit network and disk activity
 
       - name: Setup Cloudsmith CLI # Exports CLOUDSMITH_API_KEY
-        uses: step-security/cloudsmith-cli-action@dd1da513017145043c2d29a38b3b85c2b609b5ad # v2.0.3
+        uses: step-security/cloudsmith-cli-action@c8efdacddbb86cc95fcc18e06ac2597a9f449828 # v3.1.0
         # For now, we only use Cloudsmith on builds we're going to distribute: refs/head/main for nightly builds, and 'tag' for stable builds
         if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
         with:
@@ -265,7 +265,7 @@ jobs:
           - Windows
     steps:
       - name: Harden runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit # Audit network and disk activity
 
@@ -329,7 +329,7 @@ jobs:
     steps:
       # Needed so we can restore cache -- see https://github.com/actions/cache/issues/1455#issuecomment-2328358604
       - name: Harden runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit # Audit network and disk activity
 
@@ -368,7 +368,7 @@ jobs:
           - windows-latest
     steps:
       - name: Harden runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit # Audit network and disk activity
 
@@ -439,7 +439,7 @@ jobs:
           - windows-latest
     steps:
       - name: Harden runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit # Audit network and disk activity
 
@@ -572,7 +572,7 @@ jobs:
       - build # need the other builds too
     steps:
       - name: Harden runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit # Audit network and disk activity
 
@@ -641,7 +641,7 @@ jobs:
       - build # need the other builds too
     steps:
       - name: Harden runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit # Audit network and disk activity
 
@@ -726,7 +726,7 @@ jobs:
       - container_exec_testing
     steps:
       - name: Harden runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit # Audit network and disk activity
 
@@ -766,7 +766,7 @@ jobs:
       - build_linux
     steps:
       - name: Harden runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit # Audit network and disk activity
 
@@ -804,7 +804,7 @@ jobs:
       # rebuilding from source -- the merge logic is platform-independent, so the
       # cached binary does the combine without a checkout, Go toolchain, or deps.
       - name: Harden runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit # Audit network and disk activity
 
@@ -884,12 +884,12 @@ jobs:
           - windows-latest
     steps:
       - name: Harden runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit # Audit network and disk activity
 
       - name: Setup Cloudsmith CLI # Exports CLOUDSMITH_API_KEY
-        uses: step-security/cloudsmith-cli-action@dd1da513017145043c2d29a38b3b85c2b609b5ad # v2.0.3
+        uses: step-security/cloudsmith-cli-action@c8efdacddbb86cc95fcc18e06ac2597a9f449828 # v3.1.0
         # We don't distribute package_builder via these artifacts, but nonetheless use Cloudsmith where we can (main and tagged builds).
         if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
         with:
@@ -970,7 +970,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Harden runner
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit # Audit network and disk activity
 

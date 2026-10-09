@@ -2,8 +2,10 @@ package flags
 
 import (
 	"context"
+	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"slices"
@@ -348,28 +350,132 @@ func TestControllerOverride(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AgentFlagsStore.String())
-			require.NoError(t, err)
-			fc := NewFlagController(multislogger.NewNopLogger(), store)
-			assert.NotNil(t, fc)
+			synctest.Test(t, func(t *testing.T) {
+				store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AgentFlagsStore.String())
+				require.NoError(t, err)
+				fc := NewFlagController(multislogger.NewNopLogger(), store)
+				assert.NotNil(t, fc)
 
-			mockObserver := mocks.NewFlagsChangeObserver(t)
-			mockObserver.On("FlagsChanged", mock.Anything, keys.ControlRequestInterval)
+				mockObserver := mocks.NewFlagsChangeObserver(t)
+				mockObserver.On("FlagsChanged", mock.Anything, keys.ControlRequestInterval)
 
-			fc.RegisterChangeObserver(mockObserver, keys.ControlRequestInterval)
+				fc.RegisterChangeObserver(mockObserver, keys.ControlRequestInterval)
 
-			err = fc.SetControlRequestInterval(tt.valueToSet)
-			require.NoError(t, err)
+				err = fc.SetControlRequestInterval(tt.valueToSet)
+				require.NoError(t, err)
 
-			value := fc.ControlRequestInterval()
-			assert.Equal(t, tt.valueToSet, value)
+				value := fc.ControlRequestInterval()
+				assert.Equal(t, tt.valueToSet, value)
 
-			fc.SetControlRequestIntervalOverride(tt.interval, tt.duration)
-			assert.Equal(t, tt.interval, fc.ControlRequestInterval())
+				fc.SetControlRequestIntervalOverride(tt.interval, tt.duration)
+				assert.Equal(t, tt.interval, fc.ControlRequestInterval())
 
-			time.Sleep(tt.duration * 2)
-			assert.Equal(t, tt.valueToSet, fc.ControlRequestInterval())
+				time.Sleep(tt.duration * 2)
+				assert.Equal(t, tt.valueToSet, fc.ControlRequestInterval())
+			})
 		})
+	}
+}
+
+func TestOverrideReplacesExistingOverride(t *testing.T) {
+	t.Parallel()
+
+	synctest.Test(t, func(t *testing.T) {
+		store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AgentFlagsStore.String())
+		require.NoError(t, err)
+		fc := NewFlagController(multislogger.NewNopLogger(), store)
+		require.NoError(t, fc.SetControlRequestInterval(8*time.Second))
+
+		fc.SetControlRequestIntervalOverride(6*time.Second, 100*time.Millisecond)
+		fc.SetControlRequestIntervalOverride(7*time.Second, 100*time.Millisecond)
+
+		assert.Equal(t, 7*time.Second, fc.ControlRequestInterval())
+	})
+}
+
+func TestOverrideOutlivesSupersededOverride(t *testing.T) {
+	t.Parallel()
+
+	synctest.Test(t, func(t *testing.T) {
+		store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AgentFlagsStore.String())
+		require.NoError(t, err)
+		fc := NewFlagController(multislogger.NewNopLogger(), store)
+		require.NoError(t, fc.SetControlRequestInterval(8*time.Second))
+
+		fc.SetControlRequestIntervalOverride(6*time.Second, 100*time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
+		fc.SetControlRequestIntervalOverride(7*time.Second, 100*time.Millisecond)
+		time.Sleep(75 * time.Millisecond)
+
+		assert.Equal(t, 7*time.Second, fc.ControlRequestInterval())
+	})
+}
+
+func TestOverrideExpiryRestoresOriginalValue(t *testing.T) {
+	t.Parallel()
+
+	synctest.Test(t, func(t *testing.T) {
+		store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AgentFlagsStore.String())
+		require.NoError(t, err)
+		fc := NewFlagController(multislogger.NewNopLogger(), store)
+		require.NoError(t, fc.SetControlRequestInterval(8*time.Second))
+
+		fc.SetControlRequestIntervalOverride(6*time.Second, 100*time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
+		fc.SetControlRequestIntervalOverride(7*time.Second, 100*time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
+
+		assert.Equal(t, 8*time.Second, fc.ControlRequestInterval())
+	})
+}
+
+// Well-timed/rapid override calls could historically lock the flag controller:
+// setting overrides and fetching flag values hang.
+//
+// Callers expect that back-to-back overrides should never hang.
+func TestOverrideRapidConcurrentReoverride(t *testing.T) {
+	t.Parallel()
+
+	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AgentFlagsStore.String())
+	require.NoError(t, err)
+	fc := NewFlagController(multislogger.NewNopLogger(), store)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		var wg sync.WaitGroup
+		for range 8 {
+			wg.Go(func() {
+				for range 200 {
+					fc.SetControlRequestIntervalOverride(6*time.Second, time.Microsecond)
+				}
+			})
+		}
+		wg.Wait()
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("overrides did not complete")
+	}
+}
+
+// A well-timed override historically could race with a previous expiration of the same key and remove both.
+// The expiration of an override should only remove the override that expired.
+func TestOverrideExpiryDoesNotClobberNewerOverride(t *testing.T) {
+	t.Parallel()
+
+	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AgentFlagsStore.String())
+	require.NoError(t, err)
+	fc := NewFlagController(multislogger.NewNopLogger(), store)
+	require.NoError(t, fc.SetControlRequestInterval(8*time.Second))
+
+	for range 20 {
+		fc.SetControlRequestIntervalOverride(6*time.Second, time.Microsecond)
+		fc.SetControlRequestIntervalOverride(7*time.Second, time.Hour)
+		time.Sleep(time.Millisecond)
+		require.Equal(t, 7*time.Second, fc.ControlRequestInterval())
 	}
 }
 
@@ -451,53 +557,118 @@ func (d *deadlockedObserver) FlagsChanged(ctx context.Context, flagKeys ...keys.
 func TestObserverDeadlock(t *testing.T) {
 	t.Parallel()
 
-	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AgentFlagsStore.String())
-	require.NoError(t, err)
-	fc := NewFlagController(multislogger.NewNopLogger(), store)
-	assert.NotNil(t, fc)
+	synctest.Test(t, func(t *testing.T) {
+		store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AgentFlagsStore.String())
+		require.NoError(t, err)
+		fc := NewFlagController(multislogger.NewNopLogger(), store)
+		assert.NotNil(t, fc)
 
-	// Set up an observer that will observe changes to one key (ControlRequestInterval)
-	// and on change to that interval, will set up a new observer for a different key.
-	newObserverKey := keys.TableGenerateTimeout
-	d := newDeadlockedObserver(fc, newObserverKey)
-	fc.RegisterChangeObserver(d, keys.ControlRequestInterval)
+		// Set up an observer that will observe changes to one key (ControlRequestInterval)
+		// and on change to that interval, will set up a new observer for a different key.
+		newObserverKey := keys.TableGenerateTimeout
+		d := newDeadlockedObserver(fc, newObserverKey)
+		fc.RegisterChangeObserver(d, keys.ControlRequestInterval)
 
-	// Now, set up an override
-	overrideDuration := 30 * time.Second
-	setOverrideReturned := make(chan struct{})
+		// Now, set up an override
+		overrideDuration := 30 * time.Second
+		setOverrideReturned := make(chan struct{})
 
-	go func() {
-		fc.SetControlRequestIntervalOverride(3*time.Second, overrideDuration)
-		setOverrideReturned <- struct{}{}
-	}()
+		go func() {
+			fc.SetControlRequestIntervalOverride(3*time.Second, overrideDuration)
+			setOverrideReturned <- struct{}{}
+		}()
 
-	select {
-	case <-setOverrideReturned:
-	case <-time.After(30 * time.Second):
-		t.Error("could not set control request override within 30 seconds")
-		t.FailNow()
-	}
-
-	// Wait for the override to expire
-	time.Sleep(2 * overrideDuration)
-
-	// See whether override expired
-	fc.overrideMutex.RLock()
-	require.Equal(t, 0, len(fc.overrides), "override not removed")
-	fc.overrideMutex.RUnlock()
-
-	// Make sure that FlagsChanged was not held open by the observersMutex
-	require.True(t, d.flagsChangedCalled.Load(), "FlagsChanged not called")
-	require.True(t, d.flagsChangedReturned.Load(), "FlagsChanged did not return")
-
-	// Make sure that there's an observer registered for d.observerKey
-	fc.observersMutex.RLock()
-	observerForKeyFound := false
-	for _, keys := range fc.observers {
-		if slices.Contains(keys, newObserverKey) {
-			observerForKeyFound = true
+		select {
+		case <-setOverrideReturned:
+		case <-time.After(30 * time.Second):
+			t.Error("could not set control request override within 30 seconds")
+			t.FailNow()
 		}
+
+		// Wait for the override to expire
+		time.Sleep(2 * overrideDuration)
+
+		// See whether override expired
+		fc.overrideMutex.RLock()
+		require.Equal(t, 0, len(fc.overrides), "override not removed")
+		fc.overrideMutex.RUnlock()
+
+		// Make sure that FlagsChanged was not held open by the observersMutex
+		require.True(t, d.flagsChangedCalled.Load(), "FlagsChanged not called")
+		require.True(t, d.flagsChangedReturned.Load(), "FlagsChanged did not return")
+
+		// Make sure that there's an observer registered for d.observerKey
+		fc.observersMutex.RLock()
+		observerForKeyFound := false
+		for _, keys := range fc.observers {
+			if slices.Contains(keys, newObserverKey) {
+				observerForKeyFound = true
+			}
+		}
+		fc.observersMutex.RUnlock()
+		require.True(t, observerForKeyFound, "new observer not successfully registered")
+	})
+}
+
+// Parallel calls which access overrides should be safe.
+func TestOverrideConcurrentAccess(t *testing.T) {
+	t.Parallel()
+
+	const d = time.Millisecond
+	overridableAccessors := map[keys.FlagKey]struct {
+		setOverride func(fc *FlagController)
+		get         func(fc *FlagController)
+	}{
+		keys.ControlRequestInterval: {
+			setOverride: func(fc *FlagController) { fc.SetControlRequestIntervalOverride(10*time.Second, d) },
+			get:         func(fc *FlagController) { fc.ControlRequestInterval() },
+		},
+		keys.DistributedForwardingInterval: {
+			setOverride: func(fc *FlagController) { fc.SetDistributedForwardingIntervalOverride(10*time.Second, d) },
+			get:         func(fc *FlagController) { fc.DistributedForwardingInterval() },
+		},
+		keys.AutoupdateInterval: {
+			setOverride: func(fc *FlagController) { fc.SetAutoupdateIntervalOverride(10*time.Minute, d) },
+			get:         func(fc *FlagController) { fc.AutoupdateInterval() },
+		},
+		keys.AutoupdateInitialDelay: {
+			setOverride: func(fc *FlagController) { fc.SetAutoupdateInitialDelayOverride(10*time.Second, d) },
+			get:         func(fc *FlagController) { fc.AutoupdateInitialDelay() },
+		},
+		keys.ExportTraces: {
+			setOverride: func(fc *FlagController) { fc.SetExportTracesOverride(true, d) },
+			get:         func(fc *FlagController) { fc.ExportTraces() },
+		},
+		keys.TraceSamplingRate: {
+			setOverride: func(fc *FlagController) { fc.SetTraceSamplingRateOverride(0.5, d) },
+			get:         func(fc *FlagController) { fc.TraceSamplingRate() },
+		},
+		keys.LogShippingLevel: {
+			setOverride: func(fc *FlagController) { fc.SetLogShippingLevelOverride("debug", d) },
+			get:         func(fc *FlagController) { fc.LogShippingLevel() },
+		},
 	}
-	fc.observersMutex.RUnlock()
-	require.True(t, observerForKeyFound, "new observer not successfully registered")
+
+	for key, accessor := range overridableAccessors { //nolint:paralleltest
+		t.Run(key.String(), func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AgentFlagsStore.String())
+				require.NoError(t, err)
+				fc := NewFlagController(multislogger.NewNopLogger(), store)
+
+				var wg sync.WaitGroup
+				wg.Go(func() { accessor.setOverride(fc) })
+				for range 1000 {
+					accessor.get(fc)
+				}
+				wg.Wait()
+
+				time.Sleep(2 * d)
+				accessor.get(fc)
+				fc.overrideMutex.RLock()
+				defer fc.overrideMutex.RUnlock()
+				require.Empty(t, fc.overrides)
+			})
+		})
+	}
 }

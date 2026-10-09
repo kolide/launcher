@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -21,6 +22,7 @@ import (
 	"github.com/kolide/launcher/v2/ee/agent/types"
 	"github.com/kolide/launcher/v2/ee/agent/types/mocks"
 	"github.com/kolide/launcher/v2/ee/consoleuser"
+	"github.com/kolide/launcher/v2/ee/currentprocess"
 	"github.com/kolide/launcher/v2/ee/desktop/user/notify"
 	"github.com/kolide/launcher/v2/ee/presencedetection"
 	"github.com/kolide/launcher/v2/pkg/backoff"
@@ -631,4 +633,24 @@ func Test_Ping_writesLocalizationFile(t *testing.T) {
 	var got types.LocalizationData
 	require.NoError(t, json.Unmarshal(contents, &got))
 	require.Equal(t, expected.Locale, got.Locale)
+}
+
+func TestIsCurrentUser(t *testing.T) {
+	t.Parallel()
+
+	currentUid, err := currentprocess.Uid()
+	require.NoError(t, err)
+
+	r := &DesktopUsersProcessesRunner{currentUid: currentUid}
+	require.True(t, r.isCurrentUser(currentUid))
+	require.False(t, r.isCurrentUser("not-a-real-uid"))
+}
+
+func TestNoExplorerProcessError_Is(t *testing.T) {
+	t.Parallel()
+
+	err := fmt.Errorf("wrapped: %w", NoExplorerProcessError{uid: `DOMAIN\someuser`})
+	require.ErrorIs(t, err, NoExplorerProcessError{})
+
+	require.NotErrorIs(t, errors.New("unrelated"), NoExplorerProcessError{})
 }

@@ -71,6 +71,7 @@ const (
 	// Osquery log publication cutover flags
 	OsqueryPublisherURL            FlagKey = "osquery_publisher_url"
 	OsqueryPublisherPercentEnabled FlagKey = "osquery_publisher_percent_enabled"
+	DeviceTrustRebrand             FlagKey = "dt_rebrand"
 )
 
 func (key FlagKey) String() string {

@@ -181,14 +181,20 @@ func (fc *FlagController) overrideFlag(ctx context.Context, key keys.FlagKey, du
 		"duration", duration,
 	)
 
-	override, ok := fc.overrides[key]
-	if !ok || override.Value() == nil {
-		// Creating the override implicitly causes future flag value retrievals to use the override until expiration
-		override = &Override{}
-		fc.overrides[key] = override
+	// timer returns false if it's already fired, so this goroutine won the lock race on overrideMutex
+	if override, ok := fc.overrides[key]; ok && !override.timer.Stop() {
+		fc.slogger.Log(ctx, slog.LevelWarn,
+			"override creation raced with previous override expiration",
+			"flag", key,
+		)
 	}
 
-	overrideExpired := func(key keys.FlagKey) {
+	override := &Override{
+		value: value,
+	}
+
+	// Invoke the expiration callback after duration has passed
+	override.timer = time.AfterFunc(duration, func() {
 		ctx, span := observability.StartSpan(context.TODO(), "key", key.String())
 		defer span.End()
 
@@ -204,12 +210,21 @@ func (fc *FlagController) overrideFlag(ctx context.Context, key keys.FlagKey, du
 			span.AddEvent("override_lock_released")
 		}()
 
-		// Deleting the override implictly allows the next value to take precedence
-		delete(fc.overrides, key)
-	}
+		// remove the override to allow the original flag value to apply unless a
+		// new override (ptr equality check) has been set
+		if currentOverride, ok := fc.overrides[key]; ok && currentOverride == override {
+			delete(fc.overrides, key)
+		}
+	})
 
-	// Start a new override, or re-start an existing one with a new value, duration, and expiration
-	fc.overrides[key].Start(key, value, duration, overrideExpired)
+	fc.overrides[key] = override
+}
+
+func (fc *FlagController) getOverride(key keys.FlagKey) *Override {
+	fc.overrideMutex.RLock()
+	defer fc.overrideMutex.RUnlock()
+
+	return fc.overrides[key]
 }
 
 func (fc *FlagController) SetKolideServerURL(url string) error {
@@ -378,11 +393,8 @@ func (fc *FlagController) SetControlRequestIntervalOverride(value time.Duration,
 	fc.overrideFlag(ctx, keys.ControlRequestInterval, duration, value)
 }
 func (fc *FlagController) ControlRequestInterval() time.Duration {
-	fc.overrideMutex.RLock()
-	defer fc.overrideMutex.RUnlock()
-
 	return NewDurationFlagValue(fc.slogger, keys.ControlRequestInterval,
-		WithOverride(fc.overrides[keys.ControlRequestInterval]),
+		WithOverride(fc.getOverride(keys.ControlRequestInterval)),
 		WithDefault(fc.cmdLineOpts.ControlRequestInterval),
 		WithMin(5*time.Second),
 		WithMax(10*time.Minute),
@@ -460,11 +472,8 @@ func (fc *FlagController) SetDistributedForwardingIntervalOverride(value time.Du
 	fc.overrideFlag(ctx, keys.DistributedForwardingInterval, duration, value)
 }
 func (fc *FlagController) DistributedForwardingInterval() time.Duration {
-	fc.overrideMutex.RLock()
-	defer fc.overrideMutex.RUnlock()
-
 	return NewDurationFlagValue(fc.slogger, keys.DistributedForwardingInterval,
-		WithOverride(fc.overrides[keys.DistributedForwardingInterval]),
+		WithOverride(fc.getOverride(keys.DistributedForwardingInterval)),
 		WithDefault(1*time.Minute),
 		WithMin(5*time.Second),
 		WithMax(5*time.Minute),
@@ -558,11 +567,8 @@ func (fc *FlagController) SetAutoupdateIntervalOverride(value time.Duration, dur
 	fc.overrideFlag(ctx, keys.AutoupdateInterval, duration, value)
 }
 func (fc *FlagController) AutoupdateInterval() time.Duration {
-	fc.overrideMutex.RLock()
-	defer fc.overrideMutex.RUnlock()
-
 	return NewDurationFlagValue(fc.slogger, keys.AutoupdateInterval,
-		WithOverride(fc.overrides[keys.AutoupdateInterval]),
+		WithOverride(fc.getOverride(keys.AutoupdateInterval)),
 		WithDefault(fc.cmdLineOpts.AutoupdateInterval),
 		WithMin(1*time.Minute),
 		WithMax(24*time.Hour),
@@ -589,11 +595,8 @@ func (fc *FlagController) SetAutoupdateInitialDelayOverride(value time.Duration,
 	fc.overrideFlag(ctx, keys.AutoupdateInitialDelay, duration, value)
 }
 func (fc *FlagController) AutoupdateInitialDelay() time.Duration {
-	fc.overrideMutex.RLock()
-	defer fc.overrideMutex.RUnlock()
-
 	return NewDurationFlagValue(fc.slogger, keys.AutoupdateInitialDelay,
-		WithOverride(fc.overrides[keys.AutoupdateInitialDelay]),
+		WithOverride(fc.getOverride(keys.AutoupdateInitialDelay)),
 		WithDefault(fc.cmdLineOpts.AutoupdateInitialDelay),
 		WithMin(5*time.Second),
 		WithMax(12*time.Hour),
@@ -613,11 +616,8 @@ func (fc *FlagController) SetPinnedLauncherVersion(version string) error {
 	return fc.setControlServerValue(keys.PinnedLauncherVersion, []byte(version))
 }
 func (fc *FlagController) PinnedLauncherVersion() string {
-	fc.overrideMutex.RLock()
-	defer fc.overrideMutex.RUnlock()
-
 	return NewStringFlagValue(
-		WithOverrideString(fc.overrides[keys.PinnedLauncherVersion]),
+		WithOverrideString(fc.getOverride(keys.PinnedLauncherVersion)),
 		WithDefaultString(""),
 		WithSanitizer(func(version string) string {
 			return tuf.SanitizePinnedVersion("launcher", version)
@@ -629,11 +629,8 @@ func (fc *FlagController) SetPinnedOsquerydVersion(version string) error {
 	return fc.setControlServerValue(keys.PinnedOsquerydVersion, []byte(version))
 }
 func (fc *FlagController) PinnedOsquerydVersion() string {
-	fc.overrideMutex.RLock()
-	defer fc.overrideMutex.RUnlock()
-
 	return NewStringFlagValue(
-		WithOverrideString(fc.overrides[keys.PinnedOsquerydVersion]),
+		WithOverrideString(fc.getOverride(keys.PinnedOsquerydVersion)),
 		WithDefaultString(""),
 		WithSanitizer(func(version string) string {
 			return tuf.SanitizePinnedVersion("osqueryd", version)
@@ -652,7 +649,7 @@ func (fc *FlagController) SetExportTracesOverride(value bool, duration time.Dura
 }
 func (fc *FlagController) ExportTraces() bool {
 	return NewBoolFlagValue(
-		WithBoolOverride(fc.overrides[keys.ExportTraces]),
+		WithBoolOverride(fc.getOverride(keys.ExportTraces)),
 		WithDefaultBool(fc.cmdLineOpts.ExportTraces),
 	).get(fc.getControlServerValue(keys.ExportTraces))
 }
@@ -688,7 +685,7 @@ func (fc *FlagController) SetTraceSamplingRateOverride(value float64, duration t
 }
 func (fc *FlagController) TraceSamplingRate() float64 {
 	return NewFloat64FlagValue(fc.slogger, keys.LoggingInterval,
-		WithFloat64ValueOverride(fc.overrides[keys.TraceSamplingRate]),
+		WithFloat64ValueOverride(fc.getOverride(keys.TraceSamplingRate)),
 		WithFloat64ValueDefault(fc.cmdLineOpts.TraceSamplingRate),
 		WithFloat64ValueMin(0.0),
 		WithFloat64ValueMax(1.0),
@@ -726,13 +723,10 @@ func (fc *FlagController) SetLogShippingLevelOverride(value string, duration tim
 	fc.overrideFlag(ctx, keys.LogShippingLevel, duration, value)
 }
 func (fc *FlagController) LogShippingLevel() string {
-	fc.overrideMutex.RLock()
-	defer fc.overrideMutex.RUnlock()
-
 	const defaultLevel = "info"
 
 	return NewStringFlagValue(
-		WithOverrideString(fc.overrides[keys.LogShippingLevel]),
+		WithOverrideString(fc.getOverride(keys.LogShippingLevel)),
 		WithDefaultString(defaultLevel),
 		WithSanitizer(func(value string) string {
 			value = strings.ToLower(value)
@@ -897,4 +891,13 @@ func (fc *FlagController) OsqueryPublisherPercentEnabled() int {
 
 func (fc *FlagController) SetOsqueryPublisherPercentEnabled(percent int) error {
 	return fc.setControlServerValue(keys.OsqueryPublisherPercentEnabled, intToBytes(percent))
+}
+
+func (fc *FlagController) SetDeviceTrustRebrand(enabled bool) error {
+	return fc.setControlServerValue(keys.DeviceTrustRebrand, boolToBytes(enabled))
+}
+func (fc *FlagController) DeviceTrustRebrand() bool {
+	return NewBoolFlagValue(
+		WithDefaultBool(false),
+	).get(fc.getControlServerValue(keys.DeviceTrustRebrand))
 }

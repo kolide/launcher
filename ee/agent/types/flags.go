@@ -287,4 +287,9 @@ type Flags interface {
 	SetOsqueryPublisherURL(url string) error
 	OsqueryPublisherPercentEnabled() int
 	SetOsqueryPublisherPercentEnabled(percent int) error
+
+	// DeviceTrustRebrand controls whether new Device Trust icons or legacy Kolide icons are used
+	// in the menu bar app and in notifications.
+	SetDeviceTrustRebrand(enabled bool) error
+	DeviceTrustRebrand() bool
 }

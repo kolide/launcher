@@ -1,0 +1,39 @@
+name: Require Jira Ticket
+
+on:
+  pull_request:
+    # No filter on title-only edits: a skipped job counts as passing and would
+    # turn a failing check green.
+    types: [opened, edited, reopened, synchronize, ready_for_review]
+
+permissions: {}
+
+concurrency:
+  group: require-jira-ticket-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Jira ticket in description
+    runs-on: ubuntu-latest
+    # Drafts aren't ready for review. Bot PRs (Dependabot, API changelog companions) have no ticket.
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.user.type != 'Bot'
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit # Audit network and disk activity
+
+      - name: Find a Jira ticket in the PR description
+        env:
+          # Pass untrusted PR content through env vars, never shell interpolation.
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if printf '%s' "$PR_BODY" | grep -qE '\b(KOL|KS)-[0-9]+\b'; then
+            echo "Found a Jira ticket reference."
+          else
+            echo "::error::Add a Jira ticket (e.g. KOL-dddd or https://1password.atlassian.net/browse/KOL-dddd) to the PR description."
+            exit 1
+          fi
