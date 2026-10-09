@@ -65,7 +65,7 @@ jobs:
           egress-policy: audit # Audit network and disk activity
 
       - name: Setup Cloudsmith CLI # Exports CLOUDSMITH_API_KEY
-        uses: step-security/cloudsmith-cli-action@c8efdacddbb86cc95fcc18e06ac2597a9f449828 # v3.1.0
+        uses: step-security/cloudsmith-cli-action@dd1da513017145043c2d29a38b3b85c2b609b5ad # v2.0.3
         # We don't distribute any artifacts from this job, but we still use Cloudsmith where we can (main and tags).
         if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
         with:
@@ -135,7 +135,7 @@ jobs:
           egress-policy: audit # Audit network and disk activity
 
       - name: Setup Cloudsmith CLI # Exports CLOUDSMITH_API_KEY
-        uses: step-security/cloudsmith-cli-action@c8efdacddbb86cc95fcc18e06ac2597a9f449828 # v3.1.0
+        uses: step-security/cloudsmith-cli-action@dd1da513017145043c2d29a38b3b85c2b609b5ad # v2.0.3
         # We don't distribute the results of running table specs here, but we use Cloudsmith where we can (main and tags) nonetheless.
         if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
         with:
