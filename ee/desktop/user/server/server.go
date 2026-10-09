@@ -14,6 +14,7 @@ import (
 	"os"
 	"runtime"
 	"runtime/pprof"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -41,6 +42,14 @@ type UserServer struct {
 	refreshListeners    []func()
 	presenceDetector    presencedetection.PresenceDetector
 	showDesktopOnceFunc func()
+
+	deviceTrustRebrandListeners     []func(enabled bool)
+	deviceTrustRebrandListenersLock sync.RWMutex
+}
+
+// DeviceTrustRebrandRequest is sent by the desktop runner when the DeviceTrustRebrand flag changes
+type DeviceTrustRebrandRequest struct {
+	Enabled bool `json:"enabled"`
 }
 
 func New(slogger *slog.Logger,
@@ -68,6 +77,7 @@ func New(slogger *slog.Logger,
 	authedMux.HandleFunc("/ping", userServer.pingHandler)
 	authedMux.HandleFunc("/notification", userServer.notificationHandler)
 	authedMux.HandleFunc("/refresh", userServer.refreshHandler)
+	authedMux.HandleFunc("POST /device_trust_rebrand", userServer.deviceTrustRebrandHandler)
 	authedMux.HandleFunc("/show", userServer.showDesktop)
 	authedMux.HandleFunc("/detect_presence", userServer.detectPresence)
 	authedMux.HandleFunc("POST /secure_enclave_key", userServer.createSecureEnclaveKey)
@@ -253,6 +263,48 @@ func (s *UserServer) notifyRefreshListeners() {
 	for _, listener := range s.refreshListeners {
 		listener()
 	}
+}
+
+func (s *UserServer) deviceTrustRebrandHandler(w http.ResponseWriter, req *http.Request) {
+	defer req.Body.Close()
+
+	var rebrandRequest DeviceTrustRebrandRequest
+	if err := json.NewDecoder(req.Body).Decode(&rebrandRequest); err != nil {
+		s.slogger.Log(req.Context(), slog.LevelError,
+			"could not decode device trust rebrand request",
+			"err", err,
+		)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	rebrandStatus := "disabled"
+	if rebrandRequest.Enabled {
+		rebrandStatus = "enabled"
+	}
+
+	s.slogger.Log(req.Context(), slog.LevelInfo,
+		"received device trust rebrand update",
+		"device_trust_rebrand", rebrandStatus,
+	)
+
+	s.deviceTrustRebrandListenersLock.RLock()
+	listeners := slices.Clone(s.deviceTrustRebrandListeners)
+	s.deviceTrustRebrandListenersLock.RUnlock()
+
+	for _, listener := range listeners {
+		listener(rebrandRequest.Enabled)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+}
+
+// RegisterDeviceTrustRebrandListener registers a listener to be notified when the DeviceTrustRebrand flag changes
+func (s *UserServer) RegisterDeviceTrustRebrandListener(f func(enabled bool)) {
+	s.deviceTrustRebrandListenersLock.Lock()
+	defer s.deviceTrustRebrandListenersLock.Unlock()
+	s.deviceTrustRebrandListeners = append(s.deviceTrustRebrandListeners, f)
 }
 
 type ProfileResponse struct {

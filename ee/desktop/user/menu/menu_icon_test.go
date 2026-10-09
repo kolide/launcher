@@ -44,6 +44,10 @@ func Test_getIcon(t *testing.T) {
 
 			icon := getIcon(tt.icon)
 			assert.NotNil(t, icon)
+
+			deviceTrustIcon := getDeviceTrustIcon(tt.icon)
+			assert.NotNil(t, deviceTrustIcon)
+			assert.NotEqual(t, icon, deviceTrustIcon, "device trust icon should differ from the kolide icon")
 		})
 	}
 }

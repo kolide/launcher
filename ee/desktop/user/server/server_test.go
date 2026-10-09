@@ -116,6 +116,59 @@ func TestUserServer_shutdownHandler(t *testing.T) {
 	}
 }
 
+func TestUserServer_deviceTrustRebrandHandler(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		body           string
+		expectedStatus int
+		expectedValues []bool
+	}{
+		{
+			name:           "enabled",
+			body:           `{"enabled":true}`,
+			expectedStatus: http.StatusOK,
+			expectedValues: []bool{true},
+		},
+		{
+			name:           "disabled",
+			body:           `{"enabled":false}`,
+			expectedStatus: http.StatusOK,
+			expectedValues: []bool{false},
+		},
+		{
+			name:           "malformed body",
+			body:           `not json`,
+			expectedStatus: http.StatusBadRequest,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var logBytes bytes.Buffer
+			server, _ := testServer(t, validAuthHeader, testSocketPath(t), &logBytes)
+
+			var received []bool
+			server.RegisterDeviceTrustRebrandListener(func(enabled bool) {
+				received = append(received, enabled)
+			})
+
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/device_trust_rebrand", strings.NewReader(tt.body))
+			rr := httptest.NewRecorder()
+			server.deviceTrustRebrandHandler(rr, req)
+
+			require.Equal(t, tt.expectedStatus, rr.Code)
+			require.Equal(t, tt.expectedValues, received)
+
+			require.NoError(t, server.Shutdown(t.Context()))
+
+			time.Sleep(5 * time.Second) // wait for removeSocket to finish
+		})
+	}
+}
+
 func testHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(r.URL.String()))

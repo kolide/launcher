@@ -5,8 +5,7 @@ package assets
 import (
 	_ "embed"
 )
-
-{{ range $constant, $filename := . }}
-//go:embed {{ $filename }}
-var {{ $constant }} []byte
-{{ end }}
+{{ range . }}
+//go:embed {{ .Filename }}
+var {{ .Constant }} []byte
+{{ end -}}
