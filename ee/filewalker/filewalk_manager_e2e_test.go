@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+	"testing/synctest"
 	"time"
 
 	"github.com/kolide/launcher/v2/ee/agent/storage"
@@ -23,6 +24,10 @@ import (
 // Checks results from calling public APIs: a startup scan, Do() in two ways, and a Ping().
 func TestFilewalkManager_E2E(t *testing.T) {
 	t.Parallel()
+	synctest.Test(t, testFilewalkManagerE2E)
+}
+
+func testFilewalkManagerE2E(t *testing.T) {
 
 	configs := `{
   "dotenv_files": {
@@ -177,14 +182,10 @@ func TestFilewalkManager_E2E(t *testing.T) {
 	// assert all named walks ran since the timestamp
 	requireWalked := func(names []string, since int64) {
 		t.Helper()
-		require.Eventually(t, func() bool {
-			for _, name := range names {
-				if lastWalkTime(name) < since {
-					return false
-				}
-			}
-			return true
-		}, 10*time.Second, 50*time.Millisecond)
+		synctest.Wait()
+		for _, name := range names {
+			require.GreaterOrEqual(t, lastWalkTime(name), since, name)
+		}
 		for _, name := range names {
 			require.ElementsMatch(t, expected[name], storedResults(name), name)
 		}
@@ -201,21 +202,37 @@ func TestFilewalkManager_E2E(t *testing.T) {
 	}
 	allNames := slices.Collect(maps.Keys(expected))
 
+	seededNotDue := make(map[string]int64, len(notDue))
 	for name, ago := range notDue {
-		seedLastWalk(name, ago)
+		seededNotDue[name] = seedLastWalk(name, ago)
 	}
+	dueNames := slices.DeleteFunc(slices.Clone(allNames), func(name string) bool {
+		_, ok := notDue[name]
+		return ok
+	})
 
 	// runs on startup
 	walkStart := time.Now().Unix()
 	fm := New(k, slogger)
-	go fm.Execute()
-	t.Cleanup(func() { fm.Interrupt(nil) })
-	requireWalked(allNames, walkStart)
+	done := make(chan struct{})
+	go func() {
+		fm.Execute()
+		close(done)
+	}()
+	defer func() {
+		fm.Interrupt(nil)
+		<-done
+	}()
+	requireWalked(dueNames, walkStart)
+	for name, ts := range seededNotDue {
+		require.Equal(t, ts, lastWalkTime(name), name)
+	}
 
 	// runs on ping or direct call
 	seedAll()
 	pingStart := time.Now().Unix()
 	fm.Ping()
+	time.Sleep(walkCheckInterval)
 	requireWalked(allNames, pingStart)
 
 	seedAll()
