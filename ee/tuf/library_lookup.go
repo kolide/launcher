@@ -294,7 +294,7 @@ func targetsFromLocalTufMetadata(tufRepositoryLocation string, trustedRootJson [
 	rootFile := filepath.Join(tufRepositoryLocation, fmt.Sprintf("%s.json", metadata.ROOT))
 	rootData, err := os.ReadFile(rootFile)
 	if err != nil {
-		return nil, fmt.Errorf("reading %s: %w", rootData, err)
+		return nil, fmt.Errorf("reading %s: %w", rootFile, err)
 	}
 	newRoot, err := metadata.Root().FromBytes(rootData)
 	if err != nil {
