@@ -320,7 +320,7 @@ func TestResolve_Roots(t *testing.T) {
 	activated := make(map[string][]string)
 	for key, matchers := range spec.activate {
 		rel := relPaths(t, canonicalize(root), []string{key})[0]
-		for _, m := range matchers {
+		for _, m := range matchers.ms {
 			activated[rel] = append(activated[rel], m.name)
 		}
 	}
