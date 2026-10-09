@@ -98,7 +98,8 @@ func overlayFiltersMatch(overlayFilters map[string]string) bool {
 	return false
 }
 
-// Filewalk executes a filewalk with the configured settings, and then stores the results and walk time.
+// Filewalk executes a filewalk with the configured settings, and then stores the results and walk time. Context
+// is respected and interrupts walks and result storage.
 func (f *filewalker) Filewalk(ctx context.Context) {
 	ctx, span := observability.StartSpan(ctx, "filewalk_name", f.name)
 	defer span.End()
@@ -134,6 +135,10 @@ func (f *filewalker) Filewalk(ctx context.Context) {
 					}
 					return nil
 				}
+				if ctx.Err() != nil {
+					f.slogger.Log(ctx, slog.LevelDebug, "file walk interrupted by context error")
+					return filepath.SkipAll
+				}
 
 				pathsWalked++
 
@@ -161,6 +166,9 @@ func (f *filewalker) Filewalk(ctx context.Context) {
 					"start_dir", match,
 					"err", err,
 				)
+			}
+			if ctx.Err() != nil {
+				return
 			}
 		}
 	}
