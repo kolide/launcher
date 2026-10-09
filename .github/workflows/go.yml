@@ -160,7 +160,7 @@ jobs:
       - name: Install build dependencies
         run: |
           apt-get -y update
-          apt-get -y install build-essential ca-certificates openssl git zstd curl
+          apt-get -y install build-essential ca-certificates openssl git zstd curl jq
           update-ca-certificates
 
       - name: Setup Cloudsmith CLI # Exports CLOUDSMITH_API_KEY
