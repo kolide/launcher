@@ -123,7 +123,7 @@ type (
 	// specification for a single walk run
 	walkSpec struct {
 		roots    []string              // the unique, top-level absolute paths to walk
-		activate map[string][]*matcher // uppermost path => all new matchers applicable
+		activate map[string]matcherSet // uppermost path => all new matchers applicable
 		matchers []*matcher
 	}
 )
@@ -134,7 +134,7 @@ type (
 // resolve uses the filesystem to evaluate the root paths globs, then deduplicates
 // paths among the matchers which share them.
 func resolve(ctx context.Context, slogger *slog.Logger, cfgs map[string]filewalkConfig, goos string) walkSpec {
-	spec := walkSpec{activate: make(map[string][]*matcher)}
+	spec := walkSpec{activate: make(map[string]matcherSet)}
 	pathsToWalk := make(map[string]string)
 	var canonicalRoots []string
 
@@ -182,9 +182,7 @@ func resolve(ctx context.Context, slogger *slog.Logger, cfgs map[string]filewalk
 
 			for _, path := range globbedPaths {
 				canonicalRoot := canonicalize(path)
-				if !slices.Contains(spec.activate[canonicalRoot], matcher) {
-					spec.activate[canonicalRoot] = append(spec.activate[canonicalRoot], matcher)
-				}
+				spec.activate[canonicalRoot] = spec.activate[canonicalRoot].with(newMatcherSet(matcher))
 				if _, ok := pathsToWalk[canonicalRoot]; !ok {
 					pathsToWalk[canonicalRoot] = path
 				}
@@ -211,6 +209,17 @@ func overlayFiltersMatch(overlayFilters map[string]string, goos string) bool {
 	// Currently, the only filter we expect is for OS.
 	if filterGoos, goosFound := overlayFilters["goos"]; goosFound {
 		return filterGoos == goos
+	}
+	return false
+}
+
+// hasRootBelow returns whether any matcher activates strictly beneath dir.
+func (s walkSpec) hasRootBelow(dir string) bool {
+	prefix := canonicalize(dir)
+	for key := range s.activate {
+		if len(key) > len(prefix) && strings.HasPrefix(key, prefix) {
+			return true
+		}
 	}
 	return false
 }
