@@ -239,7 +239,7 @@ func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUser
 	runner.knapsack.RegisterChangeObserver(runner, keys.DesktopGoMaxProcs)
 	// Observe KolideServerURL changes to update the hostname displayed in the debug menu
 	runner.knapsack.RegisterChangeObserver(runner, keys.KolideServerURL)
-	// Observe DeviceTrustRebrand changes to switch desktop processes between Device Trust and Kolide icons
+	// Observe DeviceTrustRebrand changes to restart desktop processes with the matching icons
 	runner.knapsack.RegisterChangeObserver(runner, keys.DeviceTrustRebrand)
 
 	rs, err := runnerserver.New(runner.slogger, k, messenger)
@@ -663,9 +663,8 @@ func (r *DesktopUsersProcessesRunner) FlagsChanged(ctx context.Context, flagKeys
 			"device trust rebrand changed by control server, restarting desktop processes",
 			"device_trust_rebrand", r.knapsack.DeviceTrustRebrand(),
 		)
-		// Kill existing processes so they restart with the correct icons
+		// processes restart with the new icons on the next update interval
 		r.killDesktopProcesses(ctx)
-		// Note: processes will automatically restart on the next update interval
 		return
 	}
 
@@ -1266,7 +1265,6 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(uid, socketPath, menuPath s
 		fmt.Sprintf("WINDIR=%s", os.Getenv("WINDIR")),
 		// pass the desktop enabled flag so if it's already enabled, we show desktop immeadiately
 		fmt.Sprintf("DESKTOP_ENABLED=%v", r.knapsack.DesktopEnabled()),
-		// pass the device trust rebrand flag so the desktop process uses the correct icons
 		fmt.Sprintf("DEVICE_TRUST_REBRAND=%v", r.knapsack.DeviceTrustRebrand()),
 		// Set GOMAXPROCS for the desktop subprocess (Go respects this natively).
 		// This overrides the GOMAXPROCS value set by allowedcmd.
@@ -1369,15 +1367,12 @@ func (r *DesktopUsersProcessesRunner) processLogs(uid string, stdErr io.ReadClos
 	)
 }
 
-// writeIconFiles writes both the Kolide and the Device Trust notification icons, so that either is
-// available to desktop processes when they restart after DeviceTrustRebrand changes.
 func (r *DesktopUsersProcessesRunner) writeIconFiles() {
 	r.writeIconFile(r.iconFileLocation(false), assets.MenubarDefaultLightmodeIco)
 	r.writeIconFile(r.iconFileLocation(true), deviceTrustIconData())
 }
 
-// writeIconFile writes data to path, unless the file already exists with the same contents.
-// Differing files are overwritten so that updated icons take effect after a launcher upgrade.
+// writeIconFile overwrites differing files so that updated icons take effect after a launcher upgrade.
 func (r *DesktopUsersProcessesRunner) writeIconFile(path string, data []byte) {
 	existing, err := os.ReadFile(path)
 	if err == nil && bytes.Equal(existing, data) {

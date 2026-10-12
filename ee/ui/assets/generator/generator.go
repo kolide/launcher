@@ -128,7 +128,7 @@ func generateAssetGo(ctx context.Context, logger log.Logger) error {
 	}
 	defer output.Close()
 
-	// Sort by icon name, then extension, so each icon's variants stay grouped together.
+	// Sort by name, then extension, so each icon's ico and png stay together
 	slices.SortFunc(embeddedFiles, func(a, b string) int {
 		aExt, bExt := filepath.Ext(a), filepath.Ext(b)
 		return cmp.Or(
@@ -211,8 +211,8 @@ func generateIco(ctx context.Context, logger log.Logger, name string) error {
 		}
 	}
 
-	// Now that we have the intermediary sizes, we can stich them into a single ico. List them explicitly,
-	// since a glob on the name would also match other icons sharing the prefix (e.g. kolide-debug for kolide).
+	// Now that we have the intermediary sizes, we can stich them into a single ico.
+	// Not a glob: "kolide-*" would also match kolide-debug's sizes.
 	cmd := exec.CommandContext(ctx, "convert", append(sizedIcos, output)...) //nolint:forbidigo // Fine to use exec.CommandContext since it's not in launcher proper
 	level.Debug(logger).Log("msg", "Consolodating ico with", "cmd", cmd.String())
 

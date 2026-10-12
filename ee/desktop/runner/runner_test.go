@@ -342,34 +342,26 @@ func launcherRootDir(t *testing.T) string {
 func Test_writeIconFiles(t *testing.T) {
 	t.Parallel()
 
-	// Create a temp directory to use as our root directory
 	rootDir := t.TempDir()
-
-	// Create runner for test
 	r := DesktopUsersProcessesRunner{
 		slogger:        multislogger.NewNopLogger(),
 		usersFilesRoot: rootDir,
 	}
 
-	// Test that if the icons don't exist in the root dir, the runner will create them.
 	r.writeIconFiles()
 
 	kolideIcon, err := os.ReadFile(filepath.Join(rootDir, iconFilename(false)))
-	require.NoError(t, err, "kolide icon file not created")
+	require.NoError(t, err)
 	require.Equal(t, assets.MenubarDefaultLightmodeIco, kolideIcon)
 
+	// Icons left behind by an older launcher version are replaced
 	deviceTrustIconPath := filepath.Join(rootDir, iconFilename(true))
-	deviceTrustIcon, err := os.ReadFile(deviceTrustIconPath)
-	require.NoError(t, err, "device trust icon file not created")
-	require.Equal(t, deviceTrustIconData(), deviceTrustIcon)
-
-	// Test that a stale icon (e.g. from a previous launcher version) is replaced
 	require.NoError(t, os.WriteFile(deviceTrustIconPath, []byte("stale icon"), 0644))
 	r.writeIconFiles()
 
-	deviceTrustIcon, err = os.ReadFile(deviceTrustIconPath)
+	deviceTrustIcon, err := os.ReadFile(deviceTrustIconPath)
 	require.NoError(t, err)
-	require.Equal(t, deviceTrustIconData(), deviceTrustIcon, "stale device trust icon file not replaced")
+	require.Equal(t, deviceTrustIconData(), deviceTrustIcon)
 }
 
 func TestFlagsChanged_DeviceTrustRebrand(t *testing.T) {
@@ -393,7 +385,7 @@ func TestFlagsChanged_DeviceTrustRebrand(t *testing.T) {
 	r, err := New(mockKnapsack, nil, WithUsersFilesRoot(t.TempDir()), WithAuthToken(authToken))
 	require.NoError(t, err)
 
-	// Set up a user server standing in for a running desktop process
+	// Stand-in for a running desktop process
 	socketPath := testUserServerSocketPath(t)
 	shutdownChan := make(chan struct{}, 1)
 	userServer, err := userserver.New(multislogger.NewNopLogger(), authToken, socketPath, shutdownChan, nil, nil)
@@ -415,10 +407,10 @@ func TestFlagsChanged_DeviceTrustRebrand(t *testing.T) {
 	select {
 	case <-shutdownChan:
 	case <-time.After(5 * time.Second):
-		t.Fatal("desktop process was not asked to shut down after device trust rebrand change")
+		t.Fatal("desktop process was not asked to shut down")
 	}
 
-	// The process is no longer tracked, so it will be respawned with the new flag value on the next update interval
+	// Untracked processes are respawned, with the new flag value, on the next update interval
 	require.Empty(t, r.uidProcs)
 }
 
@@ -427,7 +419,7 @@ func testUserServerSocketPath(t *testing.T) string {
 		return fmt.Sprintf(`\\.\pipe\kolide_desktop_test_%s`, ulid.New())
 	}
 
-	// launcherRootDir keeps the path short enough for a unix socket
+	// launcherRootDir keeps the path under the unix socket path length limit
 	return filepath.Join(launcherRootDir(t), "desktop.sock")
 }
 

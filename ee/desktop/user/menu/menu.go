@@ -60,7 +60,7 @@ type menu struct {
 	slogger  *slog.Logger
 	filePath string
 	urlInput chan string
-	// deviceTrustRebrand determines whether the Device Trust or the legacy Kolide menu bar icons are used
+
 	deviceTrustRebrand bool
 }
 
