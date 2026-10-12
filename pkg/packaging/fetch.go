@@ -122,7 +122,7 @@ func getReleaseVersionFromTufRepo(binaryName, channel, platform, arch, cacheDir 
 	}
 
 	if err := up.Refresh(); err != nil {
-		// Couldn't get targets using cached data -- make a new updater that will
+		// Couldn't get targets using cached data on disk -- make a new updater that will
 		// fetch from the server instead.
 		cfg.UnsafeLocalMode = false
 		var newUpdaterErr error
@@ -139,8 +139,8 @@ func getReleaseVersionFromTufRepo(binaryName, channel, platform, arch, cacheDir 
 
 	releaseTargetName := path.Join(binaryName, platform, arch, channel, "release.json")
 	releaseTarget, releaseTargetFound := targets[releaseTargetName]
-	if !releaseTargetFound {
-		return "", fmt.Errorf("finding target metadata %s after update: %w", releaseTargetName, err)
+	if !releaseTargetFound || releaseTarget.Custom == nil {
+		return "", fmt.Errorf("finding custom release target metadata %s after update", releaseTargetName)
 	}
 
 	var custom struct {
