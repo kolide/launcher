@@ -163,8 +163,7 @@ func lookupTarget(cacheDir, targetName string) (*updater.Updater, *metadata.Targ
 }
 
 // refreshAndLookupTarget pulls in TUF metadata (from <cacheDir>/tuf only if
-// localMode is set, or optionally from the TUF server if localMode is false
-// AND the local cache dir is missing the required TUF metadata) and then
+// localMode is set, or from the TUF server if localMode is false) and then
 // looks up the given target. It returns the updater used to allow for
 // downloading the target if needed.
 func refreshAndLookupTarget(cacheDir, targetName string, localMode bool) (*updater.Updater, *metadata.TargetFiles, error) {
