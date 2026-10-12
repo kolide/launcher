@@ -2,6 +2,7 @@ package packaging
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,7 +13,6 @@ import (
 
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fsutil"
-	"github.com/kolide/launcher/v2/ee/tuf"
 	"github.com/kolide/launcher/v2/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/v2/pkg/launcher"
 	"github.com/theupdateframework/go-tuf/v2/metadata"
@@ -119,6 +119,9 @@ func tufTargetPathFromVersion(name, version, platform, arch string) string {
 	return path.Join(name, platform, arch, fmt.Sprintf("%s-%s.tar.gz", name, version))
 }
 
+//go:embed assets/tuf/root.json
+var rootJson []byte
+
 func getReleaseVersionFromTufRepo(binaryName, channel, platform, arch, cacheDir string) (string, error) {
 	releaseTargetName := path.Join(binaryName, platform, arch, channel, "release.json")
 	_, releaseTarget, err := lookupTarget(cacheDir, releaseTargetName)
@@ -176,7 +179,7 @@ func refreshAndLookupTarget(cacheDir, targetName string, localMode bool) (*updat
 	}
 
 	metadataUrl := strings.TrimSuffix(launcher.DefaultTufServer, "/") + "/repository"
-	cfg, err := config.New(metadataUrl, tuf.RootJSON())
+	cfg, err := config.New(metadataUrl, rootJson)
 	if err != nil {
 		return nil, nil, fmt.Errorf("creating go-tuf/v2 config: %w", err)
 	}
