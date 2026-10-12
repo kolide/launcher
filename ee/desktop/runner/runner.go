@@ -659,7 +659,14 @@ func (r *DesktopUsersProcessesRunner) FlagsChanged(ctx context.Context, flagKeys
 
 	// Handle DeviceTrustRebrand changes
 	if keys.Contains(flagKeys, keys.DeviceTrustRebrand) {
-		r.deviceTrustRebrandChanged(ctx, r.knapsack.DeviceTrustRebrand())
+		r.slogger.Log(ctx, slog.LevelInfo,
+			"device trust rebrand changed by control server, restarting desktop processes",
+			"device_trust_rebrand", r.knapsack.DeviceTrustRebrand(),
+		)
+		// Kill existing processes so they restart with the correct icons
+		r.killDesktopProcesses(ctx)
+		// Note: processes will automatically restart on the next update interval
+		return
 	}
 
 	// Handle DesktopGoMaxProcs changes
@@ -735,33 +742,6 @@ func (r *DesktopUsersProcessesRunner) updateIntervalChanged(ctx context.Context,
 	// Update the interval atomically and reset the ticker
 	r.updateInterval.Store(newInterval)
 	r.updateTicker.Reset(newInterval)
-}
-
-// deviceTrustRebrandChanged tells all running desktop processes which icons to use, so that they
-// can switch between the Device Trust and Kolide icons without restarting.
-func (r *DesktopUsersProcessesRunner) deviceTrustRebrandChanged(ctx context.Context, enabled bool) {
-	ctx, span := observability.StartSpan(ctx, "device_trust_rebrand", enabled)
-	defer span.End()
-
-	r.slogger.Log(ctx, slog.LevelInfo,
-		"device trust rebrand set by control server, updating desktop processes",
-		"device_trust_rebrand", enabled,
-	)
-
-	r.uidProcsLock.Lock()
-	defer r.uidProcsLock.Unlock()
-	for uid, proc := range r.uidProcs {
-		client := client.New(r.userServerAuthToken, proc.socketPath)
-		if err := client.SetDeviceTrustRebrand(ctx, enabled); err != nil {
-			r.slogger.Log(ctx, slog.LevelError,
-				"sending device trust rebrand update to user desktop process",
-				"uid", uid,
-				"pid", proc.Process.Pid,
-				"path", proc.path,
-				"err", err,
-			)
-		}
-	}
 }
 
 // writeSharedFile writes data to a shared file for user processes to access
@@ -980,8 +960,7 @@ func (r *DesktopUsersProcessesRunner) spawnForUser(ctx context.Context, uid stri
 		return fmt.Errorf("getting socket path: %w", err)
 	}
 
-	deviceTrustRebrand := r.knapsack.DeviceTrustRebrand()
-	cmd, err := r.desktopCommand(uid, socketPath, r.menuPath(), deviceTrustRebrand)
+	cmd, err := r.desktopCommand(uid, socketPath, r.menuPath())
 	if err != nil {
 		observability.SetError(span, fmt.Errorf("creating desktop command: %w", err))
 		return fmt.Errorf("creating desktop command: %w", err)
@@ -1039,19 +1018,6 @@ func (r *DesktopUsersProcessesRunner) spawnForUser(ctx context.Context, uid stri
 	if err := r.addProcessTrackingRecordForUser(uid, socketPath, cmd.Process); err != nil {
 		observability.SetError(span, fmt.Errorf("adding process to internal tracking state: %w", err))
 		return fmt.Errorf("adding process to internal tracking state: %w", err)
-	}
-
-	// The flag may have changed while the process was starting up, before it was tracked in
-	// r.uidProcs -- in that case, FlagsChanged could not have updated it.
-	if currentDeviceTrustRebrand := r.knapsack.DeviceTrustRebrand(); currentDeviceTrustRebrand != deviceTrustRebrand {
-		if err := client.SetDeviceTrustRebrand(ctx, currentDeviceTrustRebrand); err != nil {
-			r.slogger.Log(ctx, slog.LevelWarn,
-				"sending device trust rebrand update to user desktop process after startup",
-				"uid", uid,
-				"pid", cmd.Process.Pid,
-				"err", err,
-			)
-		}
 	}
 
 	return nil
@@ -1262,7 +1228,7 @@ func (r *DesktopUsersProcessesRunner) writeLocalizationFile() error {
 
 // desktopCommand invokes the launcher desktop executable with configuration
 // to interface with this process over a socket and URL
-func (r *DesktopUsersProcessesRunner) desktopCommand(uid, socketPath, menuPath string, deviceTrustRebrand bool) (*allowedcmd.TracedCmd, error) {
+func (r *DesktopUsersProcessesRunner) desktopCommand(uid, socketPath, menuPath string) (*allowedcmd.TracedCmd, error) {
 	// desktop subcommand runs the more limited desktop launcher
 	cmd, err := allowedcmd.Launcher.Cmd(context.TODO(), "desktop")
 	if err != nil {
@@ -1300,9 +1266,8 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(uid, socketPath, menuPath s
 		fmt.Sprintf("WINDIR=%s", os.Getenv("WINDIR")),
 		// pass the desktop enabled flag so if it's already enabled, we show desktop immeadiately
 		fmt.Sprintf("DESKTOP_ENABLED=%v", r.knapsack.DesktopEnabled()),
-		// pass the device trust rebrand flag so the desktop process starts with the correct icons;
-		// subsequent changes are sent to the desktop process via its user server
-		fmt.Sprintf("DEVICE_TRUST_REBRAND=%v", deviceTrustRebrand),
+		// pass the device trust rebrand flag so the desktop process uses the correct icons
+		fmt.Sprintf("DEVICE_TRUST_REBRAND=%v", r.knapsack.DeviceTrustRebrand()),
 		// Set GOMAXPROCS for the desktop subprocess (Go respects this natively).
 		// This overrides the GOMAXPROCS value set by allowedcmd.
 		fmt.Sprintf("GOMAXPROCS=%d", r.knapsack.DesktopGoMaxProcs()),
@@ -1404,8 +1369,8 @@ func (r *DesktopUsersProcessesRunner) processLogs(uid string, stdErr io.ReadClos
 	)
 }
 
-// writeIconFiles writes both the Kolide and the Device Trust notification icons, so that desktop
-// processes can switch between them without restarting when DeviceTrustRebrand changes.
+// writeIconFiles writes both the Kolide and the Device Trust notification icons, so that either is
+// available to desktop processes when they restart after DeviceTrustRebrand changes.
 func (r *DesktopUsersProcessesRunner) writeIconFiles() {
 	r.writeIconFile(r.iconFileLocation(false), assets.MenubarDefaultLightmodeIco)
 	r.writeIconFile(r.iconFileLocation(true), deviceTrustIconData())

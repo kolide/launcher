@@ -58,19 +58,10 @@ func (m *menu) Build() {
 	parseMenuData(menuData, m)
 }
 
-// SetDeviceTrustRebrand switches the menu bar between the Device Trust and the legacy Kolide icons,
-// rebuilding the menu if the value changed.
-func (m *menu) SetDeviceTrustRebrand(enabled bool) {
-	if m.deviceTrustRebrand.Swap(enabled) == enabled {
-		return
-	}
-	m.Build()
-}
-
 func (m *menu) setIcon(icon menuIcon) {
 	systrayMenuIcon = icon
 	iconBytes := getIcon(icon)
-	if m.deviceTrustRebrand.Load() {
+	if m.deviceTrustRebrand {
 		iconBytes = getDeviceTrustIcon(icon)
 	}
 	if iconBytes != nil {

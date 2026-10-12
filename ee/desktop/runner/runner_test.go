@@ -375,53 +375,51 @@ func Test_writeIconFiles(t *testing.T) {
 func TestFlagsChanged_DeviceTrustRebrand(t *testing.T) {
 	t.Parallel()
 
-	for _, enabled := range []bool{true, false} {
-		t.Run(fmt.Sprintf("enabled=%v", enabled), func(t *testing.T) {
-			t.Parallel()
+	mockKnapsack := mocks.NewKnapsack(t)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopEnabled)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopGoMaxProcs)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopUpdateInterval)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.KolideServerURL)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DeviceTrustRebrand)
+	mockKnapsack.On("DesktopUpdateInterval").Return(time.Millisecond * 250)
+	mockKnapsack.On("DesktopMenuRefreshInterval").Return(time.Millisecond * 250)
+	mockKnapsack.On("KolideServerURL").Return("somewhere-over-the-rainbow.example.com")
+	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+	mockKnapsack.On("InModernStandby").Return(false)
+	mockKnapsack.On("LocalizationData").Return(types.LocalizationData{}).Maybe()
+	mockKnapsack.On("DeviceTrustRebrand").Return(true)
 
-			mockKnapsack := mocks.NewKnapsack(t)
-			mockKnapsack.On("DeviceTrustRebrand").Return(enabled)
+	authToken := ulid.New()
+	r, err := New(mockKnapsack, nil, WithUsersFilesRoot(t.TempDir()), WithAuthToken(authToken))
+	require.NoError(t, err)
 
-			// Set up a user server standing in for a running desktop process
-			authToken := ulid.New()
-			socketPath := testUserServerSocketPath(t)
-			userServer, err := userserver.New(multislogger.NewNopLogger(), authToken, socketPath, make(chan struct{}), nil, nil)
-			require.NoError(t, err)
+	// Set up a user server standing in for a running desktop process
+	socketPath := testUserServerSocketPath(t)
+	shutdownChan := make(chan struct{}, 1)
+	userServer, err := userserver.New(multislogger.NewNopLogger(), authToken, socketPath, shutdownChan, nil, nil)
+	require.NoError(t, err)
+	go func() {
+		userServer.Serve()
+	}()
+	t.Cleanup(func() {
+		userServer.Shutdown(context.Background())
+	})
 
-			received := make(chan bool, 1)
-			userServer.RegisterDeviceTrustRebrandListener(func(enabled bool) {
-				received <- enabled
-			})
-
-			go func() {
-				userServer.Serve()
-			}()
-
-			r := &DesktopUsersProcessesRunner{
-				slogger:             multislogger.NewNopLogger(),
-				knapsack:            mockKnapsack,
-				userServerAuthToken: authToken,
-				uidProcs: map[string]processRecord{
-					"test-uid": {
-						Process:    &os.Process{},
-						socketPath: socketPath,
-					},
-				},
-				uidProcsLock: &sync.Mutex{},
-			}
-
-			r.FlagsChanged(t.Context(), keys.DeviceTrustRebrand)
-
-			select {
-			case receivedEnabled := <-received:
-				require.Equal(t, enabled, receivedEnabled)
-			case <-time.After(5 * time.Second):
-				t.Fatal("desktop process did not receive device trust rebrand update")
-			}
-
-			require.NoError(t, userServer.Shutdown(t.Context()))
-		})
+	r.uidProcs["test-uid"] = processRecord{
+		Process:    &os.Process{},
+		socketPath: socketPath,
 	}
+
+	r.FlagsChanged(t.Context(), keys.DeviceTrustRebrand)
+
+	select {
+	case <-shutdownChan:
+	case <-time.After(5 * time.Second):
+		t.Fatal("desktop process was not asked to shut down after device trust rebrand change")
+	}
+
+	// The process is no longer tracked, so it will be respawned with the new flag value on the next update interval
+	require.Empty(t, r.uidProcs)
 }
 
 func testUserServerSocketPath(t *testing.T) string {

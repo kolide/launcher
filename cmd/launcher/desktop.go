@@ -166,15 +166,13 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 		showDesktopChan = make(chan struct{})
 	}
 
-	notificationIconPath := func(deviceTrustRebrand bool) string {
-		if deviceTrustRebrand {
-			return *flDeviceTrustIconPath
-		}
-		return *flIconPath
+	notificationIconPath := *flIconPath
+	if *flDeviceTrustRebrand {
+		notificationIconPath = *flDeviceTrustIconPath
 	}
 
 	// Set up notification sending and listening
-	notifier := notify.NewDesktopNotifier(slogger, notificationIconPath(*flDeviceTrustRebrand), *flLocalizationPath)
+	notifier := notify.NewDesktopNotifier(slogger, notificationIconPath, *flLocalizationPath)
 	runGroup.Add("desktopNotifier", notifier.Execute, notifier.Interrupt)
 
 	server, err := userserver.New(slogger, *flUserServerAuthToken, *flUserServerSocketPath, shutdownChan, showDesktopChan, notifier)
@@ -189,16 +187,11 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 	universalLinkHandler, urlInput := universallink.NewUniversalLinkHandler(slogger)
 	runGroup.Add("universalLinkHandler", universalLinkHandler.Execute, universalLinkHandler.Interrupt)
 	// Pass through channel so that systray can alert the link handler when it receives a universal link request
-	m := menu.New(slogger, *flmenupath, urlInput)
-	m.SetDeviceTrustRebrand(*flDeviceTrustRebrand)
+	m := menu.New(slogger, *flmenupath, urlInput, *flDeviceTrustRebrand)
 	refreshMenu := func() {
 		m.Build()
 	}
 	server.RegisterRefreshListener(refreshMenu)
-	server.RegisterDeviceTrustRebrandListener(func(enabled bool) {
-		notifier.SetIconFilepath(notificationIconPath(enabled))
-		m.SetDeviceTrustRebrand(enabled)
-	})
 
 	// start user server
 	runGroup.Add("desktopServer", server.Serve, func(err error) {
