@@ -57,7 +57,7 @@ func FetchBinary(ctx context.Context, localCacheDir, name, binaryName, channelOr
 	baseName := strings.TrimSuffix(name, filepath.Ext(name))
 	targetName, err := tufTargetPath(baseName, channelOrVersion, string(target.Platform), string(target.Arch), localCacheDir)
 	if err != nil {
-		return "", fmt.Errorf("could not get download path: %w", err)
+		return "", fmt.Errorf("getting target name: %w", err)
 	}
 
 	level.Debug(logger).Log(
@@ -68,20 +68,20 @@ func FetchBinary(ctx context.Context, localCacheDir, name, binaryName, channelOr
 	// Download the package, verifying it against TUF metadata, and store it in cache
 	up, tufTarget, err := lookupTarget(localCacheDir, targetName)
 	if err != nil {
-		return "", fmt.Errorf("could not find target %s: %w", targetName, err)
+		return "", fmt.Errorf("finding target %s: %w", targetName, err)
 	}
 	if _, _, err := up.DownloadTarget(tufTarget, localPackagePath, launcher.DefaultMirror+"/kolide/"); err != nil {
-		return "", fmt.Errorf("couldn't download binary archive: %w", err)
+		return "", fmt.Errorf("downloading binary archive: %w", err)
 	}
 
 	if err := os.MkdirAll(filepath.Dir(localBinaryPath), fsutil.DirMode); err != nil {
-		return "", fmt.Errorf("couldn't create directory for binary: %w", err)
+		return "", fmt.Errorf("creating directory for binary: %w", err)
 	}
 
 	// UntarBundle is a bit misnamed. this untars unto the directory
 	// containing that file. It has a call to filepath.Dir(destination) there.
 	if err := fsutil.UntarBundle(localBinaryPath, localPackagePath); err != nil {
-		return "", fmt.Errorf("couldn't untar download: %w", err)
+		return "", fmt.Errorf("untarring download: %w", err)
 	}
 
 	if _, err := os.Stat(localBinaryPath); err != nil {
@@ -108,7 +108,7 @@ func tufTargetPath(name, channelOrVersion, platform, arch, cacheDir string) (str
 
 	version, err := getReleaseVersionFromTufRepo(name, channelOrVersion, platform, arch, cacheDir)
 	if err != nil {
-		return "", fmt.Errorf("could not find release version for channel %s: %w", channelOrVersion, err)
+		return "", fmt.Errorf("determining release version for channel %s: %w", channelOrVersion, err)
 	}
 
 	return tufTargetPathFromVersion(name, version, platform, arch), nil
@@ -125,17 +125,17 @@ func getReleaseVersionFromTufRepo(binaryName, channel, platform, arch, cacheDir 
 	releaseTargetName := path.Join(binaryName, platform, arch, channel, "release.json")
 	_, releaseTarget, err := lookupTarget(cacheDir, releaseTargetName)
 	if err != nil {
-		return "", fmt.Errorf("could not find release target %s: %w", releaseTargetName, err)
+		return "", fmt.Errorf("finding release target %s: %w", releaseTargetName, err)
 	}
 	if releaseTarget.Custom == nil {
-		return "", fmt.Errorf("release target %s has no custom metadata", releaseTargetName)
+		return "", fmt.Errorf("release target %s missing custom metadata", releaseTargetName)
 	}
 
 	var custom struct {
 		Target string `json:"target"`
 	}
 	if err := json.Unmarshal(*releaseTarget.Custom, &custom); err != nil {
-		return "", fmt.Errorf("could not unmarshal release file custom metadata: %w", err)
+		return "", fmt.Errorf("unmarshalling release file custom metadata: %w", err)
 	}
 
 	targetFilename := filepath.Base(custom.Target)
