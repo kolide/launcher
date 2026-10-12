@@ -18,6 +18,7 @@ import (
 	"github.com/kolide/launcher/v2/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/v2/pkg/launcher"
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
+	"github.com/theupdateframework/go-tuf/v2/metadata"
 	"github.com/theupdateframework/go-tuf/v2/metadata/config"
 	"github.com/theupdateframework/go-tuf/v2/metadata/updater"
 )
@@ -116,31 +117,20 @@ func getReleaseVersionFromTufRepo(binaryName, channel, platform, arch, cacheDir 
 	cfg.LocalTargetsDir = cacheDir
 	cfg.UnsafeLocalMode = true
 
-	up, err := updater.New(cfg)
-	if err != nil {
-		return "", fmt.Errorf("creating local go-tuf/v2 updater: %w", err)
-	}
-
-	if err := up.Refresh(); err != nil {
-		// Couldn't get targets using cached data on disk -- make a new updater that will
-		// fetch from the server instead.
-		cfg.UnsafeLocalMode = false
-		var newUpdaterErr error
-		up, newUpdaterErr = updater.New(cfg)
-		if newUpdaterErr != nil {
-			return "", fmt.Errorf("creating non-local updater after local update failed with `%s`: %w", err.Error(), newUpdaterErr)
-		}
-		if newRefreshErr := up.Refresh(); newRefreshErr != nil {
-			return "", fmt.Errorf("refreshing non-local updater after local update failed with `%s`: %w", err.Error(), newRefreshErr)
-		}
-	}
-
-	targets := up.GetTopLevelTargets()
-
 	releaseTargetName := path.Join(binaryName, platform, arch, channel, "release.json")
-	releaseTarget, releaseTargetFound := targets[releaseTargetName]
-	if !releaseTargetFound || releaseTarget.Custom == nil {
-		return "", fmt.Errorf("finding custom release target metadata %s after update", releaseTargetName)
+
+	// First, try to find the release target using only cached metadata on disk.
+	releaseTarget, localErr := lookupReleaseTarget(cfg, releaseTargetName)
+	if localErr != nil {
+		// Either the local metadata was unusable (missing or expired), or it was valid but did
+		// not contain the requested target (e.g. a new channel, binary, or platform/arch that
+		// postdates our cache). In both cases, refresh from the server and look again.
+		cfg.UnsafeLocalMode = false
+		var remoteErr error
+		releaseTarget, remoteErr = lookupReleaseTarget(cfg, releaseTargetName)
+		if remoteErr != nil {
+			return "", fmt.Errorf("finding release target via remote update after local lookup failed with `%s`: %w", localErr.Error(), remoteErr)
+		}
 	}
 
 	var custom struct {
@@ -154,4 +144,22 @@ func getReleaseVersionFromTufRepo(binaryName, channel, platform, arch, cacheDir 
 
 	// Target looks like <binary>-<version>.tar.gz -- strip off extension and binary name to get version
 	return strings.TrimSuffix(strings.TrimPrefix(targetFilename, binaryName+"-"), ".tar.gz"), nil
+}
+
+func lookupReleaseTarget(cfg *config.UpdaterConfig, releaseTargetName string) (*metadata.TargetFiles, error) {
+	up, err := updater.New(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("creating go-tuf/v2 updater (local mode: %t): %w", cfg.UnsafeLocalMode, err)
+	}
+
+	if err := up.Refresh(); err != nil {
+		return nil, fmt.Errorf("refreshing go-tuf/v2 updater (local mode: %t): %w", cfg.UnsafeLocalMode, err)
+	}
+
+	releaseTarget, found := up.GetTopLevelTargets()[releaseTargetName]
+	if !found || releaseTarget == nil || releaseTarget.Custom == nil {
+		return nil, fmt.Errorf("release target %s not found in targets (local mode: %t)", releaseTargetName, cfg.UnsafeLocalMode)
+	}
+
+	return releaseTarget, nil
 }
