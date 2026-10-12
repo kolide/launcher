@@ -96,7 +96,8 @@ func FetchBinary(ctx context.Context, localCacheDir, name, binaryName, channelOr
 }
 
 func isChannel(channelOrVersion string) bool {
-	return channelOrVersion == "stable" || channelOrVersion == "beta" || channelOrVersion == "nightly" || channelOrVersion == "alpha"
+	lowercaseChannelOrVersion := strings.ToLower(channelOrVersion)
+	return lowercaseChannelOrVersion == "stable" || lowercaseChannelOrVersion == "beta" || lowercaseChannelOrVersion == "nightly" || lowercaseChannelOrVersion == "alpha"
 }
 
 func getReleaseVersionFromTufRepo(binaryName, channel, platform, arch, cacheDir string) (string, error) {
