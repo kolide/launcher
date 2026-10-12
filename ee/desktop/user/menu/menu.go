@@ -60,13 +60,16 @@ type menu struct {
 	slogger  *slog.Logger
 	filePath string
 	urlInput chan string
+
+	deviceTrustRebrand bool
 }
 
-func New(slogger *slog.Logger, filePath string, urlInput chan string) *menu {
+func New(slogger *slog.Logger, filePath string, urlInput chan string, deviceTrustRebrand bool) *menu {
 	m := &menu{
-		slogger:  slogger.With("component", "desktop_menu"),
-		filePath: filePath,
-		urlInput: urlInput,
+		slogger:            slogger.With("component", "desktop_menu"),
+		filePath:           filePath,
+		urlInput:           urlInput,
+		deviceTrustRebrand: deviceTrustRebrand,
 	}
 
 	return m

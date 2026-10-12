@@ -24,7 +24,9 @@ import (
 	"github.com/kolide/launcher/v2/ee/consoleuser"
 	"github.com/kolide/launcher/v2/ee/currentprocess"
 	"github.com/kolide/launcher/v2/ee/desktop/user/notify"
+	userserver "github.com/kolide/launcher/v2/ee/desktop/user/server"
 	"github.com/kolide/launcher/v2/ee/presencedetection"
+	"github.com/kolide/launcher/v2/ee/ui/assets"
 	"github.com/kolide/launcher/v2/pkg/backoff"
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/kolide/launcher/v2/pkg/threadsafebuffer"
@@ -145,10 +147,12 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopGoMaxProcs)
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopUpdateInterval)
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.KolideServerURL)
+			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DeviceTrustRebrand)
 			mockKnapsack.On("DesktopUpdateInterval").Return(time.Millisecond * 250)
 			mockKnapsack.On("DesktopMenuRefreshInterval").Return(time.Millisecond * 250)
 			mockKnapsack.On("DesktopGoMaxProcs").Return(2).Maybe()
 			mockKnapsack.On("KolideServerURL").Return("somewhere-over-the-rainbow.example.com")
+			mockKnapsack.On("DeviceTrustRebrand").Return(false).Maybe()
 
 			// if we're not in CI, always expect desktop enabled call
 			// if we are in CI only expect desktop enabled on windows and darwin
@@ -335,21 +339,88 @@ func launcherRootDir(t *testing.T) string {
 	return path
 }
 
-func Test_writeIconPath(t *testing.T) {
+func Test_writeIconFiles(t *testing.T) {
 	t.Parallel()
 
-	// Create a temp directory to use as our root directory
 	rootDir := t.TempDir()
-
-	// Create runner for test
 	r := DesktopUsersProcessesRunner{
+		slogger:        multislogger.NewNopLogger(),
 		usersFilesRoot: rootDir,
 	}
 
-	// Test that if the icon doesn't exist in the root dir, the runner will create it.
-	r.writeIconFile()
-	_, err := os.Stat(filepath.Join(rootDir, iconFilename()))
-	require.NoError(t, err, "icon file not created")
+	r.writeIconFiles()
+
+	kolideIcon, err := os.ReadFile(filepath.Join(rootDir, iconFilename(false)))
+	require.NoError(t, err)
+	require.Equal(t, assets.MenubarDefaultLightmodeIco, kolideIcon)
+
+	// Icons left behind by an older launcher version are replaced
+	deviceTrustIconPath := filepath.Join(rootDir, iconFilename(true))
+	require.NoError(t, os.WriteFile(deviceTrustIconPath, []byte("stale icon"), 0644))
+	r.writeIconFiles()
+
+	deviceTrustIcon, err := os.ReadFile(deviceTrustIconPath)
+	require.NoError(t, err)
+	require.Equal(t, deviceTrustIconData(), deviceTrustIcon)
+}
+
+func TestFlagsChanged_DeviceTrustRebrand(t *testing.T) {
+	t.Parallel()
+
+	mockKnapsack := mocks.NewKnapsack(t)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopEnabled)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopGoMaxProcs)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopUpdateInterval)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.KolideServerURL)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DeviceTrustRebrand)
+	mockKnapsack.On("DesktopUpdateInterval").Return(time.Millisecond * 250)
+	mockKnapsack.On("DesktopMenuRefreshInterval").Return(time.Millisecond * 250)
+	mockKnapsack.On("KolideServerURL").Return("somewhere-over-the-rainbow.example.com")
+	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+	mockKnapsack.On("InModernStandby").Return(false)
+	mockKnapsack.On("LocalizationData").Return(types.LocalizationData{}).Maybe()
+	mockKnapsack.On("DeviceTrustRebrand").Return(true)
+
+	authToken := ulid.New()
+	r, err := New(mockKnapsack, nil, WithUsersFilesRoot(t.TempDir()), WithAuthToken(authToken))
+	require.NoError(t, err)
+
+	// Stand-in for a running desktop process
+	socketPath := testUserServerSocketPath(t)
+	shutdownChan := make(chan struct{}, 1)
+	userServer, err := userserver.New(multislogger.NewNopLogger(), authToken, socketPath, shutdownChan, nil, nil)
+	require.NoError(t, err)
+	go func() {
+		userServer.Serve()
+	}()
+	t.Cleanup(func() {
+		userServer.Shutdown(context.Background())
+	})
+
+	r.uidProcs["test-uid"] = processRecord{
+		Process:    &os.Process{},
+		socketPath: socketPath,
+	}
+
+	r.FlagsChanged(t.Context(), keys.DeviceTrustRebrand)
+
+	select {
+	case <-shutdownChan:
+	case <-time.After(5 * time.Second):
+		t.Fatal("desktop process was not asked to shut down")
+	}
+
+	// Untracked processes are respawned, with the new flag value, on the next update interval
+	require.Empty(t, r.uidProcs)
+}
+
+func testUserServerSocketPath(t *testing.T) string {
+	if runtime.GOOS == "windows" {
+		return fmt.Sprintf(`\\.\pipe\kolide_desktop_test_%s`, ulid.New())
+	}
+
+	// launcherRootDir keeps the path under the unix socket path length limit
+	return filepath.Join(launcherRootDir(t), "desktop.sock")
 }
 
 func TestUpdate(t *testing.T) {
@@ -390,6 +461,7 @@ func TestUpdate(t *testing.T) {
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopGoMaxProcs)
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopUpdateInterval)
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.KolideServerURL)
+			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DeviceTrustRebrand)
 			mockKnapsack.On("DesktopUpdateInterval").Return(time.Millisecond * 250)
 			mockKnapsack.On("DesktopMenuRefreshInterval").Return(time.Millisecond * 250)
 			mockKnapsack.On("DesktopGoMaxProcs").Return(2).Maybe()
@@ -429,6 +501,7 @@ func TestSendNotification_NoProcessesYet(t *testing.T) {
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopGoMaxProcs)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopUpdateInterval)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.KolideServerURL)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DeviceTrustRebrand)
 	mockKnapsack.On("DesktopUpdateInterval").Return(time.Millisecond * 250)
 	mockKnapsack.On("DesktopMenuRefreshInterval").Return(time.Millisecond * 250)
 	mockKnapsack.On("DesktopGoMaxProcs").Return(2).Maybe()
@@ -573,6 +646,7 @@ func Test_writeLocalizationFile(t *testing.T) {
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopGoMaxProcs)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopUpdateInterval)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.KolideServerURL)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DeviceTrustRebrand)
 	mockKnapsack.On("DesktopUpdateInterval").Return(time.Millisecond * 250)
 	mockKnapsack.On("DesktopMenuRefreshInterval").Return(time.Millisecond * 250)
 	mockKnapsack.On("DesktopGoMaxProcs").Return(2).Maybe()
@@ -612,6 +686,7 @@ func Test_Ping_writesLocalizationFile(t *testing.T) {
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopGoMaxProcs)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopUpdateInterval)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.KolideServerURL)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DeviceTrustRebrand)
 	mockKnapsack.On("DesktopUpdateInterval").Return(time.Millisecond * 250)
 	mockKnapsack.On("DesktopMenuRefreshInterval").Return(time.Millisecond * 250)
 	mockKnapsack.On("DesktopGoMaxProcs").Return(2).Maybe()
