@@ -61,6 +61,9 @@ func (m *menu) Build() {
 func (m *menu) setIcon(icon menuIcon) {
 	systrayMenuIcon = icon
 	iconBytes := getIcon(icon)
+	if m.deviceTrustRebrand {
+		iconBytes = getDeviceTrustIcon(icon)
+	}
 	if iconBytes != nil {
 		systray.SetTemplateIcon(iconBytes, iconBytes)
 	}

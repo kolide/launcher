@@ -81,10 +81,20 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 			"",
 			"path to icon file",
 		)
+		flDeviceTrustIconPath = flagset.String(
+			"device_trust_icon_path",
+			"",
+			"path to icon file used when device_trust_rebrand is enabled",
+		)
 		flDesktopEnabled = flagset.Bool(
 			"desktop_enabled",
 			false,
 			"if desktop already enabled, show desktop immediately",
+		)
+		flDeviceTrustRebrand = flagset.Bool(
+			"device_trust_rebrand",
+			false,
+			"use Device Trust icons instead of legacy Kolide icons",
 		)
 	)
 
@@ -156,8 +166,13 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 		showDesktopChan = make(chan struct{})
 	}
 
+	notificationIconPath := *flIconPath
+	if *flDeviceTrustRebrand {
+		notificationIconPath = *flDeviceTrustIconPath
+	}
+
 	// Set up notification sending and listening
-	notifier := notify.NewDesktopNotifier(slogger, *flIconPath, *flLocalizationPath)
+	notifier := notify.NewDesktopNotifier(slogger, notificationIconPath, *flLocalizationPath)
 	runGroup.Add("desktopNotifier", notifier.Execute, notifier.Interrupt)
 
 	server, err := userserver.New(slogger, *flUserServerAuthToken, *flUserServerSocketPath, shutdownChan, showDesktopChan, notifier)
@@ -172,7 +187,7 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 	universalLinkHandler, urlInput := universallink.NewUniversalLinkHandler(slogger)
 	runGroup.Add("universalLinkHandler", universalLinkHandler.Execute, universalLinkHandler.Interrupt)
 	// Pass through channel so that systray can alert the link handler when it receives a universal link request
-	m := menu.New(slogger, *flmenupath, urlInput)
+	m := menu.New(slogger, *flmenupath, urlInput, *flDeviceTrustRebrand)
 	refreshMenu := func() {
 		m.Build()
 	}

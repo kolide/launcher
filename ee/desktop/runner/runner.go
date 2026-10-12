@@ -4,6 +4,7 @@ package runner
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"encoding/json"
@@ -223,7 +224,7 @@ func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUser
 		opt(runner)
 	}
 
-	runner.writeIconFile()
+	runner.writeIconFiles()
 	runner.writeDefaultMenuTemplateFile()
 	runner.refreshMenu()
 
@@ -238,6 +239,8 @@ func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUser
 	runner.knapsack.RegisterChangeObserver(runner, keys.DesktopGoMaxProcs)
 	// Observe KolideServerURL changes to update the hostname displayed in the debug menu
 	runner.knapsack.RegisterChangeObserver(runner, keys.KolideServerURL)
+	// Observe DeviceTrustRebrand changes to restart desktop processes with the matching icons
+	runner.knapsack.RegisterChangeObserver(runner, keys.DeviceTrustRebrand)
 
 	rs, err := runnerserver.New(runner.slogger, k, messenger)
 	if err != nil {
@@ -652,6 +655,17 @@ func (r *DesktopUsersProcessesRunner) FlagsChanged(ctx context.Context, flagKeys
 	// Handle DesktopUpdateInterval changes
 	if keys.Contains(flagKeys, keys.DesktopUpdateInterval) {
 		r.updateIntervalChanged(ctx, r.knapsack.DesktopUpdateInterval())
+	}
+
+	// Handle DeviceTrustRebrand changes
+	if keys.Contains(flagKeys, keys.DeviceTrustRebrand) {
+		r.slogger.Log(ctx, slog.LevelInfo,
+			"device trust rebrand changed by control server, restarting desktop processes",
+			"device_trust_rebrand", r.knapsack.DeviceTrustRebrand(),
+		)
+		// processes restart with the new icons on the next update interval
+		r.killDesktopProcesses(ctx)
+		return
 	}
 
 	// Handle DesktopGoMaxProcs changes
@@ -1239,7 +1253,8 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(uid, socketPath, menuPath s
 		fmt.Sprintf("TEMP=%s", os.Getenv("TEMP")),
 		fmt.Sprintf("USER_SERVER_AUTH_TOKEN=%s", r.userServerAuthToken),
 		fmt.Sprintf("USER_SERVER_SOCKET_PATH=%s", socketPath),
-		fmt.Sprintf("ICON_PATH=%s", r.iconFileLocation()),
+		fmt.Sprintf("ICON_PATH=%s", r.iconFileLocation(false)),
+		fmt.Sprintf("DEVICE_TRUST_ICON_PATH=%s", r.iconFileLocation(true)),
 		fmt.Sprintf("MENU_PATH=%s", menuPath),
 		fmt.Sprintf("LOCALIZATION_PATH=%s", r.localizationPath()),
 		fmt.Sprintf("PPID=%d", os.Getpid()),
@@ -1250,6 +1265,7 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(uid, socketPath, menuPath s
 		fmt.Sprintf("WINDIR=%s", os.Getenv("WINDIR")),
 		// pass the desktop enabled flag so if it's already enabled, we show desktop immeadiately
 		fmt.Sprintf("DESKTOP_ENABLED=%v", r.knapsack.DesktopEnabled()),
+		fmt.Sprintf("DEVICE_TRUST_REBRAND=%v", r.knapsack.DeviceTrustRebrand()),
 		// Set GOMAXPROCS for the desktop subprocess (Go respects this natively).
 		// This overrides the GOMAXPROCS value set by allowedcmd.
 		fmt.Sprintf("GOMAXPROCS=%d", r.knapsack.DesktopGoMaxProcs()),
@@ -1351,35 +1367,55 @@ func (r *DesktopUsersProcessesRunner) processLogs(uid string, stdErr io.ReadClos
 	)
 }
 
-func (r *DesktopUsersProcessesRunner) writeIconFile() {
-	expectedLocation := r.iconFileLocation()
+func (r *DesktopUsersProcessesRunner) writeIconFiles() {
+	r.writeIconFile(r.iconFileLocation(false), assets.MenubarDefaultLightmodeIco)
+	r.writeIconFile(r.iconFileLocation(true), deviceTrustIconData())
+}
 
-	_, err := os.Stat(expectedLocation)
+// writeIconFile overwrites differing files so that updated icons take effect after a launcher upgrade.
+func (r *DesktopUsersProcessesRunner) writeIconFile(path string, data []byte) {
+	existing, err := os.ReadFile(path)
+	if err == nil && bytes.Equal(existing, data) {
+		return
+	}
+	if err != nil && !os.IsNotExist(err) {
+		r.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not read existing icon file, will overwrite it",
+			"path", path,
+			"err", err,
+		)
+	}
 
-	if os.IsNotExist(err) {
-		if err := os.WriteFile(expectedLocation, assets.MenubarDefaultLightmodeIco, 0644); err != nil {
-			r.slogger.Log(context.TODO(), slog.LevelError,
-				"icon file did not exist, could not create it",
-				"err", err,
-			)
-		}
-	} else if err != nil {
+	if err := os.WriteFile(path, data, 0644); err != nil {
 		r.slogger.Log(context.TODO(), slog.LevelError,
-			"could not check if icon file exists",
+			"could not write icon file",
+			"path", path,
 			"err", err,
 		)
 	}
 }
 
-func iconFilename() string {
+func deviceTrustIconData() []byte {
 	if runtime.GOOS == "windows" {
-		return "kolide.ico"
+		return assets.DeviceTrustIco
 	}
-	return "kolide.png"
+	return assets.DeviceTrustPng
 }
 
-func (r *DesktopUsersProcessesRunner) iconFileLocation() string {
-	return filepath.Join(r.usersFilesRoot, iconFilename())
+func iconFilename(deviceTrustRebrand bool) string {
+	name := "kolide"
+	if deviceTrustRebrand {
+		name = "device-trust"
+	}
+
+	if runtime.GOOS == "windows" {
+		return name + ".ico"
+	}
+	return name + ".png"
+}
+
+func (r *DesktopUsersProcessesRunner) iconFileLocation(deviceTrustRebrand bool) string {
+	return filepath.Join(r.usersFilesRoot, iconFilename(deviceTrustRebrand))
 }
 
 func removeFilesWithPrefix(folderPath, prefix string) error {
