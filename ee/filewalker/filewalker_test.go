@@ -1,6 +1,7 @@
 package filewalker
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"os"
@@ -179,6 +180,133 @@ func TestFilewalk_SkipDirsMatchFullPath(t *testing.T) {
 	})
 
 	require.ElementsMatch(t, []string{"home/kiwi/proj/aws-credentials"}, results)
+}
+
+// Configs sharing a root should split at directories only some of them skip.
+func TestFilewalk_SharedRootSplitsAtSkipDirs(t *testing.T) {
+	t.Parallel()
+
+	results := walkMany(t, fstest.MapFS{
+		"proj/.env":                       {},
+		"proj/.git/HEAD":                  {},
+		"proj/.git/hooks/.env":            {},
+		"proj/node_modules/pkg/.env":      {},
+		"proj/node_modules/pkg/.git/HEAD": {},
+	}, map[string]filewalkConfig{
+		"dotenv": testConfig(t, ".", `^\.env$`, fileTypeFile, `node_modules$`, `\.git$`),
+		"git":    testConfig(t, ".", `^\.git$`, fileTypeDir, `node_modules$`, `\.git[\\/]`),
+	})
+
+	require.ElementsMatch(t, []string{"proj/.env"}, results["dotenv"])
+	require.ElementsMatch(t, []string{"proj/.git"}, results["git"])
+}
+
+// A config rooted inside another's root should only match beneath its own root.
+func TestFilewalk_NestedRootActivatesPartwayDown(t *testing.T) {
+	t.Parallel()
+
+	results := walkMany(t, fstest.MapFS{
+		"home/kiwi/.env":              {},
+		"home/kiwi/projects/api/.env": {},
+	}, map[string]filewalkConfig{
+		"everywhere": testConfig(t, ".", `^\.env$`, fileTypeFile),
+		"projects":   testConfig(t, "home/kiwi/projects", `^\.env$`, fileTypeFile),
+	})
+
+	require.ElementsMatch(t, []string{"home/kiwi/.env", "home/kiwi/projects/api/.env"}, results["everywhere"])
+	require.ElementsMatch(t, []string{"home/kiwi/projects/api/.env"}, results["projects"])
+}
+
+// The walk should keep descending through a dir every active config skips when another config's root lies below it.
+func TestFilewalk_NestedRootUnderSkippedDir(t *testing.T) {
+	t.Parallel()
+
+	results := walkMany(t, fstest.MapFS{
+		"home/kiwi/.env":              {},
+		"home/kiwi/projects/api/.env": {},
+		"home/ostrich/.env":           {},
+	}, map[string]filewalkConfig{
+		"skips_kiwi": testConfig(t, ".", `^\.env$`, fileTypeFile, `kiwi$`),
+		"projects":   testConfig(t, "home/kiwi/projects", `^\.env$`, fileTypeFile),
+	})
+
+	require.ElementsMatch(t, []string{"home/ostrich/.env"}, results["skips_kiwi"])
+	require.ElementsMatch(t, []string{"home/kiwi/projects/api/.env"}, results["projects"])
+}
+
+// A cancelled walk should leave previously stored results in place.
+func TestFilewalk_CancelledKeepsPreviousResults(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	require.NoError(t, os.CopyFS(root, fstest.MapFS{"home/kiwi/.env": {}}))
+	slogger := multislogger.NewNopLogger()
+	store, err := storageci.NewStore(t, slogger, storage.FilewalkResultsStore.String())
+	require.NoError(t, err)
+	require.NoError(t, store.Set([]byte("dotenv"), []byte(`["previous"]`)))
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	cfg := testConfig(t, root, `^\.env$`, fileTypeFile)
+	newTestFilewalker(t, "dotenv", cfg, store, slogger).Filewalk(ctx)
+
+	raw, err := store.Get([]byte("dotenv"))
+	require.NoError(t, err)
+	require.JSONEq(t, `["previous"]`, string(raw))
+	lastWalk, err := store.Get(LastWalkTimeKey("dotenv"))
+	require.NoError(t, err)
+	require.Nil(t, lastWalk)
+}
+
+// testConfig builds a single-root config; rootDir is slash-separated and may be relative to the walked tree.
+func testConfig(t *testing.T, rootDir, fileNameRegex, fileType string, skipDirs ...string) filewalkConfig {
+	t.Helper()
+	ft := &fileTypeFilter{}
+	require.NoError(t, json.Unmarshal([]byte(`"`+fileType+`"`), ft))
+	skips := make([]*regexp.Regexp, 0, len(skipDirs))
+	for _, skipDir := range skipDirs {
+		skips = append(skips, regexp.MustCompile(skipDir))
+	}
+	rootDirs := []string{filepath.FromSlash(rootDir)}
+	return filewalkConfig{
+		filewalkDefinition: filewalkDefinition{
+			RootDirs:       &rootDirs,
+			FileNameRegex:  regexp.MustCompile(fileNameRegex),
+			SkipDirs:       &skips,
+			FileTypeFilter: ft,
+		},
+	}
+}
+
+// walkMany walks every config in a single walk over fsys, returning each config's results relative to the tree.
+func walkMany(t *testing.T, fsys fstest.MapFS, cfgs map[string]filewalkConfig) map[string][]string {
+	t.Helper()
+	root := t.TempDir()
+	require.NoError(t, os.CopyFS(root, fsys))
+
+	for name, cfg := range cfgs {
+		rootDirs := make([]string, 0, len(*cfg.RootDirs))
+		for _, rootDir := range *cfg.RootDirs {
+			rootDirs = append(rootDirs, filepath.Join(root, rootDir))
+		}
+		cfg.RootDirs = &rootDirs
+		cfgs[name] = cfg
+	}
+
+	slogger := multislogger.NewNopLogger()
+	store, err := storageci.NewStore(t, slogger, storage.FilewalkResultsStore.String())
+	require.NoError(t, err)
+	newFilewalker(resolve(t.Context(), slogger, cfgs, runtime.GOOS), store, slogger).Filewalk(t.Context())
+
+	results := make(map[string][]string, len(cfgs))
+	for name := range cfgs {
+		raw, err := store.Get([]byte(name))
+		require.NoError(t, err)
+		var paths []string
+		require.NoError(t, json.Unmarshal(raw, &paths))
+		results[name] = relPaths(t, root, paths)
+	}
+	return results
 }
 
 // Wraps configuring a filewalker in a temp directory and grabbing its results.
