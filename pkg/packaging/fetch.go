@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"path"
 	"path/filepath"
@@ -186,6 +187,12 @@ func refreshAndLookupTarget(cacheDir, targetName string, localMode bool) (*updat
 	cfg.LocalTargetsDir = cacheDir
 	cfg.PrefixTargetsWithHash = false // our mirror does not prefix target filenames with their hash
 	cfg.UnsafeLocalMode = localMode
+	if !localMode {
+		client := &http.Client{}
+		if err := cfg.SetDefaultFetcherHTTPClient(client); err != nil {
+			return nil, nil, fmt.Errorf("setting HTTP client on go-tuf/v2 updater: %w", err)
+		}
+	}
 
 	up, err := updater.New(cfg)
 	if err != nil {
