@@ -66,8 +66,13 @@ func FetchBinary(ctx context.Context, localCacheDir, name, binaryName, channelOr
 		"target", targetName,
 	)
 
+	// Use our own client to avoid idle connection goleaks. We have to specify a transport
+	// to avoid go-tuf/v2 using the default transport.
+	client := &http.Client{Transport: http.DefaultTransport.(*http.Transport).Clone()}
+	defer client.CloseIdleConnections()
+
 	// Download the package, verifying it against TUF metadata, and store it in cache
-	up, tufTarget, err := lookupTarget(localCacheDir, targetName)
+	up, tufTarget, err := lookupTarget(client, localCacheDir, targetName)
 	if err != nil {
 		return "", fmt.Errorf("finding target %s: %w", targetName, err)
 	}
@@ -123,8 +128,13 @@ func tufTargetPathFromVersion(name, version, platform, arch string) string {
 var rootJson []byte
 
 func getReleaseVersionFromTufRepo(binaryName, channel, platform, arch, cacheDir string) (string, error) {
+	// Use our own client to avoid idle connection goleaks. We have to specify a transport
+	// to avoid go-tuf/v2 using the default transport.
+	client := &http.Client{Transport: http.DefaultTransport.(*http.Transport).Clone()}
+	defer client.CloseIdleConnections()
+
 	releaseTargetName := path.Join(binaryName, platform, arch, channel, "release.json")
-	_, releaseTarget, err := lookupTarget(cacheDir, releaseTargetName)
+	_, releaseTarget, err := lookupTarget(client, cacheDir, releaseTargetName)
 	if err != nil {
 		return "", fmt.Errorf("finding release target %s: %w", releaseTargetName, err)
 	}
@@ -148,8 +158,8 @@ func getReleaseVersionFromTufRepo(binaryName, channel, platform, arch, cacheDir 
 // lookupTarget returns the target metadata for the given TUF target. It checks for metadata
 // cached on disk, falling back to refreshing metadata from the TUF server. It returns the
 // updater used to allow for downloading the target if needed.
-func lookupTarget(cacheDir, targetName string) (*updater.Updater, *metadata.TargetFiles, error) {
-	up, target, localErr := refreshAndLookupTarget(cacheDir, targetName, true)
+func lookupTarget(client *http.Client, cacheDir string, targetName string) (*updater.Updater, *metadata.TargetFiles, error) {
+	up, target, localErr := refreshAndLookupTarget(client, cacheDir, targetName, true)
 	if localErr == nil {
 		return up, target, nil
 	}
@@ -157,7 +167,7 @@ func lookupTarget(cacheDir, targetName string) (*updater.Updater, *metadata.Targ
 	// Either the local metadata was unusable (missing or expired), or it was valid but did
 	// not contain the requested target (e.g. a new version, channel, binary, or platform/arch
 	// that postdates our cache). Either way, refresh from the server and try again.
-	up, target, remoteErr := refreshAndLookupTarget(cacheDir, targetName, false)
+	up, target, remoteErr := refreshAndLookupTarget(client, cacheDir, targetName, false)
 	if remoteErr != nil {
 		return nil, nil, fmt.Errorf("finding target via remote update after local lookup failed with `%s`: %w", localErr.Error(), remoteErr)
 	}
@@ -168,8 +178,9 @@ func lookupTarget(cacheDir, targetName string) (*updater.Updater, *metadata.Targ
 // refreshAndLookupTarget pulls in TUF metadata (from <cacheDir>/tuf only if
 // localMode is set, or from the TUF server if localMode is false) and then
 // looks up the given target. It returns the updater used to allow for
-// downloading the target if needed.
-func refreshAndLookupTarget(cacheDir, targetName string, localMode bool) (*updater.Updater, *metadata.TargetFiles, error) {
+// downloading the target if needed. (Thus, even if localMode is false,
+// an http client should always be passed in.)
+func refreshAndLookupTarget(client *http.Client, cacheDir string, targetName string, localMode bool) (*updater.Updater, *metadata.TargetFiles, error) {
 	tufCacheDir := filepath.Join(cacheDir, "tuf")
 	// Make the directory if it doesn't already exist.
 	// Ensure that directory permissions are correct, otherwise TUF will fail to initialize. We cannot
@@ -187,11 +198,8 @@ func refreshAndLookupTarget(cacheDir, targetName string, localMode bool) (*updat
 	cfg.LocalTargetsDir = cacheDir
 	cfg.PrefixTargetsWithHash = false // our mirror does not prefix target filenames with their hash
 	cfg.UnsafeLocalMode = localMode
-	if !localMode {
-		client := &http.Client{}
-		if err := cfg.SetDefaultFetcherHTTPClient(client); err != nil {
-			return nil, nil, fmt.Errorf("setting HTTP client on go-tuf/v2 updater: %w", err)
-		}
+	if err := cfg.SetDefaultFetcherHTTPClient(client); err != nil {
+		return nil, nil, fmt.Errorf("setting HTTP client on go-tuf/v2 updater: %w", err)
 	}
 
 	up, err := updater.New(cfg)
