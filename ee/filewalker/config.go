@@ -1,3 +1,16 @@
+// Package filewalker provides a filewalk manager (scheduler and API), filewalker with result storage, and configuration definitions.
+//
+// Filewalks occur one at a time. All configurations due upon scheduling are included.
+//
+// The following rules apply to filewalks in practice:
+//   - Roots nested within another root are reached by descending from the outermost root, so descent rules apply to them.
+//   - Filesystem mounts and network shares are not excluded on descent.
+//   - Symlinks are not followed on descent.
+//   - A symlink root is followed only if it is outermost and written with a trailing separator.
+//   - Equivalent roots (see canonicalize) are walked once.
+//   - Unmatched directories between an outer root and a nested root are still walked, and errors on them stop the walk from reaching the nested root.
+//
+// Result order is not guaranteed.
 package filewalker
 
 import (
