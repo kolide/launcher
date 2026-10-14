@@ -6,6 +6,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -22,6 +23,17 @@ import (
 
 // Verifies broad behavior through public APIs of the package.
 // Checks results from calling public APIs: a startup scan, a scheduled scan, Do() in two ways, and a Ping().
+
+// Intended config coverage:
+//
+//	dotenv_files: happy path file matcher
+//	git_repos: happy path dir matcher; does not descend into match
+//	secret_files: overlaps dotenv config (.env in both), goos overlay w/ non-glob root
+//	host_keys: non-glob root, no skip dirs, malformed root
+//	shell_history: intermediate glob, nested root inside another config's root skipped by other configs
+//	               not technically due.
+//	keyrings: nested root glob matching nothing
+//	hosts: file root with minimal config
 func TestFilewalkManager_E2E(t *testing.T) {
 	t.Parallel()
 
@@ -30,37 +42,53 @@ func TestFilewalkManager_E2E(t *testing.T) {
     "walk_interval": "2h",
     "root_dirs": ["$ROOT/home/*"],
     "file_name_regex": "^(.+\\.env|\\.env(\\..+)?)$",
-    "skip_dirs": ["node_modules$", "vendor$", "\\.cache$", "Library$", "\\.git$"],
+    "skip_dirs": ["node_modules$", "vendor$", "\\.cache$", "\\.local$", "Library$", "\\.git$"],
     "file_type_filter": "file"
   },
   "git_repos": {
     "walk_interval": "2h",
     "root_dirs": ["$ROOT/home/*"],
     "file_name_regex": "^\\.git$",
-    "skip_dirs": ["node_modules$", "vendor$", "\\.cache$", "Library$", "\\.git/"],
+    "skip_dirs": ["node_modules$", "vendor$", "\\.cache$", "\\.local$", "Library$", "\\.git/"],
     "file_type_filter": "dir"
   },
   "secret_files": {
     "walk_interval": "4h",
     "root_dirs": ["$ROOT/home/*"],
     "file_name_regex": "^(?:\\.env(\\..+)?|.+\\.env|.+\\.tfvars|\\.netrc|\\.git-credentials|\\.npmrc|\\.pgpass|credentials(\\.json)?)$",
-    "skip_dirs": ["node_modules$", "vendor$", "\\.cache$", "Library$", "\\.git$", "Temp$"],
-    "file_type_filter": "file"
+    "skip_dirs": ["node_modules$", "vendor$", "\\.cache$", "\\.local$", "Library$", "\\.git$", "Temp$"],
+    "file_type_filter": "file",
+    "overlays": [
+      { "filters": { "goos": "linux" }, "root_dirs": ["$ROOT/home/*", "$ROOT/root"] }
+    ]
   },
   "host_keys": {
     "walk_interval": "4h",
-    "root_dirs": ["$ROOT/etc/ssh"],
+    "root_dirs": ["$ROOT/etc/ssh", "$ROOT/etc/["],
     "file_name_regex": "^ssh_host_.+_key$",
     "file_type_filter": "file"
   },
   "shell_history": {
     "walk_interval": "24h",
-    "root_dirs": ["$ROOT/home/*"],
-    "file_name_regex": "^\\.(bash|zsh)_history$",
-    "skip_dirs": ["node_modules$", "\\.cache$", "\\.git$"],
+    "root_dirs": ["$ROOT/home/*", "$ROOT/home/*/.local/share"],
+    "file_name_regex": "^\\.?(z|fish_|zsh_|bash_)?history$",
+    "skip_dirs": ["node_modules$", "\\.cache$", "\\.local$", "\\.git$"],
     "file_type_filter": "file"
+  },
+  "keyrings": {
+    "walk_interval": "24h",
+    "root_dirs": ["$ROOT/home/*/.local/share/keyrings"],
+    "file_name_regex": "\\.keyring$",
+    "file_type_filter": "file"
+  },
+  "hosts": {
+    "walk_interval": "24h",
+    "root_dirs": ["$ROOT/etc/hosts"]
   }
 }`
+	// These break filewalker and merit fixing:
+	//   - "bad_regex": {"walk_interval": "1h", "root_dirs": ["$ROOT/home/*"], "file_name_regex": "("}
+	//   - "no_interval": {"root_dirs": ["$ROOT/home/*"], "file_name_regex": "^\\.env$"}
 
 	fsys := fstest.MapFS{
 		"etc/hosts":                                             {},
@@ -70,6 +98,9 @@ func TestFilewalkManager_E2E(t *testing.T) {
 		"home/kiwi/.netrc":                                      {},
 		"home/kiwi/.git-credentials":                            {},
 		"home/kiwi/.zsh_history":                                {},
+		"home/kiwi/.local/share/fish/fish_history":              {},
+		"home/kiwi/.local/share/app/.env":                       {},
+		"home/kiwi/.local/state/zsh/history":                    {},
 		"home/kiwi/Documents/gcp/credentials.json":              {},
 		"home/kiwi/projects/api/.env":                           {},
 		"home/kiwi/projects/api/.env.local":                     {},
@@ -83,11 +114,13 @@ func TestFilewalkManager_E2E(t *testing.T) {
 		"home/kiwi/projects/web/node_modules/react/index.js":    {},
 		"home/ostrich/.npmrc":                                   {},
 		"home/ostrich/.bash_history":                            {},
+		"home/ostrich/.local/share/.zhistory":                   {},
 		"home/ostrich/.aws/credentials":                         {},
 		"home/ostrich/.cache/pre-commit/repo1/.env":             {},
 		"home/ostrich/work/infra/.env":                          {},
 		"home/ostrich/work/infra/.git/HEAD":                     {},
 		"home/ostrich/work/infra/terraform.tfvars":              {},
+		"root/.aws/credentials":                                 {},
 	}
 
 	notDue := map[string]time.Duration{
@@ -122,8 +155,17 @@ func TestFilewalkManager_E2E(t *testing.T) {
 		},
 		"shell_history": {
 			"home/kiwi/.zsh_history",
+			"home/kiwi/.local/share/fish/fish_history",
 			"home/ostrich/.bash_history",
+			"home/ostrich/.local/share/.zhistory",
 		},
+		"keyrings": nil,
+		"hosts": {
+			"etc/hosts",
+		},
+	}
+	if runtime.GOOS == "linux" {
+		expected["secret_files"] = append(expected["secret_files"], "root/.aws/credentials")
 	}
 
 	root := t.TempDir()
