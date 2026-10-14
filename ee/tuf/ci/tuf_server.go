@@ -87,7 +87,7 @@ func InitRemoteTufServer(t *testing.T, testReleaseVersion string) (tufServerURL 
 			}
 
 			// If this is our release version, also create and commit a test release file
-			for _, c := range []string{"stable", "beta", "nightly"} {
+			for _, c := range []string{"stable", "alpha", "beta", "nightly"} {
 				releaseTargetFileDir := filepath.Join(tufDir, "repository", "targets", b, runtime.GOOS, arch, c)
 				releaseTargetFile := filepath.Join(releaseTargetFileDir, "release.json")
 				require.NoError(t, os.MkdirAll(releaseTargetFileDir, 0777), "could not make staging directory")

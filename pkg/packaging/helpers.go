@@ -50,7 +50,7 @@ func (p *PackageOptions) setOsqueryVersionInCtx(ctx context.Context, osquerydCha
 func (p *PackageOptions) getFormattedVersion(binary string, channelOrVersion string, localCacheDir string) (string, error) {
 	versionRaw := channelOrVersion
 	if isChannel(channelOrVersion) {
-		versionFromTuf, err := getReleaseVersionFromTufRepo(binary, channelOrVersion, string(p.target.Platform), string(p.target.Arch), localCacheDir)
+		versionFromTuf, err := GetReleaseVersion(binary, channelOrVersion, string(p.target.Platform), string(p.target.Arch), localCacheDir)
 		if err != nil {
 			return "", fmt.Errorf("getting release version for %s from TUF for channel %s: %w", binary, channelOrVersion, err)
 		}
