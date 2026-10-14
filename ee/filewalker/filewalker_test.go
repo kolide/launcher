@@ -1,7 +1,9 @@
 package filewalker
 
 import (
+	"context"
 	"encoding/json"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -12,157 +14,10 @@ import (
 
 	"github.com/kolide/launcher/v2/ee/agent/storage"
 	storageci "github.com/kolide/launcher/v2/ee/agent/storage/ci"
+	"github.com/kolide/launcher/v2/ee/agent/types"
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 )
-
-func TestUpdateConfig(t *testing.T) {
-	t.Parallel()
-
-	testRegex := regexp.MustCompile(".*")
-	testSkipDir := regexp.MustCompile(`\/tmp\/\.git`)
-
-	nonMatchingGoos := ""
-	switch runtime.GOOS {
-	case "darwin":
-		nonMatchingGoos = "windows"
-	case "windows":
-		nonMatchingGoos = "linux"
-	case "linux":
-		nonMatchingGoos = "darwin"
-	}
-
-	for _, tt := range []struct {
-		testCaseName          string
-		cfg                   filewalkConfig
-		expectedWalkInterval  time.Duration
-		expectedRootDirs      []string
-		expectedFileNameRegex *regexp.Regexp
-		expectedSkipDirs      []*regexp.Regexp
-	}{
-		{
-			testCaseName: "no overlays, no filename regex, no skip dirs",
-			cfg: filewalkConfig{
-				WalkInterval: duration(1 * time.Minute),
-				filewalkDefinition: filewalkDefinition{
-					RootDirs:      &[]string{"test-1"},
-					FileNameRegex: nil,
-				},
-			},
-			expectedWalkInterval:  1 * time.Minute,
-			expectedRootDirs:      []string{"test-1"},
-			expectedFileNameRegex: nil,
-			expectedSkipDirs:      nil,
-		},
-		{
-			testCaseName: "no overlays, filename regex, skip dirs",
-			cfg: filewalkConfig{
-				WalkInterval: duration(2 * time.Minute),
-				filewalkDefinition: filewalkDefinition{
-					RootDirs:      &[]string{"test-2"},
-					FileNameRegex: testRegex,
-					SkipDirs:      &[]*regexp.Regexp{testSkipDir},
-				},
-			},
-			expectedWalkInterval:  2 * time.Minute,
-			expectedRootDirs:      []string{"test-2"},
-			expectedFileNameRegex: testRegex,
-			expectedSkipDirs:      []*regexp.Regexp{testSkipDir},
-		},
-		{
-			testCaseName: "overlay exists but doesn't apply",
-			cfg: filewalkConfig{
-				WalkInterval: duration(3 * time.Minute),
-				filewalkDefinition: filewalkDefinition{
-					RootDirs:      &[]string{"test-3"},
-					FileNameRegex: nil,
-				},
-				Overlays: []filewalkConfigOverlay{
-					{
-						Filters: map[string]string{
-							"goos": nonMatchingGoos,
-						},
-						filewalkDefinition: filewalkDefinition{
-							RootDirs:      &[]string{"test-other"},
-							FileNameRegex: testRegex,
-							SkipDirs:      &[]*regexp.Regexp{testSkipDir},
-						},
-					},
-				},
-			},
-			expectedWalkInterval:  3 * time.Minute,
-			expectedRootDirs:      []string{"test-3"},
-			expectedFileNameRegex: nil,
-			expectedSkipDirs:      nil,
-		},
-		{
-			testCaseName: "overlay, still no filename regex",
-			cfg: filewalkConfig{
-				WalkInterval: duration(4 * time.Minute),
-				filewalkDefinition: filewalkDefinition{
-					RootDirs:      nil,
-					FileNameRegex: nil,
-				},
-				Overlays: []filewalkConfigOverlay{
-					{
-						Filters: map[string]string{
-							"goos": runtime.GOOS,
-						},
-						filewalkDefinition: filewalkDefinition{
-							RootDirs:      &[]string{"test-4"},
-							FileNameRegex: nil,
-						},
-					},
-				},
-			},
-			expectedWalkInterval:  4 * time.Minute,
-			expectedRootDirs:      []string{"test-4"},
-			expectedFileNameRegex: nil,
-			expectedSkipDirs:      nil,
-		},
-		{
-			testCaseName: "overlay, filename regex, skipdirs",
-			cfg: filewalkConfig{
-				WalkInterval: duration(5 * time.Minute),
-				filewalkDefinition: filewalkDefinition{
-					RootDirs:      nil,
-					FileNameRegex: nil,
-				},
-				Overlays: []filewalkConfigOverlay{
-					{
-						Filters: map[string]string{
-							"goos": runtime.GOOS,
-						},
-						filewalkDefinition: filewalkDefinition{
-							RootDirs:      &[]string{"test-5"},
-							FileNameRegex: testRegex,
-							SkipDirs:      &[]*regexp.Regexp{testSkipDir},
-						},
-					},
-				},
-			},
-			expectedWalkInterval:  5 * time.Minute,
-			expectedRootDirs:      []string{"test-5"},
-			expectedFileNameRegex: testRegex,
-			expectedSkipDirs:      []*regexp.Regexp{testSkipDir},
-		},
-	} {
-		t.Run(tt.testCaseName, func(t *testing.T) {
-			t.Parallel()
-		})
-
-		slogger := multislogger.NewNopLogger()
-		resultsStore, err := storageci.NewStore(t, slogger, storage.FilewalkResultsStore.String())
-		require.NoError(t, err)
-
-		testFw := newFilewalker("test_filewalk_table", tt.cfg, resultsStore, slogger)
-		require.Equal(t, tt.expectedWalkInterval, testFw.walkInterval)
-		require.Equal(t, tt.expectedRootDirs, testFw.rootDirs)
-		require.Equal(t, tt.expectedFileNameRegex, testFw.fileNameRegex)
-		require.Equal(t, tt.expectedSkipDirs, testFw.skipDirs)
-		require.Nil(t, testFw.fileTypeFilter)
-	}
-}
 
 // Regression test. We once allowed walking a dir which failed other checks,
 // but would have matched a skipdir regex.
@@ -327,6 +182,133 @@ func TestFilewalk_SkipDirsMatchFullPath(t *testing.T) {
 	require.ElementsMatch(t, []string{"home/kiwi/proj/aws-credentials"}, results)
 }
 
+// Configs sharing a root should split at directories only some of them skip.
+func TestFilewalk_SharedRootSplitsAtSkipDirs(t *testing.T) {
+	t.Parallel()
+
+	results := walkMany(t, fstest.MapFS{
+		"proj/.env":                       {},
+		"proj/.git/HEAD":                  {},
+		"proj/.git/hooks/.env":            {},
+		"proj/node_modules/pkg/.env":      {},
+		"proj/node_modules/pkg/.git/HEAD": {},
+	}, map[string]filewalkConfig{
+		"dotenv": testConfig(t, ".", `^\.env$`, fileTypeFile, `node_modules$`, `\.git$`),
+		"git":    testConfig(t, ".", `^\.git$`, fileTypeDir, `node_modules$`, `\.git[\\/]`),
+	})
+
+	require.ElementsMatch(t, []string{"proj/.env"}, results["dotenv"])
+	require.ElementsMatch(t, []string{"proj/.git"}, results["git"])
+}
+
+// A config rooted inside another's root should only match beneath its own root.
+func TestFilewalk_NestedRootActivatesPartwayDown(t *testing.T) {
+	t.Parallel()
+
+	results := walkMany(t, fstest.MapFS{
+		"home/kiwi/.env":              {},
+		"home/kiwi/projects/api/.env": {},
+	}, map[string]filewalkConfig{
+		"everywhere": testConfig(t, ".", `^\.env$`, fileTypeFile),
+		"projects":   testConfig(t, "home/kiwi/projects", `^\.env$`, fileTypeFile),
+	})
+
+	require.ElementsMatch(t, []string{"home/kiwi/.env", "home/kiwi/projects/api/.env"}, results["everywhere"])
+	require.ElementsMatch(t, []string{"home/kiwi/projects/api/.env"}, results["projects"])
+}
+
+// The walk should keep descending through a dir every active config skips when another config's root lies below it.
+func TestFilewalk_NestedRootUnderSkippedDir(t *testing.T) {
+	t.Parallel()
+
+	results := walkMany(t, fstest.MapFS{
+		"home/kiwi/.env":              {},
+		"home/kiwi/projects/api/.env": {},
+		"home/ostrich/.env":           {},
+	}, map[string]filewalkConfig{
+		"skips_kiwi": testConfig(t, ".", `^\.env$`, fileTypeFile, `kiwi$`),
+		"projects":   testConfig(t, "home/kiwi/projects", `^\.env$`, fileTypeFile),
+	})
+
+	require.ElementsMatch(t, []string{"home/ostrich/.env"}, results["skips_kiwi"])
+	require.ElementsMatch(t, []string{"home/kiwi/projects/api/.env"}, results["projects"])
+}
+
+// A cancelled walk should leave previously stored results in place.
+func TestFilewalk_CancelledKeepsPreviousResults(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	require.NoError(t, os.CopyFS(root, fstest.MapFS{"home/kiwi/.env": {}}))
+	slogger := multislogger.NewNopLogger()
+	store, err := storageci.NewStore(t, slogger, storage.FilewalkResultsStore.String())
+	require.NoError(t, err)
+	require.NoError(t, store.Set([]byte("dotenv"), []byte(`["previous"]`)))
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	cfg := testConfig(t, root, `^\.env$`, fileTypeFile)
+	newTestFilewalker(t, "dotenv", cfg, store, slogger).Filewalk(ctx)
+
+	raw, err := store.Get([]byte("dotenv"))
+	require.NoError(t, err)
+	require.JSONEq(t, `["previous"]`, string(raw))
+	lastWalk, err := store.Get(LastWalkTimeKey("dotenv"))
+	require.NoError(t, err)
+	require.Nil(t, lastWalk)
+}
+
+// testConfig builds a single-root config; rootDir is slash-separated and may be relative to the walked tree.
+func testConfig(t *testing.T, rootDir, fileNameRegex, fileType string, skipDirs ...string) filewalkConfig {
+	t.Helper()
+	ft := &fileTypeFilter{}
+	require.NoError(t, json.Unmarshal([]byte(`"`+fileType+`"`), ft))
+	skips := make([]*regexp.Regexp, 0, len(skipDirs))
+	for _, skipDir := range skipDirs {
+		skips = append(skips, regexp.MustCompile(skipDir))
+	}
+	rootDirs := []string{filepath.FromSlash(rootDir)}
+	return filewalkConfig{
+		filewalkDefinition: filewalkDefinition{
+			RootDirs:       &rootDirs,
+			FileNameRegex:  regexp.MustCompile(fileNameRegex),
+			SkipDirs:       &skips,
+			FileTypeFilter: ft,
+		},
+	}
+}
+
+// walkMany walks every config in a single walk over fsys, returning each config's results relative to the tree.
+func walkMany(t *testing.T, fsys fstest.MapFS, cfgs map[string]filewalkConfig) map[string][]string {
+	t.Helper()
+	root := t.TempDir()
+	require.NoError(t, os.CopyFS(root, fsys))
+
+	for name, cfg := range cfgs {
+		rootDirs := make([]string, 0, len(*cfg.RootDirs))
+		for _, rootDir := range *cfg.RootDirs {
+			rootDirs = append(rootDirs, filepath.Join(root, rootDir))
+		}
+		cfg.RootDirs = &rootDirs
+		cfgs[name] = cfg
+	}
+
+	slogger := multislogger.NewNopLogger()
+	store, err := storageci.NewStore(t, slogger, storage.FilewalkResultsStore.String())
+	require.NoError(t, err)
+	newFilewalker(resolve(t.Context(), slogger, cfgs, runtime.GOOS), store, slogger).Filewalk(t.Context())
+
+	results := make(map[string][]string, len(cfgs))
+	for name := range cfgs {
+		raw, err := store.Get([]byte(name))
+		require.NoError(t, err)
+		var paths []string
+		require.NoError(t, json.Unmarshal(raw, &paths))
+		results[name] = relPaths(t, root, paths)
+	}
+	return results
+}
+
 // Wraps configuring a filewalker in a temp directory and grabbing its results.
 type filewalkerTest struct {
 	name    string
@@ -373,7 +355,7 @@ func (fwt *filewalkerTest) run(t *testing.T, fsys fstest.MapFS) []string {
 	slogger := multislogger.NewNopLogger()
 	store, err := storageci.NewStore(t, slogger, storage.FilewalkResultsStore.String())
 	require.NoError(t, err)
-	newFilewalker(fwt.name, cfg, store, slogger).Filewalk(t.Context())
+	newTestFilewalker(t, fwt.name, cfg, store, slogger).Filewalk(t.Context())
 
 	rawResults, err := store.Get([]byte(fwt.name))
 	require.NoError(t, err)
@@ -387,6 +369,10 @@ func (fwt *filewalkerTest) run(t *testing.T, fsys fstest.MapFS) []string {
 		results = append(results, filepath.ToSlash(relPath))
 	}
 	return results
+}
+
+func newTestFilewalker(tb testing.TB, name string, cfg filewalkConfig, store types.GetterSetterDeleter, slogger *slog.Logger) *filewalker {
+	return newFilewalker(resolve(tb.Context(), slogger, map[string]filewalkConfig{name: cfg}, runtime.GOOS), store, slogger)
 }
 
 func BenchmarkFilewalk(b *testing.B) {
@@ -404,7 +390,7 @@ func BenchmarkFilewalk(b *testing.B) {
 	store, err := storageci.NewStore(b, multislogger.NewNopLogger(), storage.FilewalkResultsStore.String())
 	require.NoError(b, err)
 
-	testFilewalker := newFilewalker("benchtest", filewalkConfig{
+	testFilewalker := newTestFilewalker(b, "benchtest", filewalkConfig{
 		WalkInterval: duration(1 * time.Minute),
 		filewalkDefinition: filewalkDefinition{
 			RootDirs:      &[]string{testDir},
