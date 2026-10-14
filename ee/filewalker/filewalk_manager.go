@@ -2,12 +2,17 @@ package filewalker
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
-	"sync"
+	"maps"
+	"slices"
+	"strings"
 	"sync/atomic"
+	"time"
 
 	"github.com/kolide/launcher/v2/ee/agent/types"
 	"github.com/kolide/launcher/v2/ee/gowrapper"
@@ -25,63 +30,53 @@ type controlServerFilewalkRequest struct {
 	FilewalkNames []string `json:"filewalks"`
 }
 
-// FilewalkManager creates and starts all configured filewalkers, and handles
-// updates to the filewalker configs.
+// FilewalkManager handles configuring and executing filewalkers by the config
+// in FilewalkConfigStore.
 type FilewalkManager struct {
-	filewalkers     map[string]*filewalker
-	filewalkersLock *sync.Mutex
-
 	// Internals
-	k        types.Knapsack
-	cfgStore types.Iterator
-	slogger  *slog.Logger
+	cfgStore     types.Iterator
+	resultsStore types.GetterSetterDeleterIterator
+	slogger      *slog.Logger
+
+	dirty *atomic.Bool
+	doReq chan []string
 
 	// Handle actor shutdown
 	interrupt   chan struct{}
 	interrupted *atomic.Bool
 }
 
+// How often to check filewalks due to be ran.
+const walkCheckInterval = 5 * time.Minute
+
 func New(k types.Knapsack, slogger *slog.Logger) *FilewalkManager {
 	return &FilewalkManager{
-		filewalkers:     make(map[string]*filewalker),
-		filewalkersLock: &sync.Mutex{},
-		k:               k,
-		cfgStore:        k.FilewalkConfigStore(),
-		slogger:         slogger.With("component", "filewalker"),
-		interrupt:       make(chan struct{}, 10), // We have a buffer so we don't block on sending to this channel
-		interrupted:     &atomic.Bool{},
+		cfgStore:     k.FilewalkConfigStore(),
+		resultsStore: k.FilewalkResultsStore(),
+		slogger:      slogger.With("component", "filewalker"),
+		dirty:        &atomic.Bool{},
+		doReq:        make(chan []string, 1),
+		interrupt:    make(chan struct{}, 10), // We have a buffer so we don't block on sending to this channel
+		interrupted:  &atomic.Bool{},
 	}
 }
 
 func (fm *FilewalkManager) Execute() error {
-	// Init filewalkers
-	cfgs, err := fm.pullConfigs()
-	if err != nil {
-		fm.slogger.Log(context.TODO(), slog.LevelError,
-			"failed to pull filewalk configs, will not be able to initialize filewalkers until subsystem data is updated",
-			"err", err,
-		)
-	}
-	fm.filewalkersLock.Lock()
-	for filewalkerName, cfg := range cfgs {
-		fm.filewalkers[filewalkerName] = newFilewalker(filewalkerName, cfg, fm.k.FilewalkResultsStore(), fm.slogger)
-		gowrapper.Go(context.TODO(), fm.slogger, fm.filewalkers[filewalkerName].Work)
-	}
-	fm.slogger.Log(context.TODO(), slog.LevelDebug,
-		"started all filewalkers",
-		"filewalker_count", len(fm.filewalkers),
-	)
-	fm.filewalkersLock.Unlock()
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
 
-	// Wait for shutdown, then clean up all filewalkers
-	<-fm.interrupt
-	fm.filewalkersLock.Lock()
-	defer fm.filewalkersLock.Unlock()
-	for _, fw := range fm.filewalkers {
-		fw.Stop()
-	}
+	gowrapper.Go(ctx, fm.slogger, func() {
+		select {
+		case <-fm.interrupt:
+			cancel()
+		case <-ctx.Done():
+		}
+	})
+
+	fm.run(ctx)
+
 	fm.slogger.Log(context.TODO(), slog.LevelDebug,
-		"shut down all filewalkers",
+		"shut down filewalk manager",
 	)
 	return nil
 }
@@ -95,73 +90,175 @@ func (fm *FilewalkManager) Interrupt(_ error) {
 	fm.interrupt <- struct{}{}
 }
 
+// run is the primary loop for FileWalk manager. It handles kicking off walks,
+// incoming requests, and walking when config is dirty.
+func (fm *FilewalkManager) run(ctx context.Context) {
+	ticker := time.NewTicker(walkCheckInterval)
+	defer ticker.Stop()
+
+	var requested []string
+	for {
+		extraNames := requested
+		requested = nil
+		if cfgs, present, err := fm.pullConfigs(); err != nil {
+			fm.slogger.Log(ctx, slog.LevelError,
+				"could not pull filewalk configs from store",
+				"err", err,
+			)
+		} else {
+			fm.deleteRemovedResults(ctx, present)
+			names := due(time.Now(), cfgs, fm.lastWalkTimes(cfgs))
+			if fm.dirty.Swap(false) {
+				names = slices.Collect(maps.Keys(cfgs))
+			} else {
+				names = append(names, extraNames...)
+			}
+			fm.walkConfigs(ctx, cfgs, names)
+		}
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		case requested = <-fm.doReq:
+			if len(requested) == 0 {
+				fm.dirty.Store(true)
+			}
+		}
+	}
+}
+
+func (fm *FilewalkManager) walkConfigs(ctx context.Context, cfgs map[string]filewalkConfig, names []string) {
+	slices.Sort(names)
+	for _, name := range slices.Compact(names) {
+		if ctx.Err() != nil {
+			return
+		}
+		cfg, ok := cfgs[name]
+		if !ok {
+			fm.slogger.Log(ctx, slog.LevelWarn,
+				"filewalk request from control server contained unknown filewalk name",
+				"filewalk_name", name,
+			)
+			continue
+		}
+		newFilewalker(name, cfg, fm.resultsStore, fm.slogger).Filewalk(ctx)
+	}
+}
+
+// lastWalkTimes returns the map of filewalkConfig name to the last time the config was walked
+// successfully.
+func (fm *FilewalkManager) lastWalkTimes(cfgs map[string]filewalkConfig) map[string]time.Time {
+	lastWalks := make(map[string]time.Time, len(cfgs))
+	for name := range cfgs {
+		if lastWalk, ok := fm.lastWalkTime(name); ok {
+			lastWalks[name] = lastWalk
+		}
+	}
+	return lastWalks
+}
+
+// lastWalkTime returns the last time the filewalkConfig by name was walked successfully.
+// If the name is unknown, the bool is false.
+func (fm *FilewalkManager) lastWalkTime(name string) (time.Time, bool) {
+	raw, err := fm.resultsStore.Get(LastWalkTimeKey(name))
+	if err != nil || len(raw) != 8 {
+		return time.Time{}, false
+	}
+	return time.Unix(int64(binary.NativeEndian.Uint64(raw)), 0), true
+}
+
+// returns the filewalkConfig names which are currently due for walking
+func due(now time.Time, cfgs map[string]filewalkConfig, lastWalks map[string]time.Time) []string {
+	var names []string
+	for name := range cfgs {
+		lastWalk, walked := lastWalks[name]
+		if !walked || lastWalk.After(now) || !now.Before(lastWalk.Add(time.Duration(cfgs[name].WalkInterval))) {
+			names = append(names, name)
+		}
+	}
+	return names
+}
+
 // pullConfigs gets the filewalk configs from the config store.
-func (fm *FilewalkManager) pullConfigs() (map[string]filewalkConfig, error) {
-	cfgs := make(map[string]filewalkConfig, 0)
+// First return holds valid configs and the second holds all config names. Error is only returned when neither can be read.
+func (fm *FilewalkManager) pullConfigs() (map[string]filewalkConfig, map[string]struct{}, error) {
+	cfgs := make(map[string]filewalkConfig)
+	present := make(map[string]struct{})
 	if err := fm.cfgStore.ForEach(func(k, v []byte) error {
+		present[string(k)] = struct{}{}
+
 		var currentCfg filewalkConfig
 		if err := json.Unmarshal(v, &currentCfg); err != nil {
-			return fmt.Errorf("unmarshalling filewalk config for %s: %w", string(k), err)
+			fm.slogger.Log(context.TODO(), slog.LevelWarn,
+				"could not unmarshal filewalk config, skipping",
+				"filewalker_name", string(k),
+				"err", err,
+			)
+			return nil
 		}
 
 		cfgs[string(k)] = currentCfg
 		return nil
 	}); err != nil {
-		return nil, fmt.Errorf("getting filewalk configs from store: %w", err)
+		return nil, nil, fmt.Errorf("getting filewalk configs from store: %w", err)
 	}
 
-	return cfgs, nil
+	return cfgs, present, nil
+}
+
+// deleteRemovedResults deletes results and last walk times for configs no longer in the config store.
+func (fm *FilewalkManager) deleteRemovedResults(ctx context.Context, present map[string]struct{}) {
+	lastWalkSuffix := string(LastWalkTimeKey(""))
+	isPresent := func(name string) bool {
+		_, ok := present[name]
+		return ok
+	}
+
+	var removed [][]byte
+	if err := fm.resultsStore.ForEach(func(k, _ []byte) error {
+		key := string(k)
+		// Check the whole key first: a config may itself be named "x_last_walk".
+		if isPresent(key) {
+			return nil
+		}
+		if name, isLastWalk := strings.CutSuffix(key, lastWalkSuffix); isLastWalk && isPresent(name) {
+			return nil
+		}
+		removed = append(removed, k)
+		return nil
+	}); err != nil {
+		fm.slogger.Log(ctx, slog.LevelError,
+			"could not iterate filewalk results",
+			"err", err,
+		)
+		return
+	}
+	if len(removed) == 0 {
+		return
+	}
+
+	if err := fm.resultsStore.Delete(removed...); err != nil {
+		fm.slogger.Log(ctx, slog.LevelWarn,
+			"could not delete results for removed filewalk configs",
+			"err", err,
+		)
+		return
+	}
+	fm.slogger.Log(ctx, slog.LevelInfo,
+		"deleted results for removed filewalk configs",
+		"deleted_keys", len(removed),
+	)
 }
 
 // Ping satisfies the control.subscriber interface -- the manager subscribes to changes to
 // the filewalk_config subsystem.
 func (fm *FilewalkManager) Ping() {
-	fm.filewalkersLock.Lock()
-	defer fm.filewalkersLock.Unlock()
-
 	fm.slogger.Log(context.TODO(), slog.LevelDebug,
 		"processing updated filewalk configs",
 	)
 
-	// Pull the updated config from the store.
-	cfgs, err := fm.pullConfigs()
-	if err != nil {
-		fm.slogger.Log(context.TODO(), slog.LevelError,
-			"could not pull updated configs from store",
-			"err", err,
-		)
-		return
-	}
-
-	// Check for filewalkers to add or update
-	for filewalkerName, cfg := range cfgs {
-		if fw, alreadyExists := fm.filewalkers[filewalkerName]; alreadyExists {
-			fw.UpdateConfig(cfg)
-			// Kick off a new filewalk in the background, to populate results with the updated config
-			gowrapper.Go(context.TODO(), fm.slogger, func() { fw.Filewalk(context.TODO()) })
-		} else {
-			// Add the new filewalker
-			fm.filewalkers[filewalkerName] = newFilewalker(filewalkerName, cfg, fm.k.FilewalkResultsStore(), fm.slogger)
-			gowrapper.Go(context.TODO(), fm.slogger, fm.filewalkers[filewalkerName].Work)
-		}
-	}
-
-	// Now, check to see if we need to shut down and delete any filewalkers
-	for filewalkerName, fw := range fm.filewalkers {
-		if _, stillExists := cfgs[filewalkerName]; !stillExists {
-			fm.slogger.Log(context.TODO(), slog.LevelInfo,
-				"deleting filewalker removed from config",
-				"filewalker_name", filewalkerName,
-			)
-			fw.Delete()
-			delete(fm.filewalkers, filewalkerName)
-		}
-	}
-
-	fm.slogger.Log(context.TODO(), slog.LevelDebug,
-		"completed filewalk config updates",
-		"filewalker_count", len(fm.filewalkers),
-	)
+	fm.dirty.Store(true)
 }
 
 // Do satisfies the actionqueue.actor interface; it allows the control server to send
@@ -185,48 +282,10 @@ func (fm *FilewalkManager) Do(data io.Reader) error {
 		"requested_filewalks", req.FilewalkNames,
 	)
 
-	fm.filewalkersLock.Lock()
-	defer fm.filewalkersLock.Unlock()
-
-	if len(req.FilewalkNames) > 0 {
-		startedFilewalks := make([]string, 0)
-		for _, filewalkName := range req.FilewalkNames {
-			fw, fwFound := fm.filewalkers[filewalkName]
-			if !fwFound {
-				fm.slogger.Log(ctx, slog.LevelWarn,
-					"filewalk request from control server contained unknown filewalk name",
-					"filewalk_name", filewalkName,
-				)
-				continue
-			}
-			// Filewalks can take a while -- kick off the filewalk in the background so we don't
-			// slow down control server processing.
-			gowrapper.Go(context.TODO(), fm.slogger, func() { fw.Filewalk(context.TODO()) })
-			startedFilewalks = append(startedFilewalks, filewalkName)
-		}
-
-		fm.slogger.Log(ctx, slog.LevelInfo,
-			"kicked off specified filewalks per control server request",
-			"requested_filewalks", req.FilewalkNames,
-			"started_filewalks", startedFilewalks,
-		)
-
+	select {
+	case fm.doReq <- req.FilewalkNames:
 		return nil
+	default:
+		return errors.New("filewalk request already in flight")
 	}
-
-	// If no filewalks were specified, kick off filewalks for all known filewalkers
-	startedFilewalks := make([]string, 0)
-	for filewalkName, fw := range fm.filewalkers {
-		// Filewalks can take a while -- kick off the filewalk in the background so we don't
-		// slow down control server processing.
-		gowrapper.Go(context.TODO(), fm.slogger, func() { fw.Filewalk(context.TODO()) })
-		startedFilewalks = append(startedFilewalks, filewalkName)
-	}
-
-	fm.slogger.Log(ctx, slog.LevelInfo,
-		"kicked off all filewalks per control server request",
-		"started_filewalks", startedFilewalks,
-	)
-
-	return nil
 }
