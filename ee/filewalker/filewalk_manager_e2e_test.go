@@ -31,9 +31,11 @@ import (
 //	secret_files: overlaps dotenv config (.env in both), goos overlay w/ non-glob root
 //	host_keys: non-glob root, no skip dirs, malformed root
 //	shell_history: intermediate glob, nested root inside another config's root skipped by other configs
-//	               not technically due.
+//	  not technically due.
 //	keyrings: nested root glob matching nothing
 //	hosts: file root with minimal config
+//	bad_regex: broken as described
+//	no_interval: no interval to run included
 func TestFilewalkManager_E2E(t *testing.T) {
 	t.Parallel()
 
@@ -84,11 +86,17 @@ func TestFilewalkManager_E2E(t *testing.T) {
   "hosts": {
     "walk_interval": "24h",
     "root_dirs": ["$ROOT/etc/hosts"]
+  },
+  "bad_regex": {
+    "walk_interval": "1h",
+    "root_dirs": ["$ROOT/home/*"],
+    "file_name_regex": "("
+  },
+  "no_interval": {
+    "root_dirs": ["$ROOT/home/*"],
+    "file_name_regex": "^\\.env$"
   }
 }`
-	// These break filewalker and merit fixing:
-	//   - "bad_regex": {"walk_interval": "1h", "root_dirs": ["$ROOT/home/*"], "file_name_regex": "("}
-	//   - "no_interval": {"root_dirs": ["$ROOT/home/*"], "file_name_regex": "^\\.env$"}
 
 	fsys := fstest.MapFS{
 		"etc/hosts":                                             {},
