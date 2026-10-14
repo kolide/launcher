@@ -28,6 +28,10 @@ import (
 //
 // You must specify a localCacheDir, to reuse downloads
 func FetchBinary(ctx context.Context, localCacheDir, name, binaryName, channelOrVersion string, target Target) (string, error) {
+	return fetchBinaryFromSource(ctx, launcher.DefaultTufServer, launcher.DefaultMirror, rootJson, localCacheDir, name, binaryName, channelOrVersion, target)
+}
+
+func fetchBinaryFromSource(ctx context.Context, tufServerURL, mirrorURL string, tufRootJson []byte, localCacheDir, name, binaryName, channelOrVersion string, target Target) (string, error) {
 	logger := ctxlog.FromContext(ctx)
 
 	// Create the cache directory if it doesn't already exist
@@ -56,7 +60,7 @@ func FetchBinary(ctx context.Context, localCacheDir, name, binaryName, channelOr
 	// First, determine the TUF target. The TUF repo stores binaries by their name, without a file extension,
 	// so strip that off first.
 	baseName := strings.TrimSuffix(name, filepath.Ext(name))
-	targetName, err := tufTargetPath(baseName, channelOrVersion, string(target.Platform), string(target.Arch), localCacheDir)
+	targetName, err := tufTargetPath(tufServerURL, tufRootJson, baseName, channelOrVersion, string(target.Platform), string(target.Arch), localCacheDir)
 	if err != nil {
 		return "", fmt.Errorf("getting target name: %w", err)
 	}
@@ -72,11 +76,11 @@ func FetchBinary(ctx context.Context, localCacheDir, name, binaryName, channelOr
 	defer client.CloseIdleConnections()
 
 	// Download the package, verifying it against TUF metadata, and store it in cache
-	up, tufTarget, err := lookupTarget(client, localCacheDir, targetName)
+	up, tufTarget, err := lookupTarget(client, tufServerURL, tufRootJson, localCacheDir, targetName)
 	if err != nil {
 		return "", fmt.Errorf("finding target %s: %w", targetName, err)
 	}
-	if _, _, err := up.DownloadTarget(tufTarget, localPackagePath, launcher.DefaultMirror+"/kolide/"); err != nil {
+	if _, _, err := up.DownloadTarget(tufTarget, localPackagePath, mirrorURL+"/kolide/"); err != nil {
 		return "", fmt.Errorf("downloading binary archive: %w", err)
 	}
 
@@ -105,14 +109,14 @@ func isChannel(channelOrVersion string) bool {
 	return channelOrVersion == "stable" || channelOrVersion == "beta" || channelOrVersion == "nightly" || channelOrVersion == "alpha"
 }
 
-func tufTargetPath(name, channelOrVersion, platform, arch, cacheDir string) (string, error) {
+func tufTargetPath(tufServerURL string, tufRootJson []byte, name, channelOrVersion, platform, arch, cacheDir string) (string, error) {
 	// Figure out if we're downloading a specific version or a channel
 	if !isChannel(channelOrVersion) {
 		// We're requesting a version, not a channel, so we already know where the download lives.
 		return tufTargetPathFromVersion(name, channelOrVersion, platform, arch), nil
 	}
 
-	version, err := getReleaseVersionFromTufRepo(name, channelOrVersion, platform, arch, cacheDir)
+	version, err := getReleaseVersionFromTufRepo(tufServerURL, tufRootJson, name, channelOrVersion, platform, arch, cacheDir)
 	if err != nil {
 		return "", fmt.Errorf("determining release version for channel %s: %w", channelOrVersion, err)
 	}
@@ -127,14 +131,20 @@ func tufTargetPathFromVersion(name, version, platform, arch string) string {
 //go:embed assets/tuf/root.json
 var rootJson []byte
 
-func getReleaseVersionFromTufRepo(binaryName, channel, platform, arch, cacheDir string) (string, error) {
+// GetReleaseVersion uses TUF metadata to determine the release version for the given
+// binary on the given platform.
+func GetReleaseVersion(binaryName, channel, platform, arch, cacheDir string) (string, error) {
+	return getReleaseVersionFromTufRepo(launcher.DefaultTufServer, rootJson, binaryName, channel, platform, arch, cacheDir)
+}
+
+func getReleaseVersionFromTufRepo(tufServerURL string, tufRootJson []byte, binaryName, channel, platform, arch, cacheDir string) (string, error) {
 	// Use our own client to avoid idle connection goleaks. We have to specify a transport
 	// to avoid go-tuf/v2 using the default transport.
 	client := &http.Client{Transport: http.DefaultTransport.(*http.Transport).Clone()}
 	defer client.CloseIdleConnections()
 
 	releaseTargetName := path.Join(binaryName, platform, arch, channel, "release.json")
-	_, releaseTarget, err := lookupTarget(client, cacheDir, releaseTargetName)
+	_, releaseTarget, err := lookupTarget(client, tufServerURL, tufRootJson, cacheDir, releaseTargetName)
 	if err != nil {
 		return "", fmt.Errorf("finding release target %s: %w", releaseTargetName, err)
 	}
@@ -158,8 +168,8 @@ func getReleaseVersionFromTufRepo(binaryName, channel, platform, arch, cacheDir 
 // lookupTarget returns the target metadata for the given TUF target. It checks for metadata
 // cached on disk, falling back to refreshing metadata from the TUF server. It returns the
 // updater used to allow for downloading the target if needed.
-func lookupTarget(client *http.Client, cacheDir string, targetName string) (*updater.Updater, *metadata.TargetFiles, error) {
-	up, target, localErr := refreshAndLookupTarget(client, cacheDir, targetName, true)
+func lookupTarget(client *http.Client, tufServerURL string, tufRootJson []byte, cacheDir string, targetName string) (*updater.Updater, *metadata.TargetFiles, error) {
+	up, target, localErr := refreshAndLookupTarget(client, tufServerURL, tufRootJson, cacheDir, targetName, true)
 	if localErr == nil {
 		return up, target, nil
 	}
@@ -167,7 +177,7 @@ func lookupTarget(client *http.Client, cacheDir string, targetName string) (*upd
 	// Either the local metadata was unusable (missing or expired), or it was valid but did
 	// not contain the requested target (e.g. a new version, channel, binary, or platform/arch
 	// that postdates our cache). Either way, refresh from the server and try again.
-	up, target, remoteErr := refreshAndLookupTarget(client, cacheDir, targetName, false)
+	up, target, remoteErr := refreshAndLookupTarget(client, tufServerURL, tufRootJson, cacheDir, targetName, false)
 	if remoteErr != nil {
 		return nil, nil, fmt.Errorf("finding target via remote update after local lookup failed with `%s`: %w", localErr.Error(), remoteErr)
 	}
@@ -180,7 +190,7 @@ func lookupTarget(client *http.Client, cacheDir string, targetName string) (*upd
 // looks up the given target. It returns the updater used to allow for
 // downloading the target if needed. (Thus, even if localMode is false,
 // an http client should always be passed in.)
-func refreshAndLookupTarget(client *http.Client, cacheDir string, targetName string, localMode bool) (*updater.Updater, *metadata.TargetFiles, error) {
+func refreshAndLookupTarget(client *http.Client, tufServerURL string, tufRootJson []byte, cacheDir string, targetName string, localMode bool) (*updater.Updater, *metadata.TargetFiles, error) {
 	tufCacheDir := filepath.Join(cacheDir, "tuf")
 	// Make the directory if it doesn't already exist.
 	// Ensure that directory permissions are correct, otherwise TUF will fail to initialize. We cannot
@@ -189,8 +199,8 @@ func refreshAndLookupTarget(client *http.Client, cacheDir string, targetName str
 		return nil, nil, fmt.Errorf("creating TUF directory inside cache dir: %w", err)
 	}
 
-	metadataUrl := strings.TrimSuffix(launcher.DefaultTufServer, "/") + "/repository"
-	cfg, err := config.New(metadataUrl, rootJson)
+	metadataUrl := strings.TrimSuffix(tufServerURL, "/") + "/repository"
+	cfg, err := config.New(metadataUrl, tufRootJson)
 	if err != nil {
 		return nil, nil, fmt.Errorf("creating go-tuf/v2 config: %w", err)
 	}
