@@ -197,6 +197,7 @@ func TestFilewalkManager_E2E(t *testing.T) {
 	}
 	// gets the last walk time by walk name
 	lastWalkTime := func(name string) int64 {
+		t.Helper()
 		raw, err := resultsStore.Get(LastWalkTimeKey(name))
 		if err != nil || raw == nil {
 			return 0
