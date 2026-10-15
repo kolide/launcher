@@ -22,6 +22,7 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
@@ -320,6 +321,7 @@ func (t *TelemetryExporter) setNewGlobalMeterProvider(launcherResource *resource
 	traceClientOpts := []otlpmetricgrpc.Option{
 		otlpmetricgrpc.WithEndpoint(t.knapsack.TraceIngestServerURL()),
 		otlpmetricgrpc.WithDialOption(grpc.WithPerRPCCredentials(t.ingestClientAuthenticator)),
+		otlpmetricgrpc.WithTemporalitySelector(metricsTemporalitySelector),
 	}
 	if t.disableIngestTLS {
 		traceClientOpts = append(traceClientOpts, otlpmetricgrpc.WithInsecure())
@@ -354,6 +356,23 @@ func (t *TelemetryExporter) setNewGlobalMeterProvider(launcherResource *resource
 
 	observability.ReinitializeMetrics()
 	dedup.ReinitializeMetrics()
+}
+
+// metricsTemporalitySelector exports counters and histograms as deltas: each export only carries
+// what happened since the previous one. We don't send device identity, so many devices share each
+// series on the ingest server; it can add up deltas from any number of devices, but not cumulative
+// totals. UpDownCounters stay cumulative (as with OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=delta),
+// and gauges have no temporality.
+func metricsTemporalitySelector(kind sdkmetric.InstrumentKind) metricdata.Temporality {
+	switch kind {
+	case sdkmetric.InstrumentKindCounter, sdkmetric.InstrumentKindObservableCounter, sdkmetric.InstrumentKindHistogram:
+		return metricdata.DeltaTemporality
+	case sdkmetric.InstrumentKindUpDownCounter, sdkmetric.InstrumentKindObservableUpDownCounter,
+		sdkmetric.InstrumentKindGauge, sdkmetric.InstrumentKindObservableGauge:
+		return metricdata.CumulativeTemporality
+	default:
+		return metricdata.CumulativeTemporality
+	}
 }
 
 // Execute begins exporting telemetry if exporting is enabled.

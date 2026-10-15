@@ -23,6 +23,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/attribute"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.uber.org/goleak"
 )
 
@@ -811,4 +813,28 @@ func testTokenStore(t *testing.T) types.KVStore {
 	s, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	return s
+}
+
+func Test_metricsTemporalitySelector(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name     string
+		kind     sdkmetric.InstrumentKind
+		expected metricdata.Temporality
+	}{
+		{name: "counter", kind: sdkmetric.InstrumentKindCounter, expected: metricdata.DeltaTemporality},
+		{name: "observable counter", kind: sdkmetric.InstrumentKindObservableCounter, expected: metricdata.DeltaTemporality},
+		{name: "histogram", kind: sdkmetric.InstrumentKindHistogram, expected: metricdata.DeltaTemporality},
+		{name: "up down counter", kind: sdkmetric.InstrumentKindUpDownCounter, expected: metricdata.CumulativeTemporality},
+		{name: "observable up down counter", kind: sdkmetric.InstrumentKindObservableUpDownCounter, expected: metricdata.CumulativeTemporality},
+		{name: "gauge", kind: sdkmetric.InstrumentKindGauge, expected: metricdata.CumulativeTemporality},
+		{name: "observable gauge", kind: sdkmetric.InstrumentKindObservableGauge, expected: metricdata.CumulativeTemporality},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			require.Equal(t, tt.expected, metricsTemporalitySelector(tt.kind))
+		})
+	}
 }
