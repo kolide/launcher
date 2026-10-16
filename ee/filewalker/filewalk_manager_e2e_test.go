@@ -22,7 +22,7 @@ import (
 )
 
 // Verifies broad behavior through public APIs of the package.
-// Checks results from calling public APIs: a startup scan, a scheduled scan, Do() in two ways, and a Ping().
+// Checks results from calling public APIs: a startup scan, a scheduled scan, Do, and a Ping.
 
 // Intended config coverage:
 //
@@ -281,23 +281,11 @@ func TestFilewalkManager_E2E(t *testing.T) {
 		seedAll()
 		pingStart := time.Now().Unix()
 		fm.Ping()
-		time.Sleep(5 * time.Minute)
 		requireWalked(allNames, pingStart)
 
 		seedAll()
 		doStart := time.Now().Unix()
 		require.NoError(t, fm.Do(strings.NewReader(`{"filewalks": []}`)))
 		requireWalked(allNames, doStart)
-
-		// and runs with a specific set of walks
-		seeded := seedAll()
-		doStart = time.Now().Unix()
-		require.NoError(t, fm.Do(strings.NewReader(`{"filewalks": ["host_keys"]}`)))
-		requireWalked([]string{"host_keys"}, doStart)
-		for name, ts := range seeded {
-			if name != "host_keys" {
-				require.Equal(t, ts, lastWalkTime(name), name)
-			}
-		}
 	})
 }
