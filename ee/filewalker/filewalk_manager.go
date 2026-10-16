@@ -11,6 +11,7 @@ import (
 	"maps"
 	"slices"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -42,8 +43,8 @@ type FilewalkManager struct {
 	doReq chan []string
 
 	// Handle actor shutdown
-	interrupt   chan struct{}
-	interrupted *atomic.Bool
+	interrupt     chan struct{}
+	interruptOnce sync.Once
 }
 
 // How often to check filewalks due to be ran.
@@ -56,8 +57,7 @@ func New(k types.Knapsack, slogger *slog.Logger) *FilewalkManager {
 		slogger:      slogger.With("component", "filewalker"),
 		dirty:        &atomic.Bool{},
 		doReq:        make(chan []string, 1),
-		interrupt:    make(chan struct{}, 10), // We have a buffer so we don't block on sending to this channel
-		interrupted:  &atomic.Bool{},
+		interrupt:    make(chan struct{}),
 	}
 }
 
@@ -82,12 +82,7 @@ func (fm *FilewalkManager) Execute() error {
 }
 
 func (fm *FilewalkManager) Interrupt(_ error) {
-	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if fm.interrupted.Swap(true) {
-		return
-	}
-
-	fm.interrupt <- struct{}{}
+	fm.interruptOnce.Do(func() { close(fm.interrupt) })
 }
 
 // run is the primary loop for FileWalk manager. It handles kicking off walks,
