@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -24,13 +23,6 @@ import (
 // to the filewalk manager to trigger ad hoc filewalks.
 const FilewalkNowAction = "filewalk_now"
 
-// controlServerFilewalkRequest is the request sent down by the control server
-// to trigger ad hoc filewalks. If the list of filewalks is empty, the manager
-// will trigger filewalks for all of its filewalkers.
-type controlServerFilewalkRequest struct {
-	FilewalkNames []string `json:"filewalks"`
-}
-
 // FilewalkManager handles configuring and executing filewalkers by the config
 // in FilewalkConfigStore.
 type FilewalkManager struct {
@@ -39,8 +31,8 @@ type FilewalkManager struct {
 	resultsStore types.GetterSetterDeleterIterator
 	slogger      *slog.Logger
 
-	dirty *atomic.Bool
-	doReq chan []string
+	req        chan struct{}
+	cancelWalk atomic.Pointer[context.CancelFunc]
 
 	// Handle actor shutdown
 	interrupt     chan struct{}
@@ -55,8 +47,7 @@ func New(k types.Knapsack, slogger *slog.Logger) *FilewalkManager {
 		cfgStore:     k.FilewalkConfigStore(),
 		resultsStore: k.FilewalkResultsStore(),
 		slogger:      slogger.With("component", "filewalker"),
-		dirty:        &atomic.Bool{},
-		doReq:        make(chan []string, 1),
+		req:          make(chan struct{}, 1),
 		interrupt:    make(chan struct{}),
 	}
 }
@@ -91,10 +82,8 @@ func (fm *FilewalkManager) run(ctx context.Context) {
 	ticker := time.NewTicker(walkCheckInterval)
 	defer ticker.Stop()
 
-	var requested []string
+	var requested bool
 	for {
-		extraNames := requested
-		requested = nil
 		if cfgs, present, err := fm.pullConfigs(); err != nil {
 			fm.slogger.Log(ctx, slog.LevelError,
 				"could not pull filewalk configs from store",
@@ -103,10 +92,8 @@ func (fm *FilewalkManager) run(ctx context.Context) {
 		} else {
 			fm.deleteRemovedResults(ctx, present)
 			names := due(time.Now(), cfgs, fm.lastWalkTimes(cfgs))
-			if fm.dirty.Swap(false) {
+			if requested {
 				names = slices.Collect(maps.Keys(cfgs))
-			} else {
-				names = append(names, extraNames...)
 			}
 			fm.walkConfigs(ctx, cfgs, names)
 		}
@@ -115,15 +102,18 @@ func (fm *FilewalkManager) run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-		case requested = <-fm.doReq:
-			if len(requested) == 0 {
-				fm.dirty.Store(true)
-			}
+			requested = false
+		case <-fm.req:
+			requested = true
 		}
 	}
 }
 
 func (fm *FilewalkManager) walkConfigs(ctx context.Context, cfgs map[string]filewalkConfig, names []string) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	fm.cancelWalk.Store(&cancel)
+
 	slices.Sort(names)
 	for _, name := range slices.Compact(names) {
 		if ctx.Err() != nil {
@@ -247,22 +237,36 @@ func (fm *FilewalkManager) deleteRemovedResults(ctx context.Context, present map
 }
 
 // Ping satisfies the control.subscriber interface -- the manager subscribes to changes to
-// the filewalk_config subsystem.
+// the filewalk_config subsystem. Ping cancels any in flight walks.
 func (fm *FilewalkManager) Ping() {
 	fm.slogger.Log(context.TODO(), slog.LevelDebug,
 		"processing updated filewalk configs",
 	)
 
-	fm.dirty.Store(true)
+	// capture fn to ensure we cancel what was in flight and not us. fine if
+	// another req comes in before us. walking twice > walking never.
+	cancel := fm.cancelWalk.Load()
+	fm.request()
+	if cancel != nil {
+		(*cancel)()
+	}
 }
 
-// Do satisfies the actionqueue.actor interface; it allows the control server to send
-// requests down to filewalk immediately.
+// Do satisfies the actionqueue.actor interface; it allows the control server to request
+// immediate filewalk. Never errors. If a request to walk is already queued, another
+// is not added.
 func (fm *FilewalkManager) Do(data io.Reader) error {
 	ctx, span := observability.StartSpan(context.TODO())
 	defer span.End()
 
-	var req controlServerFilewalkRequest
+	type controlServerFilewalkRequest struct {
+	}
+
+	// request sent down by the control server. names are ignored since walking
+	// is not much slower with a few more configs included.
+	var req struct {
+		FilewalkNames []string `json:"filewalks"`
+	}
 	if err := json.NewDecoder(data).Decode(&req); err != nil {
 		fm.slogger.Log(ctx, slog.LevelWarn,
 			"received filewalk request in unexpected format from control server, discarding",
@@ -277,10 +281,14 @@ func (fm *FilewalkManager) Do(data io.Reader) error {
 		"requested_filewalks", req.FilewalkNames,
 	)
 
+	fm.request()
+	return nil
+}
+
+// request requests a filewalk and returns if another request is queued
+func (fm *FilewalkManager) request() {
 	select {
-	case fm.doReq <- req.FilewalkNames:
-		return nil
+	case fm.req <- struct{}{}:
 	default:
-		return errors.New("filewalk request already in flight")
 	}
 }
