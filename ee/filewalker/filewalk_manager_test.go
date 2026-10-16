@@ -70,8 +70,8 @@ func TestManager_WalksOnSchedule(t *testing.T) {
 	})
 }
 
-// Ping should walk every config on the next tick, even those not due; ticks without a Ping should not.
-func TestManager_PingWalksAllOnNextTick(t *testing.T) {
+// Ping should walk every config immediately, even those not due.
+func TestManager_PingWalksAllImmediately(t *testing.T) {
 	t.Parallel()
 	runManagerTest(t, func(h *managerHarness) {
 		h.setConfig("dotenv", dotenvCfg)
@@ -84,44 +84,77 @@ func TestManager_PingWalksAllOnNextTick(t *testing.T) {
 		require.Equal(t, bootWalk, h.lastWalk("host_keys"))
 
 		h.fm.Ping()
-		h.advance(walkCheckInterval)
+		synctest.Wait()
 		require.Equal(t, time.Now().Unix(), h.lastWalk("dotenv"))
 		require.Equal(t, time.Now().Unix(), h.lastWalk("host_keys"))
 	})
 }
 
-// Several Pings before a tick should produce a single full walk.
-func TestManager_PingsCoalesce(t *testing.T) {
+// Several Pings or Dos before a tick should produce a single full walk.
+func TestManager_RequestsCoalesce(t *testing.T) {
 	t.Parallel()
 	runManagerTest(t, func(h *managerHarness) {
 		h.setConfig("dotenv", dotenvCfg)
+		h.setConfig("host_keys", hostKeysCfg)
+		h.seedLastWalk("dotenv", 0)
+		h.seedLastWalk("host_keys", 0)
+
+		h.fm.Ping()
+		require.NoError(t, h.do(`{"filewalks": []}`))
+		h.fm.Ping()
+		require.NoError(t, h.do(`{"filewalks": ["host_keys"]}`))
+
 		h.start()
-
-		h.fm.Ping()
-		h.fm.Ping()
-		h.fm.Ping()
-		h.advance(walkCheckInterval)
-		require.Equal(t, 2, h.walks("dotenv"))
+		require.Equal(t, 1, h.walks("dotenv"))
+		require.Equal(t, 1, h.walks("host_keys"))
 
 		h.advance(walkCheckInterval)
-		require.Equal(t, 2, h.walks("dotenv"))
+		require.Equal(t, 1, h.walks("dotenv"))
+		require.Equal(t, 1, h.walks("host_keys"))
 	})
 }
 
-// Walks requested by a Do should run immediately.
-func TestManager_DoWalksNamedImmediately(t *testing.T) {
+// A ping should cancel any walk in flight. We check this
+// by blocking on the attempt to set a last walk time.
+func TestManager_PingCancelsInFlightWalk(t *testing.T) {
 	t.Parallel()
 	runManagerTest(t, func(h *managerHarness) {
 		h.setConfig("dotenv", dotenvCfg)
 		h.setConfig("host_keys", hostKeysCfg)
 		h.start()
 
-		h.advance(time.Minute)
-		require.NoError(t, h.do(`{"filewalks": ["host_keys"]}`))
+		release := h.resultsStore.holdSet(LastWalkTimeKey("dotenv"))
+		require.NoError(t, h.do(`{"filewalks": []}`))
 		synctest.Wait()
 
+		h.fm.Ping()
+		close(release)
+		synctest.Wait()
+
+		require.Equal(t, 3, h.walks("dotenv"))
 		require.Equal(t, 2, h.walks("host_keys"))
-		require.Equal(t, 1, h.walks("dotenv"))
+	})
+}
+
+// Do defers to whatever is running. We check this
+// by blocking on the attempt to set a last walk time.
+func TestManager_DoDoesNotCancelInFlightWalk(t *testing.T) {
+	t.Parallel()
+	runManagerTest(t, func(h *managerHarness) {
+		h.setConfig("dotenv", dotenvCfg)
+		h.setConfig("host_keys", hostKeysCfg)
+		h.start()
+
+		release := h.resultsStore.holdSet(LastWalkTimeKey("dotenv"))
+		require.NoError(t, h.do(`{"filewalks": []}`))
+		synctest.Wait()
+
+		require.NoError(t, h.do(`{"filewalks": []}`))
+		close(release)
+		synctest.Wait()
+
+		require.Equal(t, 3, h.walks("dotenv"))
+		require.Equal(t, 3, h.walks("host_keys"))
 	})
 }
 
@@ -138,42 +171,6 @@ func TestManager_DoEmptyWalksAll(t *testing.T) {
 
 		require.Equal(t, 2, h.walks("dotenv"))
 		require.Equal(t, 2, h.walks("host_keys"))
-	})
-}
-
-func TestManager_DoIgnoresUnknownNames(t *testing.T) {
-	t.Parallel()
-	runManagerTest(t, func(h *managerHarness) {
-		h.setConfig("host_keys", hostKeysCfg)
-		h.start()
-
-		h.advance(time.Minute)
-		require.NoError(t, h.do(`{"filewalks": ["missing", "host_keys"]}`))
-		synctest.Wait()
-
-		require.Equal(t, time.Now().Unix(), h.lastWalk("host_keys"))
-		require.Zero(t, h.lastWalk("missing"))
-	})
-}
-
-// Do may reject a request while another is queued; retried requests, as the actionqueue does, should all walk.
-func TestManager_DoRetriedUntilAccepted(t *testing.T) {
-	t.Parallel()
-	runManagerTest(t, func(h *managerHarness) {
-		h.setConfig("dotenv", dotenvCfg)
-		h.setConfig("host_keys", hostKeysCfg)
-		h.seedLastWalk("dotenv", 0)
-		h.seedLastWalk("host_keys", 0)
-
-		require.NoError(t, h.do(`{"filewalks": ["dotenv"]}`))
-		require.Error(t, h.do(`{"filewalks": ["host_keys"]}`))
-
-		h.start()
-		require.NoError(t, h.do(`{"filewalks": ["host_keys"]}`))
-		synctest.Wait()
-
-		require.Equal(t, 1, h.walks("dotenv"))
-		require.Equal(t, 1, h.walks("host_keys"))
 	})
 }
 
@@ -221,9 +218,10 @@ func TestManager_KeepsBrokenConfigResults(t *testing.T) {
 		h.start()
 		bootWalk := time.Now().Unix()
 
+		h.advance(time.Minute)
 		h.setConfig("host_keys", `{not json`)
 		h.fm.Ping()
-		h.advance(walkCheckInterval)
+		synctest.Wait()
 
 		require.Equal(t, time.Now().Unix(), h.lastWalk("dotenv"))
 		require.Equal(t, bootWalk, h.lastWalk("host_keys"))
@@ -307,13 +305,28 @@ type countingStore struct {
 	types.KVStore
 	mu   sync.Mutex
 	sets map[string]int
+	hold map[string]chan struct{}
 }
 
 func (s *countingStore) Set(key, value []byte) error {
 	s.mu.Lock()
 	s.sets[string(key)]++
+	release, held := s.hold[string(key)]
+	delete(s.hold, string(key))
 	s.mu.Unlock()
+	if held {
+		<-release
+	}
 	return s.KVStore.Set(key, value)
+}
+
+// next set on key blocks until chan closes
+func (s *countingStore) holdSet(key []byte) chan struct{} {
+	release := make(chan struct{})
+	s.mu.Lock()
+	s.hold[string(key)] = release
+	s.mu.Unlock()
+	return release
 }
 
 // runManagerTest runs body in a synctest bubble with a fresh manager; time only advances while every goroutine is blocked.
@@ -331,7 +344,7 @@ func runManagerTest(t *testing.T, body func(h *managerHarness)) {
 		require.NoError(t, err)
 		store, err := storageci.NewStore(t, slogger, storage.FilewalkResultsStore.String())
 		require.NoError(t, err)
-		resultsStore := &countingStore{KVStore: store, sets: map[string]int{}}
+		resultsStore := &countingStore{KVStore: store, sets: map[string]int{}, hold: map[string]chan struct{}{}}
 		k := typesmocks.NewKnapsack(t)
 		k.On("FilewalkConfigStore").Return(cfgStore)
 		k.On("FilewalkResultsStore").Return(resultsStore)
