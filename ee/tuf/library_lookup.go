@@ -16,7 +16,8 @@ import (
 	"github.com/peterbourgon/ff/v3"
 	"github.com/spf13/pflag"
 	"github.com/theupdateframework/go-tuf/v2/metadata"
-	"github.com/theupdateframework/go-tuf/v2/metadata/trustedmetadata"
+	"github.com/theupdateframework/go-tuf/v2/metadata/config"
+	"github.com/theupdateframework/go-tuf/v2/metadata/updater"
 )
 
 type BinaryUpdateInfo struct {
@@ -284,65 +285,30 @@ func targetsFromLocalTufMetadata(tufRepositoryLocation string, trustedRootJson [
 		return nil, fmt.Errorf("local TUF dir doesn't exist, cannot create read-only client: %w", err)
 	}
 
-	// Start with our trusted embedded root
-	loadedMetadata, err := trustedmetadata.New(trustedRootJson)
+	// Config initialization requires that we pass in a TUF server, even if we aren't going
+	// to use it. Pass in the default; setting UnsafeLocalMode below will prevent us from using it.
+	cfg, err := config.New(launcher.DefaultTufServer, trustedRootJson)
 	if err != nil {
-		return nil, fmt.Errorf("loading trusted metadata from root JSON: %w", err)
+		return nil, fmt.Errorf("creating go-tuf/v2 config: %w", err)
+	}
+	cfg.LocalMetadataDir = tufRepositoryLocation
+	cfg.LocalTargetsDir = tufRepositoryLocation
+	cfg.PrefixTargetsWithHash = false // our mirror does not prefix target filenames with their hash
+
+	// Set UnsafeLocalMode so that we load our metadata from the disk location only,
+	// not via remote call.
+	cfg.UnsafeLocalMode = true
+
+	up, err := updater.New(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("creating go-tuf/v2 local-only updater: %w", err)
 	}
 
-	// Load latest root file from disk, validating against our embedded root
-	rootFile := filepath.Join(tufRepositoryLocation, fmt.Sprintf("%s.json", metadata.ROOT))
-	rootData, err := os.ReadFile(rootFile)
-	if err != nil {
-		return nil, fmt.Errorf("reading %s: %w", rootFile, err)
-	}
-	newRoot, err := metadata.Root().FromBytes(rootData)
-	if err != nil {
-		return nil, fmt.Errorf("loading root metadata: %w", err)
+	if err := up.Refresh(); err != nil {
+		return nil, fmt.Errorf("refreshing go-tuf/v2 local-only updater: %w", err)
 	}
 
-	// Only need to update if the data on disk is a newer version
-	if loadedMetadata.Root.Signed.Version < newRoot.Signed.Version {
-		if _, err := loadedMetadata.UpdateRoot(rootData); err != nil {
-			return nil, fmt.Errorf("updating root: %w", err)
-		}
-	}
-
-	// Load timestamp file from disk, validating against our embedded root
-	timestampFile := filepath.Join(tufRepositoryLocation, fmt.Sprintf("%s.json", metadata.TIMESTAMP))
-	timestampData, err := os.ReadFile(timestampFile)
-	if err != nil {
-		return nil, fmt.Errorf("reading %s: %w", timestampFile, err)
-	}
-	if _, err := loadedMetadata.UpdateTimestamp(timestampData); err != nil {
-		return nil, fmt.Errorf("updating timestamp: %w", err)
-	}
-
-	// Load snapshot file from disk, validating against our embedded root
-	snapshotFile := filepath.Join(tufRepositoryLocation, fmt.Sprintf("%s.json", metadata.SNAPSHOT))
-	snapshotData, err := os.ReadFile(snapshotFile)
-	if err != nil {
-		return nil, fmt.Errorf("reading %s: %w", snapshotFile, err)
-	}
-	if _, err := loadedMetadata.UpdateSnapshot(snapshotData, false); err != nil {
-		return nil, fmt.Errorf("updating snapshot: %w", err)
-	}
-
-	// Load targets file from disk, validating against our embedded root
-	targetsFile := filepath.Join(tufRepositoryLocation, fmt.Sprintf("%s.json", metadata.TARGETS))
-	targetsData, err := os.ReadFile(targetsFile)
-	if err != nil {
-		return nil, fmt.Errorf("reading %s: %w", targetsFile, err)
-	}
-	if _, err := loadedMetadata.UpdateDelegatedTargets(targetsData, metadata.TARGETS, metadata.ROOT); err != nil {
-		return nil, fmt.Errorf("updating targets: %w", err)
-	}
-
-	// All data is now present and validated; extract targets
-	if targets, targetsFound := loadedMetadata.Targets["targets"]; targetsFound {
-		return targets.Signed.Targets, nil
-	}
-	return nil, errors.New("loaded metadata missing targets")
+	return up.GetTopLevelTargets(), nil
 }
 
 // mostRecentVersion returns the path to the most recent, valid version available in the library for the
