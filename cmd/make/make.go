@@ -10,7 +10,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/launcher/v2/pkg/contexts/ctxlog"
-	"github.com/kolide/launcher/v2/pkg/make"
+	lmake "github.com/kolide/launcher/v2/pkg/make"
 	"github.com/peterbourgon/ff/v3"
 )
 
@@ -50,33 +50,33 @@ func main() {
 	ctx := context.Background()
 	ctx = ctxlog.NewContext(ctx, logger)
 
-	opts := []make.Option{
-		make.WithOS(*flBuildOS),
-		make.WithArch(*flBuildARCH),
+	opts := []lmake.Option{
+		lmake.WithOS(*flBuildOS),
+		lmake.WithArch(*flBuildARCH),
 	}
 	if *flRace {
-		opts = append(opts, make.WithRace())
+		opts = append(opts, lmake.WithRace())
 	}
 	if *flStatic {
-		opts = append(opts, make.WithStatic())
+		opts = append(opts, lmake.WithStatic())
 	}
 	if *flStampVersion {
-		opts = append(opts, make.WithStampVersion())
+		opts = append(opts, lmake.WithStampVersion())
 	}
 	if *flFakeData {
-		opts = append(opts, make.WithFakeData())
+		opts = append(opts, lmake.WithFakeData())
 	}
 
 	if *flGoPath != "" {
-		opts = append(opts, make.WithGoPath(*flGoPath))
+		opts = append(opts, lmake.WithGoPath(*flGoPath))
 	}
 
 	if *flGithubOutput {
-		opts = append(opts, make.WithGithubActionOutput())
+		opts = append(opts, lmake.WithGithubActionOutput())
 	}
 
 	if *flIncludeSymbols {
-		opts = append(opts, make.WithOutStripped())
+		opts = append(opts, lmake.WithOutStripped())
 	}
 
 	// We need to avoid cgo on windows. See
@@ -86,14 +86,14 @@ func main() {
 	optsMaybeCgo := opts
 	if *flBuildOS == "linux" {
 		// overwrite with append, since optsMaybeCgo was a shallow clone
-		optsMaybeCgo = append(opts, make.WithCgo())
+		optsMaybeCgo = append(opts, lmake.WithCgo())
 	}
 
 	targetSet := map[string]func(context.Context) error{
-		"deps-go":         make.New(opts...).DepsGo,
-		"launcher":        make.New(optsMaybeCgo...).BuildCmd("./cmd/launcher", fakeName("launcher", *flFakeData)),
-		"package-builder": make.New(opts...).BuildCmd("./cmd/package-builder", "package-builder"),
-		"make":            make.New(opts...).BuildCmd("./cmd/make", "make"),
+		"deps-go":         lmake.New(opts...).DepsGo,
+		"launcher":        lmake.New(optsMaybeCgo...).BuildCmd("./cmd/launcher", fakeName("launcher", *flFakeData)),
+		"package-builder": lmake.New(opts...).BuildCmd("./cmd/package-builder", "package-builder"),
+		"make":            lmake.New(opts...).BuildCmd("./cmd/make", "make"),
 	}
 
 	if t := strings.Split(*flTargets, ","); len(t) != 0 && t[0] != "" {
