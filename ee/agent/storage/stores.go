@@ -21,6 +21,7 @@ const (
 	ControlServerActionsStore     Store = "action_store"                       // The store used for storing actions sent by control server.
 	LauncherHistoryStore          Store = "launcher_history"                   // The store used for storing launcher start time history currently.
 	Dt4aInfoStore                 Store = "zta_info"                           // The store used for storing dt4a info about this device
+	AuthPostureInfoStore          Store = "TBD_RM"                             // TODO RM -- update name // The store used for storing device posture info used for Device Trust auth
 	WindowsUpdatesCacheStore      Store = "windows_updates_cache"              // The store used for caching the results of recent searches against the Windows Update Agent API
 	EnrollmentStore               Store = "registrations"                      // The store used for persisting launcher's enrollments ("registration" key for legacy reasons/backwards compatibility)
 	EnrollmentDetailsStore        Store = "enrollment_details"                 // The store used for persisting enrollment details

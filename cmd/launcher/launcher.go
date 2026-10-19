@@ -84,6 +84,7 @@ const (
 	filewalkSubsystemName                 = "filewalk_config"
 	ztaInfoSubsystemName                  = "zta_info" // legacy name for dt4aInfo subsystem
 	dt4aInfoSubsystemName                 = "dt4a_info"
+	authPostureInfoSubsystemName          = "TBD_RM" // TODO RM -- name to be updated
 	serverReleaseTrackerDataSubsystemName = "kolide_server_release_tracker_data"
 	localizationsSubsystemName            = "localizations"
 )
@@ -596,6 +597,13 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		//ztaInfoConsumer is the legacy consumer for zta
 		if err := controlService.RegisterConsumer(ztaInfoSubsystemName, dt4aInfoConsumer); err != nil {
 			return fmt.Errorf("failed to register dt4a info consumer: %w", err)
+		}
+
+		// Set up consumer to ingest device posture information from k2, to include in
+		// localserver responses and callbacks
+		authPostureInfoConsumer := keyvalueconsumer.NewConfigConsumer(k.AuthPostureInfoStore())
+		if err := controlService.RegisterConsumer(authPostureInfoSubsystemName, authPostureInfoConsumer); err != nil {
+			return fmt.Errorf("failed to register auth posture info consumer: %w", err)
 		}
 	}
 

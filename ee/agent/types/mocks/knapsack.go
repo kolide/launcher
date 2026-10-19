@@ -194,6 +194,52 @@ func (_c *Knapsack_AllowOverlyBroadDt4aAcceleration_Call) RunAndReturn(run func(
 	return _c
 }
 
+// AuthPostureInfoStore provides a mock function for the type Knapsack
+func (_mock *Knapsack) AuthPostureInfoStore() types.KVStore {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for AuthPostureInfoStore")
+	}
+
+	var r0 types.KVStore
+	if returnFunc, ok := ret.Get(0).(func() types.KVStore); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(types.KVStore)
+		}
+	}
+	return r0
+}
+
+// Knapsack_AuthPostureInfoStore_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AuthPostureInfoStore'
+type Knapsack_AuthPostureInfoStore_Call struct {
+	*mock.Call
+}
+
+// AuthPostureInfoStore is a helper method to define mock.On call
+func (_e *Knapsack_Expecter) AuthPostureInfoStore() *Knapsack_AuthPostureInfoStore_Call {
+	return &Knapsack_AuthPostureInfoStore_Call{Call: _e.mock.On("AuthPostureInfoStore")}
+}
+
+func (_c *Knapsack_AuthPostureInfoStore_Call) Run(run func()) *Knapsack_AuthPostureInfoStore_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Knapsack_AuthPostureInfoStore_Call) Return(kVStore types.KVStore) *Knapsack_AuthPostureInfoStore_Call {
+	_c.Call.Return(kVStore)
+	return _c
+}
+
+func (_c *Knapsack_AuthPostureInfoStore_Call) RunAndReturn(run func() types.KVStore) *Knapsack_AuthPostureInfoStore_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Autoupdate provides a mock function for the type Knapsack
 func (_mock *Knapsack) Autoupdate() bool {
 	ret := _mock.Called()

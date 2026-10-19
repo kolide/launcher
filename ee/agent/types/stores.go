@@ -20,6 +20,7 @@ type Stores interface {
 	TokenStore() KVStore
 	LauncherHistoryStore() KVStore
 	Dt4aInfoStore() KVStore
+	AuthPostureInfoStore() KVStore
 	WindowsUpdatesCacheStore() KVStore
 	EnrollmentStore() KVStore
 	EnrollmentDetailsStore() KVStore
