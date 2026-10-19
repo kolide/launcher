@@ -42,6 +42,7 @@ jobs:
       - name: golangci-lint
         uses: step-security/golangci-lint-action@2697867e9c204558ca23d0decdd0039dc21f2b93 # v9.3.0
         with:
+          version: v2.15.0
           skip-save-cache: true
 
       # Run again as a workaround for https://github.com/golangci/golangci-lint-action/issues/362
