@@ -131,10 +131,6 @@ func TestFilewalkManager_E2E(t *testing.T) {
 		"root/.aws/credentials":                                 {},
 	}
 
-	notDue := map[string]time.Duration{
-		"shell_history": 1 * time.Hour,
-	}
-
 	expected := map[string][]string{
 		"dotenv_files": {
 			"home/kiwi/projects/api/.env",
@@ -249,16 +245,13 @@ func TestFilewalkManager_E2E(t *testing.T) {
 	}
 	allNames := slices.Collect(maps.Keys(expected))
 
-	for name, ago := range notDue {
-		seedLastWalk(name, ago)
-	}
 	dueNames := slices.DeleteFunc(slices.Clone(allNames), func(name string) bool {
-		_, ok := notDue[name]
-		return ok
+		return name == "shell_history"
 	})
 
 	synctest.Test(t, func(t *testing.T) {
 		// runs on startup
+		justRan := seedLastWalk("shell_history", time.Hour)
 		walkStart := time.Now().Unix()
 		fm := New(k, slogger)
 		done := make(chan struct{})
@@ -271,6 +264,7 @@ func TestFilewalkManager_E2E(t *testing.T) {
 			<-done
 		}()
 		requireWalked(dueNames, walkStart)
+		require.Equal(t, justRan, lastWalkTime("shell_history"))
 
 		// runs on schedule
 		schedStart := time.Now().Unix()

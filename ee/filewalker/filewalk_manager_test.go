@@ -242,6 +242,19 @@ func TestManager_WalksInvalidLastWalk(t *testing.T) {
 	})
 }
 
+// A future last run should be considered due, otherwise we may never run it.
+func TestManager_WalksFutureLastWalk(t *testing.T) {
+	t.Parallel()
+	runManagerTest(t, func(h *managerHarness) {
+		h.setConfig("host_keys", hostKeysCfg)
+		h.seedLastWalk("host_keys", -10*365*24*time.Hour)
+
+		h.start()
+
+		require.Equal(t, time.Now().Unix(), h.lastWalk("host_keys"))
+	})
+}
+
 func TestManager_InterruptMultipleDoesNotBlock(t *testing.T) {
 	t.Parallel()
 	runManagerTest(t, func(h *managerHarness) {
