@@ -158,7 +158,9 @@ func (fm *FilewalkManager) lastWalkTimes(ctx context.Context, cfgs map[string]fi
 	return lastWalks
 }
 
-// returns the filewalkConfig names which are currently due for walking
+// due returns the filewalkConfig names which are currently due for walking. Anything
+// last walked in the future, not walked, or failing to parse when it walked are
+// considered due too.
 func due(now time.Time, cfgs map[string]filewalkConfig, lastWalks map[string]time.Time) []string {
 	var names []string
 	for name, cfg := range cfgs {
