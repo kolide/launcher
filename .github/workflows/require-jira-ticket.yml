@@ -5,11 +5,15 @@ on:
     # No filter on title-only edits: a skipped job counts as passing and would
     # turn a failing check green.
     types: [opened, edited, reopened, synchronize, ready_for_review]
+  # Required checks must also report on merge queue commits, or the queue stalls.
+  merge_group:
+    types: [checks_requested]
 
 permissions: {}
 
 concurrency:
-  group: require-jira-ticket-${{ github.event.pull_request.number }}
+  # merge_group events have no PR number; the queue ref is unique per entry.
+  group: require-jira-ticket-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -17,7 +21,9 @@ jobs:
     name: Jira ticket in description
     runs-on: ubuntu-latest
     # Drafts aren't ready for review. Bot PRs (Dependabot, API changelog companions) have no ticket.
+    # Skip in the merge queue: the PR already passed, and merge_group events carry no PR body.
     if: >-
+      github.event_name == 'pull_request' &&
       github.event.pull_request.draft == false &&
       github.event.pull_request.user.type != 'Bot'
     steps:
