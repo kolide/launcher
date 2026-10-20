@@ -65,8 +65,7 @@ func TestProc(t *testing.T) {
 		useShortRootDir    bool
 		osqueryFlags       []string
 		configFileContents []byte
-		wantProc           bool
-		errContainsStr     string
+		tooLong, wantProc  bool
 	}
 
 	tests := []testCase{
@@ -100,10 +99,8 @@ func TestProc(t *testing.T) {
 
 	if runtime.GOOS != "windows" {
 		tests = append(tests, testCase{
-			name:            "socket path too long, the name of the test causes the socket path to be to long to be created, resulting in timeout waiting for the socket",
-			useShortRootDir: false,
-			wantProc:        false,
-			errContainsStr:  "error waiting for osquery to create socket",
+			name:    "socket path too long, the name of the test causes the socket path to be to long to be created, resulting in timeout waiting for the socket",
+			tooLong: true,
 		},
 		)
 	}
@@ -192,9 +189,8 @@ select * from time;
 
 			select {
 			case err := <-startErr:
-				if tt.errContainsStr != "" {
-					require.Error(t, err, fmt.Sprintf("logs: %s", logBytes.String()))
-					require.Contains(t, err.Error(), tt.errContainsStr)
+				if tt.tooLong {
+					require.Contains(t, err.Error(), "waiting for unix socket to be available")
 				} else {
 					require.NoError(t, err, fmt.Sprintf("logs: %s", logBytes.String()))
 				}
