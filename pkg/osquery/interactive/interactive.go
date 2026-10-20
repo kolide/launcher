@@ -96,21 +96,6 @@ func StartProcess(knapsack types.Knapsack, interactiveRootDir string, inFile, ou
 		"pid", proc.Pid,
 	)
 
-	// while developing for windows it was found that it will sometimes take osquery a while
-	// to create the socket, so we wait for it to exist before continuing
-	if err := waitForFile(socketPath, time.Second/4, time.Second*10); err != nil {
-		procKillErr := proc.Kill()
-		if procKillErr != nil {
-			err = fmt.Errorf("error killing osqueryd interactive: %s: %w", procKillErr, err)
-		}
-
-		return nil, nil, fmt.Errorf("error waiting for osquery to create socket: %w", err)
-	}
-
-	knapsack.Slogger().Log(context.TODO(), slog.LevelDebug,
-		"osquery socket file created",
-	)
-
 	// This call is blocking -- it will run the extension manager server until the user exits.
 	extensionServer, err := loadExtensionsAndStartServer(knapsack.Slogger(), socketPath, osqPlugins...)
 	if err != nil {
@@ -156,16 +141,15 @@ func buildOsqueryFlags(socketPath, augeasLensesPath string, osqueryFlags []strin
 // loadExtensionsAndStartServer calls *osquery.ExtensionManagerServer.Start, which will block (while running the server)
 // until the user exits the process.
 func loadExtensionsAndStartServer(slogger *slog.Logger, socketPath string, plugins ...osquery.OsqueryPlugin) (*osquery.ExtensionManagerServer, error) {
-	// On Windows, the named pipe may not be ready for connections immediately after
-	// it appears to exist (os.Stat succeeds). Unlike the Unix transport, which has
-	// a built-in waitForSocket retry loop, the Windows transport dials once and fails
-	// immediately if the pipe isn't ready. Retry with backoff to handle this.
+	// Unlike the Unix transport, which has a built-in waitForSocket retry loop, the Windows
+	// transport dials once and fails immediately if the pipe isn't ready. Retry with backoff to
+	// handle this.
 	var client *osquery.ExtensionManagerClient
 	if err := backoff.WaitFor(func() error {
 		var clientErr error
 		client, clientErr = osquery.NewClient(socketPath, 10*time.Second, osquery.MaxWaitTime(10*time.Second))
 		return clientErr
-	}, 10*time.Second, 1*time.Second); err != nil {
+	}, 20*time.Second, 1*time.Second); err != nil {
 		return nil, fmt.Errorf("error creating osquery client: %w", err)
 	}
 
@@ -203,34 +187,6 @@ func loadExtensionsAndStartServer(slogger *slog.Logger, socketPath string, plugi
 	}
 
 	return extensionManagerServer, nil
-}
-
-// wait until file is present or timeout
-func waitForFile(path string, interval, timeout time.Duration) error {
-	intervalTicker := time.NewTicker(interval)
-	defer intervalTicker.Stop()
-	timeoutTimer := time.NewTimer(timeout)
-	defer timeoutTimer.Stop()
-
-	f := func() bool {
-		_, err := os.Stat(path)
-		return err == nil
-	}
-
-	if f() {
-		return nil
-	}
-
-	for {
-		select {
-		case <-timeoutTimer.C:
-			return fmt.Errorf("timeout waiting for file: %s", path)
-		case <-intervalTicker.C:
-			if f() {
-				return nil
-			}
-		}
-	}
 }
 
 func generateConfigPlugin(slogger *slog.Logger, launcherDaemonRootDir string) (*config.Plugin, error) {
