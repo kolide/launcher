@@ -181,8 +181,13 @@ func loadExtensionsAndStartServer(slogger *slog.Logger, socketPath string, plugi
 		"registered plugins with server",
 	)
 
-	// Start will start and _run_ the server; it returns once the server is shut down.
-	if err := extensionManagerServer.Start(); err != nil {
+	// Run will start and _run_ the server; it returns once the server is shut down.
+	err = extensionManagerServer.Run()
+	switch {
+	case err == nil:
+	case strings.Contains(err.Error(), "extension ping failed"):
+		// process went away (broken pipe in testing): success
+	default:
 		return nil, fmt.Errorf("error starting extension manager server: %w", err)
 	}
 
