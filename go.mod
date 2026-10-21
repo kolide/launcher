@@ -48,7 +48,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/golang-migrate/migrate/v4 v4.16.2
 	github.com/golang/snappy v0.0.4
-	github.com/klauspost/compress v1.18.5
+	github.com/klauspost/compress v1.18.7
 	github.com/kolide/go-winlsa v0.0.0-20251002154611-3c83cd484052
 	github.com/kolide/goleveldb v0.0.0-20250731160947-c6b056c282de
 	github.com/kolide/systray v1.10.5-0.20260526200512-7c4ae6cd9b72
@@ -183,6 +183,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-go 1.26.9
+go 1.26.10
 
 replace github.com/go-ole/go-ole v1.3.0 => github.com/kolide/go-ole v0.0.0-20241008210444-65130153c767
