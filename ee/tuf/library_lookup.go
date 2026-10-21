@@ -15,6 +15,9 @@ import (
 	"github.com/kolide/launcher/v2/pkg/launcher"
 	"github.com/peterbourgon/ff/v3"
 	"github.com/spf13/pflag"
+	"github.com/theupdateframework/go-tuf/v2/metadata"
+	"github.com/theupdateframework/go-tuf/v2/metadata/config"
+	"github.com/theupdateframework/go-tuf/v2/metadata/updater"
 )
 
 type BinaryUpdateInfo struct {
@@ -205,6 +208,14 @@ func getAutoupdateConfigFromFile(configFilePath string) (*autoupdateConfig, erro
 // as its version.
 func CheckOutLatest(ctx context.Context, binary autoupdatableBinary, rootDirectory string,
 	updateDirectory string, pinnedVersion string, channel string, slogger *slog.Logger) (*BinaryUpdateInfo, error) {
+	return checkOutLatestWithRootJson(ctx, binary, rootDirectory, updateDirectory, pinnedVersion, channel, rootJson, slogger)
+}
+
+// checkOutLatestWithRootJson allows for passing in `trustedRootJson` instead of using the package-level
+// embedded root JSON. It should be directly invoked only by tests; production usage should go through
+// CheckOutLatest.
+func checkOutLatestWithRootJson(ctx context.Context, binary autoupdatableBinary, rootDirectory string,
+	updateDirectory string, pinnedVersion string, channel string, trustedRootJson []byte, slogger *slog.Logger) (*BinaryUpdateInfo, error) {
 	ctx, span := observability.StartSpan(ctx, "binary", string(binary))
 	defer span.End()
 	slogger = slogger.With("binary", string(binary), "update_channel", channel, "pinned_version", pinnedVersion)
@@ -213,7 +224,7 @@ func CheckOutLatest(ctx context.Context, binary autoupdatableBinary, rootDirecto
 		updateDirectory = DefaultLibraryDirectory(rootDirectory)
 	}
 
-	update, err := findExecutable(ctx, binary, LocalTufDirectory(rootDirectory), pinnedVersion, channel, updateDirectory, slogger)
+	update, err := findExecutable(ctx, binary, LocalTufDirectory(rootDirectory), pinnedVersion, channel, updateDirectory, trustedRootJson, slogger)
 	if err == nil {
 		span.AddEvent("found_latest")
 		slogger.Log(ctx, slog.LevelInfo,
@@ -236,23 +247,14 @@ func CheckOutLatest(ctx context.Context, binary autoupdatableBinary, rootDirecto
 
 // findExecutable looks at our local TUF repository to find the release for our
 // given channel. If it's already downloaded, then we return its path and version.
-func findExecutable(ctx context.Context, binary autoupdatableBinary, tufRepositoryLocation string, pinnedVersion string, channel string, baseUpdateDirectory string, slogger *slog.Logger) (*BinaryUpdateInfo, error) {
+func findExecutable(ctx context.Context, binary autoupdatableBinary, tufRepositoryLocation string, pinnedVersion string, channel string, baseUpdateDirectory string, trustedRootJson []byte, slogger *slog.Logger) (*BinaryUpdateInfo, error) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
-	// Initialize a read-only TUF metadata client to parse the data we already have downloaded about releases.
-	metadataClient, err := readOnlyTufMetadataClient(tufRepositoryLocation)
+	// Use the TUF target data we already have downloaded and validated
+	targets, err := targetsFromLocalTufMetadata(tufRepositoryLocation, trustedRootJson)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize TUF client, cannot find release: %w", err)
-	}
-
-	// From already-downloaded metadata, look for the release version
-	targets, err := metadataClient.Targets()
-	if err != nil {
-		return nil, fmt.Errorf("could not get targets: %w", err)
-	}
-	if len(targets) == 0 {
-		return nil, errors.New("no local TUF metadata available -- likely new install")
 	}
 
 	targetName, _, err := findTarget(ctx, binary, targets, pinnedVersion, channel, slogger)
@@ -274,6 +276,39 @@ func findExecutable(ctx context.Context, binary autoupdatableBinary, tufReposito
 		Path:    targetPath,
 		Version: trimVersionString(targetVersion),
 	}, nil
+}
+
+// targetsFromLocalTufMetadata reads the trusted TUF metadata at the given location
+// and returns the current targets.
+func targetsFromLocalTufMetadata(tufRepositoryLocation string, trustedRootJson []byte) (map[string]*metadata.TargetFiles, error) {
+	if _, err := os.Stat(tufRepositoryLocation); os.IsNotExist(err) {
+		return nil, fmt.Errorf("local TUF dir doesn't exist, cannot create read-only client: %w", err)
+	}
+
+	// Config initialization requires that we pass in a TUF server, even if we aren't going
+	// to use it. Pass in the default; setting UnsafeLocalMode below will prevent us from using it.
+	cfg, err := config.New(launcher.DefaultTufServer, trustedRootJson)
+	if err != nil {
+		return nil, fmt.Errorf("creating go-tuf/v2 config: %w", err)
+	}
+	cfg.LocalMetadataDir = tufRepositoryLocation
+	cfg.LocalTargetsDir = tufRepositoryLocation
+	cfg.PrefixTargetsWithHash = false // our mirror does not prefix target filenames with their hash
+
+	// Set UnsafeLocalMode so that we load our metadata from the disk location only,
+	// not via remote call.
+	cfg.UnsafeLocalMode = true
+
+	up, err := updater.New(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("creating go-tuf/v2 local-only updater: %w", err)
+	}
+
+	if err := up.Refresh(); err != nil {
+		return nil, fmt.Errorf("refreshing go-tuf/v2 local-only updater: %w", err)
+	}
+
+	return up.GetTopLevelTargets(), nil
 }
 
 // mostRecentVersion returns the path to the most recent, valid version available in the library for the
