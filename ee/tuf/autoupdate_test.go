@@ -295,7 +295,8 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 	mockLibraryManager.On("TidyLibrary", binaryOsqueryd, mock.Anything).Return().Once()
 
 	// Expect that we attempt to update the library
-	mockLibraryManager.On("Available", binaryOsqueryd, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion)).Return(false)
+	mockLibraryManager.On("Available", binaryOsqueryd, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion)).Return(false).Once()
+	mockLibraryManager.On("Available", binaryOsqueryd, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion)).Return(true).Maybe()
 	mockLibraryManager.On("Available", binaryLauncher, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion)).Return(true)
 	mockLibraryManager.On("AddToLibrary", binaryOsqueryd, tufci.OlderBinaryVersion, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion), osquerydMetadata).Return(nil)
 
