@@ -28,6 +28,7 @@ import (
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/kolide/launcher/v2/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/v2/pkg/threadsafebuffer"
+	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/theupdateframework/go-tuf/data"
@@ -303,27 +304,15 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 	go func() {
 		executeDone <- autoupdater.Execute()
 	}()
-	time.Sleep(2 * autoupdater.osqueryTimeout)
+
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		// Check log lines to confirm that we see the log `restarted binary after update`, indicating that
+		// we restarted osqueryd
+		require.Containsf(c, logBytes.String(), "restarted binary after update", "logs missing restart: %s", logBytes.String())
+	}, 2*autoupdater.osqueryTimeout, 250*time.Millisecond)
 
 	// Assert expectation that we added the expected `testReleaseVersion` to the updates library
 	mockLibraryManager.AssertExpectations(t)
-
-	// Check log lines to confirm that we see the log `restarted binary after update`, indicating that
-	// we restarted osqueryd
-	logLines := strings.Split(strings.TrimSpace(logBytes.String()), "\n")
-
-	// We expect at least 1 log for the restart line.
-	require.GreaterOrEqual(t, len(logLines), 1)
-
-	// Check that we restarted osqueryd
-	restartFound := false
-	for _, logLine := range logLines {
-		if strings.Contains(logLine, "restarted binary after update") {
-			restartFound = true
-			break
-		}
-	}
-	require.True(t, restartFound, fmt.Sprintf("logs missing restart: %s", strings.Join(logLines, "\n")))
 
 	// The autoupdater won't stop after an osqueryd download, so interrupt it and let it shut down
 	autoupdater.Interrupt(errors.New("test error"))
