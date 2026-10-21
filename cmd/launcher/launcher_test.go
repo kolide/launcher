@@ -4,6 +4,8 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"runtime/pprof"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -105,6 +107,11 @@ func Test_runLauncher(t *testing.T) {
 				t.Error("runLauncher did not return within interrupt timeout", "elapsed", time.Since(start))
 				t.Log(logBytes.String())
 				t.Log("end of captured logs, waiting until runLauncher returns")
+				_, _ = logBytes.Write([]byte("--- interrupt timeout ---\n"))
+				var stacks strings.Builder
+				_ = pprof.Lookup("goroutine").WriteTo(&stacks, 1)
+				t.Log(stacks.String())
+				t.Log("End of captured logs, waiting until runLauncher returns")
 				<-runLauncherErr // do not leak the runtime and affect other tests
 				t.Log("launcher finally exited", "duration", time.Since(start))
 			}
