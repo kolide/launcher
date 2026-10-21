@@ -78,7 +78,7 @@ func Test_runLauncher(t *testing.T) {
 			// launcher should run successfully, not immediately return an error.
 			select {
 			case err := <-runLauncherErr:
-				t.Errorf("runLauncher did not start up successfully: returned %v", err)
+				t.Fatalf("runLauncher did not start up successfully: returned %v", err)
 			case <-time.After(tt.startupDuration):
 				// launcher started up and stayed up
 			}
@@ -90,6 +90,7 @@ func Test_runLauncher(t *testing.T) {
 				// launcher shut down successfully
 			case <-time.After(rungroup.InterruptTimeout):
 				t.Error("runLauncher did not return within interrupt timeout")
+				<-runLauncherErr // took too long, do not leak the runtime
 			}
 		})
 	}
