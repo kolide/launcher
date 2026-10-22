@@ -65,8 +65,35 @@ func writeFilteredCaCerts(directory string, source string, pemBundle []byte) (st
 		return "", fmt.Errorf("checking for existing CA certs file: %w", err)
 	}
 
-	if err := os.WriteFile(caFile, filtered, 0444); err != nil {
-		return "", fmt.Errorf("writing CA certs file: %w", err)
+	// We write to a temp file and then rename it in place, in case this call is
+	// racing with a call from another osquery instance. (This is currently
+	// only an issue in tests.)
+	tmpFile, err := os.CreateTemp(directory, "ca-certs-*.tmp")
+	if err != nil {
+		return "", fmt.Errorf("creating temp CA certs file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+	defer os.Remove(tmpPath) // no-op once the rename succeeds
+
+	if _, err := tmpFile.Write(filtered); err != nil {
+		tmpFile.Close()
+		return "", fmt.Errorf("writing temp CA certs file: %w", err)
+	}
+	if err := tmpFile.Chmod(0444); err != nil {
+		tmpFile.Close()
+		return "", fmt.Errorf("setting permissions on temp CA certs file: %w", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		return "", fmt.Errorf("closing temp CA certs file: %w", err)
+	}
+
+	if err := os.Rename(tmpPath, caFile); err != nil {
+		// A concurrent caller may have already published an identical file -- the name is
+		// derived from the content, so if it exists now, it is the file we wanted.
+		if _, statErr := os.Stat(caFile); statErr == nil {
+			return caFile, nil
+		}
+		return "", fmt.Errorf("renaming temp CA certs file into place: %w", err)
 	}
 
 	return caFile, nil
