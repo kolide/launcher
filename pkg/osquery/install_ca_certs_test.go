@@ -2,8 +2,13 @@ package osquery
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/pem"
+	"math/big"
 	"os"
 	"testing"
 
@@ -92,6 +97,9 @@ func Test_filterCaCerts(t *testing.T) {
 	trusted := pemBlocks(defaultCaCerts)[:3]
 	require.Len(t, trusted, 3)
 
+	// Generated with a random key, so build it once to use in both the bundle and the expected output.
+	sameSubjectNewKey := sameSubjectNewKeyCert(t, emSignRootCsG3)
+
 	for _, tt := range []struct {
 		name     string
 		bundle   string
@@ -132,6 +140,26 @@ func Test_filterCaCerts(t *testing.T) {
 			bundle:   trusted[0] + "-----BEGIN NOT A CERT-----\nAAAA\n-----END NOT A CERT-----\n" + emSignEccRootG3,
 			expected: trusted[0] + "-----BEGIN NOT A CERT-----\nAAAA\n-----END NOT A CERT-----\n",
 		},
+		{
+			name:     "unparseable certificate blocks are preserved",
+			bundle:   trusted[0] + "-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n" + emSignEccRootG3,
+			expected: trusted[0] + "-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n",
+		},
+		{
+			name:     "re-issued root with the same key but different serial and validity is removed",
+			bundle:   trusted[0] + reissuedCert(t, emSignEccRootG3) + trusted[1],
+			expected: trusted[0] + trusted[1],
+		},
+		{
+			name:     "cross-certificate for a distrusted key is removed",
+			bundle:   trusted[0] + crossCert(t, emSignRootTlsG3) + trusted[1],
+			expected: trusted[0] + trusted[1],
+		},
+		{
+			name:     "certificate with a distrusted subject but a different key is preserved",
+			bundle:   trusted[0] + sameSubjectNewKey + trusted[1],
+			expected: trusted[0] + sameSubjectNewKey + trusted[1],
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -147,6 +175,89 @@ func Test_filterCaCerts_EmbeddedBundleIsClean(t *testing.T) {
 	t.Parallel()
 
 	require.True(t, bytes.Equal(defaultCaCerts, filterCaCerts(defaultCaCerts)), "embedded bundle should not contain distrusted certs")
+}
+
+// parseCert parses a single PEM-encoded certificate.
+func parseCert(t *testing.T, pemCert string) *x509.Certificate {
+	block, _ := pem.Decode([]byte(pemCert))
+	require.NotNil(t, block, "decoding PEM")
+	cert, err := x509.ParseCertificate(block.Bytes)
+	require.NoError(t, err, "parsing certificate")
+	return cert
+}
+
+// testSigningKey returns a throwaway key for signing test certificates. The resulting signatures
+// will not verify against the embedded public key, but filterCaCerts does not check signatures,
+// and neither does a system trust store when deciding whether to hand us a root.
+func testSigningKey(t *testing.T) *ecdsa.PrivateKey {
+	key, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+	require.NoError(t, err, "generating signing key")
+	return key
+}
+
+// encodeCert builds a certificate from template, embedding pub as its public key, and returns it
+// PEM-encoded. If issuer is nil, the certificate is self-issued.
+func encodeCert(t *testing.T, template *x509.Certificate, issuer *x509.Certificate, pub any) string {
+	if issuer == nil {
+		issuer = template
+	}
+	der, err := x509.CreateCertificate(rand.Reader, template, issuer, pub, testSigningKey(t))
+	require.NoError(t, err, "creating certificate")
+	return string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}))
+}
+
+// reissuedCert returns a self-issued certificate with the same subject and public key as
+// original, but a different serial number and validity period -- the shape of a root that a
+// CA re-issues to extend its lifetime.
+func reissuedCert(t *testing.T, original string) string {
+	orig := parseCert(t, original)
+	template := &x509.Certificate{
+		SerialNumber:          big.NewInt(0xdecaf),
+		Subject:               orig.Subject,
+		NotBefore:             orig.NotBefore.AddDate(5, 0, 0),
+		NotAfter:              orig.NotAfter.AddDate(5, 0, 0),
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+	}
+	return encodeCert(t, template, nil, orig.PublicKey)
+}
+
+// crossCert returns a certificate for original's subject and public key, issued by a different,
+// unrelated CA -- the shape of a cross-signed root.
+func crossCert(t *testing.T, original string) string {
+	orig := parseCert(t, original)
+	issuer := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "Some Other Root CA"},
+	}
+	template := &x509.Certificate{
+		SerialNumber:          big.NewInt(0xc0ffee),
+		Subject:               orig.Subject,
+		NotBefore:             orig.NotBefore,
+		NotAfter:              orig.NotAfter,
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+	}
+	return encodeCert(t, template, issuer, orig.PublicKey)
+}
+
+// sameSubjectNewKeyCert returns a self-issued certificate with the same subject and validity as
+// original but a freshly generated key. It must not be filtered: only the key is distrusted, not
+// the name.
+func sameSubjectNewKeyCert(t *testing.T, original string) string {
+	orig := parseCert(t, original)
+	template := &x509.Certificate{
+		SerialNumber:          orig.SerialNumber,
+		Subject:               orig.Subject,
+		NotBefore:             orig.NotBefore,
+		NotAfter:              orig.NotAfter,
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+	}
+	return encodeCert(t, template, nil, &testSigningKey(t).PublicKey)
 }
 
 // pemBlocks splits bundle into its PEM-encoded blocks, re-encoded without surrounding text.
