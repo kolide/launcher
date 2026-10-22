@@ -1,6 +1,7 @@
 package osquery
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"crypto/x509"
@@ -76,9 +77,18 @@ func writeFilteredCaCerts(directory string, source string, pemBundle []byte) (st
 	filtered := filterCaCerts(pemBundle)
 	caFile := filepath.Join(directory, fmt.Sprintf("ca-certs-%s-%x.crt", source, sha256.Sum256(filtered)))
 
-	if _, err := os.Stat(caFile); err == nil {
+	// Reuse an existing file only if its contents are byte-for-byte what we would write.
+	existing, err := os.ReadFile(caFile)
+	switch {
+	case err == nil && bytes.Equal(existing, filtered):
 		return caFile, nil
-	} else if !os.IsNotExist(err) {
+	case err == nil:
+		// Removing first (rather than renaming over it) handles Windows, where a rename onto a
+		// read-only file fails; os.Remove clears the read-only attribute there.
+		if err := os.Remove(caFile); err != nil {
+			return "", fmt.Errorf("removing CA certs file with unexpected contents: %w", err)
+		}
+	case !os.IsNotExist(err):
 		return "", fmt.Errorf("checking for existing CA certs file: %w", err)
 	}
 
@@ -106,8 +116,9 @@ func writeFilteredCaCerts(directory string, source string, pemBundle []byte) (st
 
 	if err := os.Rename(tmpPath, caFile); err != nil {
 		// A concurrent caller may have already published an identical file -- the name is
-		// derived from the content, so if it exists now, it is the file we wanted.
-		if _, statErr := os.Stat(caFile); statErr == nil {
+		// derived from the content, so if it exists now with the expected contents, it is
+		// the file we wanted.
+		if existing, readErr := os.ReadFile(caFile); readErr == nil && bytes.Equal(existing, filtered) {
 			return caFile, nil
 		}
 		return "", fmt.Errorf("renaming temp CA certs file into place: %w", err)

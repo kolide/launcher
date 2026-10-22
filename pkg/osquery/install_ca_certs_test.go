@@ -145,6 +145,56 @@ func TestInstallCaCerts(t *testing.T) {
 	}
 }
 
+func Test_writeFilteredCaCerts_ExistingFile(t *testing.T) {
+	t.Parallel()
+
+	bundle := []byte(emSignEccRootG3 + aaaCertificateServices)
+
+	for _, tt := range []struct {
+		name             string
+		existingContents []byte
+	}{
+		{
+			name:             "matching contents are reused",
+			existingContents: filterCaCerts(bundle),
+		},
+		{
+			name:             "unexpected contents are replaced",
+			existingContents: []byte(emDvTlsCaG3bAaa),
+		},
+		{
+			name:             "empty file is replaced",
+			existingContents: []byte{},
+		},
+	} {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tempDir := t.TempDir()
+
+			// Establish the expected path, then plant tt.existingContents under that name.
+			caFile, err := writeFilteredCaCerts(tempDir, "test", bundle)
+			require.NoError(t, err)
+			require.NoError(t, os.Chmod(caFile, 0644), "making planted file writable")
+			require.NoError(t, os.WriteFile(caFile, tt.existingContents, 0644))
+			require.NoError(t, os.Chmod(caFile, 0444), "restoring read-only mode on planted file")
+
+			gotPath, err := writeFilteredCaCerts(tempDir, "test", bundle)
+			require.NoError(t, err)
+			require.Equal(t, caFile, gotPath, "path should be stable regardless of what was already there")
+
+			got, err := os.ReadFile(gotPath)
+			require.NoError(t, err)
+			require.Equal(t, filterCaCerts(bundle), got, "file should contain exactly the filtered bundle")
+
+			info, err := os.Stat(gotPath)
+			require.NoError(t, err)
+			require.Equal(t, os.FileMode(0444), info.Mode().Perm(), "file should be read-only")
+		})
+	}
+}
+
 func Test_filterCaCerts(t *testing.T) {
 	t.Parallel()
 
