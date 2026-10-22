@@ -1,5 +1,3 @@
-//go:build !linux
-
 package interactive
 
 import (
@@ -97,7 +95,7 @@ func TestProc(t *testing.T) {
 		},
 	}
 
-	if runtime.GOOS != "windows" {
+	if runtime.GOOS == "darwin" {
 		tests = append(tests, testCase{
 			name:    "socket path too long, the name of the test causes the socket path to be to long to be created, resulting in timeout waiting for the socket",
 			tooLong: true,
