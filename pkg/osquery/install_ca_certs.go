@@ -21,31 +21,38 @@ import (
 //go:embed ca-bundle.crt
 var defaultCaCerts []byte
 
-// CA certificates that must never be handed to osquery, even when the system trust store still
-// contains them. osquery does not check revocation, so a compromised chain that remains in the
-// system store is accepted unless we remove its root here. Note that we do not use the remote
-// feature of osquery (https://osquery.readthedocs.io/en/latest/deployment/remote/); the usage
-// of these certs for us is limited to e.g. the `curl` table.
+// distrustedCaKeyHashes lists SHA-256 hashes of the SubjectPublicKeyInfo of each CA key that must
+// never be handed to osquery, even when the system trust store still contains a certificate for
+// it. osquery does not check revocation, so a compromised chain that remains in the system store
+// is accepted unless we remove it here. Note that we do not use the remote feature of osquery
+// (https://osquery.readthedocs.io/en/latest/deployment/remote/); the usage of these certs for us
+// is limited to e.g. the `curl` table.
 //
-// All three roots issued or cross-signed the eight eMudhra intermediates whose private keys
-// were disclosed on 2026-10-17. See https://emudhra.we-have-a-problem.com/; whole-certificate
-// fingerprints and SPKI hashes retrieved from https://emudhra.we-have-a-problem.com/roots.json.
-var (
-	// distrustedCaKeyHashes lists SHA-256 hashes of the SubjectPublicKeyInfo of each distrusted root.
-	distrustedCaKeyHashes = map[string]string{
-		"8d417db2dd8bf5e3084d1e3f196d583849d81bdd4c00c70b9d39369e96b8c782": "emSign ECC Root CA - G3",
-		"c619e4780ed8e0abeda24ad732567de4383a7ea941338f6d1a7d1b49ac792fe9": "emSign Root TLS CA - G3",
-		"0a6c2b2ca5b364207954171987ac9d2178561569d8205457e77ca90c32ede282": "emSign Root CS CA - G3",
-	}
-
-	// distrustedCaCertFingerprints lists SHA-256 fingerprints of the full DER encoding of each
-	// distrusted root.
-	distrustedCaCertFingerprints = map[string]string{
-		"86a1ecba089c4a8d3bbe2734c612ba341d813e043cf9e8a862cd5c57a36bbe6b": "emSign ECC Root CA - G3",
-		"7dd78d5f4f13459a83dff9abbba62edbaf6f2d102bf257fd712f4d9f2746ed8d": "emSign Root TLS CA - G3",
-		"f2edaaff3d9b701fb4d14c9f285f8c0bad90fc3bcc1fa07d47f4718edaba34a5": "emSign Root CS CA - G3",
-	}
-)
+// The private keys of eight eMudhra intermediates were disclosed on 2026-10-17. Each intermediate
+// exists as two certificates sharing one key: one issued by an emSign root and one cross-signed by
+// Sectigo's AAA Certificate Services. The four roots and eight intermediate keys below are taken
+// from https://emudhra.we-have-a-problem.com/roots.json and https://emudhra.we-have-a-problem.com/impacted-intermediates.json.
+//
+// Matching on the key rather than on the whole certificate catches re-issued roots, cross-signs,
+// and alternate encodings, none of which share a whole-certificate fingerprint with the original.
+// The intermediates are listed as well as the roots because on Windows we export the CA store,
+// which holds intermediates, and osquery treats every certificate in its bundle as a trust anchor.
+var distrustedCaKeyHashes = map[string]string{
+	// Roots
+	"8d417db2dd8bf5e3084d1e3f196d583849d81bdd4c00c70b9d39369e96b8c782": "emSign ECC Root CA - G3",
+	"c619e4780ed8e0abeda24ad732567de4383a7ea941338f6d1a7d1b49ac792fe9": "emSign Root TLS CA - G3",
+	"0a6c2b2ca5b364207954171987ac9d2178561569d8205457e77ca90c32ede282": "emSign Root CS CA - G3",
+	"bd153ed7b0434f6886b17bce8bbe84ed340c7132d702a8f4fa318f756ecbd6f3": "AAA Certificate Services",
+	// Intermediates
+	"ebed6475c2c2d80fcb199f3fe8dd6e6b3ce60b77eb15d4e42c3dec0c6f5b5105": "EM DV TLS CA - G3B",
+	"43bffa19d6ef651451f6841e019931e96f6f2eaeff28ab4b6f1ce4576de2717b": "EM OV TLS CA - G3B",
+	"e0254c7fcdc265e2f0f8a428dabb75ab4ae039b4872d62f5ee57f0877d5a8a41": "EM EV TLS CA - G3B",
+	"49dd353dc2b919a3770645117d0e60c16115e7d1bc259eefe734b00ea434fe5f": "EM DV TLS CA - G3C",
+	"63ecefee431d49523bc1136c4e72d0206a477086caf606cd5cf025686c109cf8": "EM OV TLS CA - G3C",
+	"5c0660a2b164910d8ff589c18e14552e9e0ec237dcefe2cb736d41a4811f81a0": "EM EV TLS CA - G3C",
+	"ec4ffa1ad0ac88081314b7aaffef6a91f97cd57291bb5ba686c5415f5eb4f6b6": "EM OV CS CA - G3B",
+	"92c063d67e8f14db71d288e11266ffdaf69cbf115f7bab14f3bc2f68d25e0e30": "EM OV CS CA - G3C",
+}
 
 // InstallCaCerts returns the path to CA certificates for osquery. It prefers the system CA
 // bundle over the embedded one so that customers can supply their own CAs. Either way, the
@@ -143,7 +150,7 @@ func filterCaCerts(pemBundle []byte) []byte {
 
 // leadingCertificate returns the first ASN.1 element in der, dropping anything after it. For a
 // plain certificate this is the whole input; for a TRUSTED CERTIFICATE it strips the trailing
-// trust settings so that the certificate can be fingerprinted and parsed. If der does not start
+// trust settings so that the certificate can be parsed. If der does not start
 // with a well-formed ASN.1 element, it is returned unchanged.
 func leadingCertificate(der []byte) []byte {
 	var raw asn1.RawValue
@@ -154,24 +161,11 @@ func leadingCertificate(der []byte) []byte {
 }
 
 // isDistrustedCaCert reports whether the DER-encoded certificate is one we must not hand to
-// osquery. A certificate is distrusted if either its whole-certificate fingerprint is in
-// distrustedCaCertFingerprints or its public key is in distrustedCaKeyHashes.
-//
-// Matching on the key catches re-issued roots with the same key but a different serial number
-// or validity period, cross-certificates for the same key, and alternate encodings of the same
-// certificate, none of which share a whole-certificate fingerprint with the original. This
-// is a more thorough check, but requires parsing the certificate -- which might not always be
-// possible. Therefore, first we check the fingerprint against `distrustedCaCertFingerprints`,
-// prior to attempting to parse.
+// osquery, i.e. whether its public key is in distrustedCaKeyHashes.
 func isDistrustedCaCert(der []byte) bool {
-	// Check fingerprint first, since we don't have to parse the cert for that.
-	fingerprint := sha256.Sum256(der)
-	if _, distrusted := distrustedCaCertFingerprints[hex.EncodeToString(fingerprint[:])]; distrusted {
-		return true
-	}
-
 	// System bundles can contain legacy certs that Go's x509 package rejects (e.g. negative serial
-	// numbers). Those cannot be matched by key, so we rely on the whole-cert check above for them.
+	// numbers). Those cannot be matched by key, so they are passed through. All of the distrusted
+	// certificates parse cleanly.
 	cert, err := x509.ParseCertificate(der)
 	if err != nil {
 		return false
