@@ -185,7 +185,7 @@ select * from time;
 
 			// Make sure the process starts in a timely fashion
 			var proc *os.Process
-			startErr := make(chan error)
+			startErr := make(chan error, 1)
 			startTime := time.Now()
 			go func() {
 				proc, _, err = StartProcess(mockSack, rootDir, inFile, outFile, errFile)
