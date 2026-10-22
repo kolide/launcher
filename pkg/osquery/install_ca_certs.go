@@ -23,15 +23,11 @@ var defaultCaCerts []byte
 
 // distrustedCaKeyHashes lists SHA-256 hashes of the SubjectPublicKeyInfo of each CA key that must
 // never be handed to osquery, even when the system trust store still contains a certificate for
-// it. osquery does not check revocation, so a compromised chain that remains in the system store
-// is accepted unless we remove it here. Note that we do not use the remote feature of osquery
-// (https://osquery.readthedocs.io/en/latest/deployment/remote/); the usage of these certs for us
-// is limited to e.g. the `curl` table.
+// it. Note that we do not use the remote feature of osquery (https://osquery.readthedocs.io/en/latest/deployment/remote/);
+// the usage of these certs for us is limited to e.g. the `curl` table.
 //
-// The private keys of eight eMudhra intermediates were disclosed on 2026-10-17. Each intermediate
-// exists as two certificates sharing one key: one issued by an emSign root and one cross-signed by
-// Sectigo's AAA Certificate Services. The four roots and eight intermediate keys below are taken
-// from https://emudhra.we-have-a-problem.com/roots.json and https://emudhra.we-have-a-problem.com/impacted-intermediates.json.
+// The four roots and eight intermediate keys below are taken from https://emudhra.we-have-a-problem.com/roots.json
+// and https://emudhra.we-have-a-problem.com/impacted-intermediates.json.
 //
 // Matching on the key rather than on the whole certificate catches re-issued roots, cross-signs,
 // and alternate encodings, none of which share a whole-certificate fingerprint with the original.
