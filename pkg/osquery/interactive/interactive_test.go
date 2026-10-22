@@ -27,9 +27,16 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	// ioCompletionProcessor will continue to run forever until the process (go test in this case) exits,
-	// so we need goleak to ignore that one.
-	goleak.VerifyTestMain(m, goleak.IgnoreAnyFunction("github.com/Microsoft/go-winio.ioCompletionProcessor"))
+	goleak.VerifyTestMain(m,
+		// ioCompletionProcessor will continue to run forever until the process (go test in this case) exits,
+		// so we need goleak to ignore that one.
+		goleak.IgnoreAnyFunction("github.com/Microsoft/go-winio.ioCompletionProcessor"),
+		// The extension management server can block on sending an error from the thrift server returning.
+		goleak.IgnoreAnyFunction("github.com/osquery/osquery-go.(*ExtensionManagerServer).Run.func1"),
+		// The extension management server can be waiting to send a healthcheck error over the channel
+		// when we already yielded.
+		goleak.IgnoreAnyFunction("github.com/osquery/osquery-go.(*ExtensionManagerServer).Run.func2"),
+	)
 }
 
 var testOsqueryBinary string
