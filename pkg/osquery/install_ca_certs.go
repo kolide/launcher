@@ -49,7 +49,9 @@ var (
 
 // InstallCaCerts returns the path to CA certificates for osquery. It prefers the system CA
 // bundle over the embedded one so that customers can supply their own CAs. Either way, the
-// bundle is written out with distrusted roots removed.
+// bundle is written out with distrusted roots removed. Because the filtered bundle is a copy
+// taken when osquery starts, any CAs added to the system bundle afterward will not be picked
+// up until osquery restarts.
 func InstallCaCerts(directory string, slogger *slog.Logger) (string, error) {
 	systemCaCerts, err := readSystemCaCerts(slogger)
 	if err == nil {
