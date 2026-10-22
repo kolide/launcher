@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	_ "embed"
+	"encoding/asn1"
 	"encoding/hex"
 	"encoding/pem"
 	"fmt"
@@ -110,8 +111,14 @@ func writeFilteredCaCerts(directory string, source string, pemBundle []byte) (st
 	return caFile, nil
 }
 
+var certificatePemTypes = map[string]struct{}{
+	"CERTIFICATE":         {},
+	"X509 CERTIFICATE":    {},
+	"TRUSTED CERTIFICATE": {},
+}
+
 // filterCaCerts returns pemBundle with any distrusted certificates removed. Everything else,
-// including non-certificate PEM blocks and any text between blocks, is passed through as-is.
+// including non-certificate PEM blocks and any text between blocks, is passed through unchanged.
 func filterCaCerts(pemBundle []byte) []byte {
 	out := make([]byte, 0, len(pemBundle))
 	rest := pemBundle
@@ -124,12 +131,24 @@ func filterCaCerts(pemBundle []byte) []byte {
 
 		// pem.Decode skips any text preceding the block; consumed covers both that text and the block.
 		consumed := rest[:len(rest)-len(remaining)]
-		if block.Type != "CERTIFICATE" || !isDistrustedCaCert(block.Bytes) {
+		if _, isCert := certificatePemTypes[block.Type]; !isCert || !isDistrustedCaCert(leadingCertificate(block.Bytes)) {
 			out = append(out, consumed...)
 		}
 
 		rest = remaining
 	}
+}
+
+// leadingCertificate returns the first ASN.1 element in der, dropping anything after it. For a
+// plain certificate this is the whole input; for a TRUSTED CERTIFICATE it strips the trailing
+// trust settings so that the certificate can be fingerprinted and parsed. If der does not start
+// with a well-formed ASN.1 element, it is returned unchanged.
+func leadingCertificate(der []byte) []byte {
+	var raw asn1.RawValue
+	if _, err := asn1.Unmarshal(der, &raw); err != nil {
+		return der
+	}
+	return raw.FullBytes
 }
 
 // isDistrustedCaCert reports whether the DER-encoded certificate is one we must not hand to

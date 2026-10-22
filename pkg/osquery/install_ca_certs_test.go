@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/asn1"
 	"encoding/pem"
 	"math/big"
 	"os"
@@ -160,6 +161,36 @@ func Test_filterCaCerts(t *testing.T) {
 			bundle:   trusted[0] + sameSubjectNewKey + trusted[1],
 			expected: trusted[0] + sameSubjectNewKey + trusted[1],
 		},
+		{
+			name:     "distrusted TRUSTED CERTIFICATE block is removed",
+			bundle:   trusted[0] + trustedCertBlock(t, emSignEccRootG3) + trusted[1],
+			expected: trusted[0] + trusted[1],
+		},
+		{
+			name:     "distrusted TRUSTED CERTIFICATE block with no trust settings is removed",
+			bundle:   trusted[0] + retypedBlock(t, "TRUSTED CERTIFICATE", emSignRootTlsG3) + trusted[1],
+			expected: trusted[0] + trusted[1],
+		},
+		{
+			name:     "distrusted X509 CERTIFICATE block is removed",
+			bundle:   trusted[0] + retypedBlock(t, "X509 CERTIFICATE", emSignRootCsG3) + trusted[1],
+			expected: trusted[0] + trusted[1],
+		},
+		{
+			name:     "trusted TRUSTED CERTIFICATE block is preserved",
+			bundle:   trustedCertBlock(t, trusted[0]) + emSignEccRootG3 + trusted[1],
+			expected: trustedCertBlock(t, trusted[0]) + trusted[1],
+		},
+		{
+			name:     "trusted X509 CERTIFICATE block is preserved",
+			bundle:   retypedBlock(t, "X509 CERTIFICATE", trusted[0]) + emSignEccRootG3,
+			expected: retypedBlock(t, "X509 CERTIFICATE", trusted[0]),
+		},
+		{
+			name:     "TRUSTED CERTIFICATE block with unparseable contents is preserved",
+			bundle:   trusted[0] + "-----BEGIN TRUSTED CERTIFICATE-----\nAAAA\n-----END TRUSTED CERTIFICATE-----\n" + emSignEccRootG3,
+			expected: trusted[0] + "-----BEGIN TRUSTED CERTIFICATE-----\nAAAA\n-----END TRUSTED CERTIFICATE-----\n",
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -258,6 +289,34 @@ func sameSubjectNewKeyCert(t *testing.T, original string) string {
 		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
 	}
 	return encodeCert(t, template, nil, &testSigningKey(t).PublicKey)
+}
+
+// retypedBlock re-encodes the single PEM block in pemCert with the given block type, leaving the
+// contents unchanged.
+func retypedBlock(t *testing.T, blockType string, pemCert string) string {
+	block, _ := pem.Decode([]byte(pemCert))
+	require.NotNil(t, block, "decoding PEM")
+	return string(pem.EncodeToMemory(&pem.Block{Type: blockType, Bytes: block.Bytes}))
+}
+
+// trustedCertBlock returns pemCert as an OpenSSL TRUSTED CERTIFICATE block: the certificate DER
+// followed by X509_CERT_AUX trust settings, as written by `openssl x509 -trustout -addtrust
+// serverAuth -setalias ...`.
+func trustedCertBlock(t *testing.T, pemCert string) string {
+	block, _ := pem.Decode([]byte(pemCert))
+	require.NotNil(t, block, "decoding PEM")
+
+	// X509_CERT_AUX ::= SEQUENCE { trust SEQUENCE OF OBJECT IDENTIFIER OPTIONAL, ..., alias UTF8String OPTIONAL, ... }
+	aux, err := asn1.Marshal(struct {
+		Trust []asn1.ObjectIdentifier
+		Alias string `asn1:"utf8"`
+	}{
+		Trust: []asn1.ObjectIdentifier{{1, 3, 6, 1, 5, 5, 7, 3, 1}}, // id-kp-serverAuth
+		Alias: "test alias",
+	})
+	require.NoError(t, err, "marshalling X509_CERT_AUX")
+
+	return string(pem.EncodeToMemory(&pem.Block{Type: "TRUSTED CERTIFICATE", Bytes: append(block.Bytes, aux...)}))
 }
 
 // pemBlocks splits bundle into its PEM-encoded blocks, re-encoded without surrounding text.
