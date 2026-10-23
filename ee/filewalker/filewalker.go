@@ -11,14 +11,13 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
-	"sync"
 	"time"
 
 	"github.com/kolide/launcher/v2/ee/agent/types"
 	"github.com/kolide/launcher/v2/ee/observability"
 )
 
-// filewalker performs filewalks at the configured interval, storing results in its resultsStore.
+// filewalker stores a configured walk definition and where the results go
 type filewalker struct {
 	// Configuration
 	name           string
@@ -30,12 +29,7 @@ type filewalker struct {
 
 	// Internals
 	slogger      *slog.Logger
-	ticker       *time.Ticker
-	walkLock     *sync.Mutex
 	resultsStore types.GetterSetterDeleter
-
-	// Handle shutdown
-	interrupt chan struct{}
 }
 
 func newFilewalker(name string, cfg filewalkConfig, resultsStore types.GetterSetterDeleter, slogger *slog.Logger) *filewalker {
@@ -43,9 +37,7 @@ func newFilewalker(name string, cfg filewalkConfig, resultsStore types.GetterSet
 		name:         name,
 		walkInterval: time.Duration(cfg.WalkInterval),
 		slogger:      slogger.With("filewalker_name", name),
-		walkLock:     &sync.Mutex{},
 		resultsStore: resultsStore,
-		interrupt:    make(chan struct{}, 10), // We have a buffer so we don't block on sending to this channel
 	}
 
 	// Set config options from cfg
@@ -54,58 +46,7 @@ func newFilewalker(name string, cfg filewalkConfig, resultsStore types.GetterSet
 	return fw
 }
 
-// Work executes filewalks on the given interval, until interrupted via Stop.
-func (f *filewalker) Work() {
-	f.ticker = time.NewTicker(f.walkInterval)
-	defer f.ticker.Stop()
-
-	f.slogger.Log(context.TODO(), slog.LevelDebug,
-		"starting up",
-		"walk_interval", f.walkInterval.String(),
-	)
-
-	for {
-		f.Filewalk(context.TODO())
-
-		select {
-		case <-f.interrupt:
-			f.slogger.Log(context.TODO(), slog.LevelDebug,
-				"received external interrupt, stopping",
-			)
-			return
-		case <-f.ticker.C:
-			continue
-		}
-	}
-}
-
-// Delete removes all results for a given filewalker from the resultsStore, and then stops the filewalker.
-func (f *filewalker) Delete() {
-	if err := f.resultsStore.Delete([]byte(f.name)); err != nil {
-		f.slogger.Log(context.TODO(), slog.LevelWarn,
-			"could not remove stored results for filewalk during delete",
-			"err", err,
-		)
-	} else {
-		f.slogger.Log(context.TODO(), slog.LevelInfo,
-			"removed stored results for filewalk",
-		)
-	}
-	f.Stop()
-}
-
-func (f *filewalker) Stop() {
-	f.interrupt <- struct{}{}
-}
-
 func (f *filewalker) UpdateConfig(newCfg filewalkConfig) {
-	f.walkLock.Lock()
-	defer f.walkLock.Unlock()
-
-	// Update walk interval first, updating ticker if it exists
-	if time.Duration(newCfg.WalkInterval) != f.walkInterval && f.ticker != nil {
-		f.ticker.Reset(time.Duration(newCfg.WalkInterval))
-	}
 	f.walkInterval = time.Duration(newCfg.WalkInterval)
 
 	// Extract root dirs and filename regex from cfg -- applying base options first, and then overlays
@@ -157,15 +98,11 @@ func overlayFiltersMatch(overlayFilters map[string]string) bool {
 	return false
 }
 
-// Filewalk executes a filewalk with the configured settings, and then stores the results and walk time.
+// Filewalk executes a filewalk with the configured settings, and then stores the results and walk time. Context
+// is respected and interrupts walks and result storage.
 func (f *filewalker) Filewalk(ctx context.Context) {
 	ctx, span := observability.StartSpan(ctx, "filewalk_name", f.name)
 	defer span.End()
-
-	f.walkLock.Lock()
-	defer f.walkLock.Unlock()
-
-	span.AddEvent("walk_lock_acquired")
 
 	walkStart := time.Now()
 	fileNames := make([]string, 0)
@@ -198,6 +135,10 @@ func (f *filewalker) Filewalk(ctx context.Context) {
 					}
 					return nil
 				}
+				if ctx.Err() != nil {
+					f.slogger.Log(ctx, slog.LevelDebug, "file walk interrupted by context error")
+					return filepath.SkipAll
+				}
 
 				pathsWalked++
 
@@ -225,6 +166,9 @@ func (f *filewalker) Filewalk(ctx context.Context) {
 					"start_dir", match,
 					"err", err,
 				)
+			}
+			if ctx.Err() != nil {
+				return
 			}
 		}
 	}

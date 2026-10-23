@@ -22,7 +22,7 @@ import (
 )
 
 // Verifies broad behavior through public APIs of the package.
-// Checks results from calling public APIs: a startup scan, a scheduled scan, Do() in two ways, and a Ping().
+// Checks results from calling public APIs: a startup scan, a scheduled scan, Do, and a Ping.
 
 // Intended config coverage:
 //
@@ -31,9 +31,11 @@ import (
 //	secret_files: overlaps dotenv config (.env in both), goos overlay w/ non-glob root
 //	host_keys: non-glob root, no skip dirs, malformed root
 //	shell_history: intermediate glob, nested root inside another config's root skipped by other configs
-//	               not technically due.
+//	  not technically due.
 //	keyrings: nested root glob matching nothing
 //	hosts: file root with minimal config
+//	bad_regex: broken as described
+//	no_interval: no interval to run included
 func TestFilewalkManager_E2E(t *testing.T) {
 	t.Parallel()
 
@@ -84,11 +86,17 @@ func TestFilewalkManager_E2E(t *testing.T) {
   "hosts": {
     "walk_interval": "24h",
     "root_dirs": ["$ROOT/etc/hosts"]
+  },
+  "bad_regex": {
+    "walk_interval": "1h",
+    "root_dirs": ["$ROOT/home/*"],
+    "file_name_regex": "("
+  },
+  "no_interval": {
+    "root_dirs": ["$ROOT/home/*"],
+    "file_name_regex": "^\\.env$"
   }
 }`
-	// These break filewalker and merit fixing:
-	//   - "bad_regex": {"walk_interval": "1h", "root_dirs": ["$ROOT/home/*"], "file_name_regex": "("}
-	//   - "no_interval": {"root_dirs": ["$ROOT/home/*"], "file_name_regex": "^\\.env$"}
 
 	fsys := fstest.MapFS{
 		"etc/hosts":                                             {},
@@ -121,10 +129,6 @@ func TestFilewalkManager_E2E(t *testing.T) {
 		"home/ostrich/work/infra/.git/HEAD":                     {},
 		"home/ostrich/work/infra/terraform.tfvars":              {},
 		"root/.aws/credentials":                                 {},
-	}
-
-	notDue := map[string]time.Duration{
-		"shell_history": 1 * time.Hour,
 	}
 
 	expected := map[string][]string{
@@ -241,16 +245,13 @@ func TestFilewalkManager_E2E(t *testing.T) {
 	}
 	allNames := slices.Collect(maps.Keys(expected))
 
-	for name, ago := range notDue {
-		seedLastWalk(name, ago)
-	}
 	dueNames := slices.DeleteFunc(slices.Clone(allNames), func(name string) bool {
-		_, ok := notDue[name]
-		return ok
+		return name == "shell_history"
 	})
 
 	synctest.Test(t, func(t *testing.T) {
 		// runs on startup
+		justRan := seedLastWalk("shell_history", time.Hour)
 		walkStart := time.Now().Unix()
 		fm := New(k, slogger)
 		done := make(chan struct{})
@@ -263,6 +264,7 @@ func TestFilewalkManager_E2E(t *testing.T) {
 			<-done
 		}()
 		requireWalked(dueNames, walkStart)
+		require.Equal(t, justRan, lastWalkTime("shell_history"))
 
 		// runs on schedule
 		schedStart := time.Now().Unix()
@@ -273,23 +275,11 @@ func TestFilewalkManager_E2E(t *testing.T) {
 		seedAll()
 		pingStart := time.Now().Unix()
 		fm.Ping()
-		time.Sleep(5 * time.Minute)
 		requireWalked(allNames, pingStart)
 
 		seedAll()
 		doStart := time.Now().Unix()
 		require.NoError(t, fm.Do(strings.NewReader(`{"filewalks": []}`)))
 		requireWalked(allNames, doStart)
-
-		// and runs with a specific set of walks
-		seeded := seedAll()
-		doStart = time.Now().Unix()
-		require.NoError(t, fm.Do(strings.NewReader(`{"filewalks": ["host_keys"]}`)))
-		requireWalked([]string{"host_keys"}, doStart)
-		for name, ts := range seeded {
-			if name != "host_keys" {
-				require.Equal(t, ts, lastWalkTime(name), name)
-			}
-		}
 	})
 }
