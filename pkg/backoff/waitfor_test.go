@@ -1,6 +1,7 @@
 package backoff
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"testing/synctest"
@@ -84,4 +85,21 @@ func TestWaitFor(t *testing.T) {
 			})
 		})
 	}
+}
+
+func TestWaitForContextParentCancel(t *testing.T) {
+	t.Parallel()
+
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		time.AfterFunc(25*time.Millisecond, cancel)
+
+		start := time.Now()
+		err := WaitForContext(ctx, func(context.Context) error {
+			return errSentinel
+		}, time.Hour, 10*time.Millisecond)
+
+		require.ErrorIs(t, err, errSentinel)
+		require.Less(t, time.Since(start), time.Hour)
+	})
 }
