@@ -28,6 +28,7 @@ import (
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/kolide/launcher/v2/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/v2/pkg/threadsafebuffer"
+	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/theupdateframework/go-tuf/data"
@@ -294,37 +295,34 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 	mockLibraryManager.On("TidyLibrary", binaryOsqueryd, mock.Anything).Return().Once()
 
 	// Expect that we attempt to update the library
-	mockLibraryManager.On("Available", binaryOsqueryd, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion)).Return(false)
+	mockLibraryManager.On("Available", binaryOsqueryd, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion)).Return(false).Once()
+	mockLibraryManager.On("Available", binaryOsqueryd, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion)).Return(true).Maybe()
 	mockLibraryManager.On("Available", binaryLauncher, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion)).Return(true)
 	mockLibraryManager.On("AddToLibrary", binaryOsqueryd, tufci.OlderBinaryVersion, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion), osquerydMetadata).Return(nil)
 
 	// Let the autoupdater run for a bit
-	go autoupdater.Execute()
-	time.Sleep(2 * autoupdater.osqueryTimeout)
+	executeDone := make(chan error, 1)
+	go func() {
+		executeDone <- autoupdater.Execute()
+	}()
+
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		// Check log lines to confirm that we see the log `restarted binary after update`, indicating that
+		// we restarted osqueryd
+		require.Containsf(c, logBytes.String(), "restarted binary after update", "logs missing restart: %s", logBytes.String())
+	}, 2*autoupdater.osqueryTimeout, 250*time.Millisecond)
 
 	// Assert expectation that we added the expected `testReleaseVersion` to the updates library
 	mockLibraryManager.AssertExpectations(t)
 
-	// Check log lines to confirm that we see the log `restarted binary after update`, indicating that
-	// we restarted osqueryd
-	logLines := strings.Split(strings.TrimSpace(logBytes.String()), "\n")
-
-	// We expect at least 1 log for the restart line.
-	require.GreaterOrEqual(t, len(logLines), 1)
-
-	// Check that we restarted osqueryd
-	restartFound := false
-	for _, logLine := range logLines {
-		if strings.Contains(logLine, "restarted binary after update") {
-			restartFound = true
-			break
-		}
-	}
-	require.True(t, restartFound, fmt.Sprintf("logs missing restart: %s", strings.Join(logLines, "\n")))
-
 	// The autoupdater won't stop after an osqueryd download, so interrupt it and let it shut down
 	autoupdater.Interrupt(errors.New("test error"))
-	time.Sleep(100 * time.Millisecond)
+	select {
+	case err := <-executeDone:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("Execute did not exit after interrupt")
+	}
 
 	// Confirm we pulled all config items as expected
 	mockKnapsack.AssertExpectations(t)
@@ -410,12 +408,20 @@ func TestExecute_downgrade_osquery(t *testing.T) {
 	mockLibraryManager.On("Available", binaryLauncher, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion)).Return(true)
 
 	// Let the autoupdater run for a bit
-	go autoupdater.Execute()
+	executeDone := make(chan error, 1)
+	go func() {
+		executeDone <- autoupdater.Execute()
+	}()
 	time.Sleep(3 * time.Second)
 
 	// Stop the autoupdater
 	autoupdater.Interrupt(errors.New("test error"))
-	time.Sleep(100 * time.Millisecond)
+	select {
+	case err := <-executeDone:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("Execute did not exit after interrupt")
+	}
 
 	// osqueryd should be restarted in order to load the rollback version
 	require.GreaterOrEqual(t, osquerydRestartCount.Load(), int64(1), "expected osqueryd to be restarted on rollback -- logs: %s", logBytes.String())
@@ -504,7 +510,11 @@ func TestExecute_withInitialDelay(t *testing.T) {
 	mockLibraryManager.On("AddToLibrary", binaryLauncher, currentLauncherVersion, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion), launcherMetadata).Return(nil).Once()
 
 	// Let the autoupdater run -- it should download the update and defer the restart
-	go autoupdater.Execute()
+	executeDone := make(chan error, 1)
+	go func() {
+		executeDone <- autoupdater.Execute()
+	}()
+	defer autoupdater.Interrupt(nil)
 
 	// Wait until we observe that the launcher restart was deferred due to the initial delay
 	deferDeadline := time.Now().Add(initialDelay)
@@ -525,7 +535,12 @@ func TestExecute_withInitialDelay(t *testing.T) {
 
 	// Shut down the autoupdater
 	autoupdater.Interrupt(errors.New("test error"))
-	time.Sleep(100 * time.Millisecond)
+	select {
+	case err := <-executeDone:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("Execute did not exit after interrupt")
+	}
 
 	// Assert expectation that we closed the library
 	mockLibraryManager.AssertExpectations(t)
@@ -589,7 +604,11 @@ func TestExecute_withInitialDelayExtendedDuringDelay(t *testing.T) {
 	mockLibraryManager.On("TidyLibrary", binaryOsqueryd, mock.Anything).Return().Maybe()
 
 	// Let the autoupdater run
-	go autoupdater.Execute()
+	executeDone := make(chan error, 1)
+	go func() {
+		executeDone <- autoupdater.Execute()
+	}()
+	defer autoupdater.Interrupt(nil)
 	time.Sleep(200 * time.Millisecond)
 
 	// Extend the initial delay while Execute is still in the initial delay period
@@ -632,7 +651,12 @@ func TestExecute_withInitialDelayExtendedDuringDelay(t *testing.T) {
 
 	// Shut down the autoupdater
 	autoupdater.Interrupt(errors.New("test error"))
-	time.Sleep(100 * time.Millisecond)
+	select {
+	case err := <-executeDone:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("Execute did not exit after interrupt")
+	}
 
 	// Assert expectation
 	mockLibraryManager.AssertExpectations(t)
@@ -842,12 +866,20 @@ func TestExecute_inModernStandby(t *testing.T) {
 
 	// Let the autoupdater run for long enough to make it through tidying the library (which includes an osquery version query)
 	// and at least starting an autoupdate check
-	go autoupdater.Execute()
+	executeDone := make(chan error, 1)
+	go func() {
+		executeDone <- autoupdater.Execute()
+	}()
 	time.Sleep(2 * autoupdater.osqueryTimeout)
 
 	// Shut down the autoupdater
 	autoupdater.Interrupt(errors.New("test error"))
-	time.Sleep(100 * time.Millisecond)
+	select {
+	case err := <-executeDone:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("Execute did not exit after interrupt")
+	}
 
 	// Confirm we didn't attempt any library updates, and pulled config items as expected
 	mockLibraryManager.AssertExpectations(t)
