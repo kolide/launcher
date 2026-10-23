@@ -122,24 +122,27 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		"runLauncher starting",
 	)
 
-	// We've seen launcher intermittently be unable to recover from
-	// DNS failures in the past, so this check gives us a little bit
-	// of room to ensure that we are able to resolve DNS requests
-	// before proceeding with starting launcher.
-	//
-	// Note that the SplitN won't work for bare ip6 addresses.
-	if err := backoff.WaitFor(func() error {
-		hostport := strings.SplitN(opts.KolideServerURL, ":", 2)
-		if len(hostport) < 1 {
-			return fmt.Errorf("unable to parse url: %s", opts.KolideServerURL)
+	if hostport := strings.SplitN(opts.KolideServerURL, ":", 2); len(hostport) >= 1 {
+		// We've seen launcher intermittently be unable to recover from
+		// DNS failures in the past, so this check gives us a little bit
+		// of room to ensure that we are able to resolve DNS requests
+		// before proceeding with starting launcher.
+		//
+		// Note that the SplitN won't work for bare ip6 addresses.
+		if err := backoff.WaitForContext(ctx, func(ctx context.Context) error {
+			_, lookupErr := net.DefaultResolver.LookupIPAddr(ctx, hostport[0])
+			return lookupErr
+		}, 10*time.Second, 1*time.Second); err != nil {
+			slogger.Log(ctx, slog.LevelInfo,
+				"could not successfully perform IP lookup before starting launcher, proceeding anyway",
+				"kolide_server_url", opts.KolideServerURL,
+				"err", err,
+			)
 		}
-		_, lookupErr := net.DefaultResolver.LookupIPAddr(ctx, hostport[0])
-		return lookupErr
-	}, 10*time.Second, 1*time.Second); err != nil {
+	} else {
 		slogger.Log(ctx, slog.LevelInfo,
-			"could not successfully perform IP lookup before starting launcher, proceeding anyway",
+			"could not parse kolide server url as a hostport, proceeding anyway",
 			"kolide_server_url", opts.KolideServerURL,
-			"err", err,
 		)
 	}
 	startupSpan.AddEvent("dns_lookup_completed")
