@@ -1,5 +1,3 @@
-//go:build !linux
-
 package interactive
 
 import (
@@ -29,9 +27,16 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	// ioCompletionProcessor will continue to run forever until the process (go test in this case) exits,
-	// so we need goleak to ignore that one.
-	goleak.VerifyTestMain(m, goleak.IgnoreAnyFunction("github.com/Microsoft/go-winio.ioCompletionProcessor"))
+	goleak.VerifyTestMain(m,
+		// ioCompletionProcessor will continue to run forever until the process (go test in this case) exits,
+		// so we need goleak to ignore that one.
+		goleak.IgnoreAnyFunction("github.com/Microsoft/go-winio.ioCompletionProcessor"),
+		// The extension management server can block on sending an error from the thrift server returning.
+		goleak.IgnoreAnyFunction("github.com/osquery/osquery-go.(*ExtensionManagerServer).Run.func1"),
+		// The extension management server can be waiting to send a healthcheck error over the channel
+		// when we already yielded.
+		goleak.IgnoreAnyFunction("github.com/osquery/osquery-go.(*ExtensionManagerServer).Run.func2"),
+	)
 }
 
 var testOsqueryBinary string
@@ -97,7 +102,7 @@ func TestProc(t *testing.T) {
 		},
 	}
 
-	if runtime.GOOS != "windows" {
+	if runtime.GOOS == "darwin" {
 		tests = append(tests, testCase{
 			name:    "socket path too long, the name of the test causes the socket path to be to long to be created, resulting in timeout waiting for the socket",
 			tooLong: true,
@@ -180,7 +185,7 @@ select * from time;
 
 			// Make sure the process starts in a timely fashion
 			var proc *os.Process
-			startErr := make(chan error)
+			startErr := make(chan error, 1)
 			startTime := time.Now()
 			go func() {
 				proc, _, err = StartProcess(mockSack, rootDir, inFile, outFile, errFile)
