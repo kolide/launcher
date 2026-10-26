@@ -13,7 +13,7 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleIconFile</key>
-	<string>Kolide.icns</string>
+	<string>DeviceTrust.icns</string>
  	<key>CFBundleShortVersionString</key>
 	<string>VERSIONPLACEHOLDER</string>
 	<key>CFBundleVersion</key>
