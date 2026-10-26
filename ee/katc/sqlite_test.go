@@ -142,3 +142,23 @@ func TestSourcePatternToGlobbablePattern(t *testing.T) {
 		})
 	}
 }
+
+// querySqliteDb should clean up copied files on failure.
+func Test_querySqliteDb_cleansUpTempDirOnCopyFailure(t *testing.T) {
+	var (
+		srcRoot = t.TempDir() // distinct src
+		source  = filepath.Join(srcRoot, "missing.sqlite")
+		dstRoot = t.TempDir() // distinct dst
+	)
+
+	// os.TempDir() for all platforms
+	t.Setenv("TMPDIR", dstRoot)
+	t.Setenv("TMP", dstRoot)
+
+	_, err := querySqliteDb(t.Context(), multislogger.NewNopLogger(), source, "SELECT 1;")
+	require.Error(t, err, "database copy should fail")
+
+	entries, err := os.ReadDir(dstRoot)
+	require.NoError(t, err)
+	require.Empty(t, entries, "destination still has folders created from the copy")
+}
