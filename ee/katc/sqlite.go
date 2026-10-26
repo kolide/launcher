@@ -77,15 +77,24 @@ func querySqliteDb(ctx context.Context, slogger *slog.Logger, path string, query
 	defer span.End()
 
 	// If the database is in use, we won't be able to query it. So, copy it to a temporary location first.
-	tempDbCopyLocation, err := copySqliteDb(path)
+	tempDbDir, err := agent.MkdirTemp("sqlite-temp")
 	if err != nil {
-		if tempDbCopyLocation != "" {
-			_ = os.RemoveAll(filepath.Dir(tempDbCopyLocation))
+		return nil, fmt.Errorf("making temporary directory: %w", err)
+	}
+	defer func() {
+		if err := os.RemoveAll(tempDbDir); err != nil {
+			slogger.Log(ctx, slog.LevelWarn,
+				"failed to clean up temporary copied sqlite db",
+				"path", tempDbDir,
+				"err", err,
+			)
 		}
+	}()
+
+	tempDbCopyLocation, err := copySqliteDb(path, tempDbDir)
+	if err != nil {
 		return nil, fmt.Errorf("unable to copy db: %w", err)
 	}
-	// The copy was successful -- make sure we clean it up after we're done
-	defer os.RemoveAll(filepath.Dir(tempDbCopyLocation))
 
 	dsn := fmt.Sprintf("file:%s?mode=ro", tempDbCopyLocation)
 	conn, err := sql.Open("sqlite", dsn)
@@ -152,24 +161,19 @@ func querySqliteDb(ctx context.Context, slogger *slog.Logger, path string, query
 	return results, nil
 }
 
-// copySqliteDb makes a temporary directory and copies the given db into it,
-// along with any WAL and SHM auxiliary files.
-func copySqliteDb(path string) (string, error) {
-	dbCopyDir, err := agent.MkdirTemp("sqlite-temp")
+// copySqliteDb copies the src database to dstPath along with any
+// WAL and SHM auxiliary files. The caller owns the directory.
+func copySqliteDb(src string, dstPath string) (string, error) {
+	dbCopyDest, err := copyFile(src, dstPath)
 	if err != nil {
-		return "", fmt.Errorf("making temporary directory: %w", err)
-	}
-
-	dbCopyDest, err := copyFile(path, dbCopyDir)
-	if err != nil {
-		return "", fmt.Errorf("copying %s: %w", path, err)
+		return "", fmt.Errorf("copying %s: %w", src, err)
 	}
 
 	for _, suffix := range []string{"-wal", "-shm"} {
-		auxPath := path + suffix
+		auxPath := src + suffix
 		if _, err := os.Stat(auxPath); err == nil {
-			if _, err := copyFile(auxPath, dbCopyDir); err != nil {
-				return dbCopyDest, fmt.Errorf("copying %s: %w", suffix, err)
+			if _, err := copyFile(auxPath, dstPath); err != nil {
+				return "", fmt.Errorf("copying %s: %w", suffix, err)
 			}
 		}
 	}
