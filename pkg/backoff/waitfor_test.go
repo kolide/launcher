@@ -1,73 +1,61 @@
 package backoff
 
 import (
+	"context"
 	"errors"
-	"os"
-	"regexp"
-	"runtime"
 	"testing"
+	"testing/synctest"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var errSentinel = errors.New("sentinel")
 
 func TestWaitFor(t *testing.T) {
 	t.Parallel()
 
-	if os.Getenv("GITHUB_ACTIONS") == "true" && (runtime.GOOS == "windows" || runtime.GOOS == "darwin") {
-		t.Skip("Skipping test on GitHub Actions for windows and darwin because it's flakey there")
-	}
-
 	var tests = []struct {
-		name               string
-		innerFn            func() error
-		errorAssertion     require.ErrorAssertionFunc
-		testifyExpectation func(require.TestingT, func() bool, time.Duration, time.Duration, ...any)
-		errorRegexps       []*regexp.Regexp
-
-		interval time.Duration
-		timeout  time.Duration
+		name                          string
+		fnDuration, timeout, interval time.Duration
+		failures, wantCalls           int
+		wantErr                       bool
 	}{
 		{
-			name:               "never returns",
-			innerFn:            innerFuncGenerator(500*time.Millisecond, nil),
-			errorAssertion:     require.NoError,
-			testifyExpectation: require.Never,
-			interval:           2 * time.Millisecond,
-			timeout:            5 * time.Millisecond,
+			name:      "succeeds first try",
+			timeout:   100 * time.Millisecond,
+			interval:  10 * time.Millisecond,
+			wantCalls: 1,
 		},
 		{
-			name:               "fast returns",
-			innerFn:            innerFuncGenerator(1*time.Millisecond, nil),
-			errorAssertion:     require.NoError,
-			testifyExpectation: require.Eventually,
-			interval:           2 * time.Millisecond,
-			timeout:            5 * time.Millisecond,
+			name:      "succeeds after retries",
+			failures:  3,
+			timeout:   100 * time.Millisecond,
+			interval:  10 * time.Millisecond,
+			wantCalls: 4,
 		},
 		{
-			name:               "fast errors",
-			innerFn:            innerFuncGenerator(1*time.Millisecond, errors.New("sentinal")),
-			errorAssertion:     require.Error,
-			testifyExpectation: require.Eventually,
-			errorRegexps: []*regexp.Regexp{
-				regexp.MustCompile("sentinal"),
-				regexp.MustCompile("timeout"),
-			},
-			interval: 1 * time.Millisecond,
-			timeout:  5 * time.Millisecond,
+			name:      "fails at timeout",
+			failures:  5,
+			timeout:   25 * time.Millisecond,
+			interval:  10 * time.Millisecond,
+			wantCalls: 4, // always ran 2x, then 2x before timeout
+			wantErr:   true,
 		},
 		{
-			name:               "slow errors",
-			innerFn:            innerFuncGenerator(9*time.Millisecond, errors.New("sentinal")),
-			errorAssertion:     require.Error,
-			testifyExpectation: require.Eventually,
-			errorRegexps: []*regexp.Regexp{
-				regexp.MustCompile("sentinal"),
-				regexp.MustCompile("timeout"),
-			},
-			interval: 4 * time.Millisecond,
-			timeout:  9 * time.Millisecond,
+			name:      "interval exceeds timeout",
+			failures:  5,
+			timeout:   10 * time.Millisecond,
+			interval:  50 * time.Millisecond,
+			wantCalls: 2, // always ran 2x
+			wantErr:   true,
+		},
+		{
+			name:       "slow fn exceeds timeout",
+			fnDuration: 50 * time.Millisecond,
+			timeout:    10 * time.Millisecond,
+			interval:   1 * time.Millisecond,
+			wantCalls:  1,
 		},
 	}
 
@@ -75,28 +63,43 @@ func TestWaitFor(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Construct a test function, and a suitable
-			// comparison function for require.Never / require.Eventually
-			fn := func() bool {
-				err := WaitFor(tt.innerFn, tt.timeout, tt.interval)
-				tt.errorAssertion(t, err)
-
-				for _, rx := range tt.errorRegexps {
-					assert.Regexp(t, rx, err)
+			synctest.Test(t, func(t *testing.T) {
+				calls := 0
+				fn := func() error {
+					calls++
+					time.Sleep(tt.fnDuration)
+					if calls <= tt.failures {
+						return errSentinel
+					}
+					return nil
 				}
 
-				// This return is what causes Never or Eventual to Succeed or Fail.
-				return true
-			}
+				err := WaitFor(fn, tt.timeout, tt.interval)
 
-			tt.testifyExpectation(t, fn, 100*time.Millisecond, 5*time.Millisecond)
+				if tt.wantErr {
+					require.ErrorIs(t, err, errSentinel)
+				} else {
+					require.NoError(t, err)
+				}
+				require.Equal(t, tt.wantCalls, calls)
+			})
 		})
 	}
 }
 
-func innerFuncGenerator(t time.Duration, err error) func() error {
-	return func() error {
-		time.Sleep(t)
-		return err
-	}
+func TestWaitForContextParentCancel(t *testing.T) {
+	t.Parallel()
+
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		time.AfterFunc(25*time.Millisecond, cancel)
+
+		start := time.Now()
+		err := WaitForContext(ctx, func(context.Context) error {
+			return errSentinel
+		}, time.Hour, 10*time.Millisecond)
+
+		require.ErrorIs(t, err, errSentinel)
+		require.Less(t, time.Since(start), time.Hour)
+	})
 }
