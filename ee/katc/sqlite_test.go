@@ -1,7 +1,9 @@
 package katc
 
 import (
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"testing"
@@ -141,4 +143,91 @@ func TestSourcePatternToGlobbablePattern(t *testing.T) {
 			require.Equal(t, dbFile, matches[0])
 		})
 	}
+}
+
+// querySqliteDb should clean up copied files on failure.
+func Test_querySqliteDb_cleansUpTempDirOnCopyFailure(t *testing.T) {
+	var (
+		srcRoot = t.TempDir() // distinct src
+		source  = filepath.Join(srcRoot, "missing.sqlite")
+		dstRoot = t.TempDir() // distinct dst
+	)
+
+	// os.TempDir() for all platforms
+	t.Setenv("TMPDIR", dstRoot)
+	t.Setenv("TMP", dstRoot)
+
+	_, err := querySqliteDb(t.Context(), multislogger.NewNopLogger(), source, "SELECT 1;")
+	require.Error(t, err, "database copy should fail")
+
+	entries, err := os.ReadDir(dstRoot)
+	require.NoError(t, err)
+	require.Empty(t, entries, "destination still has folders created from the copy")
+}
+
+// querySqliteDb should not disturb source files.
+func Test_querySqliteDb_leavesSourceIntact(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name       string
+		unreadable string
+	}{
+		{name: "success"},
+		{name: "db", unreadable: "db.sqlite"},
+		{name: "wal", unreadable: "db.sqlite-wal"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			sourceDir := t.TempDir()
+			for _, name := range []string{"db.sqlite", "db.sqlite-wal", "db.sqlite-shm", "sibling.txt"} {
+				switch name {
+				case tt.unreadable:
+					require.NoError(t, os.Mkdir(filepath.Join(sourceDir, name), 0755)) // folder is not a db
+					continue
+				case "db.sqlite":
+					conn, err := sql.Open("sqlite", filepath.Join(sourceDir, name))
+					require.NoError(t, err)
+					_, err = conn.ExecContext(t.Context(), "CREATE TABLE test_data (value TEXT);")
+					require.NoError(t, err)
+					require.NoError(t, conn.Close())
+					continue
+				}
+				require.NoError(t, os.WriteFile(filepath.Join(sourceDir, name), []byte(name), 0644))
+			}
+			before := snapshotDir(t, sourceDir)
+
+			_, err := querySqliteDb(t.Context(), multislogger.NewNopLogger(), filepath.Join(sourceDir, "db.sqlite"), "SELECT * FROM test_data;")
+			if tt.unreadable == "" {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+			}
+
+			require.Equal(t, before, snapshotDir(t, sourceDir), "the source directory changed after calling querySqliteDb")
+		})
+	}
+}
+
+// Returns the dir's files mapped to their content's sha.
+func snapshotDir(t *testing.T, dir string) map[string]string {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	require.NoError(t, err)
+
+	snapshot := make(map[string]string, len(entries))
+	for _, e := range entries {
+		if e.IsDir() {
+			snapshot[e.Name()] = "<dir>"
+			continue
+		}
+		contents, err := os.ReadFile(filepath.Join(dir, e.Name()))
+		require.NoError(t, err)
+		h := sha256.New()
+		_, err = h.Write(contents)
+		require.NoError(t, err)
+		snapshot[e.Name()] = hex.EncodeToString(h.Sum(nil))
+	}
+	return snapshot
 }
