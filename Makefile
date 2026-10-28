@@ -67,7 +67,7 @@ build/darwin.%/Kolide.app: build/darwin.%/launcher
 	mkdir -p $@/Contents/MacOS
 	cp $@/../launcher $@/Contents/MacOS/
 	mkdir -p $@/Contents/Resources
-	cp tools/images/Kolide.icns $@/Contents/Resources
+	cp tools/images/DeviceTrust.icns $@/Contents/Resources
 	sed 's/VERSIONPLACEHOLDER/${RELEASE_VERSION_SHORT}/g' tools/packaging/LauncherTemplate_Info.plist > $@/Contents/Info.plist
 	cp tools/packaging/embedded.provisionprofile $@/Contents/
 	cp tools/packaging/entitlements.plist $@/../

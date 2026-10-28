@@ -100,7 +100,7 @@
 
 
     <!-- The icon is used in the add/remove program dialog -->
-    <Icon Id="icon.ico" SourceFile="kolide.ico"/>
+    <Icon Id="icon.ico" SourceFile="devicetrust.ico"/>
     <Property Id="ARPPRODUCTICON" Value="icon.ico" />
 
     {{if .Opts.WixUI}}
