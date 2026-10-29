@@ -22,8 +22,7 @@ import (
 	"github.com/Masterminds/semver"
 	"github.com/kolide/launcher/v2/ee/observability"
 	"github.com/kolide/launcher/v2/pkg/backoff"
-	"github.com/theupdateframework/go-tuf/data"
-	tufutil "github.com/theupdateframework/go-tuf/util"
+	"github.com/theupdateframework/go-tuf/v2/metadata"
 )
 
 // updateLibraryManager manages the update libraries for launcher and osquery.
@@ -87,7 +86,7 @@ func pathToTargetVersionExecutable(binary autoupdatableBinary, targetFilename st
 
 // AddToLibrary adds the given target file to the library for the given binary,
 // downloading and verifying it if it's not already there.
-func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, currentVersion string, targetFilename string, targetMetadata data.TargetFileMeta) error {
+func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, currentVersion string, targetFilename string, targetMetadata *metadata.TargetFiles) error {
 	// Acquire lock for modifying the library
 	ulm.lock.Lock(binary)
 	defer ulm.lock.Unlock(binary)
@@ -130,7 +129,7 @@ func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, curren
 
 // stageAndVerifyUpdate downloads the update indicated by `targetFilename` and verifies it against
 // the given, validated local metadata.
-func (ulm *updateLibraryManager) stageAndVerifyUpdate(binary autoupdatableBinary, targetFilename string, localTargetMetadata data.TargetFileMeta) (string, error) {
+func (ulm *updateLibraryManager) stageAndVerifyUpdate(binary autoupdatableBinary, targetFilename string, localTargetMetadata *metadata.TargetFiles) (string, error) {
 	stagingDir, err := ulm.tempDir(binary, fmt.Sprintf("staged-updates-%s", versionFromTarget(binary, targetFilename)))
 	if err != nil {
 		return "", fmt.Errorf("could not create temporary directory for downloading target: %w", err)
@@ -161,15 +160,12 @@ func (ulm *updateLibraryManager) stageAndVerifyUpdate(binary autoupdatableBinary
 	// Wrap the download in a LimitReader so we read at most localMeta.Length bytes
 	stream := io.LimitReader(resp.Body, localTargetMetadata.Length)
 	var fileBuffer bytes.Buffer
-
-	// Read the target file, simultaneously writing it to our file buffer and generating its metadata
-	actualTargetMeta, err := tufutil.GenerateTargetFileMeta(io.TeeReader(stream, io.Writer(&fileBuffer)), localTargetMetadata.HashAlgorithms()...)
-	if err != nil {
-		return stagedUpdatePath, fmt.Errorf("could not write downloaded target %s to file %s and compute its metadata: %w", targetFilename, stagedUpdatePath, err)
+	if _, err := io.Copy(&fileBuffer, stream); err != nil {
+		return stagedUpdatePath, fmt.Errorf("reading response body: %w", err)
 	}
 
 	// Verify the actual download against the confirmed local metadata
-	if err := tufutil.TargetFileMetaEqual(actualTargetMeta, localTargetMetadata); err != nil {
+	if err := localTargetMetadata.VerifyLengthHashes(fileBuffer.Bytes()); err != nil {
 		return stagedUpdatePath, fmt.Errorf("verification failed for target %s staged at %s: %w", targetFilename, stagedUpdatePath, err)
 	}
 
