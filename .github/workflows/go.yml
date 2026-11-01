@@ -37,7 +37,7 @@ jobs:
           egress-policy: audit # Audit network and disk activity
 
       - name: Setup Cloudsmith CLI # Exports CLOUDSMITH_API_KEY
-        uses: step-security/cloudsmith-cli-action@c8efdacddbb86cc95fcc18e06ac2597a9f449828 # v3.1.0
+        uses: step-security/cloudsmith-cli-action@7e9abe5d6cb7cdbf54a4036a6affc33b193ca2f8 # v3.1.1
         # For now, we only use Cloudsmith on builds we're going to distribute: refs/head/main for nightly builds, and 'tag' for stable builds
         if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
         with:
@@ -164,7 +164,7 @@ jobs:
           update-ca-certificates
 
       - name: Setup Cloudsmith CLI # Exports CLOUDSMITH_API_KEY
-        uses: step-security/cloudsmith-cli-action@c8efdacddbb86cc95fcc18e06ac2597a9f449828 # v3.1.0
+        uses: step-security/cloudsmith-cli-action@7e9abe5d6cb7cdbf54a4036a6affc33b193ca2f8 # v3.1.1
         # For now, we only use Cloudsmith on builds we're going to distribute: refs/head/main for nightly builds, and 'tag' for stable builds
         if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
         with:
@@ -889,7 +889,7 @@ jobs:
           egress-policy: audit # Audit network and disk activity
 
       - name: Setup Cloudsmith CLI # Exports CLOUDSMITH_API_KEY
-        uses: step-security/cloudsmith-cli-action@c8efdacddbb86cc95fcc18e06ac2597a9f449828 # v3.1.0
+        uses: step-security/cloudsmith-cli-action@7e9abe5d6cb7cdbf54a4036a6affc33b193ca2f8 # v3.1.1
         # We don't distribute package_builder via these artifacts, but nonetheless use Cloudsmith where we can (main and tagged builds).
         if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
         with:
