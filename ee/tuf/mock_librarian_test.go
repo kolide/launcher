@@ -6,7 +6,7 @@ package tuf
 
 import (
 	mock "github.com/stretchr/testify/mock"
-	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/v2/metadata"
 )
 
 // NewMocklibrarian creates a new instance of Mocklibrarian. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
@@ -46,7 +46,7 @@ func (_m *Mocklibrarian) EXPECT() *Mocklibrarian_Expecter {
 }
 
 // AddToLibrary provides a mock function for the type Mocklibrarian
-func (_mock *Mocklibrarian) AddToLibrary(binary autoupdatableBinary, currentVersion string, targetFilename string, targetMetadata data.TargetFileMeta) error {
+func (_mock *Mocklibrarian) AddToLibrary(binary autoupdatableBinary, currentVersion string, targetFilename string, targetMetadata *metadata.TargetFiles) error {
 	ret := _mock.Called(binary, currentVersion, targetFilename, targetMetadata)
 
 	if len(ret) == 0 {
@@ -54,7 +54,7 @@ func (_mock *Mocklibrarian) AddToLibrary(binary autoupdatableBinary, currentVers
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(autoupdatableBinary, string, string, data.TargetFileMeta) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(autoupdatableBinary, string, string, *metadata.TargetFiles) error); ok {
 		r0 = returnFunc(binary, currentVersion, targetFilename, targetMetadata)
 	} else {
 		r0 = ret.Error(0)
@@ -71,12 +71,12 @@ type Mocklibrarian_AddToLibrary_Call struct {
 //   - binary autoupdatableBinary
 //   - currentVersion string
 //   - targetFilename string
-//   - targetMetadata data.TargetFileMeta
+//   - targetMetadata *metadata.TargetFiles
 func (_e *Mocklibrarian_Expecter) AddToLibrary(binary any, currentVersion any, targetFilename any, targetMetadata any) *Mocklibrarian_AddToLibrary_Call {
 	return &Mocklibrarian_AddToLibrary_Call{Call: _e.mock.On("AddToLibrary", binary, currentVersion, targetFilename, targetMetadata)}
 }
 
-func (_c *Mocklibrarian_AddToLibrary_Call) Run(run func(binary autoupdatableBinary, currentVersion string, targetFilename string, targetMetadata data.TargetFileMeta)) *Mocklibrarian_AddToLibrary_Call {
+func (_c *Mocklibrarian_AddToLibrary_Call) Run(run func(binary autoupdatableBinary, currentVersion string, targetFilename string, targetMetadata *metadata.TargetFiles)) *Mocklibrarian_AddToLibrary_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 autoupdatableBinary
 		if args[0] != nil {
@@ -90,9 +90,9 @@ func (_c *Mocklibrarian_AddToLibrary_Call) Run(run func(binary autoupdatableBina
 		if args[2] != nil {
 			arg2 = args[2].(string)
 		}
-		var arg3 data.TargetFileMeta
+		var arg3 *metadata.TargetFiles
 		if args[3] != nil {
-			arg3 = args[3].(data.TargetFileMeta)
+			arg3 = args[3].(*metadata.TargetFiles)
 		}
 		run(
 			arg0,
@@ -109,7 +109,7 @@ func (_c *Mocklibrarian_AddToLibrary_Call) Return(err error) *Mocklibrarian_AddT
 	return _c
 }
 
-func (_c *Mocklibrarian_AddToLibrary_Call) RunAndReturn(run func(binary autoupdatableBinary, currentVersion string, targetFilename string, targetMetadata data.TargetFileMeta) error) *Mocklibrarian_AddToLibrary_Call {
+func (_c *Mocklibrarian_AddToLibrary_Call) RunAndReturn(run func(binary autoupdatableBinary, currentVersion string, targetFilename string, targetMetadata *metadata.TargetFiles) error) *Mocklibrarian_AddToLibrary_Call {
 	_c.Call.Return(run)
 	return _c
 }
