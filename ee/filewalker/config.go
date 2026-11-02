@@ -1,10 +1,30 @@
+// Package filewalker provides a filewalk manager (scheduler and API), filewalker with result storage, and configuration definitions.
+//
+// Filewalks occur one at a time. All configurations due upon scheduling are included.
+//
+// The following rules apply to filewalks in practice:
+//   - Roots nested within another root are reached by descending from the outermost root, so descent rules apply to them.
+//   - Filesystem mounts and network shares are not excluded on descent.
+//   - Symlinks are not followed on descent.
+//   - A symlink root is followed only if it is outermost and written with a trailing separator.
+//   - Equivalent roots (see canonicalize) are walked once.
+//   - Unmatched directories between an outer root and a nested root are still walked, and errors on them stop the walk from reaching the nested root.
+//
+// Result order is not guaranteed.
 package filewalker
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"log/slog"
+	"maps"
+	"path/filepath"
 	"regexp"
+	"runtime"
+	"slices"
+	"strings"
 	"time"
 )
 
@@ -103,3 +123,128 @@ type (
 		FileTypeFilter *fileTypeFilter   `json:"file_type_filter,omitempty"`
 	}
 )
+
+type (
+	// lines up with a single filewalkConfig by name
+	matcher struct {
+		name     string           // the server's filewalkConfig.name
+		skipDirs []*regexp.Regexp // directories excluded from walk
+		fileName *regexp.Regexp   // filenames included in results
+		fileType *fileTypeFilter  // file types excluded
+	}
+
+	// specification for a single walk run
+	walkSpec struct {
+		roots    []string              // the unique, top-level absolute paths to walk
+		activate map[string]matcherSet // uppermost path => all new matchers applicable
+		matchers []*matcher
+	}
+)
+
+// resolve realizes all passed server filewalkConfigs into a walkSpec that associates
+// which filtered results belong to which filewalkConfig by name.
+//
+// resolve uses the filesystem to evaluate the root paths globs, then deduplicates
+// paths among the matchers which share them.
+func resolve(ctx context.Context, slogger *slog.Logger, cfgs map[string]filewalkConfig, goos string) walkSpec {
+	spec := walkSpec{activate: make(map[string]matcherSet)}
+	pathsToWalk := make(map[string]string)
+	var canonicalRoots []string
+
+	for _, name := range slices.Sorted(maps.Keys(cfgs)) {
+		cfg := cfgs[name]
+		matcher := &matcher{name: name}
+		var rootDirs []string
+
+		// simple shortcut for overlay application
+		apply := func(def filewalkDefinition) {
+			if def.RootDirs != nil {
+				rootDirs = *def.RootDirs
+			}
+			if def.FileNameRegex != nil {
+				matcher.fileName = def.FileNameRegex
+			}
+			if def.SkipDirs != nil {
+				matcher.skipDirs = *def.SkipDirs
+			}
+			if def.FileTypeFilter != nil {
+				matcher.fileType = def.FileTypeFilter
+			}
+		}
+
+		apply(cfg.filewalkDefinition)
+		for _, overlay := range cfg.Overlays {
+			if overlayFiltersMatch(overlay.Filters, goos) {
+				apply(overlay.filewalkDefinition)
+			}
+		}
+
+		spec.matchers = append(spec.matchers, matcher)
+
+		for _, rootDir := range rootDirs {
+			globbedPaths, err := filepath.Glob(rootDir)
+			if err != nil {
+				slogger.Log(ctx, slog.LevelWarn,
+					"error globbing for directories",
+					"filewalker_name", name,
+					"root_dir", rootDir,
+					"err", err,
+				)
+				continue
+			}
+
+			for _, path := range globbedPaths {
+				canonicalRoot := canonicalize(path)
+				spec.activate[canonicalRoot] = spec.activate[canonicalRoot].with(newMatcherSet(matcher))
+				if _, ok := pathsToWalk[canonicalRoot]; !ok {
+					pathsToWalk[canonicalRoot] = path
+				}
+			}
+		}
+	}
+
+	// Parent paths sort before their longer children, which allows deduping
+	// our dense map of pathsToWalk.
+	//
+	// NB: there are clever ways to remove this. Don't. This is hard enough to
+	// track as-is.
+	for _, root := range slices.Sorted(maps.Keys(pathsToWalk)) {
+		if !slices.ContainsFunc(canonicalRoots, func(otherRoot string) bool { return strings.HasPrefix(root, otherRoot) }) {
+			canonicalRoots = append(canonicalRoots, root)
+			spec.roots = append(spec.roots, pathsToWalk[root])
+		}
+	}
+
+	return spec
+}
+
+func overlayFiltersMatch(overlayFilters map[string]string, goos string) bool {
+	// Currently, the only filter we expect is for OS.
+	if filterGoos, goosFound := overlayFilters["goos"]; goosFound {
+		return filterGoos == goos
+	}
+	return false
+}
+
+// hasRootBelow returns whether any matcher activates strictly beneath dir.
+func (s walkSpec) hasRootBelow(dir string) bool {
+	prefix := canonicalize(dir)
+	for key := range s.activate {
+		if len(key) > len(prefix) && strings.HasPrefix(key, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+const pathSep = string(filepath.Separator)
+
+// canonicalize a path so they match when walked and configured.
+// As a side effect, if a root is a file we store it with a slash on the end.
+func canonicalize(path string) string {
+	path = filepath.Clean(path)
+	if runtime.GOOS == "windows" {
+		path = strings.ToLower(path)
+	}
+	return strings.TrimSuffix(path, pathSep) + pathSep
+}
