@@ -50,13 +50,8 @@ func TestFilewalkTable(t *testing.T) {
 			FileNameRegex: nil,
 		},
 	}
-	testFilewalker := newFilewalker(walkName, cfg, store, multislogger.NewNopLogger())
 	startTime := time.Now().Unix()
-	go testFilewalker.Work()
-	t.Cleanup(testFilewalker.Stop)
-
-	// Wait for the results to be ready
-	time.Sleep(time.Duration(cfg.WalkInterval * 2))
+	newTestFilewalker(t, walkName, cfg, store, multislogger.NewNopLogger()).Filewalk(t.Context())
 
 	// Query table again, and check for our expected file
 	updatedResponse := testFilewalkTable.Call(t.Context(), ci.BuildRequestWithSingleEqualConstraint("walk_name", walkName))
@@ -68,5 +63,5 @@ func TestFilewalkTable(t *testing.T) {
 	require.Equal(t, expectedFile, updatedResponse.Response[1]["path"])
 	lastWalkTimestamp, err := strconv.Atoi(updatedResponse.Response[0]["last_walk_timestamp"])
 	require.NoError(t, err)
-	require.Less(t, startTime, int64(lastWalkTimestamp))
+	require.LessOrEqual(t, startTime, int64(lastWalkTimestamp))
 }
