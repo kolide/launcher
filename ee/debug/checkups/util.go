@@ -60,6 +60,7 @@ func pathInfo(path string) string {
 		info["mode"] = f.Mode().String()
 		info["modtime"] = f.ModTime().UTC()
 		info["kind"] = kind
+		platformPathInfo(path, f, info)
 	}
 
 	s, _ := json.Marshal(info)
