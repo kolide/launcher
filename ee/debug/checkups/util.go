@@ -34,12 +34,37 @@ func recursiveDirectoryContents(extraFH io.Writer, basedir string) (int, error) 
 			files[path] = true
 		}
 
-		fmt.Fprintln(extraFH, path)
+		fmt.Fprintln(extraFH, pathInfo(path))
 		return nil
 	})
 
 	return len(maps.Keys(files)), filewalkErr
+}
 
+// Returns json about the file or folder at path, or an error if info could not be
+// retrieved. Includes the path, size, mode, modification time, and platform-specific
+// information.
+func pathInfo(path string) string {
+	// a-prefixed to sort first on marshal
+	info := map[string]any{"apath": path}
+
+	f, err := os.Stat(path)
+	if err != nil {
+		info["error"] = err.Error()
+	} else {
+		kind := "file"
+		if f.IsDir() {
+			kind = "dir"
+		}
+		info["size"] = f.Size()
+		info["mode"] = f.Mode().String()
+		info["modtime"] = f.ModTime().UTC()
+		info["kind"] = kind
+		platformPathInfo(path, f, info)
+	}
+
+	s, _ := json.Marshal(info)
+	return string(s)
 }
 
 type fileInfo struct {
