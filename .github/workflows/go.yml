@@ -562,7 +562,6 @@ jobs:
           # See https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/about-github-hosted-runners#supported-runners-and-hardware-resources
           - ubuntu-22.04
           - ubuntu-24.04
-          - macos-14
           - macos-15
           - macos-26
           - windows-2022
