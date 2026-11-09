@@ -9,7 +9,7 @@ import (
 )
 
 // The maximum number of log lines to retrieve
-const maxInitLogLines = 10000
+const maxInitLogLines = 10000 // nolint:unused
 
 type InitLogs struct {
 	k       types.Knapsack
