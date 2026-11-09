@@ -5,12 +5,15 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+
+	"github.com/kolide/launcher/v2/ee/agent/types"
 )
 
-func writeInitLogs(_ context.Context, logZip *zip.Writer) error {
-	stdMatches, err := filepath.Glob("/var/log/kolide-k2/*")
+func writeInitLogs(_ context.Context, k types.Knapsack, logZip *zip.Writer) error {
+	logGlob := fmt.Sprintf("/var/log/%s/*", k.Identifier())
+	stdMatches, err := filepath.Glob(logGlob)
 	if err != nil {
-		return fmt.Errorf("globbing /var/log/kolide-k2/*: %w", err)
+		return fmt.Errorf("globbing %s: %w", logGlob, err)
 	}
 
 	var lastErr error

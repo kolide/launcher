@@ -7,10 +7,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/kolide/launcher/v2/ee/agent/types"
 	"github.com/kolide/launcher/v2/ee/allowedcmd"
 )
 
-func writeInitLogs(ctx context.Context, logZip *zip.Writer) error {
+func writeInitLogs(ctx context.Context, _ types.Knapsack, logZip *zip.Writer) error {
 	cmdStr := fmt.Sprintf(`Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='launcher'} -MaxEvents %d | ConvertTo-Json`, maxInitLogLines)
 	cmd, err := allowedcmd.Powershell.Cmd(ctx, cmdStr)
 	if err != nil {

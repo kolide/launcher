@@ -4,12 +4,15 @@ import (
 	"archive/zip"
 	"context"
 	"io"
+
+	"github.com/kolide/launcher/v2/ee/agent/types"
 )
 
 // The maximum number of log lines to retrieve
 const maxInitLogLines = 10000
 
 type InitLogs struct {
+	k       types.Knapsack
 	status  Status
 	summary string
 }
@@ -29,7 +32,7 @@ func (c *InitLogs) Run(ctx context.Context, fullFH io.Writer) error {
 	logZip := zip.NewWriter(fullFH)
 	defer logZip.Close()
 
-	return writeInitLogs(ctx, logZip)
+	return writeInitLogs(ctx, c.k, logZip)
 }
 
 func (c *InitLogs) Status() Status {

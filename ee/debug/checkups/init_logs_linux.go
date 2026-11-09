@@ -8,12 +8,14 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/kolide/launcher/v2/ee/agent/types"
 	"github.com/kolide/launcher/v2/ee/allowedcmd"
 )
 
-func writeInitLogs(ctx context.Context, logZip *zip.Writer) error {
+func writeInitLogs(ctx context.Context, k types.Knapsack, logZip *zip.Writer) error {
+	serviceName := fmt.Sprintf("launcher.%s.service", k.Identifier())
 	// journald may not prune logs, so pull last lines to avoid adding too much
-	cmd, err := allowedcmd.Journalctl.Cmd(ctx, "-u", "launcher.kolide-k2.service", "-o", "short-iso", "--lines", strconv.Itoa(maxInitLogLines))
+	cmd, err := allowedcmd.Journalctl.Cmd(ctx, "-u", serviceName, "-o", "short-iso", "--lines", strconv.Itoa(maxInitLogLines))
 	if err != nil {
 		return fmt.Errorf("creating journalctl command: %w", err)
 	}
