@@ -6,6 +6,9 @@ import (
 	"io"
 )
 
+// The maximum number of log lines to retrieve
+const maxInitLogLines = 10000
+
 type InitLogs struct {
 	status  Status
 	summary string
