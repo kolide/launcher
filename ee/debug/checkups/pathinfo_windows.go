@@ -29,6 +29,8 @@ func platformPathInfo(path string, fi fs.FileInfo, info map[string]any) {
 	info["ctime"] = ctime.UTC()
 }
 
+// windows.FileBasicInfo returns a void* to this struct:
+//   https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_basic_info
 type fileBasicInfo struct {
 	CreationTime   int64
 	LastAccessTime int64
@@ -59,9 +61,15 @@ func changeTime(path string) (time.Time, error) {
 	defer windows.CloseHandle(h)
 
 	var fbi fileBasicInfo
+	// https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-getfileinformationbyhandleex
 	if err := windows.GetFileInformationByHandleEx(h, windows.FileBasicInfo, (*byte)(unsafe.Pointer(&fbi)), uint32(unsafe.Sizeof(fbi))); err != nil {
 		return time.Time{}, fmt.Errorf("querying basic info: %w", err)
 	}
+
+	// Windows' FileTime is a bit quirky. It's the count of how many 100 ns intervals since, you guessed it,
+	// 1/1/1601!
+	//
+	// See: https://learn.microsoft.com/en-us/windows/win32/api/minwinbase/ns-minwinbase-filetime
 	ft := windows.Filetime{LowDateTime: uint32(fbi.ChangeTime), HighDateTime: uint32(fbi.ChangeTime >> 32)}
 	return time.Unix(0, ft.Nanoseconds()), nil
 }
