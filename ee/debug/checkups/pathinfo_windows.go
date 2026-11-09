@@ -30,7 +30,8 @@ func platformPathInfo(path string, fi fs.FileInfo, info map[string]any) {
 }
 
 // windows.FileBasicInfo returns a void* to this struct:
-//   https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_basic_info
+//
+//	https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_basic_info
 type fileBasicInfo struct {
 	CreationTime   int64
 	LastAccessTime int64
