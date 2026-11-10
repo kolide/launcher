@@ -95,7 +95,9 @@ func (fm *FilewalkManager) run(ctx context.Context) {
 			if requested {
 				names = slices.Collect(maps.Keys(cfgs))
 			}
-			fm.walkConfigs(ctx, cfgs, names)
+			if len(names) > 0 {
+				fm.walkConfigs(ctx, cfgs, names)
+			}
 			// reset after a walk, so a req to full walk is error-tolerant
 			requested = false
 		}
