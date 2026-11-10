@@ -263,31 +263,15 @@ func (fm *FilewalkManager) Ping() {
 }
 
 // Do satisfies the actionqueue.actor interface; it allows the control server to request
-// immediate filewalk. Never errors. If a request to walk is already queued, another
-// is not added.
+// immediate filewalk. Never errors to avoid retries. We also ignore the request body,
+// which lists what walks to do, and just run all walks.
 func (fm *FilewalkManager) Do(data io.Reader) error {
 	ctx, span := observability.StartSpan(context.TODO())
 	defer span.End()
 
-	// request sent down by the control server. names are ignored since walking
-	// is not much slower with a few more configs included.
-	var req struct {
-		FilewalkNames []string `json:"filewalks"`
-	}
-	if err := json.NewDecoder(data).Decode(&req); err != nil {
-		fm.slogger.Log(ctx, slog.LevelWarn,
-			"received filewalk request in unexpected format from control server, discarding",
-			"err", err,
-		)
-		// We don't return an error because we don't want the actionqueue to retry this request
-		return nil
-	}
-
 	fm.slogger.Log(ctx, slog.LevelInfo,
-		"received request from control server to perform filewalks now",
-		"requested_filewalks", req.FilewalkNames,
+		"received request from control server to perform all filewalks now",
 	)
-
 	fm.request()
 	return nil
 }
