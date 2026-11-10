@@ -96,13 +96,14 @@ func (fm *FilewalkManager) run(ctx context.Context) {
 				names = slices.Collect(maps.Keys(cfgs))
 			}
 			fm.walkConfigs(ctx, cfgs, names)
+			// reset after a walk, so a req to full walk is error-tolerant
+			requested = false
 		}
 
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			requested = false
 		case <-fm.req:
 			requested = true
 		}
