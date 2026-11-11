@@ -136,12 +136,12 @@ Accept does not honor a context outside of dialing.
 Each needs modification to use the provided context to trigger a listener.Close(). Afterward, a separate context
 can implement any specific draining logic.
 
-### logShipper
-[logShipper.Run](https://github.com/kolide/launcher/blob/b663550d2b6ae0a969776d457c062ce97c5a3740/pkg/log/logshipper/logshipper.go#L130) is an odd duck that likely belongs outside of runGroup. That way, it can be one of the final things to exit and
-flush logs.
+### Draining Actors
+Actors which need to time their shutting down for obs. None of them quite feel like they fit as an actor given their greater lifespan, but they'll work.
+  - [pkg/log/logshipper's logShipper](https://github.com/kolide/launcher/blob/b663550d2b6ae0a969776d457c062ce97c5a3740/pkg/log/logshipper/logshipper.go#L130)
+  - [ee/observability/exporter's Telemetry](https://github.com/kolide/launcher/blob/85b325963fbb9032121d4cdabc6207d635241643/ee/observability/exporter/exporter.go#L372)
 
-It already operates on a context. What changes is that now when context is cancelled, it will need to manually create
-another to drain.
+Both already operate on a context. What changes is that now when context is cancelled, it will need to manually create another to drain.
 
 ### ControlService and ActionsQueue
 Separate projects to do right. Both [ControlService](https://github.com/kolide/launcher/blob/b663550d2b6ae0a969776d457c062ce97c5a3740/cmd/launcher/launcher.go#L468) and [ActionsQueue](https://github.com/kolide/launcher/blob/b663550d2b6ae0a969776d457c062ce97c5a3740/cmd/launcher/launcher.go#L522-L528) already use contexts to signal themselves to stop.
