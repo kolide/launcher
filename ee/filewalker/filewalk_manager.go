@@ -35,8 +35,8 @@ type FilewalkManager struct {
 	cancelWalk atomic.Pointer[context.CancelFunc]
 
 	// Handle actor shutdown
-	interrupt     chan struct{}
-	interruptOnce sync.Once
+	interrupt     chan struct{} // only closed, channel is never sent on
+	interruptOnce sync.Once     // ensure we close exactly once
 }
 
 // How often to check filewalks due to be ran.
