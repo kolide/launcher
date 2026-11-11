@@ -46,7 +46,7 @@ func recursiveDirectoryContents(extraFH io.Writer, basedir string) (int, error) 
 // information.
 func pathInfo(path string) string {
 	// a-prefixed to sort first on marshal
-	info := map[string]any{"apath": path}
+	info := map[string]any{"aaa_path": path}
 
 	f, err := os.Stat(path)
 	if err != nil {
