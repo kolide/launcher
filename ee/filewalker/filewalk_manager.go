@@ -124,8 +124,9 @@ func (fm *FilewalkManager) walkConfigs(ctx context.Context, cfgs map[string]file
 		}
 		cfg, ok := cfgs[name]
 		if !ok {
-			fm.slogger.Log(ctx, slog.LevelWarn,
-				"filewalk request from control server contained unknown filewalk name",
+			// should not be possible
+			fm.slogger.Log(ctx, slog.LevelError,
+				"filewalkmanager provided name to walk which is absent from cfgs",
 				"filewalk_name", name,
 			)
 			continue
