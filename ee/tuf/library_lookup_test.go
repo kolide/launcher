@@ -52,7 +52,7 @@ func TestCheckOutLatest_withTufRepository(t *testing.T) {
 			require.NoError(t, os.MkdirAll(tufDir, 488))
 			testReleaseVersion := "1.0.30"
 			expectedTargetName := fmt.Sprintf("%s-%s.tar.gz", binary, testReleaseVersion)
-			tufci.SeedLocalTufRepo(t, testReleaseVersion, rootDir)
+			testRootJson := tufci.SeedLocalTufRepo(t, testReleaseVersion, rootDir)
 
 			// Create a corresponding downloaded target
 			executablePath, executableVersion := pathToTargetVersionExecutable(binary, expectedTargetName, updateDir)
@@ -73,7 +73,7 @@ func TestCheckOutLatest_withTufRepository(t *testing.T) {
 			}))
 
 			// Check it
-			latest, err := CheckOutLatest(t.Context(), binary, rootDir, "", "", "nightly", slogger)
+			latest, err := checkOutLatestWithRootJson(t.Context(), binary, rootDir, "", "", "nightly", testRootJson, slogger)
 			require.NoError(t, err, "unexpected error on checking out latest", logBytes.String())
 			require.Equal(t, executablePath, latest.Path, "wrong path", logBytes.String())
 			require.Equal(t, executableVersion, latest.Version, "wrong version", logBytes.String())
@@ -98,7 +98,7 @@ func TestCheckOutLatest_withTufRepository_withPinnedVersion(t *testing.T) {
 			pinnedVersion := tufci.NonReleaseVersion
 			expectedTargetName := fmt.Sprintf("%s-%s.tar.gz", binary, pinnedVersion)
 			testReleaseVersion := "2.3.3"
-			tufci.SeedLocalTufRepo(t, testReleaseVersion, rootDir)
+			testRootJson := tufci.SeedLocalTufRepo(t, testReleaseVersion, rootDir)
 
 			// Create a corresponding downloaded target for the pinned version
 			executablePath, executableVersion := pathToTargetVersionExecutable(binary, expectedTargetName, updateDir)
@@ -119,7 +119,7 @@ func TestCheckOutLatest_withTufRepository_withPinnedVersion(t *testing.T) {
 			}))
 
 			// Check it
-			latest, err := CheckOutLatest(t.Context(), binary, rootDir, "", pinnedVersion, "nightly", slogger)
+			latest, err := checkOutLatestWithRootJson(t.Context(), binary, rootDir, "", pinnedVersion, "nightly", testRootJson, slogger)
 			require.NoError(t, err, "unexpected error on checking out latest", logBytes.String())
 			require.Equal(t, executablePath, latest.Path, "wrong path", logBytes.String())
 			require.Equal(t, executableVersion, latest.Version, "wrong version", logBytes.String())
