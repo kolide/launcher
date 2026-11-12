@@ -81,6 +81,7 @@ func TestCall_recordsTableHealthMetrics(t *testing.T) { //nolint:paralleltest
 			mockFlags.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return()
 
 			tableName := "test_metrics_" + tt.name
+			healthBefore := tableHealth.countsFor(tableName)
 			w := New(mockFlags, multislogger.NewNopLogger(), tableName, nil, tt.gen)
 			w.Call(t.Context(), map[string]string{"action": "generate", "context": "{}"})
 
@@ -90,6 +91,9 @@ func TestCall_recordsTableHealthMetrics(t *testing.T) { //nolint:paralleltest
 			require.Equal(t, tt.expectedQuery, counterValueForTable(t, &rm, "launcher.tablewrapper.query", tableName), "query counter")
 			require.Equal(t, tt.expectedError, counterValueForTable(t, &rm, "launcher.tablewrapper.error", tableName), "error counter")
 			require.Equal(t, tt.expectedEmpty, counterValueForTable(t, &rm, "launcher.tablewrapper.empty", tableName), "empty counter")
+
+			// The health summary must agree with the counters
+			require.Equal(t, TableCounts{Name: tableName, Query: tt.expectedQuery, Error: tt.expectedError, Empty: tt.expectedEmpty}, tableHealth.countsFor(tableName).since(healthBefore))
 		})
 	}
 }
