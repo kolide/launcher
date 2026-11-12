@@ -111,7 +111,7 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 	{
 		// Regardless of whether or not there's a UI in the MSI, we
 		// still want the icon file to be included.
-		assetFiles := []string{"kolide.ico"}
+		assetFiles := []string{"devicetrust.ico"}
 
 		if po.WixUI {
 			assetFiles = append(assetFiles, "msi_banner.bmp", "msi_splash.bmp")

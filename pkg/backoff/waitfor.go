@@ -8,31 +8,58 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// waitFor is a wrapper over the stock go limiter pattern. It can be
-// used to retry things until the timeout is reached, with a delay in
-// between attempts. It does not implement an exponential backoff, and
-// is intended for simple startup logic.
+// WaitFor is a wrapper over the stock go limiter pattern. It can be used to
+// retry calling fn until it returns nil or timeout would be reached before another
+// attempt. It is not an exponential backoff, and is intended for use in simple
+// startup logic.
 //
-// Contrary to documentation, it appears go will always retry
-// once. Even if the interval exceeds the timeout.
+// fn is called immediately once. If it fails, a second attempt occurs without delay.
+// Subsequent attempts are spaced by interval. nil is always returned if fn returns
+// nil.
 func WaitFor(fn func() error, timeout, interval time.Duration) error {
-	deadlineCtx, cancel := context.WithTimeout(context.Background(), timeout)
+	return WaitForContext(
+		context.Background(),
+		func(_ context.Context) error {
+			return fn()
+		},
+		timeout,
+		interval,
+	)
+}
+
+// WaitForContext is a wrapper over the stock go limiter pattern. It can be used to
+// retry calling fn until it returns nil, the context is cancelled, or timeout would
+// be reached before another attempt. It is not an exponential backoff, and is intended
+// for use in simple startup logic.
+//
+// fn is called immediately once. If it fails, a second attempt occurs without delay.
+// Subsequent attempts are spaced by interval. nil is always returned if fn returns
+// nil.
+//
+// Provided context's cancellation is honored over retry logic.
+func WaitForContext(ctx context.Context, fn func(ctx context.Context) error, timeout, interval time.Duration) error {
+	deadlineCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	start := time.Now()
 
 	limiter := rate.NewLimiter(rate.Every(interval), 1)
 	counter := 0
 	for {
 		counter += 1
 
-		err := fn()
+		err := fn(deadlineCtx)
 
 		if err == nil {
 			return nil
 		}
 
-		// Did we timeout? If so, send the error
-		if limiter.Wait(deadlineCtx) != nil {
-			return fmt.Errorf("timeout after %s (%d attempts): %w", timeout, counter, err)
+		limitErr := limiter.Wait(deadlineCtx)
+
+		switch {
+		case ctx.Err() != nil:
+			return fmt.Errorf("context done after %s (%d attempts) due to %q, last fn error: %w", time.Since(start), counter, ctx.Err(), err)
+		case limitErr != nil:
+			return fmt.Errorf("timeout after %s (%d attempts) due to %q, last fn error: %w", time.Since(start), counter, limitErr, err)
 		}
 	}
 }

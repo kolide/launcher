@@ -39,27 +39,10 @@ func TestInstallCaCerts_Windows(t *testing.T) {
 	require.True(t, isSystemCert || isEmbeddedCert, "cert file should be either system or embedded")
 }
 
-func TestExportSystemCaCerts(t *testing.T) {
+func Test_readSystemCaCerts(t *testing.T) {
 	t.Parallel()
 
-	tempDir := t.TempDir()
-	slogger := multislogger.NewNopLogger()
-
-	// Try to export system certs
-	certsPath, err := exportSystemCaCerts(tempDir, slogger)
-
-	// If successful, verify the file
-	require.NotEmpty(t, certsPath)
-	require.Contains(t, certsPath, "ca-certs-system-")
+	pemData, err := readSystemCaCerts(multislogger.NewNopLogger())
 	require.NoError(t, err)
-
-	// Verify file exists and has content
-	info, err := os.Stat(certsPath)
-	require.NoError(t, err)
-	require.Greater(t, info.Size(), int64(0), "cert file should not be empty")
-
-	// Second export should reuse the same file
-	certsPath2, err := exportSystemCaCerts(tempDir, slogger)
-	require.NoError(t, err)
-	require.Equal(t, certsPath, certsPath2, "should reuse existing cert file")
+	require.NotEmpty(t, parseCerts(pemData), "system store should contain CA certs")
 }

@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"log/slog"
 	"os"
+	"runtime/pprof"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -12,6 +15,7 @@ import (
 	"github.com/kolide/launcher/v2/pkg/log/multislogger"
 	"github.com/kolide/launcher/v2/pkg/osquery/testutil"
 	"github.com/kolide/launcher/v2/pkg/rungroup"
+	"github.com/kolide/launcher/v2/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/require"
 )
 
@@ -66,19 +70,30 @@ func Test_runLauncher(t *testing.T) {
 			})
 			require.NoError(t, err)
 
+			var logBytes threadsafebuffer.ThreadSafeBuffer
+			t.Cleanup(func() {
+				if t.Failed() {
+					t.Log(logBytes.String())
+				}
+			})
+			logHandler := slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+				Level: slog.LevelDebug,
+			})
+
 			// runLauncher, if able to start up without error, will run until stopped by
 			// an autoupdate requiring reload, a sigterm, or a rungroup actor error.
 			// So, start it up in the background.
+			start := time.Now()
 			ctx, cancel := context.WithCancel(t.Context())
 			runLauncherErr := make(chan error)
 			go func() {
-				runLauncherErr <- runLauncher(ctx, cancel, multislogger.New(), multislogger.New(), defaultOpts)
+				runLauncherErr <- runLauncher(ctx, cancel, multislogger.New(logHandler), multislogger.New(logHandler), defaultOpts)
 			}()
 
 			// launcher should run successfully, not immediately return an error.
 			select {
 			case err := <-runLauncherErr:
-				t.Errorf("runLauncher did not start up successfully: returned %v", err)
+				t.Fatalf("runLauncher did not start up successfully: returned %v", err)
 			case <-time.After(tt.startupDuration):
 				// launcher started up and stayed up
 			}
@@ -89,7 +104,16 @@ func Test_runLauncher(t *testing.T) {
 			case <-runLauncherErr:
 				// launcher shut down successfully
 			case <-time.After(rungroup.InterruptTimeout):
-				t.Error("runLauncher did not return within interrupt timeout")
+				t.Error("runLauncher did not return within interrupt timeout", "elapsed", time.Since(start))
+				t.Log(logBytes.String())
+				t.Log("end of captured logs, waiting until runLauncher returns")
+				_, _ = logBytes.Write([]byte("--- interrupt timeout ---\n"))
+				var stacks strings.Builder
+				_ = pprof.Lookup("goroutine").WriteTo(&stacks, 1)
+				t.Log(stacks.String())
+				t.Log("End of captured logs, waiting until runLauncher returns")
+				<-runLauncherErr // do not leak the runtime and affect other tests
+				t.Log("launcher finally exited", "duration", time.Since(start))
 			}
 		})
 	}
