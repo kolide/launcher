@@ -239,8 +239,8 @@ func (s walkSpec) hasRootBelow(dir string) bool {
 
 const pathSep = string(filepath.Separator)
 
-// canonicalize a path so they match when walked and configured.
-// As a side effect, if a root is a file we store it with a slash on the end.
+// canonicalize a path so they match when walked and configured. A trailing
+// slash is added to ensure that partial matches are distinct (e.g., kiwi vs kiwi.bak).
 func canonicalize(path string) string {
 	path = filepath.Clean(path)
 	if runtime.GOOS == "windows" {
