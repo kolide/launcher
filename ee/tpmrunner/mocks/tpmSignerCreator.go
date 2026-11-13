@@ -17,10 +17,19 @@ func NewTpmSignerCreator(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *TpmSignerCreator {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &TpmSignerCreator{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -41,11 +50,11 @@ func (_m *TpmSignerCreator) EXPECT() *TpmSignerCreator_Expecter {
 // CreateKey provides a mock function for the type TpmSignerCreator
 func (_mock *TpmSignerCreator) CreateKey(opts ...tpm.TpmSignerOption) ([]byte, []byte, error) {
 	// tpm.TpmSignerOption
-	_va := make([]interface{}, len(opts))
+	_va := make([]any, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
 	}
-	var _ca []interface{}
+	var _ca []any
 	_ca = append(_ca, _va...)
 	ret := _mock.Called(_ca...)
 
@@ -88,9 +97,9 @@ type TpmSignerCreator_CreateKey_Call struct {
 
 // CreateKey is a helper method to define mock.On call
 //   - opts ...tpm.TpmSignerOption
-func (_e *TpmSignerCreator_Expecter) CreateKey(opts ...interface{}) *TpmSignerCreator_CreateKey_Call {
+func (_e *TpmSignerCreator_Expecter) CreateKey(opts ...any) *TpmSignerCreator_CreateKey_Call {
 	return &TpmSignerCreator_CreateKey_Call{Call: _e.mock.On("CreateKey",
-		append([]interface{}{}, opts...)...)}
+		append([]any{}, opts...)...)}
 }
 
 func (_c *TpmSignerCreator_CreateKey_Call) Run(run func(opts ...tpm.TpmSignerOption)) *TpmSignerCreator_CreateKey_Call {
@@ -156,7 +165,7 @@ type TpmSignerCreator_New_Call struct {
 // New is a helper method to define mock.On call
 //   - private []byte
 //   - public []byte
-func (_e *TpmSignerCreator_Expecter) New(private interface{}, public interface{}) *TpmSignerCreator_New_Call {
+func (_e *TpmSignerCreator_Expecter) New(private any, public any) *TpmSignerCreator_New_Call {
 	return &TpmSignerCreator_New_Call{Call: _e.mock.On("New", private, public)}
 }
 
