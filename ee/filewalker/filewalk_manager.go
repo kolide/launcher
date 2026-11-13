@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"maps"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -118,6 +119,7 @@ func (fm *FilewalkManager) walkConfigs(ctx context.Context, cfgs map[string]file
 	fm.cancelWalk.Store(&cancel)
 
 	slices.Sort(names)
+	toWalk := make(map[string]filewalkConfig, len(names))
 	for _, name := range slices.Compact(names) {
 		if ctx.Err() != nil {
 			return
@@ -131,8 +133,14 @@ func (fm *FilewalkManager) walkConfigs(ctx context.Context, cfgs map[string]file
 			)
 			continue
 		}
-		newFilewalker(name, cfg, fm.resultsStore, fm.slogger).Filewalk(ctx)
+		toWalk[name] = cfg
 	}
+	if len(toWalk) == 0 {
+		return
+	}
+
+	spec := resolve(ctx, fm.slogger, toWalk, runtime.GOOS)
+	newFilewalker(spec, fm.resultsStore, fm.slogger).Filewalk(ctx)
 }
 
 // lastWalkTimes returns the map of filewalkConfig names to the last time the config was walked
