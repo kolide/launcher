@@ -148,6 +148,7 @@ func (f *filewalker) storeResults(ctx context.Context, name string, paths []stri
 	if err != nil {
 		f.slogger.Log(ctx, slog.LevelError,
 			"could not marshal filewalk results for storage",
+			"config_name", name,
 			"err", err,
 		)
 		return
@@ -155,6 +156,7 @@ func (f *filewalker) storeResults(ctx context.Context, name string, paths []stri
 	if err := f.resultsStore.Set([]byte(name), resultsRaw); err != nil {
 		f.slogger.Log(ctx, slog.LevelError,
 			"could not set filewalk results in storage",
+			"config_name", name,
 			"err", err,
 		)
 		return
@@ -165,6 +167,7 @@ func (f *filewalker) storeResults(ctx context.Context, name string, paths []stri
 	if err := binary.Write(lastWalkTimeBuffer, binary.NativeEndian, time.Now().Unix()); err != nil {
 		f.slogger.Log(ctx, slog.LevelError,
 			"could not convert last walk timestamp to bytes",
+			"config_name", name,
 			"err", err,
 		)
 		return
@@ -172,6 +175,7 @@ func (f *filewalker) storeResults(ctx context.Context, name string, paths []stri
 	if err := f.resultsStore.Set(LastWalkTimeKey(name), lastWalkTimeBuffer.Bytes()); err != nil {
 		f.slogger.Log(ctx, slog.LevelError,
 			"could not set last walk time in storage",
+			"config_name", name,
 			"err", err,
 		)
 	}
