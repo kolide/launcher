@@ -29,6 +29,7 @@ type FilewalkManager struct {
 	// Internals
 	cfgStore     types.Iterator
 	resultsStore types.GetterSetterDeleterIterator
+	flags        types.Flags
 	slogger      *slog.Logger
 
 	req        chan struct{}
@@ -46,6 +47,7 @@ func New(k types.Knapsack, slogger *slog.Logger) *FilewalkManager {
 	return &FilewalkManager{
 		cfgStore:     k.FilewalkConfigStore(),
 		resultsStore: k.FilewalkResultsStore(),
+		flags:        k,
 		slogger:      slogger.With("component", "filewalker"),
 		req:          make(chan struct{}, 1),
 		interrupt:    make(chan struct{}),
@@ -91,7 +93,11 @@ func (fm *FilewalkManager) run(ctx context.Context) {
 			)
 		} else {
 			fm.deleteRemovedResults(ctx, present)
-			names := dueStrict(time.Now(), cfgs, fm.lastWalkTimes(ctx, cfgs))
+			due := dueHeartbeat
+			if fm.flags.FilewalkDueStrategy() == dueStrategyStrict {
+				due = dueStrict
+			}
+			names := due(time.Now(), cfgs, fm.lastWalkTimes(ctx, cfgs))
 			if requested {
 				names = slices.Collect(maps.Keys(cfgs))
 			}

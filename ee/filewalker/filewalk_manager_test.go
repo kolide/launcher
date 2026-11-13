@@ -70,6 +70,39 @@ func TestManager_WalksOnSchedule(t *testing.T) {
 	})
 }
 
+func TestManager_ChoosesDueStrategy(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		strategy string
+	}{
+		{},
+		{strategy: ""},
+		{strategy: dueStrategyStrict},
+		{strategy: "bogus"},
+	} {
+		t.Run(tt.strategy, func(t *testing.T) {
+			t.Parallel()
+			runManagerTestWithStrategy(t, tt.strategy, func(h *managerHarness) {
+				h.setConfig("dotenv", dotenvCfg)
+				h.setConfig("host_keys", hostKeysCfg)
+				h.seedLastWalk("dotenv", 2*time.Hour)
+				seeded := h.seedLastWalk("host_keys", 4*time.Hour-30*time.Minute)
+
+				h.start()
+
+				require.Equal(t, time.Now().Unix(), h.lastWalk("dotenv"))
+
+				if tt.strategy == dueStrategyStrict {
+					// not due, so not ran
+					require.Equal(t, seeded, h.lastWalk("host_keys"))
+				} else {
+					require.Equal(t, time.Now().Unix(), h.lastWalk("host_keys"))
+				}
+			})
+		})
+	}
+}
+
 // Ping should walk every config immediately, even those not due.
 func TestManager_PingWalksAllImmediately(t *testing.T) {
 	t.Parallel()
@@ -324,6 +357,10 @@ func (s *countingStore) holdSet(key []byte) chan struct{} {
 
 // runManagerTest runs body in a synctest bubble with a fresh manager; time only advances while every goroutine is blocked.
 func runManagerTest(t *testing.T, body func(h *managerHarness)) {
+	runManagerTestWithStrategy(t, dueStrategyStrict, body)
+}
+
+func runManagerTestWithStrategy(t *testing.T, strategy string, body func(h *managerHarness)) {
 	synctest.Test(t, func(t *testing.T) {
 		slogger := multislogger.NewNopLogger()
 		root := t.TempDir()
@@ -341,6 +378,7 @@ func runManagerTest(t *testing.T, body func(h *managerHarness)) {
 		k := typesmocks.NewKnapsack(t)
 		k.On("FilewalkConfigStore").Return(cfgStore)
 		k.On("FilewalkResultsStore").Return(resultsStore)
+		k.On("FilewalkDueStrategy").Return(strategy).Maybe()
 
 		h := &managerHarness{
 			t:            t,
