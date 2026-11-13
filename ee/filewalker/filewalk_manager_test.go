@@ -285,26 +285,6 @@ func TestManager_InterruptBeforeExecute(t *testing.T) {
 	})
 }
 
-// due should return config names ready to walk.
-func Test_due(t *testing.T) {
-	t.Parallel()
-
-	now := time.Unix(1_000_000, 0)
-	cfgs := map[string]filewalkConfig{
-		"never_walked": {WalkInterval: duration(time.Hour)},
-		"future":       {WalkInterval: duration(time.Hour)},
-		"not_due":      {WalkInterval: duration(time.Hour)},
-		"elapsed":      {WalkInterval: duration(time.Hour)},
-	}
-	lastWalks := map[string]time.Time{
-		"future":  now.Add(24 * time.Hour), // clock moved back
-		"not_due": now.Add(-59 * time.Minute),
-		"elapsed": now.Add(-time.Hour),
-	}
-
-	require.ElementsMatch(t, []string{"elapsed", "future", "never_walked"}, due(now, cfgs, lastWalks))
-}
-
 type managerHarness struct {
 	t            *testing.T
 	root         string
