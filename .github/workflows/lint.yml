@@ -173,6 +173,36 @@ jobs:
       - name: Check table specs
         run: ./build/launcher specs --required description --required name --quiet
 
+  mockery:
+    permissions:
+      contents: read
+    name: mockery
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit # Audit network and disk activity
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: './go.mod'
+          check-latest: true
+          cache: false
+
+      - run: make deps
+
+      - run: go run github.com/vektra/mockery/v3@v3.9.1
+
+      - name: Check mocks are up to date
+        run: |
+          git status --porcelain
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
+
   # This job is here as a github status check -- it allows us to move
   # the merge dependency from being on all the jobs to this single
   # one.
@@ -191,3 +221,4 @@ jobs:
       - golangci
       - govulncheck
       - table_specs
+      - mockery
