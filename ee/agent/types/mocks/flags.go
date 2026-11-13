@@ -1234,6 +1234,50 @@ func (_c *Flags_ExportTraces_Call) RunAndReturn(run func() bool) *Flags_ExportTr
 	return _c
 }
 
+// FilewalkDueStrategy provides a mock function for the type Flags
+func (_mock *Flags) FilewalkDueStrategy() string {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for FilewalkDueStrategy")
+	}
+
+	var r0 string
+	if returnFunc, ok := ret.Get(0).(func() string); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	return r0
+}
+
+// Flags_FilewalkDueStrategy_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FilewalkDueStrategy'
+type Flags_FilewalkDueStrategy_Call struct {
+	*mock.Call
+}
+
+// FilewalkDueStrategy is a helper method to define mock.On call
+func (_e *Flags_Expecter) FilewalkDueStrategy() *Flags_FilewalkDueStrategy_Call {
+	return &Flags_FilewalkDueStrategy_Call{Call: _e.mock.On("FilewalkDueStrategy")}
+}
+
+func (_c *Flags_FilewalkDueStrategy_Call) Run(run func()) *Flags_FilewalkDueStrategy_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Flags_FilewalkDueStrategy_Call) Return(s string) *Flags_FilewalkDueStrategy_Call {
+	_c.Call.Return(s)
+	return _c
+}
+
+func (_c *Flags_FilewalkDueStrategy_Call) RunAndReturn(run func() string) *Flags_FilewalkDueStrategy_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ForceControlSubsystems provides a mock function for the type Flags
 func (_mock *Flags) ForceControlSubsystems() bool {
 	ret := _mock.Called()
@@ -3869,6 +3913,57 @@ func (_c *Flags_SetExportTracesOverride_Call) Return() *Flags_SetExportTracesOve
 
 func (_c *Flags_SetExportTracesOverride_Call) RunAndReturn(run func(value bool, duration time.Duration)) *Flags_SetExportTracesOverride_Call {
 	_c.Run(run)
+	return _c
+}
+
+// SetFilewalkDueStrategy provides a mock function for the type Flags
+func (_mock *Flags) SetFilewalkDueStrategy(strategy string) error {
+	ret := _mock.Called(strategy)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetFilewalkDueStrategy")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(string) error); ok {
+		r0 = returnFunc(strategy)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Flags_SetFilewalkDueStrategy_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetFilewalkDueStrategy'
+type Flags_SetFilewalkDueStrategy_Call struct {
+	*mock.Call
+}
+
+// SetFilewalkDueStrategy is a helper method to define mock.On call
+//   - strategy string
+func (_e *Flags_Expecter) SetFilewalkDueStrategy(strategy any) *Flags_SetFilewalkDueStrategy_Call {
+	return &Flags_SetFilewalkDueStrategy_Call{Call: _e.mock.On("SetFilewalkDueStrategy", strategy)}
+}
+
+func (_c *Flags_SetFilewalkDueStrategy_Call) Run(run func(strategy string)) *Flags_SetFilewalkDueStrategy_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *Flags_SetFilewalkDueStrategy_Call) Return(err error) *Flags_SetFilewalkDueStrategy_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Flags_SetFilewalkDueStrategy_Call) RunAndReturn(run func(strategy string) error) *Flags_SetFilewalkDueStrategy_Call {
+	_c.Call.Return(run)
 	return _c
 }
 
