@@ -20,6 +20,8 @@ const (
 
 // TableCounts holds per-table query outcomes for one reporting window.
 // Every completed call counts as a query; timeouts are queries but not errors.
+// TotalMs and MaxMs cover the calls counted in Query: the time they took in total, and the
+// longest single call. A call that times out counts for as long as we waited for it.
 type TableCounts struct {
 	Name     string `json:"name"`
 	Query    int64  `json:"query"`
@@ -27,12 +29,30 @@ type TableCounts struct {
 	Empty    int64  `json:"empty"`
 	Timeout  int64  `json:"timeout"`
 	NoWorker int64  `json:"no_worker"`
+	TotalMs  int64  `json:"total_ms"`
+	MaxMs    int64  `json:"max_ms"`
+}
+
+// tableStats is the running state for one table. Durations are kept at full resolution and
+// only rounded to milliseconds when read, so many sub-millisecond calls still add up.
+type tableStats struct {
+	counts TableCounts
+	total  time.Duration
+	max    time.Duration
+}
+
+// read returns the counts with the durations filled in.
+func (s *tableStats) read() TableCounts {
+	c := s.counts
+	c.TotalMs = s.total.Round(time.Millisecond).Milliseconds()
+	c.MaxMs = s.max.Round(time.Millisecond).Milliseconds()
+	return c
 }
 
 // healthRecorder accumulates per-table outcomes in memory between reports.
 type healthRecorder struct {
 	lock        sync.Mutex
-	tables      map[string]*TableCounts
+	tables      map[string]*tableStats
 	windowStart time.Time
 }
 
@@ -41,34 +61,38 @@ var tableHealth = newHealthRecorder()
 
 func newHealthRecorder() *healthRecorder {
 	return &healthRecorder{
-		tables:      make(map[string]*TableCounts),
+		tables:      make(map[string]*tableStats),
 		windowStart: time.Now(),
 	}
 }
 
-func (h *healthRecorder) record(tableName string, outcome queryOutcome) {
+// record counts one call to a table. elapsed is how long the call took; it is ignored for
+// outcomeNoWorker, where the table was never called.
+func (h *healthRecorder) record(tableName string, outcome queryOutcome, elapsed time.Duration) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
-	c, ok := h.tables[tableName]
+	s, ok := h.tables[tableName]
 	if !ok {
-		c = &TableCounts{Name: tableName}
-		h.tables[tableName] = c
+		s = &tableStats{counts: TableCounts{Name: tableName}}
+		h.tables[tableName] = s
 	}
 
 	switch outcome {
 	case outcomeSuccess:
 	case outcomeNoWorker:
-		c.NoWorker++
+		s.counts.NoWorker++
 		return
 	case outcomeEmpty:
-		c.Empty++
+		s.counts.Empty++
 	case outcomeError:
-		c.Error++
+		s.counts.Error++
 	case outcomeTimeout:
-		c.Timeout++
+		s.counts.Timeout++
 	}
-	c.Query++
+	s.counts.Query++
+	s.total += elapsed
+	s.max = max(s.max, elapsed)
 }
 
 // snapshotAndReset returns the counts since the last call, sorted by table name,
@@ -81,14 +105,14 @@ func (h *healthRecorder) snapshotAndReset() ([]TableCounts, time.Time, time.Time
 	windowStart := h.windowStart
 
 	counts := make([]TableCounts, 0, len(h.tables))
-	for _, c := range h.tables {
-		counts = append(counts, *c)
+	for _, s := range h.tables {
+		counts = append(counts, s.read())
 	}
 	slices.SortFunc(counts, func(a, b TableCounts) int {
 		return strings.Compare(a.Name, b.Name)
 	})
 
-	h.tables = make(map[string]*TableCounts)
+	h.tables = make(map[string]*tableStats)
 	h.windowStart = now
 
 	return counts, windowStart, now

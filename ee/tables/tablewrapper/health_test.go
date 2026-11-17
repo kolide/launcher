@@ -27,14 +27,15 @@ func (h *healthRecorder) countsFor(tableName string) TableCounts {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
-	if c, ok := h.tables[tableName]; ok {
-		return *c
+	if s, ok := h.tables[tableName]; ok {
+		return s.read()
 	}
 	return TableCounts{Name: tableName}
 }
 
 // since returns the counts added after an earlier reading. The process-wide recorder keeps
 // its counts across runs of a test (-count=N), so tests against it compare deltas.
+// TotalMs and MaxMs are left out: they depend on how long the calls really took.
 func (c TableCounts) since(earlier TableCounts) TableCounts {
 	return TableCounts{
 		Name:     c.Name,
@@ -70,7 +71,7 @@ func TestHealthRecorder_record(t *testing.T) {
 
 			h := newHealthRecorder()
 			for _, o := range tt.outcomes {
-				h.record("test_table", o)
+				h.record("test_table", o, 0)
 			}
 
 			tt.expected.Name = "test_table"
@@ -79,15 +80,88 @@ func TestHealthRecorder_record(t *testing.T) {
 	}
 }
 
+func TestHealthRecorder_recordDurations(t *testing.T) {
+	t.Parallel()
+
+	type call struct {
+		outcome queryOutcome
+		elapsed time.Duration
+	}
+
+	for _, tt := range []struct {
+		name            string
+		calls           []call
+		expectedTotalMs int64
+		expectedMaxMs   int64
+	}{
+		{
+			name:            "single call",
+			calls:           []call{{outcomeSuccess, 40 * time.Millisecond}},
+			expectedTotalMs: 40,
+			expectedMaxMs:   40,
+		},
+		{
+			name: "every outcome that counts as a query adds its time",
+			calls: []call{
+				{outcomeSuccess, 10 * time.Millisecond},
+				{outcomeEmpty, 20 * time.Millisecond},
+				{outcomeError, 30 * time.Millisecond},
+				{outcomeTimeout, 4 * time.Minute},
+			},
+			expectedTotalMs: 240_060,
+			expectedMaxMs:   240_000,
+		},
+		{
+			name:            "no worker adds no time",
+			calls:           []call{{outcomeNoWorker, time.Second}, {outcomeSuccess, 5 * time.Millisecond}},
+			expectedTotalMs: 5,
+			expectedMaxMs:   5,
+		},
+		{
+			name: "sub-millisecond calls add up before rounding",
+			calls: []call{
+				{outcomeSuccess, 400 * time.Microsecond},
+				{outcomeSuccess, 400 * time.Microsecond},
+				{outcomeSuccess, 400 * time.Microsecond},
+				{outcomeSuccess, 400 * time.Microsecond},
+				{outcomeSuccess, 400 * time.Microsecond},
+			},
+			expectedTotalMs: 2,
+			expectedMaxMs:   0,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			h := newHealthRecorder()
+			for _, c := range tt.calls {
+				h.record("test_table", c.outcome, c.elapsed)
+			}
+
+			counts, _, _ := h.snapshotAndReset()
+			require.Len(t, counts, 1)
+			require.Equal(t, tt.expectedTotalMs, counts[0].TotalMs, "total_ms")
+			require.Equal(t, tt.expectedMaxMs, counts[0].MaxMs, "max_ms")
+
+			// Durations start over with the next window
+			h.record("test_table", outcomeSuccess, time.Millisecond)
+			counts, _, _ = h.snapshotAndReset()
+			require.Len(t, counts, 1)
+			require.Equal(t, int64(1), counts[0].TotalMs, "total_ms after reset")
+			require.Equal(t, int64(1), counts[0].MaxMs, "max_ms after reset")
+		})
+	}
+}
+
 func TestHealthRecorder_snapshotAndReset(t *testing.T) {
 	t.Parallel()
 
 	h := newHealthRecorder()
-	h.record("b_table", outcomeSuccess)
-	h.record("b_table", outcomeEmpty)
-	h.record("b_table", outcomeError)
-	h.record("b_table", outcomeTimeout)
-	h.record("a_table", outcomeNoWorker)
+	h.record("b_table", outcomeSuccess, 0)
+	h.record("b_table", outcomeEmpty, 0)
+	h.record("b_table", outcomeError, 0)
+	h.record("b_table", outcomeTimeout, 0)
+	h.record("a_table", outcomeNoWorker, 0)
 
 	counts, windowStart, windowEnd := h.snapshotAndReset()
 	require.Equal(t, []TableCounts{
@@ -119,7 +193,7 @@ func TestHealthRecorder_concurrentRecordsAndSnapshots(t *testing.T) {
 	for range 50 {
 		wg.Go(func() {
 			for range 100 {
-				h.record("concurrent_table", outcomeError)
+				h.record("concurrent_table", outcomeError, 0)
 			}
 		})
 	}
@@ -157,7 +231,12 @@ func TestGenerate_recordsTimeoutAndNoWorker(t *testing.T) {
 	require.ErrorContains(t, err, "no workers available")
 	wt.workers.Release(numWorkers)
 
-	require.Equal(t, TableCounts{Name: tableName, Query: 1, Timeout: 1, NoWorker: 1}, tableHealth.countsFor(tableName).since(before))
+	after := tableHealth.countsFor(tableName)
+	require.Equal(t, TableCounts{Name: tableName, Query: 1, Timeout: 1, NoWorker: 1}, after.since(before))
+
+	// The timed-out call counts for at least as long as we waited for it
+	require.GreaterOrEqual(t, after.TotalMs-before.TotalMs, int64(10), "total_ms")
+	require.GreaterOrEqual(t, after.MaxMs, int64(10), "max_ms")
 }
 
 // testHealthReporter wraps a reporter that has its own recorder, logs JSON to a buffer,
@@ -262,9 +341,9 @@ func TestHealthReporter_report(t *testing.T) {
 	t.Parallel()
 
 	tr := newTestHealthReporter(t, 6*time.Hour)
-	tr.recorder.record("kolide_plist", outcomeEmpty)
-	tr.recorder.record("kolide_wifi_networks", outcomeError)
-	tr.recorder.record("kolide_wifi_networks", outcomeNoWorker)
+	tr.recorder.record("kolide_plist", outcomeEmpty, 40*time.Millisecond)
+	tr.recorder.record("kolide_wifi_networks", outcomeError, 250*time.Millisecond)
+	tr.recorder.record("kolide_wifi_networks", outcomeNoWorker, 0)
 
 	tr.report(t.Context())
 
@@ -275,8 +354,8 @@ func TestHealthReporter_report(t *testing.T) {
 		require.Contains(t, raw, key)
 	}
 	require.Equal(t, []any{
-		map[string]any{"name": "kolide_plist", "query": float64(1), "error": float64(0), "empty": float64(1), "timeout": float64(0), "no_worker": float64(0)},
-		map[string]any{"name": "kolide_wifi_networks", "query": float64(1), "error": float64(1), "empty": float64(0), "timeout": float64(0), "no_worker": float64(1)},
+		map[string]any{"name": "kolide_plist", "query": float64(1), "error": float64(0), "empty": float64(1), "timeout": float64(0), "no_worker": float64(0), "total_ms": float64(40), "max_ms": float64(40)},
+		map[string]any{"name": "kolide_wifi_networks", "query": float64(1), "error": float64(1), "empty": float64(0), "timeout": float64(0), "no_worker": float64(1), "total_ms": float64(250), "max_ms": float64(250)},
 	}, raw["tables"])
 
 	summaries := tr.summaries(t)
@@ -310,7 +389,7 @@ func TestHealthReporter_flushesOnInterrupt(t *testing.T) {
 			t.Parallel()
 
 			tr := newTestHealthReporter(t, tt.interval)
-			tr.recorder.record("kolide_plist", outcomeSuccess)
+			tr.recorder.record("kolide_plist", outcomeSuccess, 0)
 
 			tr.start(t)
 			tr.stop(t)
@@ -352,14 +431,14 @@ func TestHealthReporter_FlagsChanged(t *testing.T) {
 			t.Parallel()
 
 			tr := newTestHealthReporter(t, tt.initialInterval)
-			tr.recorder.record(tt.recordBefore, outcomeSuccess)
+			tr.recorder.record(tt.recordBefore, outcomeSuccess, 0)
 			tr.start(t)
 			tr.setInterval(t, tt.newInterval)
 
 			expected := tt.expectedTables[len(tt.expectedTables)-1]
 			require.Eventually(t, func() bool {
 				if tt.recordAfter != "" {
-					tr.recorder.record(tt.recordAfter, outcomeSuccess)
+					tr.recorder.record(tt.recordAfter, outcomeSuccess, 0)
 				}
 				for _, s := range tr.summaries(t) {
 					for _, table := range s.Tables {
@@ -401,7 +480,7 @@ func TestHealthReporter_disablingStopsReporting(t *testing.T) {
 
 	// Once Execute has taken the change, nothing more is reported, not even on Interrupt
 	require.Eventually(t, func() bool { return len(tr.intervalChanged) == 0 }, 5*time.Second, time.Millisecond)
-	tr.recorder.record("kolide_plist", outcomeSuccess)
+	tr.recorder.record("kolide_plist", outcomeSuccess, 0)
 	tr.stop(t)
 
 	require.Empty(t, tr.summaries(t))

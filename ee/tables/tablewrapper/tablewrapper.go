@@ -149,7 +149,7 @@ func (wt *wrappedTable) generate(ctx context.Context, queryContext table.QueryCo
 	// we don't want too many calls to the same table piling up.
 	if !wt.workers.TryAcquire(1) {
 		span.AddEvent("no_workers_available")
-		tableHealth.record(wt.name, outcomeNoWorker)
+		tableHealth.record(wt.name, outcomeNoWorker, 0)
 		return nil, fmt.Errorf("no workers available (limit %d)", numWorkers)
 	}
 
@@ -193,12 +193,12 @@ func (wt *wrappedTable) generate(ctx context.Context, queryContext table.QueryCo
 		observability.TablewrapperQueryCounter.Add(ctx, 1, wt.metricAttrs)
 		if result.err != nil {
 			observability.TablewrapperErrorCounter.Add(ctx, 1, wt.metricAttrs)
-			tableHealth.record(wt.name, outcomeError)
+			tableHealth.record(wt.name, outcomeError, time.Since(queryStartTime))
 		} else if len(result.rows) == 0 {
 			observability.TablewrapperEmptyCounter.Add(ctx, 1, wt.metricAttrs)
-			tableHealth.record(wt.name, outcomeEmpty)
+			tableHealth.record(wt.name, outcomeEmpty, time.Since(queryStartTime))
 		} else {
-			tableHealth.record(wt.name, outcomeSuccess)
+			tableHealth.record(wt.name, outcomeSuccess, time.Since(queryStartTime))
 		}
 		return result.rows, result.err
 	case <-ctx.Done():
@@ -211,7 +211,7 @@ func (wt *wrappedTable) generate(ctx context.Context, queryContext table.QueryCo
 			"query_timeout", genTimeout.String(),
 		)
 		observability.TablewrapperTimeoutCounter.Add(ctx, 1, wt.metricAttrs)
-		tableHealth.record(wt.name, outcomeTimeout)
+		tableHealth.record(wt.name, outcomeTimeout, time.Since(queryStartTime))
 		span.AddEvent("generate_timed_out")
 		err := fmt.Errorf("querying %s timed out after %s (queried columns: %v)", wt.name, genTimeout.String(), queriedColumns)
 		observability.SetError(span, err)
