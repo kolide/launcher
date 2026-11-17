@@ -22,13 +22,15 @@ const (
 // Every completed call counts as a query; timeouts are queries but not errors.
 // TotalMs and MaxMs cover the calls counted in Query: the time they took in total, and the
 // longest single call. A call that times out counts for as long as we waited for it.
+// Zero outcome counts are left out of the JSON to keep the record under the log shipper's
+// 8 KB limit per log line; a missing count means 0.
 type TableCounts struct {
 	Name     string `json:"name"`
 	Query    int64  `json:"query"`
-	Error    int64  `json:"error"`
-	Empty    int64  `json:"empty"`
-	Timeout  int64  `json:"timeout"`
-	NoWorker int64  `json:"no_worker"`
+	Error    int64  `json:"error,omitempty"`
+	Empty    int64  `json:"empty,omitempty"`
+	Timeout  int64  `json:"timeout,omitempty"`
+	NoWorker int64  `json:"no_worker,omitempty"`
 	TotalMs  int64  `json:"total_ms"`
 	MaxMs    int64  `json:"max_ms"`
 }
@@ -116,12 +118,4 @@ func (h *healthRecorder) snapshotAndReset() ([]TableCounts, time.Time, time.Time
 	h.windowStart = now
 
 	return counts, windowStart, now
-}
-
-// windowStartedAt returns when the current window began.
-func (h *healthRecorder) windowStartedAt() time.Time {
-	h.lock.Lock()
-	defer h.lock.Unlock()
-
-	return h.windowStart
 }

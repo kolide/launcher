@@ -257,9 +257,9 @@ type Flags interface {
 	SetTableGenerateTimeout(interval time.Duration) error
 	TableGenerateTimeout() time.Duration
 
-	// TableHealthReportInterval is how often launcher logs a per-table health summary; 0 disables it
-	SetTableHealthReportInterval(interval time.Duration) error
-	TableHealthReportInterval() time.Duration
+	// TableHealthReportingEnabled controls whether launcher logs a periodic per-table health summary
+	SetTableHealthReportingEnabled(enabled bool) error
+	TableHealthReportingEnabled() bool
 
 	// UseCachedDataForScheduledQueries controls whether launcher uses cached data for scheduled queries.
 	// Currently, we do this only for the kolide_windows_updates table, since that table can time out when

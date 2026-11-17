@@ -171,7 +171,6 @@ func TestHealthRecorder_snapshotAndReset(t *testing.T) {
 	require.False(t, windowEnd.Before(windowStart))
 
 	// The next window starts where the last one ended, with no counts
-	require.Equal(t, windowEnd, h.windowStartedAt())
 	counts, nextWindowStart, _ := h.snapshotAndReset()
 	require.Empty(t, counts)
 	require.Equal(t, windowEnd, nextWindowStart)
@@ -239,78 +238,25 @@ func TestGenerate_recordsTimeoutAndNoWorker(t *testing.T) {
 	require.GreaterOrEqual(t, after.MaxMs, int64(10), "max_ms")
 }
 
-// testHealthReporter wraps a reporter that has its own recorder, logs JSON to a buffer,
-// and reads its interval from a value the test can change.
-type testHealthReporter struct {
-	*HealthReporter
-	logs          *threadsafebuffer.ThreadSafeBuffer
-	interval      *atomic.Int64
-	intervalReads *atomic.Int64
-	done          chan error
-}
-
-func newTestHealthReporter(t *testing.T, interval time.Duration) *testHealthReporter {
+// newTestHealthReporter returns a reporter with its own recorder that logs JSON to logs.
+func newTestHealthReporter(t *testing.T, enabled bool) (*HealthReporter, *threadsafebuffer.ThreadSafeBuffer) {
 	t.Helper()
 
 	logs := &threadsafebuffer.ThreadSafeBuffer{}
-	currentInterval := &atomic.Int64{}
-	currentInterval.Store(int64(interval))
-	intervalReads := &atomic.Int64{}
-
 	k := typesmocks.NewKnapsack(t)
 	k.On("Slogger").Return(slog.New(slog.NewJSONHandler(logs, nil)))
-	k.On("RegisterChangeObserver", mock.Anything, keys.TableHealthReportInterval).Return()
-	k.EXPECT().TableHealthReportInterval().RunAndReturn(func() time.Duration {
-		return time.Duration(currentInterval.Load())
-	}).Run(func() { intervalReads.Add(1) }).Maybe()
+	k.On("TableHealthReportingEnabled").Return(enabled).Maybe()
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSName: "macOS", OSVersion: "26.7.1"}).Maybe()
 
 	r := NewHealthReporter(k)
 	r.recorder = newHealthRecorder()
-	r.minInterval = time.Millisecond
-	return &testHealthReporter{HealthReporter: r, logs: logs, interval: currentInterval, intervalReads: intervalReads}
-}
-
-func (tr *testHealthReporter) start(t *testing.T) {
-	t.Helper()
-
-	tr.done = make(chan error, 1)
-	gowrapper.Go(t.Context(), multislogger.NewNopLogger(), func() {
-		tr.done <- tr.Execute()
-	})
-	t.Cleanup(func() { tr.Interrupt(nil) })
-
-	// Execute reads the interval once before it starts waiting; flag changes made by the
-	// test after this point are changes to a running reporter.
-	require.Eventually(t, func() bool { return tr.intervalReads.Load() > 0 }, 5*time.Second, time.Millisecond)
-}
-
-func (tr *testHealthReporter) setInterval(t *testing.T, d time.Duration) {
-	t.Helper()
-
-	tr.interval.Store(int64(d))
-	tr.FlagsChanged(t.Context(), keys.TableHealthReportInterval)
-}
-
-// stop interrupts the reporter and waits for Execute to return.
-func (tr *testHealthReporter) stop(t *testing.T) {
-	t.Helper()
-
-	tr.Interrupt(nil)
-	tr.Interrupt(nil) // extra calls must not block
-	select {
-	case err := <-tr.done:
-		require.NoError(t, err)
-	case <-time.After(5 * time.Second):
-		t.Fatal("Execute did not return after Interrupt")
-	}
+	return r, logs
 }
 
 type loggedSummary struct {
 	Msg           string        `json:"msg"`
 	Level         string        `json:"level"`
 	SchemaVersion int           `json:"schema_version"`
-	RecordID      string        `json:"record_id"`
 	WindowStart   time.Time     `json:"window_start"`
 	WindowEnd     time.Time     `json:"window_end"`
 	OSName        string        `json:"os_name"`
@@ -320,11 +266,11 @@ type loggedSummary struct {
 }
 
 // summaries returns every table_health_summary record logged so far.
-func (tr *testHealthReporter) summaries(t *testing.T) []loggedSummary {
+func summaries(t *testing.T, logs *threadsafebuffer.ThreadSafeBuffer) []loggedSummary {
 	t.Helper()
 
 	var found []loggedSummary
-	for line := range strings.SplitSeq(tr.logs.String(), "\n") {
+	for line := range strings.SplitSeq(logs.String(), "\n") {
 		if line == "" {
 			continue
 		}
@@ -340,197 +286,77 @@ func (tr *testHealthReporter) summaries(t *testing.T) []loggedSummary {
 func TestHealthReporter_report(t *testing.T) {
 	t.Parallel()
 
-	tr := newTestHealthReporter(t, 6*time.Hour)
-	tr.recorder.record("kolide_plist", outcomeEmpty, 40*time.Millisecond)
-	tr.recorder.record("kolide_wifi_networks", outcomeError, 250*time.Millisecond)
-	tr.recorder.record("kolide_wifi_networks", outcomeNoWorker, 0)
+	r, logs := newTestHealthReporter(t, true)
+	r.recorder.record("kolide_plist", outcomeEmpty, 40*time.Millisecond)
+	r.recorder.record("kolide_wifi_networks", outcomeError, 250*time.Millisecond)
+	r.recorder.record("kolide_wifi_networks", outcomeNoWorker, 0)
+	r.recorder.record("kolide_zero_ms", outcomeSuccess, 0)
 
-	tr.report(t.Context())
+	r.report(t.Context())
 
-	// Check the raw keys, not just what unmarshals into the struct
+	// Check the raw keys, not just what unmarshals into the struct. Zero outcome counts are
+	// left out; query, total_ms and max_ms are always present.
 	var raw map[string]any
-	require.NoError(t, json.Unmarshal([]byte(tr.logs.String()), &raw))
-	for _, key := range []string{"msg", "level", "schema_version", "record_id", "window_start", "window_end", "os_name", "os_version", "arch", "tables", "component"} {
+	require.NoError(t, json.Unmarshal([]byte(logs.String()), &raw))
+	for _, key := range []string{"msg", "level", "schema_version", "window_start", "window_end", "os_name", "os_version", "arch", "tables", "component"} {
 		require.Contains(t, raw, key)
 	}
 	require.Equal(t, []any{
-		map[string]any{"name": "kolide_plist", "query": float64(1), "error": float64(0), "empty": float64(1), "timeout": float64(0), "no_worker": float64(0), "total_ms": float64(40), "max_ms": float64(40)},
-		map[string]any{"name": "kolide_wifi_networks", "query": float64(1), "error": float64(1), "empty": float64(0), "timeout": float64(0), "no_worker": float64(1), "total_ms": float64(250), "max_ms": float64(250)},
+		map[string]any{"name": "kolide_plist", "query": float64(1), "empty": float64(1), "total_ms": float64(40), "max_ms": float64(40)},
+		map[string]any{"name": "kolide_wifi_networks", "query": float64(1), "error": float64(1), "no_worker": float64(1), "total_ms": float64(250), "max_ms": float64(250)},
+		map[string]any{"name": "kolide_zero_ms", "query": float64(1), "total_ms": float64(0), "max_ms": float64(0)},
 	}, raw["tables"])
 
-	summaries := tr.summaries(t)
-	require.Len(t, summaries, 1)
-	logged := summaries[0]
-	require.Equal(t, "INFO", logged.Level)
-	require.Equal(t, healthSummarySchemaVersion, logged.SchemaVersion)
-	require.NotEmpty(t, logged.RecordID)
-	require.False(t, logged.WindowEnd.Before(logged.WindowStart))
-	require.Equal(t, "macOS", logged.OSName)
-	require.Equal(t, "26.7.1", logged.OSVersion)
-	require.Equal(t, runtime.GOARCH, logged.Arch)
+	logged := summaries(t, logs)
+	require.Len(t, logged, 1)
+	require.Equal(t, "INFO", logged[0].Level)
+	require.Equal(t, healthSummarySchemaVersion, logged[0].SchemaVersion)
+	require.False(t, logged[0].WindowEnd.Before(logged[0].WindowStart))
+	require.Equal(t, "macOS", logged[0].OSName)
+	require.Equal(t, "26.7.1", logged[0].OSVersion)
+	require.Equal(t, runtime.GOARCH, logged[0].Arch)
 
 	// Nothing is logged when no table was queried
-	tr.report(t.Context())
-	require.Len(t, tr.summaries(t), 1)
+	r.report(t.Context())
+	require.Len(t, summaries(t, logs), 1)
 }
 
-func TestHealthReporter_flushesOnInterrupt(t *testing.T) {
+func TestHealthReporter_reportWhenDisabled(t *testing.T) {
 	t.Parallel()
 
-	for _, tt := range []struct {
-		name        string
-		interval    time.Duration
-		expectFlush bool
-	}{
-		{name: "enabled", interval: 6 * time.Hour, expectFlush: true},
-		{name: "disabled", interval: 0, expectFlush: false},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+	r, logs := newTestHealthReporter(t, false)
+	r.recorder.record("kolide_plist", outcomeSuccess, 0)
 
-			tr := newTestHealthReporter(t, tt.interval)
-			tr.recorder.record("kolide_plist", outcomeSuccess, 0)
+	r.report(t.Context())
+	require.Empty(t, summaries(t, logs))
 
-			tr.start(t)
-			tr.stop(t)
-
-			require.Equal(t, tt.expectFlush, len(tr.summaries(t)) == 1)
-		})
-	}
+	// The window is still reset, so re-enabling never reports the disabled period
+	counts, _, _ := r.recorder.snapshotAndReset()
+	require.Empty(t, counts)
 }
 
-func TestHealthReporter_FlagsChanged(t *testing.T) {
+func TestHealthReporter_Execute(t *testing.T) {
 	t.Parallel()
 
-	for _, tt := range []struct {
-		name            string
-		initialInterval time.Duration
-		newInterval     time.Duration
-		// recordBefore is recorded before the flag changes; recordAfter is recorded repeatedly after
-		recordBefore   string
-		recordAfter    string
-		expectedTables []string // tables expected across all summaries before Interrupt
-	}{
-		{
-			name:            "shortened interval reports the open window promptly, once",
-			initialInterval: 6 * time.Hour,
-			newInterval:     20 * time.Millisecond,
-			recordBefore:    "before_change",
-			expectedTables:  []string{"before_change"},
-		},
-		{
-			name:            "enabling from zero starts a fresh window",
-			initialInterval: 0,
-			newInterval:     20 * time.Millisecond,
-			recordBefore:    "before_change",
-			recordAfter:     "after_change",
-			expectedTables:  []string{"after_change"},
-		},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+	r, logs := newTestHealthReporter(t, true)
+	r.interval = 10 * time.Millisecond
 
-			tr := newTestHealthReporter(t, tt.initialInterval)
-			tr.recorder.record(tt.recordBefore, outcomeSuccess, 0)
-			tr.start(t)
-			tr.setInterval(t, tt.newInterval)
+	done := make(chan error, 1)
+	gowrapper.Go(t.Context(), multislogger.NewNopLogger(), func() {
+		done <- r.Execute()
+	})
 
-			expected := tt.expectedTables[len(tt.expectedTables)-1]
-			require.Eventually(t, func() bool {
-				if tt.recordAfter != "" {
-					tr.recorder.record(tt.recordAfter, outcomeSuccess, 0)
-				}
-				for _, s := range tr.summaries(t) {
-					for _, table := range s.Tables {
-						if table.Name == expected {
-							return true
-						}
-					}
-				}
-				return false
-			}, 5*time.Second, 10*time.Millisecond, "no summary after the interval changed")
-			tr.stop(t)
+	require.Eventually(t, func() bool {
+		r.recorder.record("kolide_plist", outcomeSuccess, 0)
+		return len(summaries(t, logs)) > 0
+	}, 5*time.Second, 5*time.Millisecond, "no summary was logged on the ticker")
 
-			// Each table shows up in exactly one record per window, and every window is distinct
-			seen := make(map[string]int)
-			var lastEnd time.Time
-			for _, s := range tr.summaries(t) {
-				require.False(t, s.WindowStart.Before(lastEnd), "windows must not overlap")
-				lastEnd = s.WindowEnd
-				for _, table := range s.Tables {
-					seen[table.Name]++
-				}
-			}
-			for name := range seen {
-				require.Contains(t, tt.expectedTables, name)
-			}
-			if tt.recordAfter == "" {
-				require.Equal(t, 1, seen[expected], "the open window must be reported exactly once")
-			}
-		})
-	}
-}
-
-func TestHealthReporter_disablingStopsReporting(t *testing.T) {
-	t.Parallel()
-
-	tr := newTestHealthReporter(t, 6*time.Hour)
-	tr.start(t)
-	tr.setInterval(t, 0)
-
-	// Once Execute has taken the change, nothing more is reported, not even on Interrupt
-	require.Eventually(t, func() bool { return len(tr.intervalChanged) == 0 }, 5*time.Second, time.Millisecond)
-	tr.recorder.record("kolide_plist", outcomeSuccess, 0)
-	tr.stop(t)
-
-	require.Empty(t, tr.summaries(t))
-}
-
-func TestJitter(t *testing.T) {
-	t.Parallel()
-
-	for _, tt := range []struct {
-		name string
-		d    time.Duration
-	}{
-		{name: "default interval", d: 6 * time.Hour},
-		{name: "floor", d: minHealthReportInterval},
-		{name: "max", d: 24 * time.Hour},
-		{name: "tiny", d: 5 * time.Nanosecond},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			lower := tt.d - tt.d/10
-			upper := tt.d + tt.d/10
-			for range 1000 {
-				got := jitter(tt.d)
-				require.GreaterOrEqual(t, got, lower)
-				require.LessOrEqual(t, got, upper)
-			}
-		})
-	}
-}
-
-func TestHealthReporter_currentInterval(t *testing.T) {
-	t.Parallel()
-
-	for _, tt := range []struct {
-		name     string
-		flag     time.Duration
-		expected time.Duration
-	}{
-		{name: "disabled", flag: 0, expected: 0},
-		{name: "below floor is raised", flag: time.Minute, expected: minHealthReportInterval},
-		{name: "at floor", flag: minHealthReportInterval, expected: minHealthReportInterval},
-		{name: "default", flag: 6 * time.Hour, expected: 6 * time.Hour},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			tr := newTestHealthReporter(t, tt.flag)
-			tr.minInterval = minHealthReportInterval
-			require.Equal(t, tt.expected, tr.currentInterval())
-		})
+	r.Interrupt(nil)
+	r.Interrupt(nil) // extra calls must not block
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("Execute did not return after Interrupt")
 	}
 }

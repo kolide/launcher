@@ -7095,39 +7095,39 @@ func (_c *Knapsack_SetTableGenerateTimeout_Call) RunAndReturn(run func(interval 
 	return _c
 }
 
-// SetTableHealthReportInterval provides a mock function for the type Knapsack
-func (_mock *Knapsack) SetTableHealthReportInterval(interval time.Duration) error {
-	ret := _mock.Called(interval)
+// SetTableHealthReportingEnabled provides a mock function for the type Knapsack
+func (_mock *Knapsack) SetTableHealthReportingEnabled(enabled bool) error {
+	ret := _mock.Called(enabled)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SetTableHealthReportInterval")
+		panic("no return value specified for SetTableHealthReportingEnabled")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(time.Duration) error); ok {
-		r0 = returnFunc(interval)
+	if returnFunc, ok := ret.Get(0).(func(bool) error); ok {
+		r0 = returnFunc(enabled)
 	} else {
 		r0 = ret.Error(0)
 	}
 	return r0
 }
 
-// Knapsack_SetTableHealthReportInterval_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetTableHealthReportInterval'
-type Knapsack_SetTableHealthReportInterval_Call struct {
+// Knapsack_SetTableHealthReportingEnabled_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetTableHealthReportingEnabled'
+type Knapsack_SetTableHealthReportingEnabled_Call struct {
 	*mock.Call
 }
 
-// SetTableHealthReportInterval is a helper method to define mock.On call
-//   - interval time.Duration
-func (_e *Knapsack_Expecter) SetTableHealthReportInterval(interval any) *Knapsack_SetTableHealthReportInterval_Call {
-	return &Knapsack_SetTableHealthReportInterval_Call{Call: _e.mock.On("SetTableHealthReportInterval", interval)}
+// SetTableHealthReportingEnabled is a helper method to define mock.On call
+//   - enabled bool
+func (_e *Knapsack_Expecter) SetTableHealthReportingEnabled(enabled any) *Knapsack_SetTableHealthReportingEnabled_Call {
+	return &Knapsack_SetTableHealthReportingEnabled_Call{Call: _e.mock.On("SetTableHealthReportingEnabled", enabled)}
 }
 
-func (_c *Knapsack_SetTableHealthReportInterval_Call) Run(run func(interval time.Duration)) *Knapsack_SetTableHealthReportInterval_Call {
+func (_c *Knapsack_SetTableHealthReportingEnabled_Call) Run(run func(enabled bool)) *Knapsack_SetTableHealthReportingEnabled_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 time.Duration
+		var arg0 bool
 		if args[0] != nil {
-			arg0 = args[0].(time.Duration)
+			arg0 = args[0].(bool)
 		}
 		run(
 			arg0,
@@ -7136,12 +7136,12 @@ func (_c *Knapsack_SetTableHealthReportInterval_Call) Run(run func(interval time
 	return _c
 }
 
-func (_c *Knapsack_SetTableHealthReportInterval_Call) Return(err error) *Knapsack_SetTableHealthReportInterval_Call {
+func (_c *Knapsack_SetTableHealthReportingEnabled_Call) Return(err error) *Knapsack_SetTableHealthReportingEnabled_Call {
 	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *Knapsack_SetTableHealthReportInterval_Call) RunAndReturn(run func(interval time.Duration) error) *Knapsack_SetTableHealthReportInterval_Call {
+func (_c *Knapsack_SetTableHealthReportingEnabled_Call) RunAndReturn(run func(enabled bool) error) *Knapsack_SetTableHealthReportingEnabled_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -8025,46 +8025,46 @@ func (_c *Knapsack_TableGenerateTimeout_Call) RunAndReturn(run func() time.Durat
 	return _c
 }
 
-// TableHealthReportInterval provides a mock function for the type Knapsack
-func (_mock *Knapsack) TableHealthReportInterval() time.Duration {
+// TableHealthReportingEnabled provides a mock function for the type Knapsack
+func (_mock *Knapsack) TableHealthReportingEnabled() bool {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for TableHealthReportInterval")
+		panic("no return value specified for TableHealthReportingEnabled")
 	}
 
-	var r0 time.Duration
-	if returnFunc, ok := ret.Get(0).(func() time.Duration); ok {
+	var r0 bool
+	if returnFunc, ok := ret.Get(0).(func() bool); ok {
 		r0 = returnFunc()
 	} else {
-		r0 = ret.Get(0).(time.Duration)
+		r0 = ret.Get(0).(bool)
 	}
 	return r0
 }
 
-// Knapsack_TableHealthReportInterval_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TableHealthReportInterval'
-type Knapsack_TableHealthReportInterval_Call struct {
+// Knapsack_TableHealthReportingEnabled_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TableHealthReportingEnabled'
+type Knapsack_TableHealthReportingEnabled_Call struct {
 	*mock.Call
 }
 
-// TableHealthReportInterval is a helper method to define mock.On call
-func (_e *Knapsack_Expecter) TableHealthReportInterval() *Knapsack_TableHealthReportInterval_Call {
-	return &Knapsack_TableHealthReportInterval_Call{Call: _e.mock.On("TableHealthReportInterval")}
+// TableHealthReportingEnabled is a helper method to define mock.On call
+func (_e *Knapsack_Expecter) TableHealthReportingEnabled() *Knapsack_TableHealthReportingEnabled_Call {
+	return &Knapsack_TableHealthReportingEnabled_Call{Call: _e.mock.On("TableHealthReportingEnabled")}
 }
 
-func (_c *Knapsack_TableHealthReportInterval_Call) Run(run func()) *Knapsack_TableHealthReportInterval_Call {
+func (_c *Knapsack_TableHealthReportingEnabled_Call) Run(run func()) *Knapsack_TableHealthReportingEnabled_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run()
 	})
 	return _c
 }
 
-func (_c *Knapsack_TableHealthReportInterval_Call) Return(duration time.Duration) *Knapsack_TableHealthReportInterval_Call {
-	_c.Call.Return(duration)
+func (_c *Knapsack_TableHealthReportingEnabled_Call) Return(b bool) *Knapsack_TableHealthReportingEnabled_Call {
+	_c.Call.Return(b)
 	return _c
 }
 
-func (_c *Knapsack_TableHealthReportInterval_Call) RunAndReturn(run func() time.Duration) *Knapsack_TableHealthReportInterval_Call {
+func (_c *Knapsack_TableHealthReportingEnabled_Call) RunAndReturn(run func() bool) *Knapsack_TableHealthReportingEnabled_Call {
 	_c.Call.Return(run)
 	return _c
 }

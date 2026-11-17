@@ -174,6 +174,20 @@ func TestControllerStringFlags(t *testing.T) {
 	}
 }
 
+func TestControllerTableHealthReportingEnabled(t *testing.T) {
+	t.Parallel()
+
+	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AgentFlagsStore.String())
+	require.NoError(t, err)
+	fc := NewFlagController(multislogger.NewNopLogger(), store)
+
+	require.True(t, fc.TableHealthReportingEnabled(), "enabled by default")
+	require.NoError(t, fc.SetTableHealthReportingEnabled(false))
+	require.False(t, fc.TableHealthReportingEnabled())
+	require.NoError(t, fc.SetTableHealthReportingEnabled(true))
+	require.True(t, fc.TableHealthReportingEnabled())
+}
+
 func TestControllerDurationFlags(t *testing.T) {
 	t.Parallel()
 
@@ -234,13 +248,6 @@ func TestControllerDurationFlags(t *testing.T) {
 			setFlag:     func(fc *FlagController, d time.Duration) error { return fc.SetAutoupdateDownloadSplay(d) },
 			valuesToSet: []time.Duration{0 * time.Second, 12 * time.Hour, 110 * time.Hour},
 			valuesToGet: []time.Duration{0 * time.Second, 12 * time.Hour, 72 * time.Hour},
-		},
-		{
-			name:        "TableHealthReportInterval",
-			getFlag:     func(fc *FlagController) time.Duration { return fc.TableHealthReportInterval() },
-			setFlag:     func(fc *FlagController, d time.Duration) error { return fc.SetTableHealthReportInterval(d) },
-			valuesToSet: []time.Duration{0 * time.Second, 1 * time.Hour, 48 * time.Hour},
-			valuesToGet: []time.Duration{0 * time.Second, 1 * time.Hour, 24 * time.Hour},
 		},
 	}
 	for _, tt := range tests {
