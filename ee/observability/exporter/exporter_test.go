@@ -46,7 +46,7 @@ func TestNewTelemetryExporter(t *testing.T) { //nolint:paralleltest
 	serverProvidedDataStore.Set([]byte("munemo"), []byte("nababe"))
 	serverProvidedDataStore.Set([]byte("organization_id"), []byte("101"))
 
-	mockKnapsack.On("TraceIngestServerURL").Return("localhost:3417")
+	mockKnapsack.On("TraceIngestServerURL").Return("127.0.0.1:3417")
 	mockKnapsack.On("DisableTraceIngestTLS").Return(false)
 	mockKnapsack.On("ExportTraces").Return(true)
 	mockKnapsack.On("TraceSamplingRate").Return(1.0)
@@ -89,7 +89,7 @@ func TestNewTelemetryExporter_exportNotEnabled(t *testing.T) {
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("TokenStore").Return(tokenStore)
 	tokenStore.Set(storage.ObservabilityIngestAuthTokenKey, []byte("test token"))
-	mockKnapsack.On("TraceIngestServerURL").Return("localhost:3417")
+	mockKnapsack.On("TraceIngestServerURL").Return("127.0.0.1:3417")
 	mockKnapsack.On("DisableTraceIngestTLS").Return(false)
 	mockKnapsack.On("ExportTraces").Return(false)
 	mockKnapsack.On("TraceSamplingRate").Return(0.0)
@@ -131,7 +131,7 @@ func TestInterrupt_Multiple(t *testing.T) { //nolint:paralleltest
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("TokenStore").Return(tokenStore)
 	tokenStore.Set(storage.ObservabilityIngestAuthTokenKey, []byte("test token"))
-	mockKnapsack.On("TraceIngestServerURL").Return("localhost:3417")
+	mockKnapsack.On("TraceIngestServerURL").Return("127.0.0.1:3417")
 	mockKnapsack.On("DisableTraceIngestTLS").Return(false)
 	mockKnapsack.On("ExportTraces").Return(false)
 	mockKnapsack.On("TraceSamplingRate").Return(0.0)
@@ -200,7 +200,7 @@ func Test_addOrgAttributes(t *testing.T) {
 		attrLock:                  sync.RWMutex{},
 		ingestClientAuthenticator: newClientAuthenticator("test token", false),
 		ingestAuthToken:           "test token",
-		ingestUrl:                 "localhost:4317",
+		ingestUrl:                 "127.0.0.1:4317",
 		disableIngestTLS:          false,
 		enabled:                   true,
 		traceSamplingRate:         1.0,
@@ -248,7 +248,7 @@ func Test_addAttributesFromOsquery(t *testing.T) {
 		attrLock:                  sync.RWMutex{},
 		ingestClientAuthenticator: newClientAuthenticator("test token", false),
 		ingestAuthToken:           "test token",
-		ingestUrl:                 "localhost:4317",
+		ingestUrl:                 "127.0.0.1:4317",
 		disableIngestTLS:          false,
 		enabled:                   true,
 		traceSamplingRate:         1.0,
@@ -295,7 +295,7 @@ func TestPing(t *testing.T) {
 		attrLock:                  sync.RWMutex{},
 		ingestClientAuthenticator: clientAuthenticator,
 		ingestAuthToken:           "test token",
-		ingestUrl:                 "localhost:4317",
+		ingestUrl:                 "127.0.0.1:4317",
 		disableIngestTLS:          false,
 		traceSamplingRate:         1.0,
 		gomaxprocsAttrValue:       &atomic.Int64{},
@@ -360,7 +360,7 @@ func TestFlagsChanged_ExportTraces(t *testing.T) { //nolint:paralleltest
 			mockKnapsack.On("GetRunID").Return(ulid.New()).Maybe()
 
 			if tt.shouldReplaceProvider {
-				mockKnapsack.On("TraceIngestServerURL").Return("https://example.com")
+				mockKnapsack.On("TraceIngestServerURL").Return("127.0.0.1:4317")
 			}
 
 			if tt.shouldReplaceProvider {
@@ -382,7 +382,7 @@ func TestFlagsChanged_ExportTraces(t *testing.T) { //nolint:paralleltest
 				attrLock:                  sync.RWMutex{},
 				ingestClientAuthenticator: newClientAuthenticator("test token", false),
 				ingestAuthToken:           "test token",
-				ingestUrl:                 "localhost:4317",
+				ingestUrl:                 "127.0.0.1:4317",
 				disableIngestTLS:          false,
 				enabled:                   tt.currentEnableValue,
 				traceSamplingRate:         1.0,
@@ -447,7 +447,7 @@ func TestFlagsChanged_TraceSamplingRate(t *testing.T) { //nolint:paralleltest
 			mockKnapsack.On("GetRunID").Return(ulid.New()).Maybe()
 
 			if tt.shouldReplaceProvider {
-				mockKnapsack.On("TraceIngestServerURL").Return("https://example.com")
+				mockKnapsack.On("TraceIngestServerURL").Return("127.0.0.1:4317")
 			}
 
 			ctx, cancel := context.WithCancel(t.Context())
@@ -459,7 +459,7 @@ func TestFlagsChanged_TraceSamplingRate(t *testing.T) { //nolint:paralleltest
 				attrLock:                  sync.RWMutex{},
 				ingestClientAuthenticator: newClientAuthenticator("test token", false),
 				ingestAuthToken:           "test token",
-				ingestUrl:                 "localhost:4317",
+				ingestUrl:                 "127.0.0.1:4317",
 				disableIngestTLS:          false,
 				enabled:                   tt.tracingEnabled,
 				traceSamplingRate:         tt.currentTraceSamplingRate,
@@ -496,23 +496,23 @@ func TestFlagsChanged_TraceIngestServerURL(t *testing.T) { //nolint:paralleltest
 	}{
 		{
 			testName:                        "update ingest URL",
-			currentTraceIngestServerURL:     "localhost:3417",
-			newObservabilityIngestServerURL: "localhost:3418",
+			currentTraceIngestServerURL:     "127.0.0.1:3417",
+			newObservabilityIngestServerURL: "127.0.0.1:3418",
 			tracingEnabled:                  true,
 			shouldReplaceProvider:           true,
 		},
 		{
 			testName:                    "update ingest URL, but tracing not enabled",
-			currentTraceIngestServerURL: "localhost:3417",
+			currentTraceIngestServerURL: "127.0.0.1:3417",
 			// new ingets url won't get set until we replace provider
-			newObservabilityIngestServerURL: "localhost:3417",
+			newObservabilityIngestServerURL: "127.0.0.1:3417",
 			tracingEnabled:                  false,
 			shouldReplaceProvider:           false,
 		},
 		{
 			testName:                        "no update to ingest URL",
-			currentTraceIngestServerURL:     "localhost:3417",
-			newObservabilityIngestServerURL: "localhost:3417",
+			currentTraceIngestServerURL:     "127.0.0.1:3417",
+			newObservabilityIngestServerURL: "127.0.0.1:3417",
 			tracingEnabled:                  true,
 			shouldReplaceProvider:           false,
 		},
@@ -600,7 +600,7 @@ func TestFlagsChanged_DisableTraceIngestTLS(t *testing.T) { //nolint:paralleltes
 			mockKnapsack.On("GetRunID").Return(ulid.New()).Maybe()
 
 			if tt.shouldReplaceProvider {
-				mockKnapsack.On("TraceIngestServerURL").Return("https://example.com")
+				mockKnapsack.On("TraceIngestServerURL").Return("127.0.0.1:4317")
 			}
 
 			clientAuthenticator := newClientAuthenticator("test token", tt.currentDisableTraceIngestTLS)
@@ -614,7 +614,7 @@ func TestFlagsChanged_DisableTraceIngestTLS(t *testing.T) { //nolint:paralleltes
 				attrLock:                  sync.RWMutex{},
 				ingestClientAuthenticator: clientAuthenticator,
 				ingestAuthToken:           "test token",
-				ingestUrl:                 "localhost:4317",
+				ingestUrl:                 "127.0.0.1:4317",
 				disableIngestTLS:          tt.currentDisableTraceIngestTLS,
 				enabled:                   tt.tracingEnabled,
 				traceSamplingRate:         1.0,
@@ -681,7 +681,7 @@ func TestFlagsChanged_TraceBatchTimeout(t *testing.T) { //nolint:paralleltest
 			mockKnapsack.On("GetRunID").Return(ulid.New()).Maybe()
 
 			if tt.shouldReplaceProvider {
-				mockKnapsack.On("TraceIngestServerURL").Return("https://example.com")
+				mockKnapsack.On("TraceIngestServerURL").Return("127.0.0.1:4317")
 			}
 
 			ctx, cancel := context.WithCancel(t.Context())
@@ -693,7 +693,7 @@ func TestFlagsChanged_TraceBatchTimeout(t *testing.T) { //nolint:paralleltest
 				attrLock:                  sync.RWMutex{},
 				ingestClientAuthenticator: newClientAuthenticator("test token", false),
 				ingestAuthToken:           "test token",
-				ingestUrl:                 "localhost:4317",
+				ingestUrl:                 "127.0.0.1:4317",
 				disableIngestTLS:          false,
 				enabled:                   tt.tracingEnabled,
 				traceSamplingRate:         1.0,
@@ -762,7 +762,7 @@ func TestFlagsChanged_LauncherGoMaxProcs(t *testing.T) { //nolint:paralleltest
 			mockKnapsack.On("GetRunID").Return(ulid.New()).Maybe()
 
 			if tt.shouldReplaceProvider {
-				mockKnapsack.On("TraceIngestServerURL").Return("https://example.com")
+				mockKnapsack.On("TraceIngestServerURL").Return("127.0.0.1:4317")
 			}
 
 			ctx, cancel := context.WithCancel(t.Context())
@@ -774,7 +774,7 @@ func TestFlagsChanged_LauncherGoMaxProcs(t *testing.T) { //nolint:paralleltest
 				attrLock:                  sync.RWMutex{},
 				ingestClientAuthenticator: newClientAuthenticator("test token", false),
 				ingestAuthToken:           "test token",
-				ingestUrl:                 "localhost:4317",
+				ingestUrl:                 "127.0.0.1:4317",
 				disableIngestTLS:          false,
 				enabled:                   tt.tracingEnabled,
 				traceSamplingRate:         1.0,
@@ -816,7 +816,7 @@ func testTokenStore(t *testing.T) types.KVStore {
 
 func Test_setNewGlobalProvider_doesNotModifyAttrs(t *testing.T) { //nolint:paralleltest
 	mockKnapsack := typesmocks.NewKnapsack(t)
-	mockKnapsack.On("TraceIngestServerURL").Return("https://example.com")
+	mockKnapsack.On("TraceIngestServerURL").Return("127.0.0.1:4317")
 	mockKnapsack.On("UpdateChannel").Return("nightly").Maybe()
 	mockKnapsack.On("GetRunID").Return(ulid.New()).Maybe()
 
@@ -838,7 +838,7 @@ func Test_setNewGlobalProvider_doesNotModifyAttrs(t *testing.T) { //nolint:paral
 		attrLock:                  sync.RWMutex{},
 		ingestClientAuthenticator: newClientAuthenticator("test token", false),
 		ingestAuthToken:           "test token",
-		ingestUrl:                 "localhost:4317",
+		ingestUrl:                 "127.0.0.1:4317",
 		disableIngestTLS:          false,
 		enabled:                   true,
 		traceSamplingRate:         1.0,
