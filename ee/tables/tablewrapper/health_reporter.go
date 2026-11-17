@@ -13,7 +13,9 @@ import (
 
 const (
 	healthSummarySchemaVersion = 1
-	healthReportInterval       = 6 * time.Hour
+	// healthReportInterval is short because the ticker only advances while the device is awake,
+	// and a restart loses the open window: a long interval would miss devices with short sessions.
+	healthReportInterval = 1 * time.Hour
 )
 
 // HealthReporter periodically logs one table_health_summary record with the per-table
