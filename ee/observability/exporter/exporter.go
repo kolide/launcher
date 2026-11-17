@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"runtime"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -222,7 +223,9 @@ func (t *TelemetryExporter) setNewGlobalProvider(rebuildExporter bool) {
 	// it just returns the current value.
 	currentGomaxprocs := int64(runtime.GOMAXPROCS(0))
 	t.gomaxprocsAttrValue.Store(currentGomaxprocs)
-	allAttrs := append(t.attrs, attribute.Int64(gomaxprocsAttrKey, currentGomaxprocs))
+	// Clone first: resource.NewWithAttributes sorts its argument in place, and appending to
+	// t.attrs directly would let that sort reorder (and later overwrite) t.attrs itself.
+	allAttrs := append(slices.Clone(t.attrs), attribute.Int64(gomaxprocsAttrKey, currentGomaxprocs))
 
 	defaultResource := resource.Default()
 	r, err := resource.Merge(
