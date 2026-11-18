@@ -33,6 +33,7 @@ type (
 		Origin            string
 		HostIdentifier    string
 		EnrollmentDetails types.EnrollmentDetails
+		AuthPostureInfo   string
 	}
 
 	status struct {
@@ -43,6 +44,10 @@ type (
 
 const (
 	idSQL = "select instance_id, osquery_info.uuid, hardware_serial from osquery_info, system_info;"
+)
+
+var (
+	authPostureInfoKey = []byte("todo-RM-update") // TODO RM -- update with key name
 )
 
 func (ls *localServer) updateIdFields() error {
@@ -129,6 +134,15 @@ func (ls *localServer) requestIdHandlerFunc(w http.ResponseWriter, r *http.Reque
 		EnrollmentDetails: enrollmentDetails,
 	}
 	response.identifiers = ls.identifiers
+
+	if authPostureInfo, err := ls.knapsack.AuthPostureInfoStore().Get(authPostureInfoKey); err != nil {
+		ls.slogger.Log(r.Context(), slog.LevelWarn,
+			"could not retrieve auth posture info from db",
+			"err", err,
+		)
+	} else if len(authPostureInfo) > 0 {
+		response.AuthPostureInfo = string(authPostureInfo)
+	}
 
 	jsonBytes, err := json.Marshal(response)
 	if err != nil {

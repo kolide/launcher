@@ -37,6 +37,9 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 	require.NoError(t, err, "could not create test config store")
 	mockKnapsack.On("ConfigStore").Return(testConfigStore).Maybe()
 	mockKnapsack.On("PersistAgentIngesterKeys", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
+	authPostureInfoStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AuthPostureInfoStore.String())
+	require.NoError(t, err)
+	mockKnapsack.On("AuthPostureInfoStore").Return(authPostureInfoStore)
 
 	var logBytes bytes.Buffer
 	slogger := slog.New(slog.NewJSONHandler(&logBytes, &slog.HandlerOptions{

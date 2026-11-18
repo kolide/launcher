@@ -138,10 +138,11 @@ const (
 
 type (
 	callbackDataStruct struct {
-		Time      int64
-		Error     callbackErrors
-		Response  string // expected base64 encoded krypto box
-		UserAgent string
+		Time            int64
+		Error           callbackErrors
+		Response        string // expected base64 encoded krypto box
+		AuthPostureInfo string
+		UserAgent       string
 	}
 
 	callbackResponse struct {
@@ -414,6 +415,14 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		callbackData := &callbackDataStruct{
 			Time:      time.Now().Unix(),
 			UserAgent: r.Header.Get("User-Agent"),
+		}
+		if authPostureInfo, err := e.knapsack.AuthPostureInfoStore().Get(authPostureInfoKey); err != nil {
+			e.slogger.Log(r.Context(), slog.LevelWarn,
+				"could not retrieve auth posture info from db",
+				"err", err,
+			)
+		} else if len(authPostureInfo) > 0 {
+			callbackData.AuthPostureInfo = string(authPostureInfo)
 		}
 
 		if callbackReq, err := cmdReq.CallbackReq(); err != nil {

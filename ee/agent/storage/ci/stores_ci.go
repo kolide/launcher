@@ -33,6 +33,7 @@ func MakeStores(t *testing.T, slogger *slog.Logger, db *bbolt.DB) (map[storage.S
 		storage.TokenStore,
 		storage.LauncherHistoryStore,
 		storage.Dt4aInfoStore,
+		storage.AuthPostureInfoStore,
 		storage.WindowsUpdatesCacheStore,
 		storage.EnrollmentStore,
 		storage.EnrollmentDetailsStore,
