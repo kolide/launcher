@@ -28,7 +28,12 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
+	goleak.VerifyTestMain(m,
+		// The exporters' gRPC clients resolve the ingest hostname. On Windows, the net package
+		// runs that lookup in a goroutine blocked in syscall.GetAddrInfoW, which can't be cancelled,
+		// so it can outlive exporter shutdown and the package's tests. It isn't a leak in our code.
+		goleak.IgnoreAnyFunction("syscall.GetAddrInfoW"),
+	)
 }
 
 // NB - Tests that result in calls to `setNewGlobalProvider` should not be run in parallel
