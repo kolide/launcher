@@ -113,10 +113,6 @@ func (md *MenuData) SetDefaults() {
 		md.Icon = DefaultIcon
 	}
 
-	if md.Tooltip == "" {
-		md.Tooltip = "Kolide"
-	}
-
 	// It should be unheard of to have a menu with no items, but just in case...
 	if md.Items == nil {
 		md.Items = []menuItemData{
