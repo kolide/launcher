@@ -63,6 +63,7 @@ const (
 	SystrayRestartEnabled            FlagKey = "systray_restart_enabled"
 	CurrentRunningOsqueryVersion     FlagKey = "osquery_version"
 	TableGenerateTimeout             FlagKey = "table_generate_timeout"
+	TableHealthReportingEnabled      FlagKey = "table_health_reporting_enabled"
 	UseCachedDataForScheduledQueries FlagKey = "use_cached_data_for_scheduled_queries"
 	CachedQueryResultsTTL            FlagKey = "cached_query_results_ttl"
 	ResetOnHardwareChangeEnabled     FlagKey = "reset_on_hardware_change_enabled"

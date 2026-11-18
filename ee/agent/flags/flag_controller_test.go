@@ -174,6 +174,20 @@ func TestControllerStringFlags(t *testing.T) {
 	}
 }
 
+func TestControllerTableHealthReportingEnabled(t *testing.T) {
+	t.Parallel()
+
+	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AgentFlagsStore.String())
+	require.NoError(t, err)
+	fc := NewFlagController(multislogger.NewNopLogger(), store)
+
+	require.True(t, fc.TableHealthReportingEnabled(), "enabled by default")
+	require.NoError(t, fc.SetTableHealthReportingEnabled(false))
+	require.False(t, fc.TableHealthReportingEnabled())
+	require.NoError(t, fc.SetTableHealthReportingEnabled(true))
+	require.True(t, fc.TableHealthReportingEnabled())
+}
+
 func TestControllerDurationFlags(t *testing.T) {
 	t.Parallel()
 

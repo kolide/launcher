@@ -53,6 +53,7 @@ import (
 	"github.com/kolide/launcher/v2/ee/observability/exporter"
 	"github.com/kolide/launcher/v2/ee/osquerypublisher"
 	"github.com/kolide/launcher/v2/ee/powereventwatcher"
+	"github.com/kolide/launcher/v2/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/v2/ee/tables/windowsupdatetable"
 	"github.com/kolide/launcher/v2/ee/tuf"
 	"github.com/kolide/launcher/v2/ee/watchdog"
@@ -352,6 +353,10 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 
 	dbBackupSaver := agentbbolt.NewDatabaseBackupSaver(k)
 	runGroup.Add("dbBackupSaver", dbBackupSaver.Execute, dbBackupSaver.Interrupt)
+
+	// Periodically log per-table query outcomes for fleet table health reporting
+	tableHealthReporter := tablewrapper.NewHealthReporter(k)
+	runGroup.Add("tableHealthReporter", tableHealthReporter.Execute, tableHealthReporter.Interrupt)
 
 	// Add the log checkpoints to the rungroup, and run it once early, to try to get data into the logs.
 	// The checkpointer can take up to 5 seconds to run, so do this in the background.

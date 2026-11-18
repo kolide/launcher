@@ -807,6 +807,15 @@ func (fc *FlagController) TableGenerateTimeout() time.Duration {
 	).get(fc.getControlServerValue(keys.TableGenerateTimeout))
 }
 
+func (fc *FlagController) SetTableHealthReportingEnabled(enabled bool) error {
+	return fc.setControlServerValue(keys.TableHealthReportingEnabled, boolToBytes(enabled))
+}
+func (fc *FlagController) TableHealthReportingEnabled() bool {
+	return NewBoolFlagValue(
+		WithDefaultBool(true),
+	).get(fc.getControlServerValue(keys.TableHealthReportingEnabled))
+}
+
 func (fc *FlagController) SetUseCachedDataForScheduledQueries(enabled bool) error {
 	return fc.setControlServerValue(keys.UseCachedDataForScheduledQueries, boolToBytes(enabled))
 }
