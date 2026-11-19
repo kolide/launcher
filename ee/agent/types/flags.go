@@ -292,4 +292,8 @@ type Flags interface {
 	// in the menu bar app and in notifications.
 	SetDeviceTrustRebrand(enabled bool) error
 	DeviceTrustRebrand() bool
+
+	// FilewalkDueStrategy controls how to determine what walks are due.
+	SetFilewalkDueStrategy(strategy string) error
+	FilewalkDueStrategy() string
 }

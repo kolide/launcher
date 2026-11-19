@@ -72,6 +72,7 @@ const (
 	OsqueryPublisherURL            FlagKey = "osquery_publisher_url"
 	OsqueryPublisherPercentEnabled FlagKey = "osquery_publisher_percent_enabled"
 	DeviceTrustRebrand             FlagKey = "dt_rebrand"
+	FilewalkDueStrategy            FlagKey = "filewalk_due_strategy"
 )
 
 func (key FlagKey) String() string {

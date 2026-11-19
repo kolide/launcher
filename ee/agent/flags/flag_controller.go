@@ -901,3 +901,12 @@ func (fc *FlagController) DeviceTrustRebrand() bool {
 		WithDefaultBool(false),
 	).get(fc.getControlServerValue(keys.DeviceTrustRebrand))
 }
+
+func (fc *FlagController) SetFilewalkDueStrategy(strategy string) error {
+	return fc.setControlServerValue(keys.FilewalkDueStrategy, []byte(strategy))
+}
+func (fc *FlagController) FilewalkDueStrategy() string {
+	return NewStringFlagValue(
+		WithDefaultString(""),
+	).get(fc.getControlServerValue(keys.FilewalkDueStrategy))
+}

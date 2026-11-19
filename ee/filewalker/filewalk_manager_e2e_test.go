@@ -183,6 +183,7 @@ func TestFilewalkManager_E2E(t *testing.T) {
 	k := typesmocks.NewKnapsack(t)
 	k.On("FilewalkConfigStore").Return(cfgStore)
 	k.On("FilewalkResultsStore").Return(resultsStore)
+	k.On("FilewalkDueStrategy").Return(dueStrategyStrict).Maybe()
 
 	escapedRoot, err := json.Marshal(root)
 	require.NoError(t, err)
