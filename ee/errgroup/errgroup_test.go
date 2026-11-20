@@ -161,7 +161,8 @@ func TestShutdown_ReturnsOnTimeout(t *testing.T) {
 	time.Sleep(2 * time.Second)
 }
 
-func TestStartGoroutine_HandlesPanic(t *testing.T) {
+// Panics which cast to error in StartGoroutine should be caught and return from Wait.
+func TestStartGoroutine_HandlesErrorPanic(t *testing.T) {
 	t.Parallel()
 
 	ctx, cancel := context.WithCancel(t.Context())
@@ -187,7 +188,8 @@ func TestStartGoroutine_HandlesPanic(t *testing.T) {
 	require.True(t, canceled, "errgroup did not exit")
 }
 
-func TestStartRepeatedGoroutine_HandlesPanic(t *testing.T) {
+// Panics which cast to error in StartRepeatedGoroutine should be caught and return from Wait.
+func TestStartRepeatedGoroutine_HandlesErrorPanic(t *testing.T) {
 	t.Parallel()
 
 	ctx, cancel := context.WithCancel(t.Context())
@@ -216,6 +218,7 @@ func TestStartRepeatedGoroutine_HandlesPanic(t *testing.T) {
 	require.True(t, canceled, "errgroup did not exit")
 }
 
+// Panics in should AddShutdownGoroutine should be caught and handled.
 func TestAddShutdownGoroutine_HandlesPanic(t *testing.T) {
 	t.Parallel()
 
