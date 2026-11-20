@@ -273,9 +273,10 @@ func (i *OsqueryInstance) WaitShutdown(ctx context.Context) error {
 	return exitErr
 }
 
-// Exited returns a channel to monitor for signal that instance has shut itself down
-func (i *OsqueryInstance) Exited() <-chan struct{} {
-	return i.errgroup.Exited()
+// Done returns a channel to monitor for signal that the instance has shutdown
+// or errored. The instance may still be running until WaitShutdown returns.
+func (i *OsqueryInstance) Done() <-chan struct{} {
+	return i.errgroup.Done()
 }
 
 // ReloadKatcExtension can be called on a running osquery instance to reload its KATC extension

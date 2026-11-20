@@ -200,6 +200,10 @@ func (l *LoggedErrgroup) Wait(ctx context.Context) error {
 	}
 }
 
-func (l *LoggedErrgroup) Exited() <-chan struct{} {
+// Done returns a channel closed when all errgroup goroutines return nil or when any
+// error or panic occurs in a LoggedErrgroup goroutine. API consumers should call
+// Wait() afterward to retrieve the failure and to wait for remaining goroutines to
+// return.
+func (l *LoggedErrgroup) Done() <-chan struct{} {
 	return l.doneCtx.Done()
 }

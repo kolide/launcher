@@ -70,7 +70,7 @@ func TestWait(t *testing.T) {
 			// We expect that the errgroup shuts down
 			canceled := false
 			select {
-			case <-eg.Exited():
+			case <-eg.Done():
 				canceled = true
 			default:
 			}
@@ -99,7 +99,7 @@ func TestShutdown(t *testing.T) {
 	// We expect that the errgroup shuts down
 	canceled := false
 	select {
-	case <-eg.Exited():
+	case <-eg.Done():
 		canceled = true
 	default:
 	}
@@ -149,7 +149,7 @@ func TestShutdown_ReturnsOnTimeout(t *testing.T) {
 	// We expect that the errgroup shuts down
 	canceled := false
 	select {
-	case <-eg.Exited():
+	case <-eg.Done():
 		canceled = true
 	default:
 	}
@@ -180,7 +180,7 @@ func TestStartGoroutine_HandlesErrorPanic(t *testing.T) {
 	require.Error(t, eg.Wait(ctx), "should have returned error from panicking goroutine")
 	canceled := false
 	select {
-	case <-eg.Exited():
+	case <-eg.Done():
 		canceled = true
 	default:
 	}
@@ -210,7 +210,7 @@ func TestStartRepeatedGoroutine_HandlesErrorPanic(t *testing.T) {
 	require.Error(t, eg.Wait(ctx), "should have returned error from panicking goroutine")
 	canceled := false
 	select {
-	case <-eg.Exited():
+	case <-eg.Done():
 		canceled = true
 	default:
 	}
@@ -241,7 +241,7 @@ func TestAddShutdownGoroutine_HandlesPanic(t *testing.T) {
 	require.Nil(t, eg.Wait(ctx), "should not returned error after call to Shutdown")
 	canceled := false
 	select {
-	case <-eg.Exited():
+	case <-eg.Done():
 		canceled = true
 	default:
 	}
@@ -260,7 +260,7 @@ func TestStartGoroutine_ShutdownOnPanic(t *testing.T) {
 	// Note: if there's only one goroutine, a panic causes the last one to end
 	// and looks like a success.
 	eg.StartGoroutine(t.Context(), "happy_goroutine", func() error {
-		<-eg.Exited()
+		<-eg.Done()
 		return nil
 	})
 	eg.StartGoroutine(t.Context(), "test_goroutine", func() error {

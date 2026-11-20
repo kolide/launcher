@@ -119,7 +119,7 @@ func (r *Runner) runInstance(enrollmentId string) error {
 	// This loop restarts the instance as necessary. It exits when `Shutdown` is called,
 	// or if the instance exits and cannot be restarted.
 	for {
-		<-instance.Exited()
+		<-instance.Done()
 		slogger.Log(context.TODO(), slog.LevelInfo,
 			"osquery instance exited",
 		)
