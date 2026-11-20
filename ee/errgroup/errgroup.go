@@ -49,6 +49,7 @@ func (l *LoggedErrgroup) StartGoroutine(ctx context.Context, goroutineName strin
 					"panic occurred in goroutine",
 					"err", r,
 				)
+				err = fmt.Errorf("panic occurred in goroutine: %+v", r)
 				if recoveredErr, ok := r.(error); ok {
 					slogger.Log(ctx, slog.LevelError,
 						"panic stack trace",
