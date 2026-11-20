@@ -248,3 +248,34 @@ func TestAddShutdownGoroutine_HandlesPanic(t *testing.T) {
 
 	require.True(t, canceled, "errgroup did not exit")
 }
+
+// Panic in StartGoroutine should mark the errgroup done immediately, with wait returning
+// the eventual error.
+// Regression test against previous behavior treating panics like a nil return unless they
+// casted to error.
+func TestStartGoroutine_ShutdownOnPanic(t *testing.T) {
+	t.Parallel()
+
+	eg := NewLoggedErrgroup(t.Context(), multislogger.NewNopLogger())
+	// Note: if there's only one goroutine, a panic causes the last one to end
+	// and looks like a success.
+	eg.StartGoroutine(t.Context(), "happy_goroutine", func() error {
+		<-eg.Exited()
+		return nil
+	})
+	eg.StartGoroutine(t.Context(), "test_goroutine", func() error {
+		panic("oops") // nolint:forbidigo
+	})
+
+	errors := make(chan error)
+	go func() {
+		errors <- eg.Wait(t.Context())
+	}()
+
+	select {
+	case err := <-errors:
+		require.Error(t, err, "should have returned error from panicking goroutine")
+	case <-time.After(5 * time.Second):
+		t.Fatal("error group did not fail on panic after 5 seconds")
+	}
+}
