@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"runtime"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -27,7 +28,12 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
+	goleak.VerifyTestMain(m,
+		// The exporters' gRPC clients resolve the ingest hostname. On Windows, the net package
+		// runs that lookup in a goroutine blocked in syscall.GetAddrInfoW, which can't be cancelled,
+		// so it can outlive exporter shutdown and the package's tests. It isn't a leak in our code.
+		goleak.IgnoreAnyFunction("syscall.GetAddrInfoW"),
+	)
 }
 
 // NB - Tests that result in calls to `setNewGlobalProvider` should not be run in parallel
@@ -811,4 +817,47 @@ func testTokenStore(t *testing.T) types.KVStore {
 	s, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	return s
+}
+
+func Test_setNewGlobalProvider_doesNotModifyAttrs(t *testing.T) { //nolint:paralleltest
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("TraceIngestServerURL").Return("https://example.com")
+	mockKnapsack.On("UpdateChannel").Return("nightly").Maybe()
+	mockKnapsack.On("GetRunID").Return(ulid.New()).Maybe()
+
+	// Unsorted, with spare capacity, so that appending to attrs would share its backing array
+	attrs := make([]attribute.KeyValue, 0, 10)
+	attrs = append(attrs,
+		attribute.String("service.version", "1.2.3"),
+		attribute.String("k2.munemo", "nababe"),
+		attribute.String("launcher.osquery_version", "5.20.0"),
+	)
+	expectedAttrs := slices.Clone(attrs)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	traceExporter := &TelemetryExporter{
+		knapsack:                  mockKnapsack,
+		bufSpanProcessor:          bufspanprocessor.NewBufSpanProcessor(500),
+		slogger:                   multislogger.NewNopLogger(),
+		attrs:                     attrs,
+		attrLock:                  sync.RWMutex{},
+		ingestClientAuthenticator: newClientAuthenticator("test token", false),
+		ingestAuthToken:           "test token",
+		ingestUrl:                 "localhost:4317",
+		disableIngestTLS:          false,
+		enabled:                   true,
+		traceSamplingRate:         1.0,
+		gomaxprocsAttrValue:       &atomic.Int64{},
+		ctx:                       ctx,
+		cancel:                    cancel,
+	}
+	t.Cleanup(func() {
+		traceExporter.Interrupt(errors.New("test"))
+	})
+
+	// Rebuild more than once, as happens on flag changes
+	for range 3 {
+		traceExporter.setNewGlobalProvider(true)
+		require.Equal(t, expectedAttrs, traceExporter.attrs, "building the provider must not reorder or overwrite attrs")
+	}
 }
