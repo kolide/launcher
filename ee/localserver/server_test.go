@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/v2/ee/agent/storage"
 	storageci "github.com/kolide/launcher/v2/ee/agent/storage/ci"
 	"github.com/kolide/launcher/v2/ee/agent/types"
@@ -15,6 +16,41 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
+
+func TestLoadDefaultKeyIfNotSet(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		kolideServer    string
+		expectedCertPem string
+	}{
+		{kolideServer: "k2device.kolide.com", expectedCertPem: k2EccServerCert},
+		{kolideServer: "k2device-preprod.kolide.com", expectedCertPem: k2EccServerCert},
+		{kolideServer: "k2device.kolide.eu", expectedCertPem: k2EccServerCert},
+		{kolideServer: "example.com", expectedCertPem: k2EccServerCert},
+		{kolideServer: "kolidestaging.com.example.com", expectedCertPem: k2EccServerCert},
+		{kolideServer: "k2device.us.kolidestaging.com", expectedCertPem: reviewEccServerCert},
+		{kolideServer: "k2device.eu.kolidestaging.com", expectedCertPem: reviewEccServerCert},
+		{kolideServer: "localhost:3443", expectedCertPem: localhostEccServerCert},
+		{kolideServer: "app.kolide.test:80", expectedCertPem: localhostEccServerCert},
+		// k2 dev advertises its bare dev domain as the enrollment host, and launcher adopts it on restart
+		{kolideServer: "kolide.test", expectedCertPem: localhostEccServerCert},
+	} {
+		t.Run(tt.kolideServer, func(t *testing.T) {
+			t.Parallel()
+
+			expectedKey, err := echelper.PublicPemToEcdsaKey([]byte(tt.expectedCertPem))
+			require.NoError(t, err)
+
+			ls := &localServer{
+				slogger:      multislogger.NewNopLogger(),
+				kolideServer: tt.kolideServer,
+			}
+			require.NoError(t, ls.LoadDefaultKeyIfNotSet())
+			require.True(t, expectedKey.Equal(ls.serverEcKey), "unexpected server key for %s", tt.kolideServer)
+		})
+	}
+}
 
 func TestInterrupt_Multiple(t *testing.T) {
 	t.Parallel()

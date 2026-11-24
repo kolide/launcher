@@ -374,8 +374,12 @@ func ParseOptions(logger *slog.Logger, subcommandName string, args []string) (*O
 		controlServerURL = "kolide-k2-control.eu.svc.1infra.net"
 		*flKolideHosted = true
 
-	case strings.HasSuffix(*flKolideServerURL, "herokuapp.com"):
-		controlServerURL = *flKolideServerURL
+	case *flKolideServerURL == "k2device.us.kolidestaging.com":
+		controlServerURL = "k2control.us.kolidestaging.com"
+		*flKolideHosted = true
+
+	case *flKolideServerURL == "k2device.eu.kolidestaging.com":
+		controlServerURL = "k2control.eu.kolidestaging.com"
 		*flKolideHosted = true
 
 	case *flKolideServerURL == "localhost:3443":
@@ -648,5 +652,5 @@ func commandUsage(fs *flag.FlagSet, short string) func() {
 // IsKolideHostedServerURL is a convenience function to enable gating functionality for
 // developer (or other non-production) deployments
 func IsKolideHostedServerURL(serverURL string) bool {
-	return serverURL == "k2device.kolide.com" || serverURL == "k2device-preprod.kolide.com" || serverURL == "k2device.kolide.eu" || serverURL == "kolide-k2-device.eu.svc.1infra.net"
+	return serverURL == "k2device.kolide.com" || serverURL == "k2device-preprod.kolide.com" || serverURL == "k2device.kolide.eu" || serverURL == "kolide-k2-device.eu.svc.1infra.net" || serverURL == "k2device.us.kolidestaging.com" || serverURL == "k2device.eu.kolidestaging.com"
 }
